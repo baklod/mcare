@@ -1,0 +1,78 @@
+<?php
+
+namespace Tests\Feature;
+
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
+
+class EnrollmentSubmissionTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_applicant_can_submit_documents_and_drawn_signature(): void
+    {
+        Storage::fake('local');
+
+        $signature = 'data:image/png;base64,'.base64_encode('fake-signature-bytes');
+
+        $this->post(route('enrollment.store'), [
+            'email' => 'applicant@gmail.com',
+            'password' => 'Password123',
+            'password_confirmation' => 'Password123',
+            'first_name' => 'Maria',
+            'middle_name' => 'Reyes',
+            'last_name' => 'Santos',
+            'extension_name' => null,
+            'birth_date' => '2000-01-01',
+            'birthplace_city' => 'Quezon City',
+            'birthplace_province' => 'Metro Manila',
+            'birthplace_region' => 'NCR',
+            'gender' => 'Female',
+            'civil_status' => 'Single',
+            'employment_status' => 'Unemployed',
+            'employment_type' => null,
+            'contact_number' => '09170000000',
+            'nationality' => 'Filipino',
+            'schedule_preference' => 'AM',
+            'street' => '123 Training Street',
+            'barangay' => 'Central',
+            'city' => 'Quezon City',
+            'province' => 'Metro Manila',
+            'region' => 'NCR',
+            'zip_code' => '1100',
+            'educational_attainment' => 'High School Graduate',
+            'school_name' => 'MCARE High School',
+            'year_graduated' => 2020,
+            'guardian_name' => 'Ana Santos',
+            'guardian_address' => '123 Training Street',
+            'classification' => null,
+            'disability_type' => null,
+            'disability_cause' => null,
+            'scholarship_type' => null,
+            'privacy_consent' => '1',
+            'signature_name' => 'Maria Santos',
+            'signature_type' => 'draw',
+            'signature_data' => $signature,
+            'birth_certificate' => UploadedFile::fake()->create('birth-certificate.pdf', 100, 'application/pdf'),
+            'education_document' => UploadedFile::fake()->create('diploma.pdf', 100, 'application/pdf'),
+            'good_moral_certificate' => UploadedFile::fake()->create('good-moral.pdf', 100, 'application/pdf'),
+            'id_photo' => UploadedFile::fake()->create('id-photo.jpg', 100, 'image/jpeg'),
+        ])->assertRedirect(route('enrollment.create'));
+
+        $this->assertDatabaseHas('enrollment_applications', [
+            'email' => 'applicant@gmail.com',
+            'signature_type' => 'draw',
+            'status' => 'profile_submitted',
+        ]);
+
+        $application = \App\Models\EnrollmentApplication::firstOrFail();
+
+        Storage::disk('local')->assertExists($application->birth_certificate_path);
+        Storage::disk('local')->assertExists($application->education_document_path);
+        Storage::disk('local')->assertExists($application->good_moral_certificate_path);
+        Storage::disk('local')->assertExists($application->id_photo_path);
+        Storage::disk('local')->assertExists($application->signature_path);
+    }
+}
