@@ -9,6 +9,14 @@
             'denied' => 'bg-red-50 text-red-700 ring-red-100',
         ];
 
+        $paymentBadgeClasses = [
+            'not_selected' => 'bg-slate-50 text-slate-700 ring-slate-100',
+            'onsite_pending' => 'bg-amber-50 text-amber-700 ring-amber-100',
+            'online_pending' => 'bg-purple-50 text-purple-700 ring-purple-100',
+            'paid' => 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+            'expired' => 'bg-red-50 text-red-700 ring-red-100',
+        ];
+
         $defaultDecision = in_array($application->status, $reviewableStatuses, true)
             ? $application->status
             : 'pre_enlistment';
@@ -107,6 +115,37 @@
                     </div>
                 </div>
             </div>
+
+            <section class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm sm:p-7">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-sm font-bold uppercase text-purple-600">Payment</p>
+                        <h2 class="mt-2 text-xl font-bold text-slate-900">Payment selection</h2>
+                    </div>
+                    <span class="inline-flex w-fit rounded-full px-4 py-2 text-sm font-bold ring-1 {{ $paymentBadgeClasses[$application->payment_status] ?? 'bg-slate-50 text-slate-700 ring-slate-100' }}">
+                        {{ $application->paymentStatusLabel() }}
+                    </span>
+                </div>
+                <dl class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                    @foreach ([
+                        'Method' => $application->payment_method ? str($application->payment_method)->headline() : 'Not selected',
+                        'Amount' => $application->payment_currency.' '.number_format((float) $application->payment_amount, 2),
+                        'Batch' => $application->batch ? $application->batch->name.' '.$application->batch->year : 'Unassigned',
+                        'Class schedule' => $application->batch?->scheduleLabelFor($application->schedule_preference),
+                        'Room destination' => $application->batch?->roomFor($application->schedule_preference),
+                        'Enrollment deadline' => $application->batch?->enrollment_ends_at?->format('M d, Y g:i A'),
+                        'Reference' => $application->payment_reference,
+                        'Receipt number' => $application->payment_receipt_number,
+                        'Receipt expires' => $application->effectivePaymentDeadline()?->format('M d, Y g:i A'),
+                        'PayMongo reference' => $application->paymongo_checkout_reference,
+                    ] as $label => $value)
+                        <div class="rounded-2xl bg-slate-50 p-4">
+                            <dt class="text-xs font-bold uppercase text-slate-500">{{ $label }}</dt>
+                            <dd class="mt-1 break-all text-sm font-semibold leading-6 text-slate-900">{{ filled($value) ? $value : 'Not available' }}</dd>
+                        </div>
+                    @endforeach
+                </dl>
+            </section>
 
             @foreach ([
                 'Personal information' => $personalFields,

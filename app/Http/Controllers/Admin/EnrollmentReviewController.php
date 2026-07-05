@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,7 @@ class EnrollmentReviewController extends Controller
         $search = trim($request->string('search')->toString());
 
         $applicationsQuery = EnrollmentApplication::query()
-            ->with('user')
+            ->with(['user', 'batch'])
             ->latest();
 
         if (array_key_exists($selectedStatus, $statuses)) {
@@ -61,7 +62,7 @@ class EnrollmentReviewController extends Controller
     public function show(EnrollmentApplication $enrollmentApplication): View
     {
         return view('admin.enrollments.show', [
-            'application' => $enrollmentApplication->load(['user', 'reviewer']),
+            'application' => $enrollmentApplication->load(['user', 'reviewer', 'batch']),
             'reviewableStatuses' => EnrollmentApplication::reviewableStatuses(),
             'statuses' => EnrollmentApplication::statuses(),
         ]);
@@ -92,6 +93,11 @@ class EnrollmentReviewController extends Controller
             'applicant_status' => $validated['status'],
         ])->save();
 
+        AdminActivityLog::record($request->user(), 'enrollment.review.updated', $enrollmentApplication, [
+            'status' => $validated['status'],
+            'applicant_email' => $enrollmentApplication->email,
+        ]);
+
         return redirect()
             ->route('admin.enrollments.show', $enrollmentApplication)
             ->with('saved', 'Enrollment review decision saved.');
@@ -112,6 +118,11 @@ class EnrollmentReviewController extends Controller
         $path = $enrollmentApplication->{$fields[$document]};
 
         abort_unless($path && Storage::disk('local')->exists($path), 404);
+
+        AdminActivityLog::record(request()->user(), 'enrollment.document.downloaded', $enrollmentApplication, [
+            'document' => $document,
+            'applicant_email' => $enrollmentApplication->email,
+        ]);
 
         return Storage::disk('local')->download($path);
     }

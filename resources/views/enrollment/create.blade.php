@@ -10,6 +10,10 @@
     <div class="pointer-events-none fixed inset-x-0 top-0 -z-10 h-72 bg-gradient-to-b from-purple-100 via-purple-50/70 to-white"></div>
     <div class="pointer-events-none fixed inset-x-0 bottom-0 -z-10 h-72 bg-gradient-to-t from-purple-100 via-purple-50/60 to-white"></div>
 
+    <div id="action-toast" class="fixed right-5 top-5 z-50 hidden max-w-sm rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-semibold leading-6 text-amber-800 shadow-xl shadow-amber-100">
+        Too many actions. Please wait for the current request to finish.
+    </div>
+
     <header class="border-b border-purple-100 bg-white/90 backdrop-blur-xl">
         <div class="mx-auto flex max-w-7xl flex-col gap-5 px-6 py-5 sm:flex-row sm:items-center sm:justify-between lg:px-8">
             <a href="{{ route('landing') }}" class="flex items-center gap-4">
@@ -487,8 +491,17 @@
         const passwordConfirmationInput = document.getElementById('password_confirmation');
         const emailInput = document.getElementById('email');
         const enrollmentForm = document.querySelector('form[action="{{ route('enrollment.store') }}"]');
+        const actionToast = document.getElementById('action-toast');
         const existingSignatureSaved = @json((bool) ($application->signature_path ?? false));
         let signatureDrawn = false;
+
+        function showActionToast(message) {
+            if (!actionToast) return;
+            actionToast.textContent = message;
+            actionToast.classList.remove('hidden');
+            window.clearTimeout(window.mcareEnrollmentToastTimer);
+            window.mcareEnrollmentToastTimer = window.setTimeout(() => actionToast.classList.add('hidden'), 2800);
+        }
 
         function setCheckState(elementId, isValid) {
             const row = document.getElementById(elementId);
@@ -680,6 +693,12 @@
 
         function attachSubmitValidation() {
             enrollmentForm?.addEventListener('submit', (event) => {
+                if (enrollmentForm.dataset.submitted === 'true') {
+                    event.preventDefault();
+                    showActionToast('Too many actions. Please wait for the current request to finish.');
+                    return;
+                }
+
                 const signatureMode = document.querySelector('input[name="signature_type"]:checked')?.value || 'draw';
                 const signatureData = document.getElementById('signature_data');
                 const signatureUpload = document.getElementById('signature_upload');
@@ -702,6 +721,16 @@
                     signatureUpload?.reportValidity();
                 } else {
                     signatureUpload?.setCustomValidity('');
+                }
+
+                if (!event.defaultPrevented) {
+                    enrollmentForm.dataset.submitted = 'true';
+                    const submitButton = enrollmentForm.querySelector('button[type="submit"]');
+                    if (submitButton) {
+                        submitButton.disabled = true;
+                        submitButton.classList.add('cursor-not-allowed', 'opacity-70');
+                        submitButton.textContent = 'Submitting securely...';
+                    }
                 }
             });
         }

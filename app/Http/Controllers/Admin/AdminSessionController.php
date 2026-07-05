@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminActivityLog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -27,6 +28,10 @@ class AdminSessionController extends Controller
         ]);
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+            AdminActivityLog::record(null, 'admin.login.failed', null, [
+                'email' => $credentials['email'],
+            ]);
+
             return back()
                 ->withErrors(['email' => 'The provided admin credentials are invalid.'])
                 ->onlyInput('email');
@@ -35,6 +40,11 @@ class AdminSessionController extends Controller
         $request->session()->regenerate();
 
         if ($request->user()?->role !== 'admin') {
+            AdminActivityLog::record($request->user(), 'admin.login.rejected', $request->user(), [
+                'email' => $request->user()?->email,
+                'role' => $request->user()?->role,
+            ]);
+
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
@@ -44,11 +54,15 @@ class AdminSessionController extends Controller
                 ->onlyInput('email');
         }
 
+        AdminActivityLog::record($request->user(), 'admin.login.success', $request->user());
+
         return redirect()->intended(route('admin.enrollments.index'));
     }
 
     public function destroy(Request $request): RedirectResponse
     {
+        AdminActivityLog::record($request->user(), 'admin.logout', $request->user());
+
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

@@ -8,6 +8,14 @@
             'approved' => 'bg-emerald-50 text-emerald-700 ring-emerald-100',
             'denied' => 'bg-red-50 text-red-700 ring-red-100',
         ];
+
+        $paymentBadgeClasses = [
+            'not_selected' => 'bg-slate-50 text-slate-700 ring-slate-100',
+            'onsite_pending' => 'bg-amber-50 text-amber-700 ring-amber-100',
+            'online_pending' => 'bg-purple-50 text-purple-700 ring-purple-100',
+            'paid' => 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+            'expired' => 'bg-red-50 text-red-700 ring-red-100',
+        ];
     @endphp
 
     <section class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
@@ -71,8 +79,10 @@
                     <tr>
                         <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Applicant</th>
                         <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Program</th>
+                        <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Batch</th>
                         <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Schedule</th>
                         <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Status</th>
+                        <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Payment</th>
                         <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Submitted</th>
                         <th class="px-6 py-4 text-right text-xs font-bold uppercase tracking-wide text-slate-500">Action</th>
                     </tr>
@@ -86,10 +96,16 @@
                                 <p class="mt-1 text-xs text-slate-400">{{ $application->contact_number }}</p>
                             </td>
                             <td class="px-6 py-5 text-sm font-semibold text-slate-700">{{ $application->program }}</td>
+                            <td class="px-6 py-5 text-sm text-slate-600">{{ $application->batch ? $application->batch->name.' '.$application->batch->year : 'Unassigned' }}</td>
                             <td class="px-6 py-5 text-sm text-slate-600">{{ $application->schedule_preference }}</td>
                             <td class="px-6 py-5">
                                 <span class="inline-flex rounded-full px-3 py-1 text-xs font-bold ring-1 {{ $badgeClasses[$application->status] ?? 'bg-slate-50 text-slate-700 ring-slate-100' }}">
                                     {{ $application->statusLabel() }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-5">
+                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-bold ring-1 {{ $paymentBadgeClasses[$application->payment_status] ?? 'bg-slate-50 text-slate-700 ring-slate-100' }}">
+                                    {{ $application->paymentStatusLabel() }}
                                 </span>
                             </td>
                             <td class="px-6 py-5 text-sm text-slate-500">{{ $application->created_at?->format('M d, Y') }}</td>
@@ -101,7 +117,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-14 text-center">
+                            <td colspan="8" class="px-6 py-14 text-center">
                                 <p class="text-lg font-bold text-slate-900">No applications found</p>
                                 <p class="mt-2 text-sm text-slate-500">Try adjusting the search or status filter.</p>
                             </td>

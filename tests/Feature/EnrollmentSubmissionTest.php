@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use App\Models\EnrollmentApplication;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -59,7 +60,7 @@ class EnrollmentSubmissionTest extends TestCase
             'education_document' => UploadedFile::fake()->create('diploma.pdf', 100, 'application/pdf'),
             'good_moral_certificate' => UploadedFile::fake()->create('good-moral.pdf', 100, 'application/pdf'),
             'id_photo' => UploadedFile::fake()->create('id-photo.jpg', 100, 'image/jpeg'),
-        ])->assertRedirect(route('enrollment.create'));
+        ])->assertRedirect(route('payment.show'));
 
         $this->assertDatabaseHas('enrollment_applications', [
             'email' => 'applicant@gmail.com',
@@ -67,12 +68,61 @@ class EnrollmentSubmissionTest extends TestCase
             'status' => 'profile_submitted',
         ]);
 
-        $application = \App\Models\EnrollmentApplication::firstOrFail();
+        $application = EnrollmentApplication::firstOrFail();
 
         Storage::disk('local')->assertExists($application->birth_certificate_path);
         Storage::disk('local')->assertExists($application->education_document_path);
         Storage::disk('local')->assertExists($application->good_moral_certificate_path);
         Storage::disk('local')->assertExists($application->id_photo_path);
         Storage::disk('local')->assertExists($application->signature_path);
+    }
+
+    public function test_applicant_can_generate_pay_on_site_receipt(): void
+    {
+        $user = \App\Models\User::factory()->create();
+        EnrollmentApplication::create([
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => 'Maria',
+            'last_name' => 'Santos',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'civil_status' => 'Single',
+            'employment_status' => 'Unemployed',
+            'contact_number' => '09170000000',
+            'nationality' => 'Filipino',
+            'schedule_preference' => 'AM',
+            'street' => '123 Training Street',
+            'barangay' => 'Central',
+            'city' => 'Quezon City',
+            'province' => 'Metro Manila',
+            'region' => 'NCR',
+            'zip_code' => '1100',
+            'educational_attainment' => 'High School Graduate',
+            'school_name' => 'MCARE High School',
+            'year_graduated' => 2020,
+            'guardian_name' => 'Ana Santos',
+            'guardian_address' => '123 Training Street',
+            'privacy_consent' => true,
+            'signature_name' => 'Maria Santos',
+            'date_accomplished' => now()->toDateString(),
+            'status' => EnrollmentApplication::STATUS_PROFILE_SUBMITTED,
+            'payment_status' => EnrollmentApplication::PAYMENT_NOT_SELECTED,
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('payment.select'), [
+                'payment_method' => 'onsite',
+            ])
+            ->assertRedirect(route('payment.receipt'));
+
+        $application = EnrollmentApplication::firstOrFail();
+
+        $this->assertSame(EnrollmentApplication::PAYMENT_ONSITE_PENDING, $application->payment_status);
+        $this->assertSame('onsite', $application->payment_method);
+        $this->assertNotNull($application->payment_reference);
+        $this->assertNotNull($application->payment_receipt_number);
+        $this->assertTrue($application->payment_receipt_expires_at->isFuture());
     }
 }

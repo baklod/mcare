@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 class EnrollmentApplication extends Model
 {
@@ -18,10 +19,21 @@ class EnrollmentApplication extends Model
 
     public const STATUS_DENIED = 'denied';
 
+    public const PAYMENT_NOT_SELECTED = 'not_selected';
+
+    public const PAYMENT_ONSITE_PENDING = 'onsite_pending';
+
+    public const PAYMENT_ONLINE_PENDING = 'online_pending';
+
+    public const PAYMENT_PAID = 'paid';
+
+    public const PAYMENT_EXPIRED = 'expired';
+
     protected $fillable = [
         'user_id',
         'email',
         'program',
+        'training_batch_id',
         'first_name',
         'middle_name',
         'last_name',
@@ -62,6 +74,17 @@ class EnrollmentApplication extends Model
         'signature_path',
         'date_accomplished',
         'status',
+        'payment_method',
+        'payment_status',
+        'payment_amount',
+        'payment_currency',
+        'payment_reference',
+        'payment_receipt_number',
+        'payment_receipt_expires_at',
+        'payment_selected_at',
+        'paymongo_checkout_reference',
+        'paymongo_checkout_url',
+        'payment_meta',
         'admin_notes',
         'reviewed_at',
         'reviewed_by_id',
@@ -73,6 +96,10 @@ class EnrollmentApplication extends Model
             'birth_date' => 'date',
             'date_accomplished' => 'date',
             'privacy_consent' => 'boolean',
+            'payment_amount' => 'decimal:2',
+            'payment_receipt_expires_at' => 'datetime',
+            'payment_selected_at' => 'datetime',
+            'payment_meta' => 'array',
             'reviewed_at' => 'datetime',
         ];
     }
@@ -101,6 +128,30 @@ class EnrollmentApplication extends Model
         return self::statuses()[$this->status] ?? str($this->status)->headline()->toString();
     }
 
+    public static function paymentStatuses(): array
+    {
+        return [
+            self::PAYMENT_NOT_SELECTED => 'Not selected',
+            self::PAYMENT_ONSITE_PENDING => 'Pay on site',
+            self::PAYMENT_ONLINE_PENDING => 'Online pending',
+            self::PAYMENT_PAID => 'Paid',
+            self::PAYMENT_EXPIRED => 'Expired',
+        ];
+    }
+
+    public function paymentStatusLabel(): string
+    {
+        return self::paymentStatuses()[$this->payment_status] ?? str($this->payment_status)->headline()->toString();
+    }
+
+    public function hasActiveOnsiteReceipt(): bool
+    {
+        return $this->payment_method === 'onsite'
+            && filled($this->payment_receipt_number)
+            && $this->payment_receipt_expires_at
+            && $this->payment_receipt_expires_at->isFuture();
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -109,5 +160,22 @@ class EnrollmentApplication extends Model
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by_id');
+    }
+
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(TrainingBatch::class, 'training_batch_id');
+    }
+
+    public function effectivePaymentDeadline(): ?Carbon
+    {
+        $receiptDeadline = $this->payment_receipt_expires_at;
+        $batchDeadline = $this->batch?->enrollment_ends_at;
+
+        if ($receiptDeadline && $batchDeadline) {
+            return $receiptDeadline->lte($batchDeadline) ? $receiptDeadline : $batchDeadline;
+        }
+
+        return $receiptDeadline ?: $batchDeadline;
     }
 }

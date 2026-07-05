@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\EnrollmentApplication;
+use App\Models\TrainingBatch;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -145,6 +146,7 @@ class EnrollmentController extends Controller
             ->merge([
                 'user_id' => $user->id,
                 'program' => 'Caregiving NC II',
+                'training_batch_id' => $currentApplication?->training_batch_id ?: TrainingBatch::active()?->id,
                 'privacy_consent' => true,
                 'date_accomplished' => now()->toDateString(),
                 'status' => 'profile_submitted',
@@ -160,8 +162,8 @@ class EnrollmentController extends Controller
         Auth::login($user);
 
         return redirect()
-            ->route('enrollment.create')
-            ->with('saved', 'Caregiving NC II enrollment registration saved. Your documents and signature are ready for admin review.');
+            ->route('payment.show')
+            ->with('payment_notice', 'Caregiving NC II enrollment registration saved. Choose your payment method to continue.');
     }
 
     private function storeUploadedDocument(Request $request, string $field, User $user, ?string $existingPath): ?string
