@@ -20,15 +20,21 @@ Route::middleware('throttle:global-web')->group(function () {
         return view('landing.home');
     })->name('landing');
 
+    /*
+     * OAuth callback URLs can temporarily contain authorization parameters.
+     * Mark both directions no-store/noindex in addition to rate limiting them.
+     */
     Route::get('/auth/google', [GoogleAuthController::class, 'redirect'])
-        ->middleware('throttle:oauth')
+        ->middleware(['throttle:oauth', 'private.response'])
         ->name('auth.google.redirect');
 
     Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])
-        ->middleware('throttle:oauth')
+        ->middleware(['throttle:oauth', 'private.response'])
         ->name('auth.google.callback');
 
-    Route::get('/login', fn () => redirect()->route('enrollment.create'))->name('login');
+    Route::get('/login', fn () => redirect()->route('enrollment.create'))
+        ->middleware('private.response')
+        ->name('login');
 
     Route::post('/logout', [GoogleAuthController::class, 'logout'])
         ->middleware('throttle:sensitive-mutation')
