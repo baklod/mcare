@@ -25,8 +25,13 @@ class SecurityHeaders
         // clickjacking risk, where a malicious site overlays our buttons invisibly.
         $response->headers->set('X-Frame-Options', 'DENY');
 
-        // Send only the origin to another site, not a sensitive full path/query string.
-        $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
+        /*
+         * Use a safe public default, but do not overwrite a stricter policy set
+         * by PrivateResponseHeaders (for example, `no-referrer` on PII pages).
+         */
+        if (! $response->headers->has('Referrer-Policy')) {
+            $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
+        }
 
         // Disable browser capabilities that the current application does not need.
         $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
