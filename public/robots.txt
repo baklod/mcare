@@ -1,2 +1,7 @@
+# Search-engine crawling rules are privacy hygiene only.
+# Real protection still comes from authentication and authorization middleware.
 User-agent: *
-Disallow:
+Disallow: /admin/
+Disallow: /payment
+Disallow: /auth/
+Disallow: /enrollment
