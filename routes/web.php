@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\AccountSessionController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\EnrollmentPaymentController;
@@ -8,6 +9,10 @@ use App\Http\Controllers\Admin\AdminSessionController;
 use App\Http\Controllers\Admin\BatchScheduleController;
 use App\Http\Controllers\Admin\EnrollmentReviewController;
 use App\Http\Controllers\Admin\PaymentScheduleController;
+use App\Http\Controllers\Trainer\TrainerDashboardController;
+use App\Http\Controllers\Trainer\TrainerSessionController;
+use App\Http\Controllers\Trainee\TraineeDashboardController;
+use App\Http\Controllers\Trainee\TraineeSessionController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -32,11 +37,15 @@ Route::middleware('throttle:global-web')->group(function () {
         ->middleware(['throttle:oauth', 'private.response'])
         ->name('auth.google.callback');
 
-    Route::get('/login', fn () => redirect()->route('enrollment.create'))
+    Route::get('/login', [AccountSessionController::class, 'create'])
         ->middleware('private.response')
         ->name('login');
 
-    Route::post('/logout', [GoogleAuthController::class, 'logout'])
+    Route::post('/login', [AccountSessionController::class, 'store'])
+        ->middleware(['throttle:8,1', 'private.response'])
+        ->name('login.store');
+
+    Route::post('/logout', [AccountSessionController::class, 'destroy'])
         ->middleware('throttle:sensitive-mutation')
         ->name('logout');
 
@@ -132,6 +141,59 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/logs', [AdminActivityLogController::class, 'index'])
                     ->middleware('throttle:search')
                     ->name('logs.index');
+            });
+        });
+    Route::prefix('trainer')
+        ->name('trainer.')
+        ->middleware('private.response')
+        ->group(function () {
+            Route::get('/login', [TrainerSessionController::class, 'create'])
+                ->name('login');
+
+            Route::post('/login', [TrainerSessionController::class, 'store'])
+                ->middleware('throttle:6,1')
+                ->name('login.store');
+
+            Route::middleware(['auth', 'trainer'])->group(function () {
+                Route::post('/logout', [TrainerSessionController::class, 'destroy'])
+                    ->middleware('throttle:sensitive-mutation')
+                    ->name('logout');
+
+                Route::get('/', [TrainerDashboardController::class, 'index'])
+                    ->name('dashboard');
+
+                Route::post('/modules', [TrainerDashboardController::class, 'storeModule'])
+                    ->middleware('throttle:8,1')
+                    ->name('modules.store');
+
+                Route::get('/modules/{module}/download', [TrainerDashboardController::class, 'downloadModule'])
+                    ->middleware('throttle:document-downloads')
+                    ->name('modules.download');
+            });
+        });
+
+    Route::prefix('trainee')
+        ->name('trainee.')
+        ->middleware('private.response')
+        ->group(function () {
+            Route::get('/login', [TraineeSessionController::class, 'create'])
+                ->name('login');
+
+            Route::post('/login', [TraineeSessionController::class, 'store'])
+                ->middleware('throttle:6,1')
+                ->name('login.store');
+
+            Route::middleware(['auth', 'trainee'])->group(function () {
+                Route::post('/logout', [TraineeSessionController::class, 'destroy'])
+                    ->middleware('throttle:sensitive-mutation')
+                    ->name('logout');
+
+                Route::get('/', [TraineeDashboardController::class, 'index'])
+                    ->name('dashboard');
+
+                Route::get('/modules/{module}/download', [TraineeDashboardController::class, 'downloadModule'])
+                    ->middleware('throttle:document-downloads')
+                    ->name('modules.download');
             });
         });
 });

@@ -25,11 +25,16 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureAdmin::class,
             'private.response' => \App\Http\Middleware\PrivateResponseHeaders::class,
+            'trainer' => \App\Http\Middleware\EnsureTrainer::class,
+            'trainee' => \App\Http\Middleware\EnsureTrainee::class,
         ]);
 
-        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('admin/*')
-            ? route('admin.login')
-            : route('login'));
+        $middleware->redirectGuestsTo(fn (Request $request) => match (true) {
+            $request->is('admin') || $request->is('admin/*') => route('admin.login'),
+            $request->is('trainer') || $request->is('trainer/*') => route('trainer.login'),
+            $request->is('trainee') || $request->is('trainee/*') => route('trainee.login'),
+            default => route('login'),
+        });
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (Throwable $e, Request $request) {

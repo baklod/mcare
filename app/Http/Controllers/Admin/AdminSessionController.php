@@ -18,7 +18,10 @@ class AdminSessionController extends Controller
             return redirect()->route('admin.enrollments.index');
         }
 
-        return view('admin.auth.login');
+        return view('admin.auth.login', [
+            // Makes role testing clear when another account is already active in this browser.
+            'activeUser' => request()->user(),
+        ]);
     }
 
     public function store(Request $request): RedirectResponse

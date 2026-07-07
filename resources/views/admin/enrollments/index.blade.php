@@ -19,29 +19,29 @@
     @endphp
 
     <section class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
-        <div class="rounded-3xl border border-purple-100 bg-white p-7 shadow-xl shadow-purple-100/40 sm:p-8">
+        <div class="dashboard-hero">
             <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                    <p class="text-sm font-bold uppercase text-purple-600">Enrollment admin</p>
-                    <h1 class="mt-2 text-4xl font-bold leading-tight text-slate-900">Applicant queue</h1>
-                    <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-500">
+                    <span class="dashboard-pill bg-white/15 text-white ring-white/20">Enrollment admin</span>
+                    <h1 class="mt-4">Applicant queue</h1>
+                    <p>
                         Review submitted Caregiving NC II learner profiles and move qualified applicants into pre-enlistment, approval, or denial.
                     </p>
                 </div>
-                <div class="rounded-2xl bg-purple-50 px-5 py-4 text-right ring-1 ring-purple-100">
-                    <p class="text-sm font-semibold text-purple-700">Total applications</p>
-                    <p class="mt-1 text-3xl font-bold text-slate-900">{{ $totalApplications }}</p>
+                <div class="rounded-2xl bg-white/15 px-5 py-4 text-right ring-1 ring-white/20">
+                    <p class="text-xs font-black uppercase tracking-wide text-white/65">Total applications</p>
+                    <p class="mt-1 font-display text-3xl font-black text-white">{{ $totalApplications }}</p>
                 </div>
             </div>
 
             <form method="GET" action="{{ route('admin.enrollments.index') }}" class="mt-8 grid grid-cols-1 gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 md:grid-cols-[1fr_220px_auto]">
                 <div>
                     <label for="search" class="mb-2 block text-xs font-bold uppercase text-slate-500">Search</label>
-                    <input id="search" name="search" type="search" value="{{ $search }}" placeholder="Name, email, or contact number" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-purple-300 focus:ring-4 focus:ring-purple-100">
+                    <input id="search" name="search" type="search" value="{{ $search }}" placeholder="Name, email, or contact number" class="form-field bg-white">
                 </div>
                 <div>
                     <label for="status" class="mb-2 block text-xs font-bold uppercase text-slate-500">Status</label>
-                    <select id="status" name="status" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-purple-300 focus:ring-4 focus:ring-purple-100">
+                    <select id="status" name="status" class="form-field bg-white">
                         <option value="">All statuses</option>
                         @foreach ($statuses as $status => $label)
                             <option value="{{ $status }}" @selected($selectedStatus === $status)>{{ $label }}</option>
@@ -49,18 +49,18 @@
                     </select>
                 </div>
                 <div class="flex items-end gap-2">
-                    <button type="submit" class="inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 md:w-auto">
+                    <button type="submit" class="primary-action w-full md:w-auto">
                         Filter
                     </button>
-                    <a href="{{ route('admin.enrollments.index') }}" class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:border-purple-200 hover:text-purple-700">
+                    <a href="{{ route('admin.enrollments.index') }}" class="secondary-action">
                         Reset
                     </a>
                 </div>
             </form>
         </div>
 
-        <aside class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-            <p class="text-sm font-bold uppercase text-purple-600">Status summary</p>
+        <aside class="dashboard-panel">
+            <p class="dashboard-section-kicker">Status summary</p>
             <div class="mt-5 space-y-3">
                 @foreach ($statuses as $status => $label)
                     <a href="{{ route('admin.enrollments.index', ['status' => $status]) }}" class="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 hover:border-purple-100 hover:bg-purple-50">

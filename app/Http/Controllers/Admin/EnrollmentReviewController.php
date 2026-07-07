@@ -100,8 +100,13 @@ class EnrollmentReviewController extends Controller
             'reviewed_by_id' => $request->user()->id,
         ])->save();
 
+        $newRole = $validated['status'] === EnrollmentApplication::STATUS_APPROVED
+            ? 'trainee'
+            : ($enrollmentApplication->user?->role === 'trainee' ? 'applicant' : $enrollmentApplication->user?->role);
+
         $enrollmentApplication->user?->forceFill([
             'applicant_status' => $validated['status'],
+            'role' => $newRole,
         ])->save();
 
         AdminActivityLog::record($request->user(), 'enrollment.review.updated', $enrollmentApplication, [
