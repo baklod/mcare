@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\EnrollmentPaymentController;
 use App\Http\Controllers\Admin\AdminActivityLogController;
+use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminSessionController;
 use App\Http\Controllers\Admin\BatchScheduleController;
 use App\Http\Controllers\Admin\EnrollmentReviewController;
@@ -35,7 +36,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
     Route::middleware(['auth', 'admin'])->group(function () {
         Route::post('/logout', [AdminSessionController::class, 'destroy'])->name('logout');
-        Route::redirect('/', '/admin/enrollments')->name('dashboard');
+        Route::get('/', AdminDashboardController::class)->name('dashboard');
         Route::get('/enrollments', [EnrollmentReviewController::class, 'index'])->name('enrollments.index');
         Route::get('/enrollments/{enrollmentApplication}', [EnrollmentReviewController::class, 'show'])->name('enrollments.show');
         Route::patch('/enrollments/{enrollmentApplication}', [EnrollmentReviewController::class, 'update'])->name('enrollments.update');
