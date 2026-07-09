@@ -18,11 +18,14 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureAdmin::class,
+            'trainer' => \App\Http\Middleware\EnsureTrainer::class,
         ]);
 
-        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('admin/*')
-            ? route('admin.login')
-            : route('login'));
+        $middleware->redirectGuestsTo(fn (Request $request) => match (true) {
+            $request->is('admin') || $request->is('admin/*') => route('admin.login'),
+            $request->is('trainer') || $request->is('trainer/*') => route('trainer.login'),
+            default => route('login'),
+        });
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (Throwable $e, Request $request) {

@@ -9,6 +9,8 @@ use App\Http\Controllers\Admin\AdminSessionController;
 use App\Http\Controllers\Admin\BatchScheduleController;
 use App\Http\Controllers\Admin\EnrollmentReviewController;
 use App\Http\Controllers\Admin\PaymentScheduleController;
+use App\Http\Controllers\Trainer\TrainerDashboardController;
+use App\Http\Controllers\Trainer\TrainerSessionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -48,5 +50,15 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::delete('/schedules/{trainingBatch}', [BatchScheduleController::class, 'destroy'])->middleware('throttle:6,1')->name('schedules.destroy');
         Route::get('/payment-scheduling', [PaymentScheduleController::class, 'index'])->name('payment-schedules.index');
         Route::get('/logs', [AdminActivityLogController::class, 'index'])->name('logs.index');
+    });
+});
+
+Route::prefix('trainer')->name('trainer.')->group(function () {
+    Route::get('/login', [TrainerSessionController::class, 'create'])->name('login');
+    Route::post('/login', [TrainerSessionController::class, 'store'])->name('login.store');
+
+    Route::middleware(['auth', 'trainer'])->group(function () {
+        Route::post('/logout', [TrainerSessionController::class, 'destroy'])->name('logout');
+        Route::get('/', TrainerDashboardController::class)->name('dashboard');
     });
 });
