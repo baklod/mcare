@@ -1,6 +1,29 @@
 @extends('admin.layouts.app', ['title' => 'Admin Operations Console | MCARE'])
 
 @section('content')
+    <style>
+        .admin-dashboard .font-black {
+            font-weight: 700;
+        }
+
+        .admin-dashboard [class~="rounded-[2rem]"],
+        .admin-dashboard .rounded-3xl,
+        .admin-dashboard .rounded-2xl {
+            border-radius: 0.75rem;
+        }
+
+        .admin-dashboard .shadow-sm,
+        .admin-dashboard .shadow-lg,
+        .admin-dashboard .shadow-xl,
+        .admin-dashboard .shadow-2xl {
+            box-shadow: none;
+        }
+
+        .admin-dashboard [class*="bg-gradient-to"] {
+            background-image: none;
+        }
+    </style>
+
     @php
         $statusBadgeClasses = [
             'profile_submitted' => 'bg-sky-50 text-sky-700 ring-sky-100',
@@ -49,17 +72,16 @@
         ];
     @endphp
 
-    <section class="space-y-8">
+    <section class="admin-dashboard space-y-6">
         <div class="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
-            <div class="overflow-hidden rounded-[2rem] border border-purple-100 bg-white shadow-xl shadow-purple-100/40">
+            <div class="overflow-hidden rounded-xl border border-stone-200 bg-white">
                 <div class="relative isolate p-7 sm:p-8">
-                    <div class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-40 bg-gradient-to-b from-purple-100/70 via-purple-50/50 to-transparent"></div>
                     <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                         <div>
-                            <span class="inline-flex rounded-full bg-purple-50 px-4 py-2 text-xs font-black uppercase tracking-wide text-purple-700 ring-1 ring-purple-100">
+                            <span class="inline-flex bg-purple-50 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-purple-700 ring-1 ring-purple-100">
                                 Mission Care Training Center
                             </span>
-                            <h1 class="mt-5 max-w-3xl text-4xl font-black leading-tight text-slate-950 sm:text-5xl">
+                            <h1 class="mt-4 max-w-3xl text-3xl font-bold leading-tight text-slate-950 sm:text-4xl">
                                 Admin Operations Console
                             </h1>
                             <p class="mt-4 max-w-2xl text-sm leading-6 text-slate-600">
@@ -68,10 +90,10 @@
                         </div>
 
                         <div class="grid grid-cols-2 gap-3 sm:min-w-80">
-                            <a href="{{ route('admin.enrollments.index') }}" class="inline-flex items-center justify-center rounded-full bg-purple-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-purple-200 transition hover:bg-purple-700">
+                            <a href="{{ route('admin.enrollments.index') }}" class="inline-flex items-center justify-center bg-purple-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-purple-800">
                                 Review Queue
                             </a>
-                            <a href="{{ route('admin.schedules.index') }}" class="inline-flex items-center justify-center rounded-full border border-purple-200 bg-white px-5 py-3 text-sm font-black text-purple-700 transition hover:bg-purple-50">
+                            <a href="{{ route('admin.schedules.index') }}" class="inline-flex items-center justify-center border border-stone-300 bg-white px-5 py-3 text-sm font-bold text-stone-700 transition hover:border-purple-300 hover:text-purple-700">
                                 Edit Schedule
                             </a>
                         </div>
@@ -79,14 +101,14 @@
 
                     <div class="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                         @foreach ($overviewCards as $card)
-                            <article class="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
+                            <article class="rounded-xl border border-stone-200 bg-white p-5">
                                 <div class="flex items-start justify-between gap-4">
                                     <div>
                                         <p class="text-xs font-black uppercase tracking-wide text-slate-500">{{ $card['label'] }}</p>
                                         <p class="mt-3 text-3xl font-black text-slate-950">{{ $card['value'] }}</p>
                                         <p class="mt-2 text-xs font-semibold text-slate-500">{{ $card['hint'] }}</p>
                                     </div>
-                                    <span class="grid h-11 w-11 place-items-center rounded-2xl text-sm font-black ring-1 {{ $card['tone'] }}">
+                                    <span class="grid h-11 w-11 place-items-center rounded-lg text-sm font-bold ring-1 {{ $card['tone'] }}">
                                         {{ $card['abbr'] }}
                                     </span>
                                 </div>
@@ -96,7 +118,7 @@
                 </div>
             </div>
 
-            <aside id="batch-schedules" class="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-xl shadow-slate-200/60">
+            <aside id="batch-schedules" class="rounded-xl border border-stone-200 bg-white p-6">
                 <div class="flex items-start justify-between gap-4">
                     <div>
                         <p class="text-xs font-black uppercase tracking-wide text-purple-600">Active Batch</p>

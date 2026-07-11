@@ -20,15 +20,15 @@
         <div class="dashboard-hero">
             <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                    <span class="dashboard-pill bg-white/15 text-white ring-white/20">Approved trainee</span>
+                    <span class="dashboard-pill bg-purple-50 text-purple-700 ring-purple-100">Approved trainee</span>
                     <h1 class="mt-4">Welcome back, {{ $application->first_name }}</h1>
                     <p>
                         Continue your Caregiving NC II training with your approved batch schedule, modules, payment status, and submitted records in one place.
                     </p>
                 </div>
-                <div class="rounded-2xl bg-white/15 px-5 py-4 ring-1 ring-white/20">
-                    <p class="text-xs font-black uppercase tracking-wide text-white/65">Current batch</p>
-                    <p class="mt-1 font-display text-2xl font-black text-white">{{ $batchLabel }}</p>
+                <div class="rounded-xl bg-purple-50 px-5 py-4 ring-1 ring-purple-100">
+                    <p class="text-xs font-bold uppercase tracking-wide text-purple-700">Current batch</p>
+                    <p class="mt-1 font-display text-2xl font-extrabold text-slate-950">{{ $batchLabel }}</p>
                 </div>
             </div>
         </div>

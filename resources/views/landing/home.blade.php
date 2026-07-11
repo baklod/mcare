@@ -16,32 +16,50 @@
             background-size: 20px 20px, 20px 20px, 100% 100%, 100% 100%;
         }
 
-        /* Path: resources/views/landing/home.blade.php | Label: Sticky header scroll blur */
+        /* Path: resources/views/landing/home.blade.php | Label: Solid sticky header */
         .site-header {
-            transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, backdrop-filter 180ms ease;
+            transition: border-color 180ms ease, box-shadow 180ms ease;
         }
 
         .site-header.is-scrolled {
-            background: rgba(255, 255, 255, 0.72);
-            border-color: rgba(216, 180, 254, 0.55);
-            box-shadow: 0 18px 45px rgba(88, 28, 135, 0.08);
-            backdrop-filter: blur(18px);
-        }
-
-        .site-header.is-scrolled:hover,
-        .site-header.is-scrolled:focus-within {
-            background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(0);
+            background: #ffffff;
+            border-color: #e2e8f0;
+            box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
         }
 
         /* Path: resources/views/landing/home.blade.php | Label: 6.7-inch phone header layout */
         @media (max-width: 767px) {
             .site-header {
-                background: rgba(255, 255, 255, 0.92);
+                background: #ffffff;
             }
 
-            .mobile-header-cta {
-                box-shadow: 0 12px 28px rgba(126, 34, 206, 0.16);
+            /* Path: resources/views/landing/home.blade.php | Label: Phone-first landing density */
+            .phone-hero-copy {
+                max-width: 24rem;
+                margin-inline: auto;
+                text-align: center;
+            }
+
+            .phone-section-heading {
+                max-width: 24rem;
+            }
+
+            .phone-hero-card {
+                max-width: 20.5rem;
+            }
+
+            .phone-hero-frame {
+                border-radius: 1.5rem;
+                padding: 0.625rem;
+            }
+
+            .phone-hero-media {
+                border-radius: 1.125rem;
+            }
+
+            .phone-soft-card {
+                border-radius: 1rem;
+                box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
             }
         }
 
@@ -95,12 +113,7 @@
         }
 
         @keyframes hero-slide-cycle {
-            0%, 6% {
-                opacity: 0;
-                transform: translate3d(18px, 0, 0) scale(0.985);
-            }
-
-            10%, 30% {
+            0%, 30% {
                 opacity: 1;
                 transform: translate3d(0, 0, 0) scale(1);
             }
@@ -112,14 +125,14 @@
         }
 
         @keyframes hero-dot-cycle {
-            0%, 8%, 36%, 100% {
-                width: 0.5rem;
-                background: rgb(216 180 254);
-            }
-
-            10%, 30% {
+            0%, 30% {
                 width: 1.75rem;
                 background: rgb(147 51 234);
+            }
+
+            36%, 100% {
+                width: 0.5rem;
+                background: rgb(216 180 254);
             }
         }
 
@@ -200,74 +213,77 @@
         $accountCtaUrl = $currentUser ? \App\Support\AccountPortal::urlFor($currentUser) : route('enrollment.create');
         $accountCtaLabel = $currentUser ? \App\Support\AccountPortal::ctaLabelFor($currentUser) : 'Start Enrollment';
         $accountRoleLabel = \App\Support\AccountPortal::roleLabelFor($currentUser);
+        $accountInitial = $currentUser ? \Illuminate\Support\Str::of($currentUser->name ?: $currentUser->email)->substr(0, 1)->upper() : null;
     @endphp
 
     <!-- Path: resources/views/landing/home.blade.php | Label: Main landing background layer -->
     <div class="landing-grid-bg pointer-events-none fixed inset-0 z-0"></div>
 
-    <!-- Path: resources/views/landing/home.blade.php | Label: Sticky adaptive header -->
-    <header id="site-header" class="site-header sticky top-0 z-50 border-b border-slate-100 bg-white/95 backdrop-blur-xl">
-        <div class="hidden border-b border-purple-100 bg-purple-50 sm:block">
-            <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-2 text-xs font-semibold text-purple-700 lg:px-8">
-                <p>TESDA-focused caregiving training with secure online applicant enrollment</p>
-                <a href="#programs" class="hidden text-purple-800 hover:text-purple-600 sm:inline-flex">Explore programs</a>
-            </div>
-        </div>
-
-        <nav class="mx-auto flex min-h-16 max-w-7xl items-center justify-between px-4 py-3 sm:h-20 sm:px-6 sm:py-0 lg:px-8" aria-label="Main navigation">
+    <!-- Path: resources/views/landing/home.blade.php | Label: Clean single-row header -->
+    <header id="site-header" class="site-header sticky top-0 z-50 border-b border-slate-200 bg-white">
+        <nav class="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-4 px-4 py-2 sm:min-h-20 sm:px-6 lg:px-8" aria-label="Main navigation">
             <a href="{{ route('landing') }}" class="flex min-w-0 items-center gap-3">
-                <img src="{{ asset('assets/official-logo.png') }}" alt="Mission Care Training Center logo" class="h-10 w-10 shrink-0 rounded-2xl object-contain sm:h-12 sm:w-12">
-                <span>
+                <img src="{{ asset('assets/mcare-mark.png') }}" alt="MCARE mark" class="h-10 w-10 shrink-0 rounded-lg border border-slate-100 bg-white object-contain sm:h-12 sm:w-12">
+                <span class="min-w-0">
                     <span class="block text-sm font-bold leading-5 text-slate-900">MCARE</span>
-                    <span class="block max-w-[190px] truncate text-xs leading-4 text-slate-500 sm:max-w-none">Mission Care Training Center</span>
+                    <span class="block max-w-[170px] truncate text-[11px] leading-4 text-slate-500 sm:max-w-none sm:text-xs">Mission Care Training Center</span>
                 </span>
             </a>
 
-            <div class="hidden items-center gap-8 md:flex">
-                <a href="#programs" class="text-sm font-semibold text-slate-600 hover:text-purple-600">Programs</a>
-                <a href="#admissions" class="text-sm font-semibold text-slate-600 hover:text-purple-600">Admissions</a>
-                <a href="#why" class="text-sm font-semibold text-slate-600 hover:text-purple-600">Why MCARE</a>
-                <a href="#discover" class="text-sm font-semibold text-slate-600 hover:text-purple-600">Discover</a>
-                <a href="#contact" class="text-sm font-semibold text-slate-600 hover:text-purple-600">Contact</a>
+            <div class="hidden items-center gap-6 lg:flex">
+                <a href="#programs" class="text-sm font-semibold text-slate-600 hover:text-purple-700">Programs</a>
+                <a href="#admissions" class="text-sm font-semibold text-slate-600 hover:text-purple-700">Admissions</a>
+                <a href="#why" class="text-sm font-semibold text-slate-600 hover:text-purple-700">Why MCARE</a>
+                <a href="#discover" class="text-sm font-semibold text-slate-600 hover:text-purple-700">Discover</a>
+                <a href="#contact" class="text-sm font-semibold text-slate-600 hover:text-purple-700">Contact</a>
             </div>
 
-            <div class="flex shrink-0 items-center gap-3">
+            <div class="flex shrink-0 items-center gap-2">
                 @auth
-                    <form method="POST" action="{{ route('logout') }}" class="hidden md:block">
-                        @csrf
-                        <button type="submit" class="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:border-purple-200 hover:text-purple-700">Sign out</button>
-                    </form>
-                    <a href="{{ route('enrollment.create') }}" class="hidden rounded-full bg-purple-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 md:inline-flex">Enroll Now</a>
+                    <!-- Path: resources/views/landing/home.blade.php | Label: Compact active account menu -->
+                    <details class="relative hidden md:block">
+                        <summary class="flex cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-left hover:bg-slate-50">
+                            <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-purple-100 text-sm font-bold text-purple-700">{{ $accountInitial }}</span>
+                            <span class="hidden min-w-0 max-w-32 lg:block">
+                                <span class="block truncate text-sm font-bold text-slate-900">{{ $currentUser->name }}</span>
+                                <span class="block truncate text-xs text-slate-500">{{ $accountRoleLabel }}</span>
+                            </span>
+                            <i class="fa-solid fa-chevron-down px-1 text-xs text-slate-400" aria-hidden="true"></i>
+                        </summary>
+                        <div class="absolute right-0 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                            <div class="border-b border-slate-100 px-3 py-2.5">
+                                <p class="truncate text-sm font-bold text-slate-900">{{ $currentUser->name }}</p>
+                                <p class="mt-0.5 truncate text-xs text-slate-500">{{ $currentUser->email }}</p>
+                            </div>
+                            <a href="{{ $accountCtaUrl }}" class="mt-1 flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-semibold text-purple-700 hover:bg-purple-50">
+                                <span>{{ $accountCtaLabel }}</span>
+                                <i class="fa-solid fa-arrow-right text-xs" aria-hidden="true"></i>
+                            </a>
+                            <form method="POST" action="{{ route('logout') }}" class="mt-1 border-t border-slate-100 pt-1">
+                                @csrf
+                                <button type="submit" class="w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-red-600 hover:bg-red-50">Sign out</button>
+                            </form>
+                        </div>
+                    </details>
                 @else
-                    <a href="{{ route('enrollment.create') }}" class="hidden rounded-full bg-purple-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 md:inline-flex">Enroll Now</a>
+                    <a href="{{ route('enrollment.create') }}" class="hidden bg-purple-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-purple-800 md:inline-flex">Enroll now</a>
                 @endauth
 
-                <button id="mobile-menu-open" type="button" aria-controls="mobile-sidebar" aria-expanded="false" class="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-purple-200 hover:text-purple-700 md:hidden">
+                <button id="mobile-menu-open" type="button" aria-controls="mobile-sidebar" aria-expanded="false" class="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:border-purple-200 hover:text-purple-700 lg:hidden">
                     <span class="sr-only">Open navigation menu</span>
-                    <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5" aria-hidden="true">
-                        <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    </svg>
+                    <i class="fa-solid fa-bars" aria-hidden="true"></i>
                 </button>
             </div>
         </nav>
-
-        <!-- Path: resources/views/landing/home.blade.php | Label: Centered mobile sticky CTA -->
-        <div class="border-t border-purple-100/70 px-4 pb-3 md:hidden">
-            @auth
-                <a href="{{ route('enrollment.create') }}" class="mobile-header-cta mx-auto mt-1 flex h-11 max-w-[22rem] items-center justify-center rounded-full bg-purple-600 px-5 text-sm font-bold text-white hover:bg-purple-700">Continue Enrollment</a>
-            @else
-                <a href="{{ route('enrollment.create') }}" class="mobile-header-cta mx-auto mt-1 flex h-11 max-w-[22rem] items-center justify-center rounded-full bg-purple-600 px-5 text-sm font-bold text-white hover:bg-purple-700">Start Enrollment</a>
-            @endauth
-        </div>
     </header>
 
     <!-- Path: resources/views/landing/home.blade.php | Label: Mobile sidebar navigation -->
     <div id="mobile-sidebar" class="mobile-sidebar-shell fixed inset-0 z-[60] md:hidden" aria-hidden="true">
-        <button id="mobile-menu-overlay" type="button" class="absolute inset-0 bg-slate-950/35 backdrop-blur-sm" aria-label="Close navigation menu"></button>
-        <aside class="mobile-sidebar-panel absolute right-0 top-0 flex h-full w-[min(88vw,360px)] flex-col border-l border-purple-100 bg-white shadow-2xl shadow-purple-950/20">
-            <div class="flex items-center justify-between border-b border-slate-100 px-5 py-5">
+        <button id="mobile-menu-overlay" type="button" class="absolute inset-0 bg-slate-950/35" aria-label="Close navigation menu"></button>
+        <aside class="mobile-sidebar-panel absolute right-0 top-0 flex h-full w-[min(86vw,340px)] flex-col border-l border-purple-100 bg-white shadow-2xl shadow-purple-950/20">
+            <div class="flex items-center justify-between border-b border-slate-100 px-4 py-4">
                 <a href="{{ route('landing') }}" class="flex items-center gap-3">
-                    <img src="{{ asset('assets/official-logo.png') }}" alt="Mission Care Training Center logo" class="h-11 w-11 rounded-2xl object-contain">
+                    <img src="{{ asset('assets/mcare-mark.png') }}" alt="MCARE mark" class="h-10 w-10 rounded-lg border border-slate-100 object-contain">
                     <span>
                         <span class="block text-sm font-bold text-slate-900">MCARE</span>
                         <span class="block text-xs text-slate-500">Navigation</span>
@@ -275,23 +291,43 @@
                 </a>
                 <button id="mobile-menu-close" type="button" class="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:border-purple-200 hover:text-purple-700">
                     <span class="sr-only">Close navigation menu</span>
-                    <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5" aria-hidden="true">
-                        <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    </svg>
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
             </div>
 
-            <nav class="flex-1 space-y-2 overflow-y-auto px-5 py-5" aria-label="Mobile navigation">
-                <a href="#programs" class="mobile-sidebar-link block rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Programs</a>
-                <a href="#admissions" class="mobile-sidebar-link block rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Admissions</a>
-                <a href="#why" class="mobile-sidebar-link block rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Why MCARE</a>
-                <a href="#discover" class="mobile-sidebar-link block rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Discover</a>
-                <a href="#contact" class="mobile-sidebar-link block rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Contact</a>
+            <nav class="flex-1 space-y-1.5 overflow-y-auto px-4 py-4" aria-label="Mobile navigation">
+                @auth
+                    <!-- Path: resources/views/landing/home.blade.php | Label: Mobile active account identity -->
+                    <div class="mb-3 rounded-2xl border border-purple-100 bg-purple-50/80 p-4">
+                        <div class="flex items-start gap-3">
+                            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-purple-600 text-sm font-black text-white">
+                                {{ $accountInitial }}
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[10px] font-black uppercase tracking-wide text-purple-700">Active account</p>
+                                <p class="truncate text-sm font-bold text-slate-900" title="{{ $currentUser->name }}">{{ $currentUser->name }}</p>
+                                <p class="mt-0.5 truncate text-xs font-semibold text-slate-500" title="{{ $currentUser->email }}">{{ $currentUser->email }}</p>
+                                <p class="mt-1 inline-flex rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-purple-700">{{ $accountRoleLabel }}</p>
+                            </div>
+                        </div>
+                    </div>
+                @endauth
+                <a href="#programs" class="mobile-sidebar-link block rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Programs</a>
+                <a href="#admissions" class="mobile-sidebar-link block rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Admissions</a>
+                <a href="#why" class="mobile-sidebar-link block rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Why MCARE</a>
+                <a href="#discover" class="mobile-sidebar-link block rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Discover</a>
+                <a href="#contact" class="mobile-sidebar-link block rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Contact</a>
             </nav>
 
-            <div class="border-t border-slate-100 p-5">
+            <div class="border-t border-slate-100 p-4">
                 @auth
-                    <a href="{{ route('enrollment.create') }}" class="inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700">Continue Enrollment</a>
+                    <a href="{{ $accountCtaUrl }}" class="inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700">{{ $accountCtaLabel }}</a>
+                    <form method="POST" action="{{ route('logout') }}" class="mt-2">
+                        @csrf
+                        <button type="submit" class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 hover:border-purple-200 hover:text-purple-700">
+                            Sign out
+                        </button>
+                    </form>
                 @else
                     <a href="{{ route('enrollment.create') }}" class="inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700">Start Enrollment</a>
                 @endauth
@@ -301,42 +337,42 @@
 
     <main class="relative z-10">
         <section class="relative overflow-hidden bg-white/45 backdrop-blur-[1px]">
-            <div class="mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-5 py-12 sm:px-6 sm:py-20 lg:grid-cols-2 lg:gap-16 lg:px-8 lg:py-28">
-                <div>
-                    <div class="inline-flex items-center gap-2 rounded-full bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 ring-1 ring-purple-100">
+            <div class="mx-auto grid max-w-7xl grid-cols-1 items-center gap-8 px-4 py-8 sm:gap-10 sm:px-6 sm:py-20 lg:grid-cols-2 lg:gap-16 lg:px-8 lg:py-28">
+                <div class="phone-hero-copy sm:text-left">
+                    <div class="inline-flex items-center gap-2 rounded-full bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 ring-1 ring-purple-100 sm:px-4 sm:py-2 sm:text-sm">
                         <span class="h-2 w-2 rounded-full bg-purple-500"></span>
                         Direct NC II applicant registration
                     </div>
 
-                    <h1 class="mt-7 max-w-3xl text-4xl font-bold leading-tight text-slate-900 sm:text-6xl sm:leading-none">
+                    <h1 class="mt-5 max-w-3xl text-[2rem] font-bold leading-[2.3rem] text-slate-900 sm:mt-7 sm:text-6xl sm:leading-none">
                         Build a caregiving career with a training center you can trust.
                     </h1>
 
-                    <p class="mt-5 max-w-2xl text-base leading-7 text-slate-600 sm:mt-7 sm:text-lg sm:leading-8">
+                    <p class="mt-4 max-w-2xl text-sm leading-6 text-slate-600 sm:mt-7 sm:text-lg sm:leading-8">
                         MCARE connects Mission Care applicants to a clearer enrollment pathway, TESDA-oriented caregiving programs, class scheduling, learning records, and future alumni career support.
                     </p>
 
-                    <div class="mt-10 flex flex-col gap-3 sm:flex-row">
+                    <div class="mt-6 grid grid-cols-1 gap-2.5 sm:mt-10 sm:flex sm:flex-row sm:gap-3">
                         @auth
-                            <a href="{{ route('enrollment.create') }}" class="inline-flex items-center justify-center rounded-full bg-purple-600 px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700">Enroll Now</a>
+                            <a href="{{ $accountCtaUrl }}" class="inline-flex h-11 items-center justify-center rounded-full bg-purple-600 px-6 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:h-auto sm:px-7 sm:py-3.5">{{ $accountCtaLabel }}</a>
                         @else
-                            <a href="{{ route('enrollment.create') }}" class="inline-flex items-center justify-center rounded-full bg-purple-600 px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700">Start Enrollment</a>
+                            <a href="{{ route('enrollment.create') }}" class="inline-flex h-11 items-center justify-center rounded-full bg-purple-600 px-6 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:h-auto sm:px-7 sm:py-3.5">Start Enrollment</a>
                         @endauth
-                        <a href="#programs" class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-7 py-3.5 text-sm font-semibold text-slate-700 hover:border-purple-200 hover:text-purple-700">View Programs</a>
+                        <a href="#programs" class="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 hover:border-purple-200 hover:text-purple-700 sm:h-auto sm:px-7 sm:py-3.5">View Programs</a>
                     </div>
 
-                    <div class="mt-10 grid max-w-xl grid-cols-3 gap-5 border-t border-slate-100 pt-8">
+                    <div class="mt-7 grid max-w-xl grid-cols-3 gap-3 border-t border-slate-100 pt-5 text-left sm:mt-10 sm:gap-5 sm:pt-8">
                         <div>
-                            <p class="text-2xl font-bold text-slate-900">NC II</p>
-                            <p class="mt-1 text-sm leading-6 text-slate-500">Caregiving pathway</p>
+                            <p class="text-lg font-bold text-slate-900 sm:text-2xl">NC II</p>
+                            <p class="mt-1 text-[11px] leading-4 text-slate-500 sm:text-sm sm:leading-6">Caregiving pathway</p>
                         </div>
                         <div>
-                            <p class="text-2xl font-bold text-slate-900">OAuth</p>
-                            <p class="mt-1 text-sm leading-6 text-slate-500">Secure entry</p>
+                            <p class="text-lg font-bold text-slate-900 sm:text-2xl">OAuth</p>
+                            <p class="mt-1 text-[11px] leading-4 text-slate-500 sm:text-sm sm:leading-6">Secure entry</p>
                         </div>
                         <div>
-                            <p class="text-2xl font-bold text-slate-900">Hub</p>
-                            <p class="mt-1 text-sm leading-6 text-slate-500">Training to alumni</p>
+                            <p class="text-lg font-bold text-slate-900 sm:text-2xl">Hub</p>
+                            <p class="mt-1 text-[11px] leading-4 text-slate-500 sm:text-sm sm:leading-6">Training to alumni</p>
                         </div>
                     </div>
 
@@ -359,25 +395,25 @@
                     @endif
                 </div>
 
-                <div class="relative mx-auto w-full max-w-[420px] sm:max-w-[560px] lg:mx-0">
-                    <div class="relative rounded-[2rem] border border-purple-100 bg-white/80 p-4 shadow-2xl shadow-purple-100/70 backdrop-blur">
-                        <div class="relative aspect-[4/5] overflow-hidden rounded-[1.5rem] bg-slate-100">
+                <div class="phone-hero-card relative mx-auto w-full sm:max-w-[560px] lg:mx-0">
+                    <div class="phone-hero-frame relative rounded-[2rem] border border-purple-100 bg-white/80 p-4 shadow-2xl shadow-purple-100/70 backdrop-blur">
+                        <div class="phone-hero-media relative aspect-[4/5] overflow-hidden rounded-[1.5rem] bg-slate-100">
                             <div class="hero-slide absolute inset-0">
                                 <img src="{{ asset('assets/landing/caregiving-training-hero.png') }}" alt="MCARE caregiving training preview" class="h-full w-full object-cover">
-                                <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/75 via-slate-950/20 to-transparent p-7 text-white">
+                                <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/75 via-slate-950/20 to-transparent p-4 text-white sm:p-7">
                                     <p class="text-xs font-bold uppercase tracking-wide text-purple-100">Hands-on learning</p>
-                                    <p class="mt-2 max-w-xs text-2xl font-bold leading-tight">Training built around real caregiving routines.</p>
+                                    <p class="mt-2 max-w-xs text-lg font-bold leading-tight sm:text-2xl">Training built around real caregiving routines.</p>
                                 </div>
                             </div>
 
-                            <div class="hero-slide absolute inset-0 bg-gradient-to-br from-purple-50 via-white to-slate-100 p-7">
+                            <div class="hero-slide absolute inset-0 bg-gradient-to-br from-purple-50 via-white to-slate-100 p-5 sm:p-7">
                                 <div class="flex h-full flex-col justify-between">
                                     <div>
                                         <p class="text-xs font-bold uppercase tracking-wide text-purple-600">Applicant tracking</p>
-                                        <h2 class="mt-3 max-w-sm text-3xl font-bold leading-tight text-slate-900">Submit your profile, documents, and signature in one flow.</h2>
+                                        <h2 class="mt-3 max-w-sm text-xl font-bold leading-tight text-slate-900 sm:text-3xl">Submit your profile, documents, and signature in one flow.</h2>
                                     </div>
                                     <div class="space-y-3">
-                                        <div class="rounded-2xl border border-purple-100 bg-white p-4 shadow-sm">
+                                        <div class="rounded-xl border border-purple-100 bg-white p-3 shadow-sm sm:rounded-2xl sm:p-4">
                                             <div class="flex items-center justify-between gap-4">
                                                 <div>
                                                     <p class="text-sm font-bold text-slate-900">Learner profile</p>
@@ -386,7 +422,7 @@
                                                 <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">Ready</span>
                                             </div>
                                         </div>
-                                        <div class="rounded-2xl border border-purple-100 bg-white p-4 shadow-sm">
+                                        <div class="rounded-xl border border-purple-100 bg-white p-3 shadow-sm sm:rounded-2xl sm:p-4">
                                             <div class="flex items-center justify-between gap-4">
                                                 <div>
                                                     <p class="text-sm font-bold text-slate-900">Uploads</p>
@@ -399,24 +435,24 @@
                                 </div>
                             </div>
 
-                            <div class="hero-slide absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-950 to-slate-800 p-7 text-white">
+                            <div class="hero-slide absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-950 to-slate-800 p-5 text-white sm:p-7">
                                 <div class="flex h-full flex-col justify-between">
                                     <div>
                                         <p class="text-xs font-bold uppercase tracking-wide text-purple-200">Admin review</p>
-                                        <h2 class="mt-3 max-w-sm text-3xl font-bold leading-tight">Move applicants from submitted to pre-enlistment.</h2>
+                                        <h2 class="mt-3 max-w-sm text-xl font-bold leading-tight sm:text-3xl">Move applicants from submitted to pre-enlistment.</h2>
                                     </div>
                                     <div class="grid grid-cols-1 gap-3">
-                                        <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+                                        <div class="rounded-xl border border-white/10 bg-white/10 p-3 backdrop-blur sm:rounded-2xl sm:p-4">
                                             <p class="text-xs font-semibold text-purple-100">Current status</p>
-                                            <p class="mt-1 text-xl font-bold">Pre-enlistment</p>
+                                            <p class="mt-1 text-lg font-bold sm:text-xl">Pre-enlistment</p>
                                         </div>
                                         <div class="grid grid-cols-2 gap-3">
-                                            <div class="rounded-2xl border border-white/10 bg-white/10 p-4">
-                                                <p class="text-2xl font-bold">3</p>
+                                            <div class="rounded-xl border border-white/10 bg-white/10 p-3 sm:rounded-2xl sm:p-4">
+                                                <p class="text-xl font-bold sm:text-2xl">3</p>
                                                 <p class="mt-1 text-xs text-purple-100">Review decisions</p>
                                             </div>
-                                            <div class="rounded-2xl border border-white/10 bg-white/10 p-4">
-                                                <p class="text-2xl font-bold">5</p>
+                                            <div class="rounded-xl border border-white/10 bg-white/10 p-3 sm:rounded-2xl sm:p-4">
+                                                <p class="text-xl font-bold sm:text-2xl">5</p>
                                                 <p class="mt-1 text-xs text-purple-100">Required files</p>
                                             </div>
                                         </div>
@@ -424,24 +460,24 @@
                                 </div>
                             </div>
 
-                            <div class="absolute right-5 top-5 flex gap-2 rounded-full bg-white/85 px-3 py-2 shadow-sm backdrop-blur">
+                            <div class="absolute right-4 top-4 flex gap-2 rounded-full bg-white/85 px-3 py-2 shadow-sm backdrop-blur sm:right-5 sm:top-5">
                                 <span class="hero-dot h-2 rounded-full"></span>
                                 <span class="hero-dot h-2 rounded-full"></span>
                                 <span class="hero-dot h-2 rounded-full"></span>
                             </div>
                         </div>
                     </div>
-                    <div class="absolute -bottom-7 left-6 right-6 rounded-3xl border border-slate-100 bg-white p-5 shadow-xl shadow-slate-200">
+                    <div class="phone-soft-card relative mx-2 mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-200 sm:absolute sm:-bottom-7 sm:left-6 sm:right-6 sm:mx-0 sm:mt-0 sm:rounded-3xl sm:p-5">
                         <div class="flex items-center gap-4">
-                            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-purple-600">
-                                <svg viewBox="0 0 24 24" fill="none" class="h-6 w-6" aria-hidden="true">
+                            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-600 sm:h-12 sm:w-12 sm:rounded-2xl">
+                                <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true">
                                     <path d="M8 12.5l2.5 2.5L16.5 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                     <path d="M12 21a9 9 0 100-18 9 9 0 000 18z" stroke="currentColor" stroke-width="2"/>
                                 </svg>
                             </div>
                             <div>
                                 <p class="text-sm font-bold text-slate-900">Applicant profile ready</p>
-                            <p class="mt-1 text-sm text-slate-500">Create your account during enrollment.</p>
+                                <p class="mt-1 text-xs text-slate-500 sm:text-sm">Create your account during enrollment.</p>
                             </div>
                         </div>
                     </div>
@@ -450,105 +486,105 @@
         </section>
 
         <section class="border-y border-slate-100 bg-slate-50/85 backdrop-blur">
-            <div class="mx-auto max-w-7xl px-6 py-10 lg:px-8">
-                <p class="text-sm font-semibold text-slate-500">Designed for training operations inspired by trusted healthcare education platforms</p>
-                <div class="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                    <div class="rounded-2xl border border-slate-100 bg-white px-5 py-4 text-sm font-bold text-slate-700">Admissions</div>
-                    <div class="rounded-2xl border border-slate-100 bg-white px-5 py-4 text-sm font-bold text-slate-700">Programs</div>
-                    <div class="rounded-2xl border border-slate-100 bg-white px-5 py-4 text-sm font-bold text-slate-700">Schedules</div>
-                    <div class="rounded-2xl border border-slate-100 bg-white px-5 py-4 text-sm font-bold text-slate-700">Career Hub</div>
+            <div class="mx-auto max-w-7xl px-4 py-7 sm:px-6 sm:py-10 lg:px-8">
+                <p class="text-center text-xs font-semibold leading-5 text-slate-500 sm:text-left sm:text-sm">Designed for training operations inspired by trusted healthcare education platforms</p>
+                <div class="mt-5 grid grid-cols-2 gap-3 sm:mt-6 sm:grid-cols-4 sm:gap-4">
+                    <div class="phone-soft-card rounded-xl border border-slate-100 bg-white px-4 py-3 text-center text-xs font-bold text-slate-700 sm:rounded-2xl sm:px-5 sm:py-4 sm:text-sm">Admissions</div>
+                    <div class="phone-soft-card rounded-xl border border-slate-100 bg-white px-4 py-3 text-center text-xs font-bold text-slate-700 sm:rounded-2xl sm:px-5 sm:py-4 sm:text-sm">Programs</div>
+                    <div class="phone-soft-card rounded-xl border border-slate-100 bg-white px-4 py-3 text-center text-xs font-bold text-slate-700 sm:rounded-2xl sm:px-5 sm:py-4 sm:text-sm">Schedules</div>
+                    <div class="phone-soft-card rounded-xl border border-slate-100 bg-white px-4 py-3 text-center text-xs font-bold text-slate-700 sm:rounded-2xl sm:px-5 sm:py-4 sm:text-sm">Career Hub</div>
                 </div>
             </div>
         </section>
 
-        <section id="programs" class="bg-white/90 py-24 backdrop-blur sm:py-32">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
-                <div class="max-w-3xl">
+        <section id="programs" class="bg-white/90 py-14 backdrop-blur sm:py-32">
+            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div class="phone-section-heading max-w-3xl">
                     <p class="text-sm font-bold uppercase text-purple-600">Our programs</p>
-                    <h2 class="mt-4 text-4xl font-bold leading-tight text-slate-900 sm:text-5xl">Caregiving education for local and international readiness.</h2>
-                    <p class="mt-6 text-lg leading-8 text-slate-600">Structured course cards follow the clearer course discovery style used by modern training centers: direct titles, practical outcomes, and fast enrollment access.</p>
+                    <h2 class="mt-3 text-2xl font-bold leading-tight text-slate-900 sm:mt-4 sm:text-5xl">Caregiving education for local and international readiness.</h2>
+                    <p class="mt-4 text-sm leading-6 text-slate-600 sm:mt-6 sm:text-lg sm:leading-8">Structured course cards follow the clearer course discovery style used by modern training centers: direct titles, practical outcomes, and fast enrollment access.</p>
                 </div>
 
-                <div class="mt-14 grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    <article class="rounded-xl border border-slate-100 bg-white p-8 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
-                        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-purple-600">
-                            <svg viewBox="0 0 24 24" fill="none" class="h-6 w-6" aria-hidden="true">
+                <div class="mt-8 grid grid-cols-1 gap-4 sm:mt-14 sm:gap-6 lg:grid-cols-3">
+                    <article class="phone-soft-card rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg sm:p-8">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-600 sm:h-12 sm:w-12 sm:rounded-2xl">
+                            <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true">
                                 <path d="M5 20V7a2 2 0 012-2h10a2 2 0 012 2v13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                                 <path d="M8 9h8M8 13h6M5 20h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
                         </div>
-                        <h3 class="mt-7 text-2xl font-bold text-slate-900">Caregiving NC II</h3>
-                        <p class="mt-4 leading-7 text-slate-600">Core caregiving preparation with practical training, patient support routines, documentation, and assessment readiness.</p>
-                        <a href="#admissions" class="mt-8 inline-flex text-sm font-semibold text-purple-600 hover:text-purple-700">Enroll in this program</a>
+                        <h3 class="mt-5 text-xl font-bold text-slate-900 sm:mt-7 sm:text-2xl">Caregiving NC II</h3>
+                        <p class="mt-3 text-sm leading-6 text-slate-600 sm:mt-4 sm:text-base sm:leading-7">Core caregiving preparation with practical training, patient support routines, documentation, and assessment readiness.</p>
+                        <a href="#admissions" class="mt-5 inline-flex text-sm font-semibold text-purple-600 hover:text-purple-700 sm:mt-8">Enroll in this program</a>
                     </article>
 
-                    <article class="rounded-xl border border-slate-100 bg-white p-8 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
-                        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-purple-600">
-                            <svg viewBox="0 0 24 24" fill="none" class="h-6 w-6" aria-hidden="true">
+                    <article class="phone-soft-card rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg sm:p-8">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-600 sm:h-12 sm:w-12 sm:rounded-2xl">
+                            <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true">
                                 <path d="M12 21s-7-4.35-7-10a4 4 0 017-2.65A4 4 0 0119 11c0 5.65-7 10-7 10z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
                                 <path d="M9 12h2l1-2 1.5 4 1-2H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
                         </div>
-                        <h3 class="mt-7 text-2xl font-bold text-slate-900">Basic Life Support</h3>
-                        <p class="mt-4 leading-7 text-slate-600">A focused module for emergency awareness, response confidence, and healthcare-adjacent caregiving preparation.</p>
-                        <a href="#admissions" class="mt-8 inline-flex text-sm font-semibold text-purple-600 hover:text-purple-700">View training path</a>
+                        <h3 class="mt-5 text-xl font-bold text-slate-900 sm:mt-7 sm:text-2xl">Basic Life Support</h3>
+                        <p class="mt-3 text-sm leading-6 text-slate-600 sm:mt-4 sm:text-base sm:leading-7">A focused module for emergency awareness, response confidence, and healthcare-adjacent caregiving preparation.</p>
+                        <a href="#admissions" class="mt-5 inline-flex text-sm font-semibold text-purple-600 hover:text-purple-700 sm:mt-8">View training path</a>
                     </article>
 
-                    <article class="rounded-xl border border-slate-100 bg-white p-8 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
-                        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-purple-600">
-                            <svg viewBox="0 0 24 24" fill="none" class="h-6 w-6" aria-hidden="true">
+                    <article class="phone-soft-card rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg sm:p-8">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-600 sm:h-12 sm:w-12 sm:rounded-2xl">
+                            <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true">
                                 <path d="M4 7h16v11a2 2 0 01-2 2H6a2 2 0 01-2-2V7z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
                                 <path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M9 13h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
                         </div>
-                        <h3 class="mt-7 text-2xl font-bold text-slate-900">Alumni Career Hub</h3>
-                        <p class="mt-4 leading-7 text-slate-600">A capstone-ready layer for graduate tracking, career support, employment status updates, and partner opportunities.</p>
-                        <a href="#why" class="mt-8 inline-flex text-sm font-semibold text-purple-600 hover:text-purple-700">See career support</a>
+                        <h3 class="mt-5 text-xl font-bold text-slate-900 sm:mt-7 sm:text-2xl">Alumni Career Hub</h3>
+                        <p class="mt-3 text-sm leading-6 text-slate-600 sm:mt-4 sm:text-base sm:leading-7">A capstone-ready layer for graduate tracking, career support, employment status updates, and partner opportunities.</p>
+                        <a href="#why" class="mt-5 inline-flex text-sm font-semibold text-purple-600 hover:text-purple-700 sm:mt-8">See career support</a>
                     </article>
                 </div>
             </div>
         </section>
 
-        <section id="admissions" class="bg-slate-50/90 py-24 backdrop-blur sm:py-32">
-            <div class="mx-auto grid max-w-7xl grid-cols-1 gap-12 px-6 lg:grid-cols-2 lg:px-8">
+        <section id="admissions" class="bg-slate-50/90 py-14 backdrop-blur sm:py-32">
+            <div class="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 sm:gap-12 sm:px-6 lg:grid-cols-2 lg:px-8">
                 <div>
                     <p class="text-sm font-bold uppercase text-purple-600">Admissions</p>
-                    <h2 class="mt-4 text-4xl font-bold leading-tight text-slate-900 sm:text-5xl">A simple enrollment flow before the admin review.</h2>
-                    <p class="mt-6 text-lg leading-8 text-slate-600">Applicants now complete a direct TESDA-inspired learner profile for Caregiving NC II while Google OAuth is paused during development.</p>
-                    <div class="mt-10">
+                    <h2 class="mt-3 text-2xl font-bold leading-tight text-slate-900 sm:mt-4 sm:text-5xl">A simple enrollment flow before the admin review.</h2>
+                    <p class="mt-4 text-sm leading-6 text-slate-600 sm:mt-6 sm:text-lg sm:leading-8">Applicants now complete a direct TESDA-inspired learner profile for Caregiving NC II while Google OAuth is paused during development.</p>
+                    <div class="mt-6 sm:mt-10">
                         @auth
-                            <a href="{{ route('enrollment.create') }}" class="inline-flex items-center justify-center rounded-full bg-purple-600 px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700">Continue Enrollment</a>
+                            <a href="{{ $accountCtaUrl }}" class="inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:w-auto">{{ $accountCtaLabel }}</a>
                         @else
-                            <a href="{{ route('enrollment.create') }}" class="inline-flex items-center justify-center rounded-full bg-purple-600 px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700">Start Enrollment</a>
+                            <a href="{{ route('enrollment.create') }}" class="inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:w-auto">Start Enrollment</a>
                         @endauth
                     </div>
                 </div>
 
-                <div class="space-y-4">
-                    <div class="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-                        <div class="flex gap-5">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-purple-50 text-sm font-bold text-purple-600">1</span>
+                <div class="space-y-3 sm:space-y-4">
+                    <div class="phone-soft-card rounded-xl border border-slate-100 bg-white p-4 shadow-sm sm:rounded-2xl sm:p-6">
+                        <div class="flex gap-3 sm:gap-5">
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-50 text-sm font-bold text-purple-600 sm:h-10 sm:w-10">1</span>
                             <div>
-                                <h3 class="text-lg font-bold text-slate-900">Verify with Google</h3>
-                                <p class="mt-2 leading-7 text-slate-600">The account establishes the applicant name and email before enrollment begins.</p>
+                                <h3 class="text-base font-bold text-slate-900 sm:text-lg">Verify with Google</h3>
+                                <p class="mt-1.5 text-sm leading-6 text-slate-600 sm:mt-2 sm:text-base sm:leading-7">The account establishes the applicant name and email before enrollment begins.</p>
                             </div>
                         </div>
                     </div>
-                    <div class="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-                        <div class="flex gap-5">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-purple-50 text-sm font-bold text-purple-600">2</span>
+                    <div class="phone-soft-card rounded-xl border border-slate-100 bg-white p-4 shadow-sm sm:rounded-2xl sm:p-6">
+                        <div class="flex gap-3 sm:gap-5">
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-50 text-sm font-bold text-purple-600 sm:h-10 sm:w-10">2</span>
                             <div>
-                                <h3 class="text-lg font-bold text-slate-900">Complete applicant details</h3>
-                                <p class="mt-2 leading-7 text-slate-600">Personal information, address, education, contact details, and preferred schedule are saved for review.</p>
+                                <h3 class="text-base font-bold text-slate-900 sm:text-lg">Complete applicant details</h3>
+                                <p class="mt-1.5 text-sm leading-6 text-slate-600 sm:mt-2 sm:text-base sm:leading-7">Personal information, address, education, contact details, and preferred schedule are saved for review.</p>
                             </div>
                         </div>
                     </div>
-                    <div class="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-                        <div class="flex gap-5">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-purple-50 text-sm font-bold text-purple-600">3</span>
+                    <div class="phone-soft-card rounded-xl border border-slate-100 bg-white p-4 shadow-sm sm:rounded-2xl sm:p-6">
+                        <div class="flex gap-3 sm:gap-5">
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-50 text-sm font-bold text-purple-600 sm:h-10 sm:w-10">3</span>
                             <div>
-                                <h3 class="text-lg font-bold text-slate-900">Admin approval next</h3>
-                                <p class="mt-2 leading-7 text-slate-600">Document verification, payment review, training access, and certificate records can be built after the flow is confirmed.</p>
+                                <h3 class="text-base font-bold text-slate-900 sm:text-lg">Admin approval next</h3>
+                                <p class="mt-1.5 text-sm leading-6 text-slate-600 sm:mt-2 sm:text-base sm:leading-7">Document verification, payment review, training access, and certificate records can be built after the flow is confirmed.</p>
                             </div>
                         </div>
                     </div>
@@ -556,30 +592,30 @@
             </div>
         </section>
 
-        <section id="why" class="bg-white/90 py-24 backdrop-blur sm:py-32">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
-                <div class="grid grid-cols-1 gap-12 lg:grid-cols-3">
+        <section id="why" class="bg-white/90 py-14 backdrop-blur sm:py-32">
+            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div class="grid grid-cols-1 gap-8 sm:gap-12 lg:grid-cols-3">
                     <div>
                         <p class="text-sm font-bold uppercase text-purple-600">Why MCARE</p>
-                        <h2 class="mt-4 text-4xl font-bold leading-tight text-slate-900">Built like a real training operations hub.</h2>
+                        <h2 class="mt-3 text-2xl font-bold leading-tight text-slate-900 sm:mt-4 sm:text-4xl">Built like a real training operations hub.</h2>
                     </div>
                     <div class="lg:col-span-2">
-                        <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                            <div class="rounded-xl border border-slate-100 bg-white p-7 shadow-sm">
-                                <h3 class="text-lg font-bold text-slate-900">Clear schedules</h3>
-                                <p class="mt-3 leading-7 text-slate-600">Support for weekday, weekend, and special training batches.</p>
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+                            <div class="phone-soft-card rounded-xl border border-slate-100 bg-white p-5 shadow-sm sm:p-7">
+                                <h3 class="text-base font-bold text-slate-900 sm:text-lg">Clear schedules</h3>
+                                <p class="mt-2 text-sm leading-6 text-slate-600 sm:mt-3 sm:text-base sm:leading-7">Support for weekday, weekend, and special training batches.</p>
                             </div>
-                            <div class="rounded-xl border border-slate-100 bg-white p-7 shadow-sm">
-                                <h3 class="text-lg font-bold text-slate-900">Document readiness</h3>
-                                <p class="mt-3 leading-7 text-slate-600">Prepared for applicant requirements, verification status, and admin notes.</p>
+                            <div class="phone-soft-card rounded-xl border border-slate-100 bg-white p-5 shadow-sm sm:p-7">
+                                <h3 class="text-base font-bold text-slate-900 sm:text-lg">Document readiness</h3>
+                                <p class="mt-2 text-sm leading-6 text-slate-600 sm:mt-3 sm:text-base sm:leading-7">Prepared for applicant requirements, verification status, and admin notes.</p>
                             </div>
-                            <div class="rounded-xl border border-slate-100 bg-white p-7 shadow-sm">
-                                <h3 class="text-lg font-bold text-slate-900">Learning records</h3>
-                                <p class="mt-3 leading-7 text-slate-600">A foundation for modules, progress tracking, certificates, and digital records.</p>
+                            <div class="phone-soft-card rounded-xl border border-slate-100 bg-white p-5 shadow-sm sm:p-7">
+                                <h3 class="text-base font-bold text-slate-900 sm:text-lg">Learning records</h3>
+                                <p class="mt-2 text-sm leading-6 text-slate-600 sm:mt-3 sm:text-base sm:leading-7">A foundation for modules, progress tracking, certificates, and digital records.</p>
                             </div>
-                            <div class="rounded-xl border border-slate-100 bg-white p-7 shadow-sm">
-                                <h3 class="text-lg font-bold text-slate-900">Career continuity</h3>
-                                <p class="mt-3 leading-7 text-slate-600">Alumni profiles can continue after training for employment and job placement updates.</p>
+                            <div class="phone-soft-card rounded-xl border border-slate-100 bg-white p-5 shadow-sm sm:p-7">
+                                <h3 class="text-base font-bold text-slate-900 sm:text-lg">Career continuity</h3>
+                                <p class="mt-2 text-sm leading-6 text-slate-600 sm:mt-3 sm:text-base sm:leading-7">Alumni profiles can continue after training for employment and job placement updates.</p>
                             </div>
                         </div>
                     </div>
@@ -587,31 +623,31 @@
             </div>
         </section>
 
-        <section id="discover" class="relative overflow-hidden border-y border-purple-100 py-20">
+        <section id="discover" class="relative overflow-hidden border-y border-purple-100 py-14 sm:py-20">
             <!-- Path: resources/views/landing/home.blade.php | Label: Discover bottom radial background layer -->
             <div class="discover-radial-bg absolute inset-0 z-0"></div>
-            <div class="relative z-10 mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <p class="discover-fade text-sm font-bold uppercase text-purple-600">Discover more</p>
-                        <h2 class="discover-fade mt-4 max-w-3xl text-4xl font-bold leading-tight text-slate-900">Follow MCARE and watch training updates.</h2>
-                        <p class="discover-fade mt-4 max-w-2xl leading-7 text-slate-600">Connect with the official pages and explore videos from Facebook to learn more about programs, student activities, and enrollment announcements.</p>
+                        <h2 class="discover-fade mt-3 max-w-3xl text-2xl font-bold leading-tight text-slate-900 sm:mt-4 sm:text-4xl">Follow MCARE and watch training updates.</h2>
+                        <p class="discover-fade mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:mt-4 sm:text-base sm:leading-7">Connect with the official pages and explore videos from Facebook to learn more about programs, student activities, and enrollment announcements.</p>
                     </div>
 
-                    <div class="discover-fade flex flex-wrap gap-3">
-                        <a href="{{ $socialLinks['facebook'] }}" target="_blank" rel="noopener noreferrer" aria-label="Open MCARE Facebook page" class="inline-flex h-12 w-12 items-center justify-center rounded-full border border-purple-100 bg-white text-purple-700 shadow-sm transition hover:-translate-y-0.5 hover:border-purple-200 hover:bg-purple-50 hover:text-purple-800">
+                    <div class="discover-fade flex flex-wrap gap-2.5 sm:gap-3">
+                        <a href="{{ $socialLinks['facebook'] }}" target="_blank" rel="noopener noreferrer" aria-label="Open MCARE Facebook page" class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-purple-100 bg-white text-purple-700 shadow-sm transition hover:-translate-y-0.5 hover:border-purple-200 hover:bg-purple-50 hover:text-purple-800 sm:h-12 sm:w-12">
                             <svg viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5" aria-hidden="true">
                                 <path d="M14 8.5h2V5.2c-.35-.05-1.55-.15-2.95-.15-2.9 0-4.9 1.82-4.9 5.18v2.92H5v3.7h3.15V24h3.88v-7.15h3.03l.48-3.7h-3.51v-2.55c0-1.07.29-2.1 1.97-2.1Z"/>
                             </svg>
                         </a>
-                        <a href="{{ $socialLinks['instagram'] }}" target="_blank" rel="noopener noreferrer" aria-label="Open MCARE Instagram page" class="inline-flex h-12 w-12 items-center justify-center rounded-full border border-purple-100 bg-white text-purple-700 shadow-sm transition hover:-translate-y-0.5 hover:border-purple-200 hover:bg-purple-50 hover:text-purple-800">
+                        <a href="{{ $socialLinks['instagram'] }}" target="_blank" rel="noopener noreferrer" aria-label="Open MCARE Instagram page" class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-purple-100 bg-white text-purple-700 shadow-sm transition hover:-translate-y-0.5 hover:border-purple-200 hover:bg-purple-50 hover:text-purple-800 sm:h-12 sm:w-12">
                             <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5" aria-hidden="true">
                                 <rect x="4" y="4" width="16" height="16" rx="5" stroke="currentColor" stroke-width="2"/>
                                 <circle cx="12" cy="12" r="3.5" stroke="currentColor" stroke-width="2"/>
                                 <circle cx="16.8" cy="7.2" r="1" fill="currentColor"/>
                             </svg>
                         </a>
-                        <a href="{{ $socialLinks['youtube'] }}" target="_blank" rel="noopener noreferrer" aria-label="Open MCARE YouTube channel" class="inline-flex h-12 w-12 items-center justify-center rounded-full border border-purple-100 bg-white text-purple-700 shadow-sm transition hover:-translate-y-0.5 hover:border-purple-200 hover:bg-purple-50 hover:text-purple-800">
+                        <a href="{{ $socialLinks['youtube'] }}" target="_blank" rel="noopener noreferrer" aria-label="Open MCARE YouTube channel" class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-purple-100 bg-white text-purple-700 shadow-sm transition hover:-translate-y-0.5 hover:border-purple-200 hover:bg-purple-50 hover:text-purple-800 sm:h-12 sm:w-12">
                             <svg viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6" aria-hidden="true">
                                 <path d="M21.6 7.2a3 3 0 0 0-2.1-2.1C17.65 4.6 12 4.6 12 4.6s-5.65 0-7.5.5a3 3 0 0 0-2.1 2.1A31.2 31.2 0 0 0 1.9 12c0 1.6.16 3.2.5 4.8a3 3 0 0 0 2.1 2.1c1.85.5 7.5.5 7.5.5s5.65 0 7.5-.5a3 3 0 0 0 2.1-2.1c.34-1.6.5-3.2.5-4.8 0-1.6-.16-3.2-.5-4.8ZM10 15.4V8.6l5.8 3.4L10 15.4Z"/>
                             </svg>
@@ -619,9 +655,9 @@
                     </div>
                 </div>
 
-                <div class="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-3">
+                <div class="mt-8 grid grid-cols-1 gap-4 sm:mt-12 sm:gap-6 lg:grid-cols-3">
                     @foreach ($facebookVideos as $video)
-                        <article class="discover-fade overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+                        <article class="discover-fade phone-soft-card overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm sm:rounded-2xl">
                             <div class="aspect-video bg-slate-100">
                                 <iframe
                                     src="https://www.facebook.com/plugins/video.php?href={{ rawurlencode($video['url']) }}&show_text=false&width=560"
@@ -632,8 +668,8 @@
                                     title="{{ $video['title'] }}">
                                 </iframe>
                             </div>
-                            <div class="p-5">
-                                <h3 class="text-lg font-bold text-slate-900">{{ $video['title'] }}</h3>
+                            <div class="p-4 sm:p-5">
+                                <h3 class="text-base font-bold text-slate-900 sm:text-lg">{{ $video['title'] }}</h3>
                                 <p class="mt-2 text-sm leading-6 text-slate-500">{{ $video['description'] }}</p>
                                 <a href="{{ $video['url'] }}" target="_blank" rel="noopener noreferrer" class="mt-4 inline-flex text-sm font-bold text-purple-700 hover:text-purple-800">Open on Facebook</a>
                             </div>
@@ -643,17 +679,17 @@
             </div>
         </section>
 
-        <section id="contact" class="border-y border-slate-100 bg-gradient-to-t from-purple-50/90 via-slate-50/90 to-white/85 py-20 backdrop-blur">
-            <div class="mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 px-6 lg:flex-row lg:items-center lg:px-8">
+        <section id="contact" class="border-y border-slate-100 bg-gradient-to-t from-purple-50/90 via-slate-50/90 to-white/85 py-14 backdrop-blur sm:py-20">
+            <div class="mx-auto flex max-w-7xl flex-col items-start justify-between gap-6 px-4 sm:gap-8 sm:px-6 lg:flex-row lg:items-center lg:px-8">
                 <div>
                     <p class="text-sm font-bold uppercase text-purple-600">Mission Care</p>
-                    <h2 class="mt-4 text-4xl font-bold leading-tight text-slate-900">Ready to begin your applicant profile?</h2>
-                    <p class="mt-4 max-w-2xl leading-7 text-slate-600">Start securely, then proceed to the enrollment form prepared for MCARE training operations.</p>
+                    <h2 class="mt-3 text-2xl font-bold leading-tight text-slate-900 sm:mt-4 sm:text-4xl">Ready to begin your applicant profile?</h2>
+                    <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:mt-4 sm:text-base sm:leading-7">Start securely, then proceed to the enrollment form prepared for MCARE training operations.</p>
                 </div>
                 @auth
-                    <a href="{{ route('enrollment.create') }}" class="inline-flex items-center justify-center rounded-full bg-purple-600 px-8 py-4 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700">Enroll Now</a>
+                    <a href="{{ $accountCtaUrl }}" class="inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-8 py-4 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:w-auto">{{ $accountCtaLabel }}</a>
                 @else
-                    <a href="{{ route('enrollment.create') }}" class="inline-flex items-center justify-center rounded-full bg-purple-600 px-8 py-4 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700">Start Enrollment</a>
+                    <a href="{{ route('enrollment.create') }}" class="inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-8 py-4 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:w-auto">Start Enrollment</a>
                 @endauth
             </div>
         </section>
@@ -662,12 +698,12 @@
     <!-- Path: resources/views/landing/home.blade.php | Label: Footer radial gradient area -->
     <footer class="relative z-10 overflow-hidden border-t border-purple-100">
         <div class="footer-radial-bg absolute inset-0 z-0"></div>
-        <div class="relative z-10 mx-auto flex max-w-7xl flex-col gap-5 px-6 py-12 text-sm text-slate-700 sm:flex-row sm:items-center sm:justify-between lg:px-8">
+        <div class="relative z-10 mx-auto flex max-w-7xl flex-col gap-5 px-4 py-10 text-center text-sm text-slate-700 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-12 sm:text-left lg:px-8">
             <div>
                 <p class="font-bold text-slate-900">&copy; {{ date('Y') }} Mission Care Training and Assessment Center.</p>
                 <p class="mt-1 text-slate-600">MCARE Hub | Caregiving NC II | Applicant Management</p>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center justify-center gap-3">
                 <a href="{{ $socialLinks['facebook'] }}" target="_blank" rel="noopener noreferrer" aria-label="Open MCARE Facebook page from footer" class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/50 bg-white/85 text-purple-700 shadow-sm hover:bg-white">
                     <svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4" aria-hidden="true">
                         <path d="M14 8.5h2V5.2c-.35-.05-1.55-.15-2.95-.15-2.9 0-4.9 1.82-4.9 5.18v2.92H5v3.7h3.15V24h3.88v-7.15h3.03l.48-3.7h-3.51v-2.55c0-1.07.29-2.1 1.97-2.1Z"/>

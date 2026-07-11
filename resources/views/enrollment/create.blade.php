@@ -5,8 +5,122 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Caregiving NC II Enrollment | MCARE</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>
+        /* Path: resources/views/enrollment/create.blade.php | Label: Phone-first enrollment density */
+        @media (max-width: 767px) {
+            .enrollment-header-inner {
+                padding: 0.875rem 1rem;
+                gap: 0.875rem;
+            }
+
+            .enrollment-logo {
+                width: 2.75rem;
+                height: 2.75rem;
+                border-radius: 1rem;
+            }
+
+            .enrollment-main {
+                padding: 1rem;
+            }
+
+            .enrollment-hero-card,
+            .enrollment-status-card,
+            .enrollment-form-shell,
+            .enrollment-upload-card,
+            .enrollment-consent-card,
+            .enrollment-signature-card {
+                border-radius: 1.25rem;
+                box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+            }
+
+            .enrollment-hero-card {
+                padding: 1.125rem;
+            }
+
+            .enrollment-status-card {
+                padding: 1rem;
+            }
+
+            .enrollment-form-shell {
+                margin-top: 1rem;
+                padding: 1rem;
+            }
+
+            .enrollment-form > * + * {
+                margin-top: 1.75rem !important;
+            }
+
+            .enrollment-section-heading {
+                padding-bottom: 0.875rem;
+            }
+
+            .enrollment-section-heading h2,
+            .enrollment-consent-card h2 {
+                font-size: 1.125rem;
+                line-height: 1.55rem;
+            }
+
+            .enrollment-fields {
+                gap: 0.875rem;
+                margin-top: 1rem;
+            }
+
+            .enrollment-page label {
+                margin-bottom: 0.375rem;
+                font-size: 0.8125rem;
+            }
+
+            .enrollment-page input:not([type="checkbox"]):not([type="radio"]),
+            .enrollment-page select {
+                min-height: 2.75rem;
+                border-radius: 1rem !important;
+                padding: 0.7rem 0.875rem;
+                font-size: 0.875rem;
+            }
+
+            .enrollment-upload-card {
+                padding: 1rem;
+            }
+
+            .enrollment-upload-zone {
+                border-radius: 1rem;
+                padding: 1.25rem 0.875rem;
+            }
+
+            .enrollment-consent-card {
+                padding: 1rem;
+            }
+
+            .enrollment-signature-card {
+                padding: 1rem;
+            }
+
+            .enrollment-signature-switch {
+                width: 100%;
+                justify-content: center;
+            }
+
+            #signature_canvas {
+                height: 9.75rem;
+            }
+
+            .enrollment-submit-row {
+                padding-top: 1rem;
+            }
+        }
+
+        /* Path: resources/views/enrollment/create.blade.php | Label: Enrollment section jump menu */
+        .enrollment-jump-target {
+            scroll-margin-top: 6rem;
+        }
+
+        .enrollment-jump-panel {
+            max-height: min(58vh, 26rem);
+            overflow-y: auto;
+        }
+    </style>
 </head>
-<body class="min-h-screen bg-white font-sans text-slate-900 antialiased">
+<body class="enrollment-page min-h-screen bg-white font-sans text-slate-900 antialiased">
     <div class="pointer-events-none fixed inset-x-0 top-0 -z-10 h-72 bg-gradient-to-b from-purple-100 via-purple-50/70 to-white"></div>
     <div class="pointer-events-none fixed inset-x-0 bottom-0 -z-10 h-72 bg-gradient-to-t from-purple-100 via-purple-50/60 to-white"></div>
 
@@ -15,51 +129,84 @@
     </div>
 
     <header class="border-b border-purple-100 bg-white/90 backdrop-blur-xl">
-        <div class="mx-auto flex max-w-7xl flex-col gap-5 px-6 py-5 sm:flex-row sm:items-center sm:justify-between lg:px-8">
+        <div class="enrollment-header-inner mx-auto flex max-w-7xl flex-col gap-5 px-6 py-5 sm:flex-row sm:items-center sm:justify-between lg:px-8">
             <a href="{{ route('landing') }}" class="flex items-center gap-4">
-                <img src="{{ asset('assets/official-logo.png') }}" alt="Mission Care Training Center logo" class="h-16 w-16 rounded-2xl object-contain">
+                <img src="{{ asset('assets/official-logo.png') }}" alt="Mission Care Training Center logo" class="enrollment-logo h-16 w-16 rounded-2xl object-contain">
                 <span>
-                    <span class="block text-base font-bold text-slate-900">Mission Care Training Center</span>
-                    <span class="block text-sm text-slate-500">Caregiving NC II Enrollment</span>
+                    <span class="block text-sm font-bold text-slate-900 sm:text-base">Mission Care Training Center</span>
+                    <span class="block text-xs text-slate-500 sm:text-sm">Caregiving NC II Enrollment</span>
                 </span>
             </a>
-            <a href="{{ route('landing') }}" class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:border-purple-200 hover:text-purple-700">
+            <a href="{{ route('landing') }}" class="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:border-purple-200 hover:text-purple-700 sm:h-auto sm:px-5 sm:py-2.5">
                 Back to landing
             </a>
         </div>
     </header>
 
-    <main class="mx-auto max-w-7xl px-6 py-10 lg:px-8 lg:py-14">
-        <section class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
-            <div class="rounded-3xl border border-purple-100 bg-white p-7 shadow-xl shadow-purple-100/40 sm:p-10">
-                <div class="inline-flex items-center gap-2 rounded-full bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 ring-1 ring-purple-100">
+    <main class="enrollment-main mx-auto max-w-7xl px-6 py-10 lg:px-8 lg:py-14">
+        <section class="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[1fr_380px]">
+            <div class="enrollment-hero-card rounded-3xl border border-purple-100 bg-white p-7 shadow-xl shadow-purple-100/40 sm:p-10">
+                <div class="inline-flex items-center gap-2 rounded-full bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 ring-1 ring-purple-100 sm:px-4 sm:py-2 sm:text-sm">
                     TESDA-DPA inspired learner profile
                 </div>
-                <h1 class="mt-7 max-w-4xl text-4xl font-bold leading-tight text-slate-900 sm:text-5xl">
+                <h1 class="mt-5 max-w-4xl text-2xl font-bold leading-tight text-slate-900 sm:mt-7 sm:text-5xl">
                     Caregiving NC II Enrollment Registration
                 </h1>
-                <p class="mt-5 max-w-3xl text-lg leading-8 text-slate-600">
+                <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600 sm:mt-5 sm:text-lg sm:leading-8">
                     Complete the learner profile for MCARE's NC II enrollment. This version uses direct applicant registration while Google OAuth is paused during development.
                 </p>
             </div>
 
-            <aside class="rounded-3xl border border-slate-100 bg-slate-50 p-7 shadow-sm">
+            <aside class="enrollment-status-card rounded-3xl border border-slate-100 bg-slate-50 p-7 shadow-sm">
                 <p class="text-sm font-bold uppercase text-purple-600">Application status</p>
-                <div class="mt-5 rounded-2xl bg-white p-5 shadow-sm">
+                <div class="mt-4 rounded-2xl bg-white p-4 shadow-sm sm:mt-5 sm:p-5">
                     <p class="text-sm text-slate-500">Program</p>
-                    <p class="mt-1 text-xl font-bold text-slate-900">Caregiving NC II</p>
+                    <p class="mt-1 text-lg font-bold text-slate-900 sm:text-xl">Caregiving NC II</p>
                 </div>
-                <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
+                <div class="mt-3 rounded-2xl bg-white p-4 shadow-sm sm:mt-4 sm:p-5">
                     <p class="text-sm text-slate-500">Current step</p>
-                    <p class="mt-1 text-xl font-bold text-slate-900">Learner profile</p>
+                    <p class="mt-1 text-lg font-bold text-slate-900 sm:text-xl">Learner profile</p>
                 </div>
-                <p class="mt-5 text-sm leading-6 text-slate-500">
+                <p class="mt-4 text-sm leading-6 text-slate-500 sm:mt-5">
                     Documents, payment review, and admin verification will follow after this base registration is stable.
                 </p>
             </aside>
         </section>
 
-        <section class="mt-8 rounded-3xl border border-slate-100 bg-white p-6 shadow-xl shadow-slate-200/60 sm:p-8">
+        <!-- Path: resources/views/enrollment/create.blade.php | Label: Sticky enrollment section jump menu -->
+        <section class="enrollment-jump-nav sticky top-0 z-40 mt-4 rounded-2xl border border-purple-100 bg-white/95 shadow-lg shadow-purple-100/50 backdrop-blur-xl">
+            <details id="enrollment-jump-details" class="group">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-slate-800 marker:hidden">
+                    <span class="flex min-w-0 items-center gap-3">
+                        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-purple-600 text-white">
+                            <svg viewBox="0 0 24 24" fill="none" class="h-4 w-4" aria-hidden="true">
+                                <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                        </span>
+                        <span>
+                            <span class="block leading-5">Jump to section</span>
+                            <span class="block text-xs font-semibold text-slate-500">Tap a part instead of scrolling the whole form.</span>
+                        </span>
+                    </span>
+                    <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5 shrink-0 text-slate-400 transition group-open:rotate-180" aria-hidden="true">
+                        <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </summary>
+                <nav class="enrollment-jump-panel grid grid-cols-2 gap-2 border-t border-purple-100 p-3 text-sm sm:grid-cols-4" aria-label="Enrollment form sections">
+                    <a href="#enrollment-account" class="rounded-xl bg-purple-50 px-3 py-2 font-bold text-purple-700 hover:bg-purple-100">Account</a>
+                    <a href="#enrollment-profile" class="rounded-xl bg-slate-50 px-3 py-2 font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Profile</a>
+                    <a href="#enrollment-address" class="rounded-xl bg-slate-50 px-3 py-2 font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Address</a>
+                    <a href="#enrollment-personal" class="rounded-xl bg-slate-50 px-3 py-2 font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Personal</a>
+                    <a href="#enrollment-education" class="rounded-xl bg-slate-50 px-3 py-2 font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Education</a>
+                    <a href="#enrollment-classification" class="rounded-xl bg-slate-50 px-3 py-2 font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Classification</a>
+                    <a href="#enrollment-documents" class="rounded-xl bg-slate-50 px-3 py-2 font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Documents</a>
+                    <a href="#enrollment-signature" class="rounded-xl bg-slate-50 px-3 py-2 font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Signature</a>
+                    <a href="#enrollment-submit" class="col-span-2 rounded-xl bg-purple-600 px-3 py-2 text-center font-black text-white hover:bg-purple-700 sm:col-span-4">Submit</a>
+                </nav>
+            </details>
+        </section>
+
+        <section class="enrollment-form-shell mt-8 rounded-3xl border border-slate-100 bg-white p-6 shadow-xl shadow-slate-200/60 sm:p-8">
             @if (session('saved'))
                 <div class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold leading-6 text-emerald-700">
                     {{ session('saved') }}
@@ -72,16 +219,16 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('enrollment.store') }}" enctype="multipart/form-data" class="space-y-10">
+            <form method="POST" action="{{ route('enrollment.store') }}" enctype="multipart/form-data" class="enrollment-form space-y-10">
                 @csrf
 
-                <div>
-                    <div class="border-b border-slate-100 pb-5">
+                <div id="enrollment-account" class="enrollment-jump-target">
+                    <div class="enrollment-section-heading border-b border-slate-100 pb-5">
                         <p class="text-sm font-bold uppercase text-purple-600">Account</p>
                         <h2 class="mt-2 text-2xl font-bold text-slate-900">Applicant account</h2>
                         <p class="mt-2 text-sm leading-6 text-slate-500">This replaces Google OAuth for now. The email becomes the applicant account used for enrollment tracking.</p>
                     </div>
-                    <div class="mt-6 grid grid-cols-1 gap-5 md:grid-cols-3">
+                    <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-3">
                         <div class="md:col-span-2">
                             <label for="email" class="mb-2 block text-sm font-semibold text-slate-800">Email address</label>
                             <input id="email" name="email" type="email" inputmode="email" pattern="^[A-Za-z0-9._%+\-]+@gmail\.com$" value="{{ old('email', $application->email ?? $user?->email ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
@@ -117,12 +264,12 @@
                     </div>
                 </div>
 
-                <div>
-                    <div class="border-b border-slate-100 pb-5">
+                <div id="enrollment-profile" class="enrollment-jump-target">
+                    <div class="enrollment-section-heading border-b border-slate-100 pb-5">
                         <p class="text-sm font-bold uppercase text-purple-600">Learner profile</p>
                         <h2 class="mt-2 text-2xl font-bold text-slate-900">Name and contact details</h2>
                     </div>
-                    <div class="mt-6 grid grid-cols-1 gap-5 md:grid-cols-4">
+                    <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-4">
                         <div>
                             <label for="last_name" class="mb-2 block text-sm font-semibold text-slate-800">Last name</label>
                             <input id="last_name" name="last_name" type="text" value="{{ old('last_name', $application->last_name ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
@@ -156,12 +303,12 @@
                     </div>
                 </div>
 
-                <div>
-                    <div class="border-b border-slate-100 pb-5">
+                <div id="enrollment-address" class="enrollment-jump-target">
+                    <div class="enrollment-section-heading border-b border-slate-100 pb-5">
                         <p class="text-sm font-bold uppercase text-purple-600">Permanent mailing address</p>
                         <h2 class="mt-2 text-2xl font-bold text-slate-900">Address information</h2>
                     </div>
-                    <div class="mt-6 grid grid-cols-1 gap-5 md:grid-cols-6">
+                    <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-6">
                         <div class="md:col-span-2">
                             <label for="street" class="mb-2 block text-sm font-semibold text-slate-800">Number, street</label>
                             <input id="street" name="street" type="text" value="{{ old('street', $application->street ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
@@ -195,12 +342,12 @@
                     </div>
                 </div>
 
-                <div>
-                    <div class="border-b border-slate-100 pb-5">
+                <div id="enrollment-personal" class="enrollment-jump-target">
+                    <div class="enrollment-section-heading border-b border-slate-100 pb-5">
                         <p class="text-sm font-bold uppercase text-purple-600">Personal information</p>
                         <h2 class="mt-2 text-2xl font-bold text-slate-900">Birth, status, and employment</h2>
                     </div>
-                    <div class="mt-6 grid grid-cols-1 gap-5 md:grid-cols-4">
+                    <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-4">
                         <div>
                             <label for="gender" class="mb-2 block text-sm font-semibold text-slate-800">Sex</label>
                             <select id="gender" name="gender" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
@@ -264,12 +411,12 @@
                     </div>
                 </div>
 
-                <div>
-                    <div class="border-b border-slate-100 pb-5">
+                <div id="enrollment-education" class="enrollment-jump-target">
+                    <div class="enrollment-section-heading border-b border-slate-100 pb-5">
                         <p class="text-sm font-bold uppercase text-purple-600">Education and guardian</p>
                         <h2 class="mt-2 text-2xl font-bold text-slate-900">Training eligibility details</h2>
                     </div>
-                    <div class="mt-6 grid grid-cols-1 gap-5 md:grid-cols-3">
+                    <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-3">
                         <div>
                             <label for="educational_attainment" class="mb-2 block text-sm font-semibold text-slate-800">Educational attainment</label>
                             <select id="educational_attainment" name="educational_attainment" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
@@ -303,12 +450,12 @@
                     </div>
                 </div>
 
-                <div>
-                    <div class="border-b border-slate-100 pb-5">
+                <div id="enrollment-classification" class="enrollment-jump-target">
+                    <div class="enrollment-section-heading border-b border-slate-100 pb-5">
                         <p class="text-sm font-bold uppercase text-purple-600">TESDA classification</p>
                         <h2 class="mt-2 text-2xl font-bold text-slate-900">Optional classification details</h2>
                     </div>
-                    <div class="mt-6 grid grid-cols-1 gap-5 md:grid-cols-4">
+                    <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-4">
                         <div>
                             <label for="classification" class="mb-2 block text-sm font-semibold text-slate-800">Client classification</label>
                             <select id="classification" name="classification" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
@@ -347,8 +494,8 @@
                     </div>
                 </div>
 
-                <div>
-                    <div class="border-b border-slate-100 pb-5">
+                <div id="enrollment-documents" class="enrollment-jump-target">
+                    <div class="enrollment-section-heading border-b border-slate-100 pb-5">
                         <p class="text-sm font-bold uppercase text-purple-600">Document upload</p>
                         <h2 class="mt-2 text-2xl font-bold text-slate-900">Supporting requirements</h2>
                         <p class="mt-2 text-sm leading-6 text-slate-500">Accepted formats are PDF, JPG, JPEG, and PNG. ID photo accepts JPG or PNG only. Maximum size is 5MB per file.</p>
@@ -383,12 +530,12 @@
                         ];
                     @endphp
 
-                    <div class="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
                         @foreach ($uploadFields as $field => $details)
-                            <div class="rounded-3xl border border-slate-100 bg-slate-50 p-5">
+                            <div class="enrollment-upload-card rounded-3xl border border-slate-100 bg-slate-50 p-5">
                                 <label for="{{ $field }}" class="block text-sm font-bold text-slate-900">{{ $details['label'] }}</label>
                                 <p class="mt-1 text-xs leading-5 text-slate-500">{{ $details['description'] }}</p>
-                                <div data-upload-zone class="relative mt-4 rounded-2xl border-2 border-dashed border-purple-200 bg-white px-5 py-7 text-center transition hover:border-purple-400 hover:bg-purple-50/50">
+                                <div data-upload-zone class="enrollment-upload-zone relative mt-4 rounded-2xl border-2 border-dashed border-purple-200 bg-white px-5 py-7 text-center transition hover:border-purple-400 hover:bg-purple-50/50">
                                     <input id="{{ $field }}" name="{{ $field }}" type="file" accept="{{ $details['accept'] }}" @required(! $details['path']) class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0">
                                     <div class="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-purple-50 text-purple-600">
                                         <svg viewBox="0 0 24 24" fill="none" class="h-6 w-6" aria-hidden="true">
@@ -405,7 +552,7 @@
                     </div>
                 </div>
 
-                <div class="rounded-3xl border border-purple-100 bg-purple-50/70 p-6">
+                <div id="enrollment-signature" class="enrollment-consent-card enrollment-jump-target rounded-3xl border border-purple-100 bg-purple-50/70 p-6">
                     <div class="grid grid-cols-1 gap-5 md:grid-cols-3">
                         <div class="md:col-span-2">
                             <h2 class="text-2xl font-bold text-slate-900">Privacy consent and signature</h2>
@@ -426,13 +573,13 @@
                         </div>
                     </div>
 
-                    <div class="mt-6 rounded-3xl border border-purple-100 bg-white p-5">
+                    <div class="enrollment-signature-card mt-6 rounded-3xl border border-purple-100 bg-white p-5">
                         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <p class="text-sm font-bold uppercase text-purple-600">E-signature method</p>
                                 <p class="mt-1 text-sm leading-6 text-slate-500">Draw directly on the pad or upload a clear signature image.</p>
                             </div>
-                            <div class="flex rounded-full border border-purple-100 bg-purple-50 p-1">
+                            <div class="enrollment-signature-switch flex rounded-full border border-purple-100 bg-purple-50 p-1">
                                 <label class="cursor-pointer rounded-full px-4 py-2 text-sm font-bold text-slate-700">
                                     <input type="radio" name="signature_type" value="draw" class="mr-1" @checked(old('signature_type', $application->signature_type ?? 'draw') === 'draw')>
                                     Draw
@@ -475,9 +622,9 @@
                     </div>
                 </div>
 
-                <div class="flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
+                <div id="enrollment-submit" class="enrollment-submit-row enrollment-jump-target flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
                     <p class="text-sm leading-6 text-slate-500">Date accomplished will be recorded automatically when the form is submitted.</p>
-                    <button type="submit" class="inline-flex items-center justify-center rounded-full bg-purple-600 px-8 py-4 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700">
+                    <button type="submit" class="inline-flex h-12 items-center justify-center rounded-full bg-purple-600 px-8 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:h-auto sm:py-4">
                         Submit NC II enrollment
                     </button>
                 </div>
@@ -492,6 +639,7 @@
         const emailInput = document.getElementById('email');
         const enrollmentForm = document.querySelector('form[action="{{ route('enrollment.store') }}"]');
         const actionToast = document.getElementById('action-toast');
+        const enrollmentJumpDetails = document.getElementById('enrollment-jump-details');
         const existingSignatureSaved = @json((bool) ($application->signature_path ?? false));
         let signatureDrawn = false;
 
@@ -735,9 +883,18 @@
             });
         }
 
+        function attachEnrollmentJumpMenu() {
+            enrollmentJumpDetails?.querySelectorAll('a[href^="#"]').forEach((link) => {
+                link.addEventListener('click', () => {
+                    enrollmentJumpDetails.open = false;
+                });
+            });
+        }
+
         attachInputHardening();
         attachUploadFeedback();
         attachSignaturePad();
+        attachEnrollmentJumpMenu();
         attachSubmitValidation();
     </script>
 </body>

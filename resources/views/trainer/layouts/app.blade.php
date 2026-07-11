@@ -6,13 +6,13 @@
     <title>{{ $title ?? 'MCARE Trainer' }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="min-h-screen bg-[#faf9f7] font-sans text-slate-900 antialiased">
+<body class="dashboard-shell universal-dashboard" data-dashboard-role="trainer">
     @php
         $trainerName = auth()->user()?->name ?? 'Trainer User';
         $trainerInitial = strtoupper(substr($trainerName, 0, 1));
-        $navClass = 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition';
-        $navIdle = 'text-slate-600 hover:bg-slate-100 hover:text-slate-950';
-        $navActive = 'bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-100';
+        $navClass = 'dashboard-nav-link';
+        $navIdle = '';
+        $navActive = 'is-active';
         $trainerNav = [
             ['label' => 'Teaching Day', 'icon' => 'fa-calendar-days', 'href' => route('trainer.dashboard'), 'active' => request()->routeIs('trainer.dashboard')],
             ['label' => 'My Trainings', 'icon' => 'fa-book-open', 'href' => route('trainer.dashboard').'#modules', 'active' => false],
@@ -25,91 +25,99 @@
         ];
     @endphp
 
-    <aside class="fixed inset-y-0 left-0 z-30 hidden w-60 border-r border-slate-200 bg-white px-4 py-6 lg:flex lg:flex-col">
-        <a href="{{ route('trainer.dashboard') }}" class="flex items-center gap-3 px-2">
-            <img src="{{ asset('assets/official-logo.png') }}" alt="Mission Care Training Center logo" class="h-12 w-12 object-contain">
+    <div class="dashboard-backdrop" data-dashboard-backdrop></div>
+
+    <aside class="dashboard-sidebar" data-dashboard-sidebar>
+        <a href="{{ route('trainer.dashboard') }}" class="dashboard-brand">
+            <img src="{{ asset('assets/mcare-mark.png') }}" alt="MCARE mark" class="dashboard-brand-logo">
             <span class="min-w-0">
-                <span class="block text-base font-bold tracking-tight text-slate-950">MCARE Hub</span>
-                <span class="block text-xs font-semibold uppercase tracking-wide text-purple-700">Trainer</span>
+                <span class="dashboard-brand-title">MCARE Hub</span>
+                <span class="dashboard-brand-subtitle">Trainer Portal</span>
             </span>
         </a>
+        <button type="button" class="dashboard-menu-button absolute right-4 top-5" data-dashboard-menu-close aria-label="Close navigation">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
 
-        <nav class="mt-10 flex-1 space-y-1 overflow-y-auto">
+        <nav class="dashboard-nav" aria-label="Trainer navigation">
             @foreach ($trainerNav as $item)
-                <a href="{{ $item['href'] }}" class="{{ $navClass }} {{ $item['active'] ? $navActive : $navIdle }}">
-                    <i class="fa-solid {{ $item['icon'] }} w-4 text-center" aria-hidden="true"></i>
+                <a href="{{ $item['href'] }}" data-dashboard-nav-key="trainer-{{ str($item['label'])->slug() }}" class="{{ $navClass }} {{ $item['active'] ? $navActive : $navIdle }}" @if($item['active']) aria-current="page" @endif>
+                    <i class="dashboard-nav-icon fa-solid {{ $item['icon'] }}" aria-hidden="true"></i>
                     <span>{{ $item['label'] }}</span>
                 </a>
             @endforeach
             <a href="{{ route('landing') }}" class="{{ $navClass }} {{ $navIdle }}">
-                <i class="fa-solid fa-arrow-up-right-from-square w-4 text-center" aria-hidden="true"></i>
+                <i class="dashboard-nav-icon fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
                 <span>Public site</span>
             </a>
         </nav>
 
-        <details class="relative mt-6 border-t border-slate-200 pt-5">
-            <summary class="flex cursor-pointer list-none items-center gap-3 rounded-xl p-2 text-left hover:bg-slate-50">
-                <span class="grid h-10 w-10 place-items-center rounded-full bg-purple-100 text-sm font-bold text-purple-700">{{ $trainerInitial }}</span>
+        <details class="dashboard-sidebar-footer" data-dashboard-account>
+            <summary class="dashboard-account-summary">
+                <span class="dashboard-account-avatar">{{ $trainerInitial }}</span>
                 <span class="min-w-0 flex-1">
                     <span class="block truncate text-sm font-bold text-slate-950">{{ $trainerName }}</span>
                     <span class="block text-xs text-slate-500">Caregiving NC II Trainer</span>
                 </span>
-                <i class="fa-solid fa-chevron-down text-xs text-slate-500" aria-hidden="true"></i>
+                <i class="dashboard-chevron fa-solid fa-chevron-down text-xs text-slate-500 transition" aria-hidden="true"></i>
             </summary>
-            <div class="absolute bottom-full left-0 mb-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+            <div class="dashboard-account-menu">
                 @if (auth()->user()?->role === 'trainer')
                     <form method="POST" action="{{ route('trainer.logout') }}">
                         @csrf
-                        <button type="submit" class="w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-red-600 hover:bg-red-50">Sign out</button>
+                        <button type="submit" class="dashboard-account-action is-danger">Sign out</button>
                     </form>
                 @endif
             </div>
         </details>
     </aside>
 
-    <div class="lg:pl-60">
-        <header class="sticky top-0 z-20 border-b border-slate-200 bg-white">
-            <div class="flex min-h-20 items-center justify-between gap-4 px-5 py-3 lg:px-8">
+    <div class="dashboard-layout">
+        <header class="dashboard-topbar">
+            <div class="dashboard-topbar-inner">
                 <div class="flex min-w-0 items-center gap-3">
-                    <a href="{{ route('trainer.dashboard') }}" class="lg:hidden">
-                        <img src="{{ asset('assets/official-logo.png') }}" alt="Mission Care Training Center logo" class="h-10 w-10 object-contain">
-                    </a>
+                    <button type="button" class="dashboard-menu-button" data-dashboard-menu-open aria-label="Open navigation">
+                        <i class="fa-solid fa-bars" aria-hidden="true"></i><span class="hidden sm:inline">Menu</span>
+                    </button>
                     <div class="min-w-0">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-purple-700">Mission Care Training Center</p>
-                        <h1 class="truncate text-lg font-bold text-slate-950">{{ $title ?? 'MCARE Trainer' }}</h1>
+                        <p class="dashboard-header-kicker">Mission Care Training Center</p>
+                        <h1 class="dashboard-header-title">{{ $title ?? 'MCARE Trainer' }}</h1>
                     </div>
                 </div>
 
-                <form method="GET" action="{{ route('trainer.dashboard') }}" class="hidden w-full max-w-sm items-center gap-3 rounded-lg border border-slate-300 bg-white px-3 md:flex">
+                <form method="GET" action="{{ route('trainer.dashboard') }}" class="dashboard-search">
                     <i class="fa-solid fa-magnifying-glass text-sm text-slate-400" aria-hidden="true"></i>
                     <input name="search" value="{{ request('search') }}" type="search" placeholder="Search trainees, sessions, modules..." class="min-w-0 flex-1 border-0 bg-transparent py-2.5 text-sm outline-none placeholder:text-slate-400">
                     <button type="submit" class="sr-only">Search</button>
                 </form>
 
-                <details class="relative shrink-0">
-                    <summary class="flex cursor-pointer list-none items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-semibold hover:bg-slate-50">
-                        <span class="grid h-9 w-9 place-items-center rounded-full bg-purple-100 text-purple-700">{{ $trainerInitial }}</span>
+                <details class="relative shrink-0 justify-self-end" data-dashboard-account>
+                    <summary class="dashboard-account-summary">
+                        <span class="dashboard-account-avatar h-9 w-9">{{ $trainerInitial }}</span>
                         <span class="hidden max-w-32 truncate sm:block">{{ $trainerName }}</span>
-                        <i class="fa-solid fa-chevron-down text-xs text-slate-500" aria-hidden="true"></i>
+                        <i class="dashboard-chevron fa-solid fa-chevron-down text-xs text-slate-500 transition" aria-hidden="true"></i>
                     </summary>
                     <div class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
                         @if (auth()->user()?->role === 'trainer')
                             <form method="POST" action="{{ route('trainer.logout') }}">
                                 @csrf
-                                <button type="submit" class="w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-red-600 hover:bg-red-50">Sign out</button>
+                                <button type="submit" class="dashboard-account-action is-danger">Sign out</button>
                             </form>
                         @endif
                     </div>
                 </details>
             </div>
-            <nav class="flex items-center justify-between gap-0 overflow-hidden border-t border-slate-100 px-3 py-2 lg:hidden">
+            <nav class="dashboard-mobile-bar grid-cols-4" aria-label="Mobile trainer navigation">
                 @foreach (array_slice($trainerNav, 0, 4) as $item)
-                    <a href="{{ $item['href'] }}" class="shrink-0 rounded-lg px-2 py-2 text-xs font-semibold {{ $item['active'] ? 'bg-purple-50 text-purple-700' : 'text-slate-600' }}">{{ $item['label'] }}</a>
+                    <a href="{{ $item['href'] }}" data-dashboard-nav-key="trainer-{{ str($item['label'])->slug() }}" class="dashboard-mobile-link {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
+                        <i class="fa-solid {{ $item['icon'] }}" aria-hidden="true"></i>
+                        <span class="truncate">{{ $item['label'] }}</span>
+                    </a>
                 @endforeach
             </nav>
         </header>
 
-        <main class="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-8 lg:py-9">
+        <main class="dashboard-main">
             @if (session('saved'))
                 <div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{{ session('saved') }}</div>
             @endif
