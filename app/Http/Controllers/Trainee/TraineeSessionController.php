@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Trainer;
+namespace App\Http\Controllers\Trainee;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
@@ -9,15 +9,15 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
-class TrainerSessionController extends Controller
+class TraineeSessionController extends Controller
 {
     public function create(Request $request): View|RedirectResponse
     {
-        if ($request->user()?->role === 'trainer') {
-            return redirect()->route('trainer.dashboard');
+        if ($request->user()?->role === 'trainee') {
+            return redirect()->route('trainee.dashboard');
         }
 
-        return view('trainer.auth.login', [
+        return view('trainee.auth.login', [
             // Makes role testing clear when another account is already active in this browser.
             'activeUser' => $request->user(),
         ]);
@@ -31,19 +31,19 @@ class TrainerSessionController extends Controller
         ]);
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
-            AdminActivityLog::record(null, 'trainer.login.failed', null, [
+            AdminActivityLog::record(null, 'trainee.login.failed', null, [
                 'email' => $credentials['email'],
             ]);
 
             return back()
-                ->withErrors(['email' => 'The provided trainer credentials are invalid.'])
+                ->withErrors(['email' => 'The provided trainee credentials are invalid.'])
                 ->onlyInput('email');
         }
 
         $request->session()->regenerate();
 
-        if ($request->user()?->role !== 'trainer') {
-            AdminActivityLog::record($request->user(), 'trainer.login.rejected', $request->user(), [
+        if ($request->user()?->role !== 'trainee') {
+            AdminActivityLog::record($request->user(), 'trainee.login.rejected', $request->user(), [
                 'email' => $request->user()?->email,
                 'role' => $request->user()?->role,
             ]);
@@ -53,23 +53,23 @@ class TrainerSessionController extends Controller
             $request->session()->regenerateToken();
 
             return back()
-                ->withErrors(['email' => 'This account is not allowed to access the trainer area.'])
+                ->withErrors(['email' => 'This account is not approved for the trainee dashboard yet.'])
                 ->onlyInput('email');
         }
 
-        AdminActivityLog::record($request->user(), 'trainer.login.success', $request->user());
+        AdminActivityLog::record($request->user(), 'trainee.login.success', $request->user());
 
-        return redirect()->intended(route('trainer.dashboard'));
+        return redirect()->intended(route('trainee.dashboard'));
     }
 
     public function destroy(Request $request): RedirectResponse
     {
-        AdminActivityLog::record($request->user(), 'trainer.logout', $request->user());
+        AdminActivityLog::record($request->user(), 'trainee.logout', $request->user());
 
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('trainer.login');
+        return redirect()->route('trainee.login');
     }
 }

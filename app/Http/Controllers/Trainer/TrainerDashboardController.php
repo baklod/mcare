@@ -3,67 +3,37 @@
 namespace App\Http\Controllers\Trainer;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
+use App\Models\TrainingModule;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TrainerDashboardController extends Controller
 {
     public function __invoke(Request $request): View
     {
+        $trainer = $request->user();
         $activeBatch = TrainingBatch::active();
 
-        $modules = collect([
-            [
-                'title' => 'Basic Patient Care and Safety',
-                'training' => 'Caregiving NC II',
-                'status' => 'In progress',
-                'progress' => 60,
-            ],
-            [
-                'title' => 'Caregiving Communication Skills',
-                'training' => 'Caregiving NC II',
-                'status' => 'Upcoming',
-                'progress' => 78,
-            ],
-            [
-                'title' => 'Elderly Care Fundamentals',
-                'training' => 'Caregiving NC II',
-                'status' => 'Upcoming',
-                'progress' => 44,
-            ],
-        ]);
-
-        // The trainer dashboard focuses on enrolled learners, not applicant intake.
-        $assignedTrainees = EnrollmentApplication::query()
-            ->with(['batch', 'user'])
-            ->whereIn('status', [
-                EnrollmentApplication::STATUS_PRE_ENLISTMENT,
-                EnrollmentApplication::STATUS_APPROVED,
-            ])
-            ->latest()
-            ->limit(5)
+        // Approved applications in the active batch are the trainer's official learner list.
+        $assignedTrainees = $this->approvedTraineesFor($activeBatch)
+            ->limit(20)
             ->get()
             ->values();
 
-        $progressRows = $assignedTrainees->map(function (EnrollmentApplication $application, int $index) {
-            $fallbackProgress = [60, 40, 100, 25, 80][$index] ?? 55;
-            $progress = $application->status === EnrollmentApplication::STATUS_APPROVED
-                ? max($fallbackProgress, 78)
-                : $fallbackProgress;
-
+        $progressRows = $assignedTrainees->map(function (EnrollmentApplication $application) {
             return [
                 'name' => trim($application->first_name.' '.$application->last_name),
                 'email' => $application->email,
                 'training' => $application->program ?: 'Caregiving NC II',
-                'schedule' => $application->batch?->scheduleLabelFor($application->schedule_preference) ?? $application->schedule_preference,
-                'progress' => $progress,
-                'status' => match (true) {
-                    $progress >= 100 => 'Completed',
-                    $progress <= 25 => 'Not Started',
-                    default => 'In Progress',
-                },
+                'schedule' => $application->batch?->scheduleLabelFor($application->schedule_preference)
+                    ?? $application->schedule_preference,
+                'status' => 'Assigned',
             ];
         });
 
@@ -76,8 +46,26 @@ class TrainerDashboardController extends Controller
             })->values();
         }
 
-        $averageProgress = (int) round($progressRows->avg('progress') ?: 0);
-        $batchLabel = $activeBatch ? $activeBatch->name.' '.$activeBatch->year : 'Batch 1 2026';
+        // Published modules remain backed by the private LMS storage introduced on the review branch.
+        $modules = TrainingModule::query()
+            ->with('batch')
+            ->where('trainer_id', $trainer->id)
+            ->latest('published_at')
+            ->get()
+            ->map(function (TrainingModule $module) {
+                return [
+                    'id' => $module->id,
+                    'title' => $module->title,
+                    'training' => $module->batch
+                        ? $module->batch->name.' '.$module->batch->year
+                        : 'Caregiving NC II',
+                    'file' => $module->original_file_name,
+                    'published_at' => $module->published_at?->format('M j, Y') ?? 'Not published',
+                    'status' => $module->is_published ? 'Published' : 'Draft',
+                ];
+            });
+
+        $batchLabel = $activeBatch ? $activeBatch->name.' '.$activeBatch->year : 'Current batch';
         $morningRoom = $activeBatch?->roomFor('AM') ?: 'Room 201 / Skills Lab';
         $afternoonRoom = $activeBatch?->roomFor('PM') ?: 'Room 202 / Lecture Room';
 
@@ -85,7 +73,6 @@ class TrainerDashboardController extends Controller
             [
                 'time' => '9:00 AM',
                 'title' => 'Caregiving Communication Skills',
-                'type' => 'Live session',
                 'batch' => $batchLabel,
                 'duration' => '1h 30m',
                 'room' => $morningRoom,
@@ -93,7 +80,6 @@ class TrainerDashboardController extends Controller
             [
                 'time' => '2:00 PM',
                 'title' => 'Elderly Care Fundamentals',
-                'type' => 'Workshop',
                 'batch' => $batchLabel,
                 'duration' => '2h',
                 'room' => $afternoonRoom,
@@ -140,41 +126,92 @@ class TrainerDashboardController extends Controller
         ]);
 
         $learnerFollowUps = $progressRows->map(function (array $row) {
-            $needsAction = $row['status'] !== 'Completed';
-
             return [
                 ...$row,
                 'initial' => mb_strtoupper(mb_substr($row['name'], 0, 1)),
-                'needs_action' => $needsAction,
-                'action' => match ($row['status']) {
-                    'Not Started' => 'Start learner follow-up',
-                    'Completed' => 'Review completion',
-                    default => 'Review progress',
-                },
-                'priority' => $row['progress'] <= 25 ? 'Overdue' : ($needsAction ? 'Needs action' : 'On track'),
+                'needs_action' => false,
+                'action' => $row['schedule'] ?: 'Assigned to the current training batch',
+                'priority' => 'On track',
             ];
         });
 
         return view('trainer.dashboard', [
             'activeBatch' => $activeBatch,
-            'averageProgress' => $averageProgress,
             'learnerFollowUps' => $learnerFollowUps,
             'modules' => $modules,
             'progressRows' => $progressRows,
             'search' => $search,
             'stats' => [
                 'total_trainings' => $modules->count(),
-                'total_trainees' => EnrollmentApplication::query()
-                    ->whereIn('status', [
-                        EnrollmentApplication::STATUS_PRE_ENLISTMENT,
-                        EnrollmentApplication::STATUS_APPROVED,
-                    ])
-                    ->count(),
+                'total_trainees' => $assignedTrainees->count(),
                 'sessions_today' => count($todaySessions),
-                'average_progress' => $averageProgress,
             ],
             'teachingTimeline' => $teachingTimeline,
             'todaySessions' => $todaySessions,
         ]);
+    }
+
+    public function storeModule(Request $request): RedirectResponse
+    {
+        $safeText = ['not_regex:/[<>"\'`;{}|\\\\]/u'];
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:160', ...$safeText],
+            'description' => ['required', 'string', 'max:1200', ...$safeText],
+            'module_file' => ['required', 'file', 'mimes:pdf,doc,docx,ppt,pptx', 'max:20480'],
+        ], [
+            'not_regex' => 'This field contains characters that are not allowed for security reasons.',
+            'module_file.mimes' => 'Training modules must be PDF, DOC, DOCX, PPT, or PPTX files.',
+            'module_file.max' => 'Training modules must not exceed 20MB.',
+        ]);
+
+        $file = $request->file('module_file');
+        $trainer = $request->user();
+        $activeBatch = TrainingBatch::active();
+
+        // Keep trainer materials private so authorization remains enforceable on download.
+        $path = $file->store("training-modules/{$trainer->id}", 'local');
+
+        $module = TrainingModule::create([
+            'trainer_id' => $trainer->id,
+            'training_batch_id' => $activeBatch?->id,
+            'title' => $validated['title'],
+            'description' => $validated['description'],
+            'file_path' => $path,
+            'original_file_name' => $file->getClientOriginalName(),
+            'mime_type' => $file->getClientMimeType(),
+            'file_size' => $file->getSize() ?: 0,
+            'is_published' => true,
+            'published_at' => now(),
+        ]);
+
+        AdminActivityLog::record($trainer, 'trainer.module.uploaded', $module, [
+            'title' => $module->title,
+            'batch' => $activeBatch ? $activeBatch->name.' '.$activeBatch->year : null,
+        ]);
+
+        return redirect()
+            ->to(route('trainer.dashboard').'#modules')
+            ->with('saved', 'Training module published for trainees.');
+    }
+
+    public function downloadModule(Request $request, TrainingModule $module): StreamedResponse
+    {
+        abort_unless($module->trainer_id === $request->user()->id, 403);
+
+        AdminActivityLog::record($request->user(), 'trainer.module.downloaded', $module, [
+            'title' => $module->title,
+        ]);
+
+        return Storage::disk('local')->download($module->file_path, $module->original_file_name);
+    }
+
+    private function approvedTraineesFor(?TrainingBatch $activeBatch)
+    {
+        return EnrollmentApplication::query()
+            ->with(['batch', 'user'])
+            ->where('status', EnrollmentApplication::STATUS_APPROVED)
+            ->when($activeBatch, fn ($query) => $query->where('training_batch_id', $activeBatch->id))
+            ->orderBy('last_name')
+            ->orderBy('first_name');
     }
 }

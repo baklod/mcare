@@ -20,13 +20,22 @@ class GoogleAuthController extends Controller
                 ->with('google_config_missing', 'Google OAuth is installed. Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI to .env to enable sign in.');
         }
 
+        /*
+         * Keep Socialite stateful for this normal browser/session application.
+         * Socialite stores an OAuth `state` value in the session and checks it
+         * on callback, which helps defend against login CSRF and response mixups.
+         */
         return Socialite::driver('google')->redirect();
     }
 
     public function callback(): RedirectResponse
     {
         try {
-            $googleUser = Socialite::driver('google')->stateless()->user();
+            /*
+             * Do NOT call stateless() here. The application already uses web
+             * sessions, so preserving Socialite's state validation is safer.
+             */
+            $googleUser = Socialite::driver('google')->user();
         } catch (Throwable) {
             return redirect()
                 ->route('landing')
@@ -56,6 +65,9 @@ class GoogleAuthController extends Controller
         }
 
         Auth::login($user, true);
+
+        // Rotate the session ID after authentication to reduce fixation risk.
+        request()->session()->regenerate();
 
         return redirect()
             ->route('landing')

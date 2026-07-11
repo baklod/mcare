@@ -6,12 +6,12 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class EnsureTrainer
+class EnsureTrainee
 {
     public function handle(Request $request, Closure $next): Response
     {
-        // This guard is intentionally role-column based until Spatie Permission is migrated in.
-        if ($request->user()?->role !== 'trainer') {
+        // Approved applicants are promoted to this role by the admin review flow.
+        if ($request->user()?->role !== 'trainee') {
             abort(403);
         }
 

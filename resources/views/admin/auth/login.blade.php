@@ -29,6 +29,8 @@
         </div>
 
         <div class="p-8 sm:p-10">
+            @include('auth.partials.current-account', ['activeUser' => $activeUser ?? auth()->user()])
+
             <h2 class="text-2xl font-bold text-slate-900">Admin login</h2>
             <form method="POST" action="{{ route('admin.login.store') }}" class="mt-7 space-y-5">
                 @csrf

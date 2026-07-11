@@ -195,6 +195,11 @@
                 'url' => 'https://www.facebook.com/facebook/videos/10153231379946729/',
             ],
         ];
+
+        $currentUser = auth()->user();
+        $accountCtaUrl = $currentUser ? \App\Support\AccountPortal::urlFor($currentUser) : route('enrollment.create');
+        $accountCtaLabel = $currentUser ? \App\Support\AccountPortal::ctaLabelFor($currentUser) : 'Start Enrollment';
+        $accountRoleLabel = \App\Support\AccountPortal::roleLabelFor($currentUser);
     @endphp
 
     <!-- Path: resources/views/landing/home.blade.php | Label: Main landing background layer -->

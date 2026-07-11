@@ -16,19 +16,30 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        /*
+         * SecurityHeaders runs for every response. This gives the whole app a
+         * common browser-security baseline instead of relying on each page.
+         */
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureAdmin::class,
+            'private.response' => \App\Http\Middleware\PrivateResponseHeaders::class,
             'trainer' => \App\Http\Middleware\EnsureTrainer::class,
+            'trainee' => \App\Http\Middleware\EnsureTrainee::class,
         ]);
 
         $middleware->redirectGuestsTo(fn (Request $request) => match (true) {
             $request->is('admin') || $request->is('admin/*') => route('admin.login'),
             $request->is('trainer') || $request->is('trainer/*') => route('trainer.login'),
+            $request->is('trainee') || $request->is('trainee/*') => route('trainee.login'),
             default => route('login'),
         });
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (Throwable $e, Request $request) {
+            // Let Laravel keep its normal redirect/JSON behavior for these two
+            // common framework exceptions. Everything else gets a safe wrapper.
             if ($e instanceof AuthenticationException || $e instanceof ValidationException) {
                 return null;
             }
@@ -45,12 +56,18 @@ return Application::configure(basePath: dirname(__DIR__))
                         403 => 'You are not allowed to access this resource.',
                         404 => 'The requested resource was not found.',
                         419 => 'Your session expired. Please refresh and try again.',
+                        429 => 'Too many requests. Please wait before trying again.',
                         default => 'Something went wrong. Please try again later.',
                     },
                 ], $status);
             }
 
-            if (config('app.debug') && $status === 500) {
+            /*
+             * Detailed exceptions are useful only on a truly local machine.
+             * Even if APP_DEBUG is accidentally left true in production, this
+             * condition keeps the public 500 response generic.
+             */
+            if (app()->isLocal() && config('app.debug') && $status === 500) {
                 return null;
             }
 
@@ -60,12 +77,14 @@ return Application::configure(basePath: dirname(__DIR__))
                     403 => 'Access denied',
                     404 => 'Page not found',
                     419 => 'Session expired',
+                    429 => 'Too many requests',
                     default => 'Something went wrong',
                 },
                 'message' => match ($status) {
                     403 => 'You do not have permission to open this page.',
                     404 => 'The page or record you requested could not be found.',
                     419 => 'Your session has expired. Please refresh the page and try again.',
+                    429 => 'Too many requests were sent in a short time. Please wait and try again.',
                     default => 'The system could not complete the request. Please try again later.',
                 },
             ], $status);

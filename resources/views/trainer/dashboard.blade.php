@@ -7,9 +7,8 @@
         $trainerDisplayName = trim(auth()->user()?->name ?? 'Trainer');
         $followUpCount = $learnerFollowUps->where('needs_action', true)->count();
         $moduleStatusClasses = [
-            'Complete' => 'bg-emerald-50 text-emerald-800 ring-emerald-200',
-            'In progress' => 'bg-violet-50 text-violet-800 ring-violet-200',
-            'Upcoming' => 'bg-stone-100 text-stone-700 ring-stone-200',
+            'Published' => 'bg-emerald-50 text-emerald-800 ring-emerald-200',
+            'Draft' => 'bg-stone-100 text-stone-700 ring-stone-200',
         ];
     @endphp
 
@@ -74,7 +73,7 @@
                                         <p class="text-xs font-bold uppercase tracking-[0.14em] text-stone-500">Session room</p>
                                         <p class="mt-2 font-semibold text-stone-950">{{ $item['room'] }}</p>
                                         <p class="mt-1 text-sm text-stone-600">Keep the learner checklist open while you deliver.</p>
-                                        <a href="#module-checklist" class="mt-3 inline-flex min-h-10 items-center justify-center bg-violet-700 px-4 text-sm font-bold text-white transition hover:bg-violet-800">
+                                        <a href="#modules" class="mt-3 inline-flex min-h-10 items-center justify-center bg-violet-700 px-4 text-sm font-bold text-white transition hover:bg-violet-800">
                                             Open session
                                         </a>
                                     </div>
@@ -140,7 +139,7 @@
             </aside>
         </section>
 
-        <section id="module-checklist" class="border border-stone-200 bg-white">
+        <section id="modules" class="border border-stone-200 bg-white">
             <div class="flex flex-col gap-4 border-b border-stone-200 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-6">
                 <div>
                     <p class="text-sm font-semibold uppercase tracking-[0.16em] text-violet-700">Training delivery</p>
@@ -152,13 +151,43 @@
                 </a>
             </div>
 
+            <details class="border-b border-stone-200 bg-stone-50 p-5 sm:p-6">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-4 font-bold text-stone-950">
+                    <span class="inline-flex items-center gap-2">
+                        <i class="fa-solid fa-cloud-arrow-up text-violet-700" aria-hidden="true"></i>
+                        Publish a training module
+                    </span>
+                    <i class="fa-solid fa-chevron-down text-xs text-stone-500" aria-hidden="true"></i>
+                </summary>
+
+                <form method="POST" action="{{ route('trainer.modules.store') }}" enctype="multipart/form-data" class="mt-5 grid gap-4 lg:grid-cols-2">
+                    @csrf
+                    <div>
+                        <label for="module-title" class="mb-2 block text-sm font-semibold text-stone-800">Module title</label>
+                        <input id="module-title" name="title" value="{{ old('title') }}" required maxlength="160" class="w-full border border-stone-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500" placeholder="Example: Infection Control">
+                    </div>
+                    <div>
+                        <label for="module-file" class="mb-2 block text-sm font-semibold text-stone-800">Training file</label>
+                        <input id="module-file" name="module_file" type="file" required accept=".pdf,.doc,.docx,.ppt,.pptx" class="w-full border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 file:mr-3 file:border-0 file:bg-violet-50 file:px-3 file:py-1.5 file:font-semibold file:text-violet-800">
+                    </div>
+                    <div class="lg:col-span-2">
+                        <label for="module-description" class="mb-2 block text-sm font-semibold text-stone-800">Description</label>
+                        <textarea id="module-description" name="description" required maxlength="1200" rows="3" class="w-full border border-stone-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500" placeholder="What should learners understand after this module?">{{ old('description') }}</textarea>
+                    </div>
+                    <div class="lg:col-span-2">
+                        <button type="submit" class="inline-flex min-h-11 items-center justify-center bg-violet-700 px-5 text-sm font-bold text-white hover:bg-violet-800">Publish module</button>
+                    </div>
+                </form>
+            </details>
+
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[44rem] text-left text-sm">
                     <thead class="border-b border-stone-200 bg-stone-50 text-xs font-bold uppercase tracking-[0.12em] text-stone-500">
                         <tr>
                             <th scope="col" class="px-5 py-4 sm:px-6">Module</th>
                             <th scope="col" class="px-5 py-4">Training</th>
-                            <th scope="col" class="px-5 py-4">Progress</th>
+                            <th scope="col" class="px-5 py-4">File</th>
+                            <th scope="col" class="px-5 py-4">Published</th>
                             <th scope="col" class="px-5 py-4 sm:px-6">Status</th>
                         </tr>
                     </thead>
@@ -167,14 +196,17 @@
                             <tr class="text-stone-700">
                                 <td class="px-5 py-4 font-bold text-stone-950 sm:px-6">{{ $module['title'] }}</td>
                                 <td class="px-5 py-4">{{ $module['training'] }}</td>
-                                <td class="px-5 py-4">{{ $module['progress'] }}%</td>
+                                <td class="px-5 py-4">
+                                    <a href="{{ route('trainer.modules.download', $module['id']) }}" class="font-semibold text-violet-800 hover:text-violet-950">{{ $module['file'] }}</a>
+                                </td>
+                                <td class="px-5 py-4">{{ $module['published_at'] }}</td>
                                 <td class="px-5 py-4 sm:px-6">
                                     <span class="inline-flex px-2.5 py-1 text-xs font-bold ring-1 ring-inset {{ $moduleStatusClasses[$module['status']] ?? 'bg-stone-100 text-stone-700 ring-stone-200' }}">{{ $module['status'] }}</span>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="px-5 py-10 text-center text-stone-600 sm:px-6">Your assigned modules will appear here when delivery is scheduled.</td>
+                                <td colspan="5" class="px-5 py-10 text-center text-stone-600 sm:px-6">No modules published yet. Use the form above to add the first private training file.</td>
                             </tr>
                         @endforelse
                     </tbody>

@@ -15,12 +15,12 @@
         $navActive = 'bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-100';
         $trainerNav = [
             ['label' => 'Teaching Day', 'icon' => 'fa-calendar-days', 'href' => route('trainer.dashboard'), 'active' => request()->routeIs('trainer.dashboard')],
-            ['label' => 'My Trainings', 'icon' => 'fa-book-open', 'href' => route('trainer.dashboard').'#module-checklist', 'active' => false],
+            ['label' => 'My Trainings', 'icon' => 'fa-book-open', 'href' => route('trainer.dashboard').'#modules', 'active' => false],
             ['label' => 'Trainees', 'icon' => 'fa-users', 'href' => route('trainer.dashboard').'#learner-follow-up', 'active' => false],
             ['label' => 'Sessions', 'icon' => 'fa-clipboard-list', 'href' => route('trainer.dashboard').'#teaching-timeline', 'active' => false],
             ['label' => 'Assessments', 'icon' => 'fa-square-check', 'href' => route('trainer.dashboard').'#learner-follow-up', 'active' => false],
-            ['label' => 'Resources', 'icon' => 'fa-folder-open', 'href' => route('trainer.dashboard').'#module-checklist', 'active' => false],
-            ['label' => 'Certificates', 'icon' => 'fa-award', 'href' => route('trainer.dashboard').'#module-checklist', 'active' => false],
+            ['label' => 'Resources', 'icon' => 'fa-folder-open', 'href' => route('trainer.dashboard').'#modules', 'active' => false],
+            ['label' => 'Certificates', 'icon' => 'fa-award', 'href' => route('trainer.dashboard').'#modules', 'active' => false],
             ['label' => 'Reports', 'icon' => 'fa-chart-column', 'href' => route('trainer.dashboard').'#learner-follow-up', 'active' => false],
         ];
     @endphp

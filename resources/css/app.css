@@ -1,6 +1,186 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Nunito:wght@700;800;900&display=swap');
 @import "tailwindcss";
 @import "@fortawesome/fontawesome-free/css/all.min.css";
 
 @source "../views";
 @source "../js";
 @source "../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php";
+
+@layer base {
+    html {
+        font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+    }
+
+    body {
+        color: #1a1a2e;
+        background: #f9f6ff;
+    }
+
+    h1,
+    h2,
+    h3,
+    .font-display {
+        font-family: "Nunito", "Inter", ui-sans-serif, system-ui, sans-serif;
+    }
+}
+
+@layer components {
+    .dashboard-shell {
+        @apply min-h-screen bg-[#f9f6ff] text-slate-900 antialiased;
+    }
+
+    .dashboard-gradient {
+        @apply pointer-events-none fixed inset-x-0 top-0 -z-10 h-80 bg-gradient-to-b from-purple-100 via-purple-50/70 to-[#f9f6ff];
+    }
+
+    .dashboard-sidebar {
+        @apply fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col bg-[#3d1a6e] px-4 py-5 text-white shadow-2xl shadow-purple-950/20 transition-transform duration-200 lg:translate-x-0;
+    }
+
+    .dashboard-sidebar.is-open {
+        @apply translate-x-0;
+    }
+
+    .dashboard-backdrop {
+        @apply fixed inset-0 z-30 hidden bg-slate-950/40 backdrop-blur-sm lg:hidden;
+    }
+
+    .dashboard-backdrop.is-open {
+        @apply block;
+    }
+
+    .dashboard-brand {
+        @apply flex items-center gap-3 rounded-2xl px-2 py-2;
+    }
+
+    .dashboard-brand-logo {
+        @apply h-12 w-12 rounded-xl bg-white object-contain p-1.5 shadow-lg shadow-purple-950/20;
+    }
+
+    .dashboard-brand-title {
+        font-family: "Nunito", "Inter", ui-sans-serif, system-ui, sans-serif;
+        @apply block text-sm font-black uppercase tracking-wide text-white;
+    }
+
+    .dashboard-brand-subtitle {
+        @apply block text-[11px] font-semibold uppercase tracking-wide text-white/60;
+    }
+
+    .dashboard-menu-label {
+        @apply px-3 pt-7 pb-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/40;
+    }
+
+    .dashboard-nav-link {
+        @apply flex items-center justify-between rounded-xl px-3 py-3 text-sm font-bold text-white/70 transition hover:bg-white/10 hover:text-white;
+    }
+
+    .dashboard-nav-link.is-active {
+        @apply bg-white/15 text-white shadow-sm ring-1 ring-white/10;
+    }
+
+    .dashboard-topbar {
+        @apply sticky top-0 z-20 border-b border-purple-100 bg-white/90 backdrop-blur-xl;
+    }
+
+    .dashboard-main {
+        @apply mx-auto max-w-7xl px-5 py-7 sm:px-6 lg:px-8 lg:py-9;
+    }
+
+    .dashboard-card {
+        @apply rounded-2xl border border-[#ede8f8] bg-white shadow-sm shadow-purple-100/40;
+    }
+
+    .dashboard-panel {
+        @apply rounded-2xl border border-[#ede8f8] bg-white p-5 shadow-sm shadow-purple-100/40 sm:p-6;
+    }
+
+    .dashboard-hero {
+        @apply overflow-hidden rounded-2xl bg-gradient-to-br from-[#3d1a6e] to-[#5b2d8e] p-6 text-white shadow-xl shadow-purple-200/60 sm:p-8;
+    }
+
+    .dashboard-hero h1 {
+        @apply text-3xl font-black leading-tight sm:text-4xl;
+    }
+
+    .dashboard-hero p {
+        @apply mt-2 max-w-3xl text-sm leading-6 text-white/75;
+    }
+
+    .dashboard-pill {
+        @apply inline-flex w-fit items-center rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-wide ring-1;
+    }
+
+    .dashboard-stat {
+        @apply flex min-h-32 items-start justify-between gap-4 rounded-2xl border border-[#ede8f8] bg-white p-5 shadow-sm shadow-purple-100/40;
+    }
+
+    .dashboard-stat-label {
+        @apply text-xs font-black uppercase tracking-wide text-slate-500;
+    }
+
+    .dashboard-stat-value {
+        font-family: "Nunito", "Inter", ui-sans-serif, system-ui, sans-serif;
+        @apply mt-2 text-3xl font-black leading-none text-slate-900;
+    }
+
+    .dashboard-stat-help {
+        @apply mt-2 text-xs font-semibold leading-5 text-slate-500;
+    }
+
+    .dashboard-section-title {
+        font-family: "Nunito", "Inter", ui-sans-serif, system-ui, sans-serif;
+        @apply text-2xl font-black text-slate-900;
+    }
+
+    .dashboard-section-kicker {
+        @apply text-xs font-black uppercase tracking-wide text-purple-600;
+    }
+
+    .dashboard-table-wrap {
+        @apply overflow-hidden rounded-2xl border border-[#ede8f8] bg-white shadow-sm shadow-purple-100/40;
+    }
+
+    .dashboard-table {
+        @apply min-w-full divide-y divide-slate-100;
+    }
+
+    .dashboard-table thead {
+        @apply bg-[#f4f0fb];
+    }
+
+    .dashboard-table th {
+        @apply px-5 py-4 text-left text-xs font-black uppercase tracking-wide text-slate-500;
+    }
+
+    .dashboard-table td {
+        @apply px-5 py-4 align-top text-sm text-slate-600;
+    }
+
+    .dashboard-table tbody {
+        @apply divide-y divide-slate-100 bg-white;
+    }
+
+    .dashboard-table tbody tr {
+        @apply hover:bg-purple-50/40;
+    }
+
+    .dashboard-mobile-bar {
+        @apply fixed inset-x-3 bottom-3 z-20 grid grid-cols-4 rounded-2xl border border-purple-100 bg-white/95 p-2 shadow-2xl shadow-slate-300/70 backdrop-blur-xl lg:hidden;
+    }
+
+    .dashboard-mobile-link {
+        @apply flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-bold text-slate-500 hover:bg-purple-50 hover:text-purple-700;
+    }
+
+    .form-field {
+        @apply w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100;
+    }
+
+    .primary-action {
+        @apply inline-flex items-center justify-center rounded-full bg-purple-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-70;
+    }
+
+    .secondary-action {
+        @apply inline-flex items-center justify-center rounded-full border border-purple-200 bg-white px-5 py-3 text-sm font-bold text-purple-700 hover:bg-purple-50;
+    }
+}

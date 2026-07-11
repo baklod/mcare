@@ -7,6 +7,7 @@ use App\Models\AdminActivityLog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class AdminSessionController extends Controller
@@ -18,15 +19,25 @@ class AdminSessionController extends Controller
             return redirect()->route('admin.dashboard');
         }
 
-        return view('admin.auth.login');
+        return view('admin.auth.login', [
+            // Makes role testing clear when another account is already active in this browser.
+            'activeUser' => request()->user(),
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
+        /*
+         * Rate limiting slows repeated attempts, while these max lengths stop
+         * a single request from sending unnecessarily huge credential values.
+         */
         $credentials = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required', 'string'],
+            'email' => ['required', 'email', 'max:255'],
+            'password' => ['required', 'string', 'max:1024'],
         ]);
+
+        // Normalize email consistently with the admin-login rate-limiter key.
+        $credentials['email'] = Str::lower(trim($credentials['email']));
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
             AdminActivityLog::record(null, 'admin.login.failed', null, [
@@ -38,6 +49,7 @@ class AdminSessionController extends Controller
                 ->onlyInput('email');
         }
 
+        // Regenerate after authentication to reduce session fixation risk.
         $request->session()->regenerate();
 
         // Reject non-admin accounts even when their email and password are valid.

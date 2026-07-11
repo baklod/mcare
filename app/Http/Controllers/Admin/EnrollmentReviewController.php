@@ -17,8 +17,19 @@ class EnrollmentReviewController extends Controller
     public function index(Request $request): View
     {
         $statuses = EnrollmentApplication::statuses();
-        $selectedStatus = $request->string('status')->toString();
-        $search = trim($request->string('search')->toString());
+
+        /*
+         * Search values are bounded before they reach LIKE queries. Eloquent
+         * parameter binding already protects query values from SQL injection;
+         * this validation mainly prevents oversized/abusive search payloads.
+         */
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $selectedStatus = trim((string) ($filters['status'] ?? ''));
+        $search = trim((string) ($filters['search'] ?? ''));
 
         $applicationsQuery = EnrollmentApplication::query()
             ->with(['user', 'batch'])
@@ -89,8 +100,13 @@ class EnrollmentReviewController extends Controller
             'reviewed_by_id' => $request->user()->id,
         ])->save();
 
+        $newRole = $validated['status'] === EnrollmentApplication::STATUS_APPROVED
+            ? 'trainee'
+            : ($enrollmentApplication->user?->role === 'trainee' ? 'applicant' : $enrollmentApplication->user?->role);
+
         $enrollmentApplication->user?->forceFill([
             'applicant_status' => $validated['status'],
+            'role' => $newRole,
         ])->save();
 
         AdminActivityLog::record($request->user(), 'enrollment.review.updated', $enrollmentApplication, [

@@ -11,7 +11,16 @@ class AdminActivityLogController extends Controller
 {
     public function index(Request $request): View
     {
-        $search = trim($request->string('search')->toString());
+        /*
+         * Bound the search string before running wildcard LIKE queries.
+         * Eloquent still parameter-binds the value; max:100 is mainly an
+         * abuse/performance control against extremely large search payloads.
+         */
+        $validated = $request->validate([
+            'search' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $search = trim((string) ($validated['search'] ?? ''));
 
         $logs = AdminActivityLog::query()
             ->with('user')
