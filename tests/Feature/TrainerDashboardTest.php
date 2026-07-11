@@ -32,7 +32,7 @@ class TrainerDashboardTest extends TestCase
         $this->actingAs($trainer)
             ->get(route('trainer.dashboard'))
             ->assertOk()
-            ->assertSee('Current LMS delivery')
-            ->assertSee('Assigned learner monitoring');
+        ->assertSee('Teaching day')
+        ->assertSee('Learner follow-up');
     }
 }

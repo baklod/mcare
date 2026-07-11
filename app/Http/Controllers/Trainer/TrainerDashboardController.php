@@ -5,42 +5,37 @@ namespace App\Http\Controllers\Trainer;
 use App\Http\Controllers\Controller;
 use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class TrainerDashboardController extends Controller
 {
-    public function __invoke(): View
+    public function __invoke(Request $request): View
     {
         $activeBatch = TrainingBatch::active();
 
-        $modules = [
+        $modules = collect([
             [
                 'title' => 'Basic Patient Care and Safety',
-                'description' => 'Core caregiving routines, safety checks, and patient handling basics.',
-                'status' => 'In Progress',
-                'lessons' => 8,
-                'completed_lessons' => 4,
+                'training' => 'Caregiving NC II',
+                'status' => 'In progress',
                 'progress' => 60,
             ],
             [
                 'title' => 'Caregiving Communication Skills',
-                'description' => 'Communication practices for clients, families, and care teams.',
-                'status' => 'Ready',
-                'lessons' => 6,
-                'completed_lessons' => 5,
+                'training' => 'Caregiving NC II',
+                'status' => 'Upcoming',
                 'progress' => 78,
             ],
             [
                 'title' => 'Elderly Care Fundamentals',
-                'description' => 'Daily care support, dignity, comfort, and observation routines.',
-                'status' => 'Review',
-                'lessons' => 7,
-                'completed_lessons' => 3,
+                'training' => 'Caregiving NC II',
+                'status' => 'Upcoming',
                 'progress' => 44,
             ],
-        ];
+        ]);
 
-        // The trainer dashboard should focus on assigned learner progress, not applicant intake.
+        // The trainer dashboard focuses on enrolled learners, not applicant intake.
         $assignedTrainees = EnrollmentApplication::query()
             ->with(['batch', 'user'])
             ->whereIn('status', [
@@ -72,42 +67,103 @@ class TrainerDashboardController extends Controller
             ];
         });
 
+        $search = trim((string) $request->query('search', ''));
+
+        if ($search !== '') {
+            $progressRows = $progressRows->filter(function (array $row) use ($search) {
+                return str_contains(strtolower($row['name']), strtolower($search))
+                    || str_contains(strtolower($row['training']), strtolower($search));
+            })->values();
+        }
+
         $averageProgress = (int) round($progressRows->avg('progress') ?: 0);
+        $batchLabel = $activeBatch ? $activeBatch->name.' '.$activeBatch->year : 'Batch 1 2026';
+        $morningRoom = $activeBatch?->roomFor('AM') ?: 'Room 201 / Skills Lab';
+        $afternoonRoom = $activeBatch?->roomFor('PM') ?: 'Room 202 / Lecture Room';
 
         $todaySessions = [
             [
-                'time' => '09:00 AM',
+                'time' => '9:00 AM',
                 'title' => 'Caregiving Communication Skills',
-                'type' => 'Live Session',
-                'batch' => $activeBatch ? $activeBatch->name.' '.$activeBatch->year : 'Batch 1 2026',
+                'type' => 'Live session',
+                'batch' => $batchLabel,
                 'duration' => '1h 30m',
-                'room' => $activeBatch?->roomFor('AM') ?: 'Room 201 / Skills Lab',
+                'room' => $morningRoom,
             ],
             [
-                'time' => '02:00 PM',
+                'time' => '2:00 PM',
                 'title' => 'Elderly Care Fundamentals',
                 'type' => 'Workshop',
-                'batch' => $activeBatch ? $activeBatch->name.' '.$activeBatch->year : 'Batch 1 2026',
+                'batch' => $batchLabel,
                 'duration' => '2h',
-                'room' => $activeBatch?->roomFor('PM') ?: 'Room 202 / Lecture Room',
+                'room' => $afternoonRoom,
             ],
         ];
 
-        $announcements = [
-            ['title' => 'New training module available', 'body' => 'Advanced Elderly Care is ready for trainer review.', 'date' => now()->subDays(1)->format('M d, Y'), 'tone' => 'purple'],
-            ['title' => 'Schedule update', 'body' => 'Use the active AM/PM batch schedule for learner reminders.', 'date' => now()->subDays(2)->format('M d, Y'), 'tone' => 'emerald'],
-            ['title' => 'Certificate readiness', 'body' => 'Approved and paid learners can be prepared for future record generation.', 'date' => now()->subDays(4)->format('M d, Y'), 'tone' => 'amber'],
-        ];
+        $teachingTimeline = collect([
+            [
+                'time' => '8:00 AM',
+                'title' => 'Preparation and setup',
+                'training' => $batchLabel,
+                'duration' => '30 min',
+                'room' => $morningRoom,
+                'state' => 'complete',
+                'label' => 'Completed',
+            ],
+            [
+                'time' => $todaySessions[0]['time'],
+                'title' => $todaySessions[0]['title'],
+                'training' => $todaySessions[0]['batch'],
+                'duration' => $todaySessions[0]['duration'],
+                'room' => $todaySessions[0]['room'],
+                'state' => 'current',
+                'label' => 'In progress',
+            ],
+            [
+                'time' => $todaySessions[1]['time'],
+                'title' => $todaySessions[1]['title'],
+                'training' => $todaySessions[1]['batch'],
+                'duration' => $todaySessions[1]['duration'],
+                'room' => $todaySessions[1]['room'],
+                'state' => 'upcoming',
+                'label' => 'Upcoming',
+            ],
+            [
+                'time' => '4:00 PM',
+                'title' => 'Wrap-up and reflection',
+                'training' => 'Trainer notes and learner follow-up',
+                'duration' => '30 min',
+                'room' => $morningRoom,
+                'state' => 'upcoming',
+                'label' => 'Upcoming',
+            ],
+        ]);
+
+        $learnerFollowUps = $progressRows->map(function (array $row) {
+            $needsAction = $row['status'] !== 'Completed';
+
+            return [
+                ...$row,
+                'initial' => mb_strtoupper(mb_substr($row['name'], 0, 1)),
+                'needs_action' => $needsAction,
+                'action' => match ($row['status']) {
+                    'Not Started' => 'Start learner follow-up',
+                    'Completed' => 'Review completion',
+                    default => 'Review progress',
+                },
+                'priority' => $row['progress'] <= 25 ? 'Overdue' : ($needsAction ? 'Needs action' : 'On track'),
+            ];
+        });
 
         return view('trainer.dashboard', [
             'activeBatch' => $activeBatch,
-            'announcements' => $announcements,
             'averageProgress' => $averageProgress,
-            'currentModule' => $modules[0],
+            'learnerFollowUps' => $learnerFollowUps,
             'modules' => $modules,
             'progressRows' => $progressRows,
+            'search' => $search,
             'stats' => [
-                'total_trainings' => count($modules),
+                'total_trainings' => $modules->count(),
                 'total_trainees' => EnrollmentApplication::query()
                     ->whereIn('status', [
                         EnrollmentApplication::STATUS_PRE_ENLISTMENT,
@@ -117,6 +173,7 @@ class TrainerDashboardController extends Controller
                 'sessions_today' => count($todaySessions),
                 'average_progress' => $averageProgress,
             ],
+            'teachingTimeline' => $teachingTimeline,
             'todaySessions' => $todaySessions,
         ]);
     }
