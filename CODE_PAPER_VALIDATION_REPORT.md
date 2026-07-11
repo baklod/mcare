@@ -1,7 +1,7 @@
 # MCARE Hub — Code vs. Capstone Paper Validation Report
 
 **Audit branch:** `comments-checking-in-code`
-**Code baseline reviewed:** latest implemented Codex work derived from `feature/admin-enrollment-review` / PR #2
+**Code baseline reviewed:** latest implemented branch work derived from `feature/admin-enrollment-review` / PR #2
 **Paper reviewed:** `paper.docx` uploaded in ChatGPT
 **Audit type:** static code review + requirements traceability review
 **Important limitation:** this report does **not** claim a fresh local runtime execution of the whole Laravel application. The audit checked repository structure, routes, controllers, models, migrations, package manifests, views, and available tests. A fresh `composer install`, `npm install`, migrations, and test run should still be performed on the target machine before merge/deployment.
@@ -42,7 +42,7 @@ However, the paper describes a substantially broader end-to-end system. The curr
 
 ## 2. Repository Evidence Reviewed
 
-The current implementation contains approximately 97 changed files in the latest Codex PR line. Important reviewed areas include:
+The current implementation contains approximately 97 changed files in the latest review branch. Important reviewed areas include:
 
 - `routes/web.php`
 - `composer.json`
