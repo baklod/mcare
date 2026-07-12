@@ -15,13 +15,13 @@
         $navActive = 'is-active';
         $trainerNav = [
             ['label' => 'Teaching Day', 'icon' => 'fa-calendar-days', 'href' => route('trainer.dashboard'), 'active' => request()->routeIs('trainer.dashboard')],
-            ['label' => 'My Trainings', 'icon' => 'fa-book-open', 'href' => route('trainer.dashboard').'#modules', 'active' => false],
-            ['label' => 'Trainees', 'icon' => 'fa-users', 'href' => route('trainer.dashboard').'#learner-follow-up', 'active' => false],
-            ['label' => 'Sessions', 'icon' => 'fa-clipboard-list', 'href' => route('trainer.dashboard').'#teaching-timeline', 'active' => false],
-            ['label' => 'Assessments', 'icon' => 'fa-square-check', 'href' => route('trainer.dashboard').'#learner-follow-up', 'active' => false],
-            ['label' => 'Resources', 'icon' => 'fa-folder-open', 'href' => route('trainer.dashboard').'#modules', 'active' => false],
-            ['label' => 'Certificates', 'icon' => 'fa-award', 'href' => route('trainer.dashboard').'#modules', 'active' => false],
-            ['label' => 'Reports', 'icon' => 'fa-chart-column', 'href' => route('trainer.dashboard').'#learner-follow-up', 'active' => false],
+            ['label' => 'My Trainings', 'icon' => 'fa-book-open', 'href' => route('trainer.trainings'), 'active' => request()->routeIs('trainer.trainings')],
+            ['label' => 'Trainees', 'icon' => 'fa-users', 'href' => route('trainer.trainees'), 'active' => request()->routeIs('trainer.trainees')],
+            ['label' => 'Sessions', 'icon' => 'fa-clipboard-list', 'href' => route('trainer.sessions'), 'active' => request()->routeIs('trainer.sessions')],
+            ['label' => 'Assessments', 'icon' => 'fa-square-check', 'href' => route('trainer.assessments'), 'active' => request()->routeIs('trainer.assessments')],
+            ['label' => 'Resources', 'icon' => 'fa-folder-open', 'href' => route('trainer.resources'), 'active' => request()->routeIs('trainer.resources')],
+            ['label' => 'Certificates', 'icon' => 'fa-award', 'href' => route('trainer.certificates'), 'active' => request()->routeIs('trainer.certificates')],
+            ['label' => 'Reports', 'icon' => 'fa-chart-column', 'href' => route('trainer.reports'), 'active' => request()->routeIs('trainer.reports')],
         ];
     @endphp
 
@@ -85,7 +85,7 @@
                     </div>
                 </div>
 
-                <form method="GET" action="{{ route('trainer.dashboard') }}" class="dashboard-search">
+                <form method="GET" action="{{ request()->routeIs('trainer.trainees') ? route('trainer.trainees') : route('trainer.dashboard') }}" class="dashboard-search">
                     <i class="fa-solid fa-magnifying-glass text-sm text-slate-400" aria-hidden="true"></i>
                     <input name="search" value="{{ request('search') }}" type="search" placeholder="Search trainees, sessions, modules..." class="min-w-0 flex-1 border-0 bg-transparent py-2.5 text-sm outline-none placeholder:text-slate-400">
                     <button type="submit" class="sr-only">Search</button>

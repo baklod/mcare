@@ -55,6 +55,19 @@
                     @error('enrollment_ends_at') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                 </div>
 
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label for="training_starts_at" class="mb-2 block text-sm font-semibold text-slate-800">Training starts</label>
+                        <input id="training_starts_at" name="training_starts_at" type="datetime-local" value="{{ old('training_starts_at', $batch?->training_starts_at?->format('Y-m-d\TH:i')) }}" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                        @error('training_starts_at') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label for="training_ends_at" class="mb-2 block text-sm font-semibold text-slate-800">Training target completion</label>
+                        <input id="training_ends_at" name="training_ends_at" type="datetime-local" value="{{ old('training_ends_at', $batch?->training_ends_at?->format('Y-m-d\TH:i')) }}" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                        @error('training_ends_at') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
+                    </div>
+                </div>
+
                 <div class="rounded-3xl border border-slate-100 bg-slate-50 p-4">
                     <p class="text-sm font-bold uppercase text-purple-600">AM class</p>
                     <div class="mt-4">
@@ -125,9 +138,8 @@
                         <div>
                             <div class="flex flex-wrap items-center gap-2">
                                 <h3 class="text-xl font-bold text-slate-900">{{ $item->name }} {{ $item->year }}</h3>
-                                @if ($item->is_active)
-                                    <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">Active</span>
-                                @endif
+                                <span class="rounded-full px-3 py-1 text-xs font-bold ring-1 {{ $item->acceptsEnrollment() ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-slate-100 text-slate-700 ring-slate-200' }}">{{ $item->enrollmentStateLabel() }}</span>
+                                <span class="rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700 ring-1 ring-purple-100">{{ $item->trainingStateLabel() }}</span>
                             </div>
                             <p class="mt-2 text-sm leading-6 text-slate-500">Enrollment ends {{ $item->enrollment_ends_at->format('M d, Y g:i A') }}</p>
                         </div>

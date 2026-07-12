@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use App\Models\EnrollmentApplication;
+use App\Models\TrainingBatch;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -15,6 +16,14 @@ class EnrollmentSubmissionTest extends TestCase
     public function test_applicant_can_submit_documents_and_drawn_signature(): void
     {
         Storage::fake('local');
+
+        TrainingBatch::create([
+            'name' => 'Batch 1',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_starts_at' => now()->subDay(),
+            'enrollment_ends_at' => now()->addWeek(),
+        ]);
 
         $signature = 'data:image/png;base64,'.base64_encode('fake-signature-bytes');
 

@@ -6,11 +6,13 @@ use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\EnrollmentPaymentController;
 use App\Http\Controllers\Admin\AdminActivityLogController;
 use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\AdminLearningSystemController;
 use App\Http\Controllers\Admin\AdminSessionController;
 use App\Http\Controllers\Admin\BatchScheduleController;
 use App\Http\Controllers\Admin\EnrollmentReviewController;
 use App\Http\Controllers\Admin\PaymentScheduleController;
 use App\Http\Controllers\Trainer\TrainerDashboardController;
+use App\Http\Controllers\Trainer\TrainerPortalController;
 use App\Http\Controllers\Trainer\TrainerSessionController;
 use App\Http\Controllers\Trainee\TraineeDashboardController;
 use App\Http\Controllers\Trainee\TraineeSessionController;
@@ -114,6 +116,10 @@ Route::middleware('throttle:global-web')->group(function () {
                     ->middleware('throttle:sensitive-mutation')
                     ->name('enrollments.update');
 
+                Route::get('/enrollments/{enrollmentApplication}/tesda-form', [EnrollmentReviewController::class, 'tesdaForm'])
+                    ->middleware('throttle:document-downloads')
+                    ->name('enrollments.tesda-form');
+
                 Route::get('/enrollments/{enrollmentApplication}/documents/{document}', [EnrollmentReviewController::class, 'document'])
                     ->middleware('throttle:document-downloads')
                     ->name('enrollments.documents.show');
@@ -139,6 +145,16 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/payment-scheduling', [PaymentScheduleController::class, 'index'])
                     ->name('payment-schedules.index');
 
+                Route::patch('/payment-scheduling/{enrollmentApplication}', [PaymentScheduleController::class, 'update'])
+                    ->middleware('throttle:sensitive-mutation')
+                    ->name('payment-schedules.update');
+
+                Route::get('/learning/trainees', [AdminLearningSystemController::class, 'trainees'])->name('learning.trainees');
+                Route::get('/learning/modules', [AdminLearningSystemController::class, 'modules'])->name('learning.modules');
+                Route::get('/learning/certificates', [AdminLearningSystemController::class, 'certificates'])->name('learning.certificates');
+                Route::get('/learning/alumni-jobs', [AdminLearningSystemController::class, 'alumniJobs'])->name('learning.alumni-jobs');
+                Route::get('/learning/reports', [AdminLearningSystemController::class, 'reports'])->name('learning.reports');
+
                 Route::get('/logs', [AdminActivityLogController::class, 'index'])
                     ->middleware('throttle:search')
                     ->name('logs.index');
@@ -162,6 +178,14 @@ Route::middleware('throttle:global-web')->group(function () {
 
                 Route::get('/', TrainerDashboardController::class)
                     ->name('dashboard');
+
+                Route::get('/trainings', [TrainerPortalController::class, 'trainings'])->name('trainings');
+                Route::get('/trainees', [TrainerPortalController::class, 'trainees'])->name('trainees');
+                Route::get('/sessions', [TrainerPortalController::class, 'sessions'])->name('sessions');
+                Route::get('/assessments', [TrainerPortalController::class, 'assessments'])->name('assessments');
+                Route::get('/resources', [TrainerPortalController::class, 'resources'])->name('resources');
+                Route::get('/certificates', [TrainerPortalController::class, 'certificates'])->name('certificates');
+                Route::get('/reports', [TrainerPortalController::class, 'reports'])->name('reports');
 
                 Route::post('/modules', [TrainerDashboardController::class, 'storeModule'])
                     ->middleware('throttle:8,1')

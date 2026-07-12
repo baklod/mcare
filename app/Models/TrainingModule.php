@@ -13,6 +13,7 @@ class TrainingModule extends Model
     protected $fillable = [
         'trainer_id',
         'training_batch_id',
+        'target_enrollment_application_id',
         'title',
         'description',
         'file_path',
@@ -39,5 +40,10 @@ class TrainingModule extends Model
     public function batch(): BelongsTo
     {
         return $this->belongsTo(TrainingBatch::class, 'training_batch_id');
+    }
+
+    public function targetTrainee(): BelongsTo
+    {
+        return $this->belongsTo(EnrollmentApplication::class, 'target_enrollment_application_id');
     }
 }

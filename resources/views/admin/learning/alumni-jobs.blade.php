@@ -1,0 +1,9 @@
+@extends('admin.layouts.app', ['title' => 'Alumni & Jobs | MCARE Admin'])
+
+@section('content')
+<section class="space-y-6">
+    <header class="border-b border-slate-200 pb-6"><p class="dashboard-section-kicker">Learning system · Alumni Jobs</p><h1 class="mt-2 dashboard-section-title text-3xl">Graduate transition and career hub</h1><p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">A dedicated focal point for converting verified graduates to alumni and managing employment outcomes. Job actions follow after graduation and certificate gates are complete.</p></header>
+    <div class="grid gap-4 md:grid-cols-3"><article class="dashboard-stat"><div><p class="dashboard-stat-label">Approved trainees</p><p class="dashboard-stat-value">{{ $approvedTrainees }}</p><p class="dashboard-stat-help">Current learner pipeline</p></div></article><article class="dashboard-stat"><div><p class="dashboard-stat-label">Completed batches</p><p class="dashboard-stat-value">{{ $completedBatches }}</p><p class="dashboard-stat-help">Based on training end dates</p></div></article><article class="dashboard-stat"><div><p class="dashboard-stat-label">Alumni accounts</p><p class="dashboard-stat-value">{{ $alumniAccounts }}</p><p class="dashboard-stat-help">Accounts carrying alumni role</p></div></article></div>
+    <div class="dashboard-panel"><p class="dashboard-section-kicker">Required graduation gate</p><h2 class="mt-2 dashboard-section-title">Complete the learning record first</h2><ol class="mt-5 grid gap-4 md:grid-cols-4">@foreach(['Finish required modules','Pass assessments and competency','Complete attendance requirement','Issue a verified certificate'] as $index => $step)<li class="rounded-xl border border-slate-200 bg-slate-50 p-4"><span class="text-xs font-bold text-purple-700">STEP {{ $index + 1 }}</span><p class="mt-2 font-bold text-slate-900">{{ $step }}</p></li>@endforeach</ol></div>
+</section>
+@endsection

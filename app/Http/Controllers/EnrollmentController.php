@@ -24,8 +24,11 @@ class EnrollmentController extends Controller
             $application = EnrollmentApplication::where('user_id', $request->user()->id)->latest()->first();
         }
 
+        $enrollmentBatch = $application?->batch ?: TrainingBatch::openForEnrollment();
+
         return view('enrollment.create', [
             'application' => $application,
+            'enrollmentBatch' => $enrollmentBatch,
             'user' => $request->user(),
         ]);
     }
@@ -43,6 +46,14 @@ class EnrollmentController extends Controller
         $currentApplication = $currentUser
             ? EnrollmentApplication::where('user_id', $currentUser->id)->first()
             : null;
+        $enrollmentBatch = $currentApplication?->batch ?: TrainingBatch::openForEnrollment();
+
+        // Existing applicants may update their record; only new entries require an open window.
+        if (! $currentApplication && ! $enrollmentBatch) {
+            throw ValidationException::withMessages([
+                'training_batch' => 'Enrollment is currently closed. Please wait for the next batch enrollment window.',
+            ]);
+        }
         $safeText = ["not_regex:/[<>\"'`;{}|\\\\]/u"];
         $safeOptionalText = ["nullable", "string", "max:120", "not_regex:/[<>\"'`;{}|\\\\]/u"];
         $blockedPasswordCharacters = "not_regex:/[<>\"'`;{}|\\\\]/u";
@@ -146,7 +157,7 @@ class EnrollmentController extends Controller
             ->merge([
                 'user_id' => $user->id,
                 'program' => 'Caregiving NC II',
-                'training_batch_id' => $currentApplication?->training_batch_id ?: TrainingBatch::active()?->id,
+                'training_batch_id' => $currentApplication?->training_batch_id ?: $enrollmentBatch?->id,
                 'privacy_consent' => true,
                 'date_accomplished' => now()->toDateString(),
                 'status' => 'profile_submitted',

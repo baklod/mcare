@@ -167,6 +167,15 @@
                     <p class="text-sm text-slate-500">Current step</p>
                     <p class="mt-1 text-lg font-bold text-slate-900 sm:text-xl">Learner profile</p>
                 </div>
+                <div class="mt-3 rounded-2xl bg-white p-4 shadow-sm sm:mt-4 sm:p-5">
+                    <p class="text-sm text-slate-500">Enrollment batch</p>
+                    <p class="mt-1 text-lg font-bold text-slate-900 sm:text-xl">
+                        {{ $enrollmentBatch ? $enrollmentBatch->name.' '.$enrollmentBatch->year : 'Enrollment closed' }}
+                    </p>
+                    @if ($enrollmentBatch)
+                        <p class="mt-2 text-xs font-semibold text-purple-700">{{ $enrollmentBatch->enrollmentStateLabel() }} · {{ $enrollmentBatch->trainingStateLabel() }}</p>
+                    @endif
+                </div>
                 <p class="mt-4 text-sm leading-6 text-slate-500 sm:mt-5">
                     Documents, payment review, and admin verification will follow after this base registration is stable.
                 </p>
@@ -207,6 +216,11 @@
         </section>
 
         <section class="enrollment-form-shell mt-8 rounded-3xl border border-slate-100 bg-white p-6 shadow-xl shadow-slate-200/60 sm:p-8">
+            @if (! $application && ! $enrollmentBatch)
+                <div class="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-semibold leading-6 text-amber-800">
+                    This batch is no longer accepting new applications. The form remains visible for reference, but submission will reopen only when an administrator activates a valid enrollment window.
+                </div>
+            @endif
             @if (session('saved'))
                 <div class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold leading-6 text-emerald-700">
                     {{ session('saved') }}
@@ -624,7 +638,7 @@
 
                 <div id="enrollment-submit" class="enrollment-submit-row enrollment-jump-target flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
                     <p class="text-sm leading-6 text-slate-500">Date accomplished will be recorded automatically when the form is submitted.</p>
-                    <button type="submit" class="inline-flex h-12 items-center justify-center rounded-full bg-purple-600 px-8 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:h-auto sm:py-4">
+                    <button type="submit" @disabled(! $application && ! $enrollmentBatch) class="inline-flex h-12 items-center justify-center rounded-full bg-purple-600 px-8 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:h-auto sm:py-4">
                         Submit NC II enrollment
                     </button>
                 </div>

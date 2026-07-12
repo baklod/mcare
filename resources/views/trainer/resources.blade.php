@@ -1,0 +1,23 @@
+@extends('trainer.layouts.app', ['title' => 'Resources | MCARE Trainer'])
+
+@section('content')
+<div class="mx-auto max-w-7xl space-y-7">
+    <header class="border-b border-stone-200 pb-6"><p class="text-sm font-bold uppercase tracking-[0.16em] text-violet-700">Resources</p><h1 class="mt-2 text-3xl font-bold text-stone-950">Publish learning modules</h1><p class="mt-2 text-stone-600">Choose whether each file is visible to an entire batch or only one approved trainee.</p></header>
+
+    @if($errors->any())<div class="border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{{ $errors->first() }}</div>@endif
+
+    <form method="POST" action="{{ route('trainer.modules.store') }}" enctype="multipart/form-data" class="grid gap-5 border border-stone-200 bg-white p-6 lg:grid-cols-2">
+        @csrf
+        <div><label class="mb-2 block text-sm font-bold">Module title</label><input name="title" value="{{ old('title') }}" required maxlength="160" class="w-full border border-stone-300 px-4 py-3" placeholder="Example: Module 03 — Infection Control"></div>
+        <div><label class="mb-2 block text-sm font-bold">Training file</label><input name="module_file" type="file" required accept=".pdf,.doc,.docx,.ppt,.pptx" class="w-full border border-stone-300 px-4 py-2.5"></div>
+        <div class="lg:col-span-2"><label class="mb-2 block text-sm font-bold">Description</label><textarea name="description" required maxlength="1200" rows="3" class="w-full border border-stone-300 px-4 py-3">{{ old('description') }}</textarea></div>
+        <fieldset class="lg:col-span-2"><legend class="text-sm font-bold">Visible to</legend><div class="mt-3 grid gap-4 md:grid-cols-2">
+            <label class="border border-stone-200 p-4"><span class="flex items-center gap-2 font-bold"><input type="radio" name="audience_type" value="batch" @checked(old('audience_type', 'batch') === 'batch')> Entire batch</span><select name="training_batch_id" class="mt-3 w-full border border-stone-300 px-3 py-2"><option value="">Choose batch</option>@foreach($batches as $batch)<option value="{{ $batch->id }}" @selected((string)old('training_batch_id', $batches->firstWhere('is_active', true)?->id) === (string)$batch->id)>{{ $batch->name }} {{ $batch->year }}{{ $batch->is_active ? ' — Active' : '' }}</option>@endforeach</select></label>
+            <label class="border border-stone-200 p-4"><span class="flex items-center gap-2 font-bold"><input type="radio" name="audience_type" value="trainee" @checked(old('audience_type') === 'trainee')> Specific trainee</span><select name="target_enrollment_application_id" class="mt-3 w-full border border-stone-300 px-3 py-2"><option value="">Choose approved trainee</option>@foreach($trainees as $trainee)<option value="{{ $trainee->id }}" @selected((string)old('target_enrollment_application_id') === (string)$trainee->id)>{{ $trainee->last_name }}, {{ $trainee->first_name }} — {{ $trainee->batch?->name ?? 'No batch' }}</option>@endforeach</select></label>
+        </div></fieldset>
+        <div class="lg:col-span-2"><button class="bg-violet-700 px-6 py-3 font-bold text-white hover:bg-violet-800">Publish module</button></div>
+    </form>
+
+    <section class="overflow-x-auto border border-stone-200 bg-white"><table class="w-full min-w-[50rem] text-left text-sm"><thead class="bg-stone-50 text-xs uppercase text-stone-500"><tr><th class="px-5 py-4">Module</th><th class="px-5 py-4">Audience</th><th class="px-5 py-4">Batch</th><th class="px-5 py-4">Published</th><th class="px-5 py-4">File</th></tr></thead><tbody class="divide-y divide-stone-200">@forelse($modules as $module)<tr><td class="px-5 py-4"><p class="font-bold text-stone-950">{{ $module->title }}</p><p class="mt-1 text-stone-500">{{ str($module->description)->limit(80) }}</p></td><td class="px-5 py-4">{{ $module->targetTrainee ? $module->targetTrainee->first_name.' '.$module->targetTrainee->last_name : 'Entire batch' }}</td><td class="px-5 py-4">{{ $module->batch ? $module->batch->name.' '.$module->batch->year : 'All batches' }}</td><td class="px-5 py-4">{{ $module->published_at?->format('M d, Y g:i A') }}</td><td class="px-5 py-4"><a class="font-bold text-violet-700" href="{{ route('trainer.modules.download', $module) }}">Download</a></td></tr>@empty<tr><td colspan="5" class="px-5 py-10 text-center text-stone-600">No modules published yet.</td></tr>@endforelse</tbody></table></section>
+</div>
+@endsection

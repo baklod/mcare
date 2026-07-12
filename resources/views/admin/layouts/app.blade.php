@@ -24,11 +24,11 @@
         ];
 
         $capstoneNav = [
-            ['label' => 'Trainees', 'icon' => 'fa-users', 'href' => route('admin.dashboard').'#action-queue'],
-            ['label' => 'LMS Modules', 'icon' => 'fa-book-open', 'href' => route('admin.dashboard').'#lms-modules'],
-            ['label' => 'Certificates', 'icon' => 'fa-award', 'href' => route('admin.dashboard').'#certificates'],
-            ['label' => 'Alumni Jobs', 'icon' => 'fa-briefcase', 'href' => route('admin.dashboard').'#reports'],
-            ['label' => 'Reports', 'icon' => 'fa-chart-column', 'href' => route('admin.dashboard').'#reports'],
+            ['label' => 'Trainees', 'icon' => 'fa-users', 'href' => route('admin.learning.trainees'), 'active' => request()->routeIs('admin.learning.trainees')],
+            ['label' => 'LMS Modules', 'icon' => 'fa-book-open', 'href' => route('admin.learning.modules'), 'active' => request()->routeIs('admin.learning.modules')],
+            ['label' => 'Certificates', 'icon' => 'fa-award', 'href' => route('admin.learning.certificates'), 'active' => request()->routeIs('admin.learning.certificates')],
+            ['label' => 'Alumni Jobs', 'icon' => 'fa-briefcase', 'href' => route('admin.learning.alumni-jobs'), 'active' => request()->routeIs('admin.learning.alumni-jobs')],
+            ['label' => 'Reports', 'icon' => 'fa-chart-column', 'href' => route('admin.learning.reports'), 'active' => request()->routeIs('admin.learning.reports')],
         ];
     @endphp
 
@@ -63,7 +63,7 @@
                 <p class="px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Learning system</p>
                 <div class="mt-2 space-y-1">
                     @foreach ($capstoneNav as $item)
-                        <a href="{{ $item['href'] }}" data-dashboard-nav-key="admin-{{ str($item['label'])->slug() }}" class="{{ $navClass }} {{ $navIdle }}">
+                        <a href="{{ $item['href'] }}" data-dashboard-nav-key="admin-{{ str($item['label'])->slug() }}" class="{{ $navClass }} {{ $item['active'] ? $navActive : $navIdle }}" @if($item['active']) aria-current="page" @endif>
                             <i class="dashboard-nav-icon fa-solid {{ $item['icon'] }}" aria-hidden="true"></i>
                             <span>{{ $item['label'] }}</span>
                         </a>

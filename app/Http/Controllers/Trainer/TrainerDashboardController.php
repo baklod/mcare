@@ -7,15 +7,18 @@ use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
+use App\Services\TrainerScheduleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TrainerDashboardController extends Controller
 {
-    public function __invoke(Request $request): View
+    public function __invoke(Request $request, TrainerScheduleService $scheduleService): View
     {
         $trainer = $request->user();
         $activeBatch = TrainingBatch::active();
@@ -65,65 +68,27 @@ class TrainerDashboardController extends Controller
                 ];
             });
 
-        $batchLabel = $activeBatch ? $activeBatch->name.' '.$activeBatch->year : 'Current batch';
-        $morningRoom = $activeBatch?->roomFor('AM') ?: 'Room 201 / Skills Lab';
-        $afternoonRoom = $activeBatch?->roomFor('PM') ?: 'Room 202 / Lecture Room';
+        // Today's timeline is derived directly from the active admin-managed batch schedule.
+        $todaySessions = $activeBatch ? $scheduleService->today($activeBatch) : collect();
+        $teachingTimeline = $todaySessions->map(function (array $session) {
+            $state = now()->gte($session['ends_at'])
+                ? 'complete'
+                : (now()->between($session['starts_at'], $session['ends_at']) ? 'current' : 'upcoming');
 
-        $todaySessions = [
-            [
-                'time' => '9:00 AM',
-                'title' => 'Caregiving Communication Skills',
-                'batch' => $batchLabel,
-                'duration' => '1h 30m',
-                'room' => $morningRoom,
-            ],
-            [
-                'time' => '2:00 PM',
-                'title' => 'Elderly Care Fundamentals',
-                'batch' => $batchLabel,
-                'duration' => '2h',
-                'room' => $afternoonRoom,
-            ],
-        ];
-
-        $teachingTimeline = collect([
-            [
-                'time' => '8:00 AM',
-                'title' => 'Preparation and setup',
-                'training' => $batchLabel,
-                'duration' => '30 min',
-                'room' => $morningRoom,
-                'state' => 'complete',
-                'label' => 'Completed',
-            ],
-            [
-                'time' => $todaySessions[0]['time'],
-                'title' => $todaySessions[0]['title'],
-                'training' => $todaySessions[0]['batch'],
-                'duration' => $todaySessions[0]['duration'],
-                'room' => $todaySessions[0]['room'],
-                'state' => 'current',
-                'label' => 'In progress',
-            ],
-            [
-                'time' => $todaySessions[1]['time'],
-                'title' => $todaySessions[1]['title'],
-                'training' => $todaySessions[1]['batch'],
-                'duration' => $todaySessions[1]['duration'],
-                'room' => $todaySessions[1]['room'],
-                'state' => 'upcoming',
-                'label' => 'Upcoming',
-            ],
-            [
-                'time' => '4:00 PM',
-                'title' => 'Wrap-up and reflection',
-                'training' => 'Trainer notes and learner follow-up',
-                'duration' => '30 min',
-                'room' => $morningRoom,
-                'state' => 'upcoming',
-                'label' => 'Upcoming',
-            ],
-        ]);
+            return [
+                'time' => $session['time'],
+                'title' => $session['title'],
+                'training' => $session['batch'],
+                'duration' => $session['duration'],
+                'room' => $session['room'],
+                'state' => $state,
+                'label' => match ($state) {
+                    'complete' => 'Completed',
+                    'current' => 'In progress',
+                    default => 'Upcoming',
+                },
+            ];
+        });
 
         $learnerFollowUps = $progressRows->map(function (array $row) {
             return [
@@ -144,7 +109,7 @@ class TrainerDashboardController extends Controller
             'stats' => [
                 'total_trainings' => $modules->count(),
                 'total_trainees' => $assignedTrainees->count(),
-                'sessions_today' => count($todaySessions),
+                'sessions_today' => $todaySessions->count(),
             ],
             'teachingTimeline' => $teachingTimeline,
             'todaySessions' => $todaySessions,
@@ -153,11 +118,25 @@ class TrainerDashboardController extends Controller
 
     public function storeModule(Request $request): RedirectResponse
     {
+        $activeBatch = TrainingBatch::active();
+        $request->merge([
+            'audience_type' => $request->input('audience_type', 'batch'),
+            'training_batch_id' => $request->input('training_batch_id', $activeBatch?->id),
+        ]);
         $safeText = ['not_regex:/[<>"\'`;{}|\\\\]/u'];
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:160', ...$safeText],
             'description' => ['required', 'string', 'max:1200', ...$safeText],
             'module_file' => ['required', 'file', 'mimes:pdf,doc,docx,ppt,pptx', 'max:20480'],
+            'audience_type' => ['required', Rule::in(['batch', 'trainee'])],
+            'training_batch_id' => ['nullable', 'integer', 'exists:training_batches,id'],
+            'target_enrollment_application_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('enrollment_applications', 'id')->where(
+                    fn ($query) => $query->where('status', EnrollmentApplication::STATUS_APPROVED)
+                ),
+            ],
         ], [
             'not_regex' => 'This field contains characters that are not allowed for security reasons.',
             'module_file.mimes' => 'Training modules must be PDF, DOC, DOCX, PPT, or PPTX files.',
@@ -166,14 +145,24 @@ class TrainerDashboardController extends Controller
 
         $file = $request->file('module_file');
         $trainer = $request->user();
-        $activeBatch = TrainingBatch::active();
+        $targetTrainee = $validated['audience_type'] === 'trainee'
+            ? EnrollmentApplication::query()->find($validated['target_enrollment_application_id'] ?? null)
+            : null;
+        $batchId = $targetTrainee?->training_batch_id ?? ($validated['training_batch_id'] ?? null);
+
+        if (! $batchId || ($validated['audience_type'] === 'trainee' && ! $targetTrainee)) {
+            throw ValidationException::withMessages([
+                'audience_type' => 'Choose a batch or an approved trainee before publishing.',
+            ]);
+        }
 
         // Keep trainer materials private so authorization remains enforceable on download.
         $path = $file->store("training-modules/{$trainer->id}", 'local');
 
         $module = TrainingModule::create([
             'trainer_id' => $trainer->id,
-            'training_batch_id' => $activeBatch?->id,
+            'training_batch_id' => $batchId,
+            'target_enrollment_application_id' => $targetTrainee?->id,
             'title' => $validated['title'],
             'description' => $validated['description'],
             'file_path' => $path,
@@ -186,12 +175,16 @@ class TrainerDashboardController extends Controller
 
         AdminActivityLog::record($trainer, 'trainer.module.uploaded', $module, [
             'title' => $module->title,
-            'batch' => $activeBatch ? $activeBatch->name.' '.$activeBatch->year : null,
+            'batch_id' => $batchId,
+            'audience' => $targetTrainee ? 'trainee' : 'batch',
+            'target_trainee_id' => $targetTrainee?->id,
         ]);
 
         return redirect()
-            ->to(route('trainer.dashboard').'#modules')
-            ->with('saved', 'Training module published for trainees.');
+            ->route('trainer.resources')
+            ->with('saved', $targetTrainee
+                ? 'Training module published for the selected trainee.'
+                : 'Training module published for the selected batch.');
     }
 
     public function downloadModule(Request $request, TrainingModule $module): StreamedResponse

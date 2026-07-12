@@ -99,7 +99,7 @@ class TrainerPortalTest extends TestCase
                 'description' => 'Safe infection prevention lesson for Caregiving NC II trainees.',
                 'module_file' => $file,
             ])
-            ->assertRedirect(route('trainer.dashboard').'#modules');
+            ->assertRedirect(route('trainer.resources'));
 
         $this->assertDatabaseHas('training_modules', [
             'trainer_id' => $trainer->id,
@@ -110,5 +110,100 @@ class TrainerPortalTest extends TestCase
         $path = Storage::disk('local')->files("training-modules/{$trainer->id}")[0] ?? null;
         $this->assertNotNull($path);
         Storage::disk('local')->assertExists($path);
+    }
+
+    public function test_each_trainer_sidebar_destination_has_its_own_page(): void
+    {
+        $trainer = User::factory()->create(['role' => 'trainer']);
+
+        foreach ([
+            'trainer.dashboard',
+            'trainer.trainings',
+            'trainer.trainees',
+            'trainer.sessions',
+            'trainer.assessments',
+            'trainer.resources',
+            'trainer.certificates',
+            'trainer.reports',
+        ] as $routeName) {
+            $this->actingAs($trainer)->get(route($routeName))->assertOk();
+        }
+    }
+
+    public function test_admin_batch_schedule_is_reflected_in_trainer_month_calendar(): void
+    {
+        $trainer = User::factory()->create(['role' => 'trainer']);
+        TrainingBatch::create([
+            'name' => 'Realtime Batch',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+            'training_starts_at' => now()->startOfMonth(),
+            'training_ends_at' => now()->endOfMonth(),
+            'am_days' => strtoupper(now()->format('D')),
+            'am_start_time' => '08:30',
+            'am_end_time' => '11:30',
+            'am_room' => 'Admin Scheduled Skills Lab',
+            'pm_days' => 'MON',
+        ]);
+
+        $this->actingAs($trainer)
+            ->get(route('trainer.sessions', ['month' => now()->format('Y-m')]))
+            ->assertOk()
+            ->assertSee('Realtime Batch')
+            ->assertSee('8:30 AM - 11:30 AM')
+            ->assertSee('Admin Scheduled Skills Lab');
+    }
+
+    public function test_trainer_can_publish_module_to_one_approved_trainee(): void
+    {
+        Storage::fake('local');
+        $trainer = User::factory()->create(['role' => 'trainer']);
+        $student = User::factory()->create(['role' => 'trainee']);
+        $batch = TrainingBatch::create([
+            'name' => 'Target Batch',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+            'am_days' => 'MWF',
+            'pm_days' => 'TTS',
+        ]);
+        $application = EnrollmentApplication::create([
+            'user_id' => $student->id,
+            'training_batch_id' => $batch->id,
+            'email' => $student->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => 'Target',
+            'last_name' => 'Student',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'street' => 'Street',
+            'barangay' => 'Barangay',
+            'city' => 'City',
+            'province' => 'Province',
+            'zip_code' => '1000',
+            'educational_attainment' => 'College Graduate',
+            'school_name' => 'MCARE College',
+            'year_graduated' => 2022,
+            'status' => EnrollmentApplication::STATUS_APPROVED,
+        ]);
+
+        $this->actingAs($trainer)
+            ->post(route('trainer.modules.store'), [
+                'title' => 'Private Remediation Module',
+                'description' => 'Visible only to the selected trainee.',
+                'audience_type' => 'trainee',
+                'target_enrollment_application_id' => $application->id,
+                'module_file' => UploadedFile::fake()->create('private-module.pdf', 64, 'application/pdf'),
+            ])
+            ->assertRedirect(route('trainer.resources'));
+
+        $this->assertDatabaseHas('training_modules', [
+            'title' => 'Private Remediation Module',
+            'training_batch_id' => $batch->id,
+            'target_enrollment_application_id' => $application->id,
+        ]);
     }
 }

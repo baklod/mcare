@@ -22,20 +22,20 @@
         <div class="dashboard-hero">
             <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                    <span class="dashboard-pill bg-white/15 text-white ring-white/20">Enrollment admin</span>
+                    <span class="dashboard-pill bg-purple-50 text-purple-700 ring-purple-100">Enrollment admin</span>
                     <h1 class="mt-4">Applicant queue</h1>
                     <p>
                         Review submitted Caregiving NC II learner profiles and move qualified applicants into pre-enlistment, approval, or denial.
                     </p>
                 </div>
-                <div class="rounded-2xl bg-white/15 px-5 py-4 text-right ring-1 ring-white/20">
-                    <p class="text-xs font-black uppercase tracking-wide text-white/65">Total applications</p>
-                    <p class="mt-1 font-display text-3xl font-black text-white">{{ $totalApplications }}</p>
+                <div class="rounded-xl bg-purple-50 px-5 py-4 text-right ring-1 ring-purple-100">
+                    <p class="text-xs font-bold uppercase tracking-wide text-purple-700">Total applications</p>
+                    <p class="mt-1 font-display text-3xl font-extrabold text-slate-950">{{ $totalApplications }}</p>
                 </div>
             </div>
 
-            <form method="GET" action="{{ route('admin.enrollments.index') }}" class="mt-8 grid grid-cols-1 gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 md:grid-cols-[1fr_220px_auto]">
-                <div>
+            <form method="GET" action="{{ route('admin.enrollments.index') }}" class="mt-8 grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-2 xl:grid-cols-6">
+                <div class="md:col-span-2 xl:col-span-2">
                     <label for="search" class="mb-2 block text-xs font-bold uppercase text-slate-500">Search</label>
                     <input id="search" name="search" type="search" value="{{ $search }}" placeholder="Name, email, or contact number" class="form-field bg-white">
                 </div>
@@ -48,7 +48,42 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="flex items-end gap-2">
+                <div>
+                    <label for="batch_id" class="mb-2 block text-xs font-bold uppercase text-slate-500">Batch</label>
+                    <select id="batch_id" name="batch_id" class="form-field bg-white">
+                        <option value="">All batches</option>
+                        @foreach ($batches as $batch)
+                            <option value="{{ $batch->id }}" @selected($batchId === $batch->id)>{{ $batch->name }} {{ $batch->year }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label for="schedule" class="mb-2 block text-xs font-bold uppercase text-slate-500">Class schedule</label>
+                    <select id="schedule" name="schedule" class="form-field bg-white">
+                        <option value="">AM and PM</option>
+                        <option value="AM" @selected($schedule === 'AM')>AM students</option>
+                        <option value="PM" @selected($schedule === 'PM')>PM students</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="enrollment_state" class="mb-2 block text-xs font-bold uppercase text-slate-500">Enrollment window</label>
+                    <select id="enrollment_state" name="enrollment_state" class="form-field bg-white">
+                        <option value="">Any window</option>
+                        <option value="open" @selected($enrollmentState === 'open')>Open</option>
+                        <option value="upcoming" @selected($enrollmentState === 'upcoming')>Starting soon</option>
+                        <option value="closed" @selected($enrollmentState === 'closed')>Closed</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="training_state" class="mb-2 block text-xs font-bold uppercase text-slate-500">Training lifecycle</label>
+                    <select id="training_state" name="training_state" class="form-field bg-white">
+                        <option value="">Any training state</option>
+                        <option value="not_started" @selected($trainingState === 'not_started')>Not started</option>
+                        <option value="in_progress" @selected($trainingState === 'in_progress')>In progress</option>
+                        <option value="completed" @selected($trainingState === 'completed')>Completed</option>
+                    </select>
+                </div>
+                <div class="flex items-end gap-2 md:col-span-2 xl:col-span-6">
                     <button type="submit" class="primary-action w-full md:w-auto">
                         Filter
                     </button>

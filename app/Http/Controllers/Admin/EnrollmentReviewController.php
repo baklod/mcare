@@ -5,12 +5,15 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
+use App\Models\TrainingBatch;
+use App\Services\TesdaRegistrationPdfService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 class EnrollmentReviewController extends Controller
 {
@@ -26,10 +29,18 @@ class EnrollmentReviewController extends Controller
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
             'status' => ['nullable', 'string', 'max:50'],
+            'batch_id' => ['nullable', 'integer', 'exists:training_batches,id'],
+            'schedule' => ['nullable', Rule::in(['AM', 'PM'])],
+            'enrollment_state' => ['nullable', Rule::in(['open', 'upcoming', 'closed'])],
+            'training_state' => ['nullable', Rule::in(['not_started', 'in_progress', 'completed'])],
         ]);
 
         $selectedStatus = trim((string) ($filters['status'] ?? ''));
         $search = trim((string) ($filters['search'] ?? ''));
+        $batchId = isset($filters['batch_id']) ? (int) $filters['batch_id'] : null;
+        $schedule = $filters['schedule'] ?? null;
+        $enrollmentState = $filters['enrollment_state'] ?? null;
+        $trainingState = $filters['training_state'] ?? null;
 
         $applicationsQuery = EnrollmentApplication::query()
             ->with(['user', 'batch'])
@@ -37,6 +48,43 @@ class EnrollmentReviewController extends Controller
 
         if (array_key_exists($selectedStatus, $statuses)) {
             $applicationsQuery->where('status', $selectedStatus);
+        }
+
+        if ($batchId) {
+            $applicationsQuery->where('training_batch_id', $batchId);
+        }
+
+        if ($schedule) {
+            $applicationsQuery->where('schedule_preference', $schedule);
+        }
+
+        if ($enrollmentState) {
+            $applicationsQuery->whereHas('batch', function ($batchQuery) use ($enrollmentState) {
+                match ($enrollmentState) {
+                    'open' => $batchQuery
+                        ->where('is_active', true)
+                        ->where(fn ($query) => $query->whereNull('enrollment_starts_at')->orWhere('enrollment_starts_at', '<=', now()))
+                        ->where('enrollment_ends_at', '>', now()),
+                    'upcoming' => $batchQuery
+                        ->where('is_active', true)
+                        ->where('enrollment_starts_at', '>', now()),
+                    'closed' => $batchQuery
+                        ->where(fn ($query) => $query->where('is_active', false)->orWhere('enrollment_ends_at', '<=', now())),
+                };
+            });
+        }
+
+        if ($trainingState) {
+            $applicationsQuery->whereHas('batch', function ($batchQuery) use ($trainingState) {
+                match ($trainingState) {
+                    'not_started' => $batchQuery
+                        ->where(fn ($query) => $query->whereNull('training_starts_at')->orWhere('training_starts_at', '>', now())),
+                    'in_progress' => $batchQuery
+                        ->where('training_starts_at', '<=', now())
+                        ->where(fn ($query) => $query->whereNull('training_ends_at')->orWhere('training_ends_at', '>', now())),
+                    'completed' => $batchQuery->where('training_ends_at', '<=', now()),
+                };
+            });
         }
 
         if ($search !== '') {
@@ -61,12 +109,17 @@ class EnrollmentReviewController extends Controller
 
         return view('admin.enrollments.index', [
             'applications' => $applicationsQuery->paginate(10)->withQueryString(),
+            'batches' => TrainingBatch::query()->orderByDesc('year')->orderBy('name')->get(),
+            'batchId' => $batchId,
             'counts' => $counts,
+            'enrollmentState' => $enrollmentState,
             'reviewableStatuses' => EnrollmentApplication::reviewableStatuses(),
             'search' => $search,
             'selectedStatus' => $selectedStatus,
+            'schedule' => $schedule,
             'statuses' => $statuses,
             'totalApplications' => EnrollmentApplication::count(),
+            'trainingState' => $trainingState,
         ]);
     }
 
@@ -117,6 +170,33 @@ class EnrollmentReviewController extends Controller
         return redirect()
             ->route('admin.enrollments.show', $enrollmentApplication)
             ->with('saved', 'Enrollment review decision saved.');
+    }
+
+    public function tesdaForm(
+        Request $request,
+        EnrollmentApplication $enrollmentApplication,
+        TesdaRegistrationPdfService $pdfService,
+    ): Response {
+        $validated = $request->validate([
+            'disposition' => ['nullable', Rule::in(['inline', 'attachment'])],
+        ]);
+        $disposition = $validated['disposition'] ?? 'inline';
+
+        $enrollmentApplication->loadMissing('batch');
+        $pdf = $pdfService->generate($enrollmentApplication);
+        $filename = $pdfService->filename($enrollmentApplication);
+
+        AdminActivityLog::record($request->user(), 'enrollment.tesda-form.generated', $enrollmentApplication, [
+            'disposition' => $disposition,
+            'applicant_email' => $enrollmentApplication->email,
+        ]);
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => $disposition.'; filename="'.$filename.'"',
+            'Content-Length' => (string) strlen($pdf),
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function document(EnrollmentApplication $enrollmentApplication, string $document): StreamedResponse

@@ -16,6 +16,8 @@ class TrainingBatch extends Model
         'is_active',
         'enrollment_starts_at',
         'enrollment_ends_at',
+        'training_starts_at',
+        'training_ends_at',
         'am_start_time',
         'am_end_time',
         'am_room',
@@ -33,6 +35,8 @@ class TrainingBatch extends Model
             'is_active' => 'boolean',
             'enrollment_starts_at' => 'datetime',
             'enrollment_ends_at' => 'datetime',
+            'training_starts_at' => 'datetime',
+            'training_ends_at' => 'datetime',
         ];
     }
 
@@ -57,6 +61,72 @@ class TrainingBatch extends Model
             ->where('is_active', true)
             ->orderBy('enrollment_ends_at')
             ->first();
+    }
+
+    public static function openForEnrollment(): ?self
+    {
+        return self::query()
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $query->whereNull('enrollment_starts_at')
+                    ->orWhere('enrollment_starts_at', '<=', now());
+            })
+            ->where('enrollment_ends_at', '>', now())
+            ->orderBy('enrollment_ends_at')
+            ->first();
+    }
+
+    public function acceptsEnrollment(): bool
+    {
+        return $this->is_active
+            && (! $this->enrollment_starts_at || $this->enrollment_starts_at->isPast())
+            && $this->enrollment_ends_at->isFuture();
+    }
+
+    public function enrollmentState(): string
+    {
+        if (! $this->is_active) {
+            return 'disabled';
+        }
+
+        if ($this->enrollment_starts_at?->isFuture()) {
+            return 'upcoming';
+        }
+
+        return $this->enrollment_ends_at->isFuture() ? 'open' : 'closed';
+    }
+
+    public function enrollmentStateLabel(): string
+    {
+        return match ($this->enrollmentState()) {
+            'open' => 'Open for enrollment',
+            'upcoming' => 'Enrollment starting soon',
+            'closed' => 'Enrollment closed',
+            default => 'Not accepting enrollment',
+        };
+    }
+
+    public function trainingState(): string
+    {
+        if (! $this->training_starts_at) {
+            return 'not_scheduled';
+        }
+
+        if ($this->training_starts_at->isFuture()) {
+            return 'not_started';
+        }
+
+        return $this->training_ends_at?->isPast() ? 'completed' : 'in_progress';
+    }
+
+    public function trainingStateLabel(): string
+    {
+        return match ($this->trainingState()) {
+            'not_started' => 'Training not started',
+            'in_progress' => 'Training in progress',
+            'completed' => 'Training completed',
+            default => 'Training dates not set',
+        };
     }
 
     public function scheduleLabelFor(?string $preference): string

@@ -62,7 +62,14 @@ class TraineeDashboardController extends Controller
 
         abort_unless($application, 403);
         abort_unless($module->is_published, 404);
-        abort_unless($module->training_batch_id === null || $module->training_batch_id === $application->training_batch_id, 403);
+        abort_unless(
+            $module->target_enrollment_application_id === $application->id
+                || (
+                    $module->target_enrollment_application_id === null
+                    && ($module->training_batch_id === null || $module->training_batch_id === $application->training_batch_id)
+                ),
+            403
+        );
 
         AdminActivityLog::record($request->user(), 'trainee.module.downloaded', $module, [
             'title' => $module->title,
@@ -88,8 +95,14 @@ class TraineeDashboardController extends Controller
             ->with(['trainer', 'batch'])
             ->where('is_published', true)
             ->where(function ($query) use ($application) {
-                $query->whereNull('training_batch_id')
-                    ->orWhere('training_batch_id', $application->training_batch_id);
+                $query->where('target_enrollment_application_id', $application->id)
+                    ->orWhere(function ($batchQuery) use ($application) {
+                        $batchQuery->whereNull('target_enrollment_application_id')
+                            ->where(function ($scopeQuery) use ($application) {
+                                $scopeQuery->whereNull('training_batch_id')
+                                    ->orWhere('training_batch_id', $application->training_batch_id);
+                            });
+                    });
             })
             ->latest('published_at');
     }

@@ -74,6 +74,42 @@ class TraineePortalTest extends TestCase
             ->assertSee('MWF | 8:00 AM - 12:00 PM');
     }
 
+    public function test_private_module_is_visible_only_to_its_selected_trainee(): void
+    {
+        $trainer = User::factory()->create(['role' => 'trainer']);
+        $targetUser = User::factory()->create(['role' => 'trainee']);
+        $otherUser = User::factory()->create(['role' => 'trainee']);
+        $batch = $this->batch();
+        $targetApplication = $this->approvedReadyApplication($targetUser, EnrollmentApplication::STATUS_APPROVED, $batch);
+        $this->approvedReadyApplication($otherUser, EnrollmentApplication::STATUS_APPROVED, $batch);
+
+        $module = TrainingModule::create([
+            'trainer_id' => $trainer->id,
+            'training_batch_id' => $batch->id,
+            'target_enrollment_application_id' => $targetApplication->id,
+            'title' => 'Private Coaching Module',
+            'description' => 'Targeted learner follow-up.',
+            'file_path' => 'training-modules/private.pdf',
+            'original_file_name' => 'private.pdf',
+            'is_published' => true,
+            'published_at' => now(),
+        ]);
+
+        $this->actingAs($targetUser)
+            ->get(route('trainee.dashboard'))
+            ->assertOk()
+            ->assertSee('Private Coaching Module');
+
+        $this->actingAs($otherUser)
+            ->get(route('trainee.dashboard'))
+            ->assertOk()
+            ->assertDontSee('Private Coaching Module');
+
+        $this->actingAs($otherUser)
+            ->get(route('trainee.modules.download', $module))
+            ->assertForbidden();
+    }
+
     private function batch(): TrainingBatch
     {
         return TrainingBatch::create([

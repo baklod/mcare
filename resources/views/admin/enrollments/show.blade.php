@@ -187,6 +187,20 @@
 
         <aside class="space-y-6">
             <section class="rounded-3xl border border-purple-100 bg-white p-6 shadow-xl shadow-purple-100/40">
+                <p class="text-sm font-bold uppercase text-purple-600">Official TESDA form</p>
+                <h2 class="mt-2 text-2xl font-bold text-slate-900">Registration Form MIS 03-01</h2>
+                <p class="mt-3 text-sm leading-6 text-slate-500">Applicant answers, ID photo, and e-signature are placed on the original two-page TESDA form.</p>
+                <div class="mt-5 grid grid-cols-1 gap-3">
+                    <a href="{{ route('admin.enrollments.tesda-form', [$application, 'disposition' => 'inline']) }}" target="_blank" rel="noopener" class="inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700">
+                        Preview / Print form
+                    </a>
+                    <a href="{{ route('admin.enrollments.tesda-form', [$application, 'disposition' => 'attachment']) }}" class="inline-flex w-full items-center justify-center rounded-full border border-purple-200 bg-white px-5 py-3 text-sm font-bold text-purple-700 hover:bg-purple-50">
+                        Download PDF
+                    </a>
+                </div>
+            </section>
+
+            <section class="rounded-3xl border border-purple-100 bg-white p-6 shadow-xl shadow-purple-100/40">
                 <p class="text-sm font-bold uppercase text-purple-600">Review decision</p>
                 <h2 class="mt-2 text-2xl font-bold text-slate-900">Update application</h2>
 

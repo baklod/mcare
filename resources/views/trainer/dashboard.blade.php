@@ -41,7 +41,7 @@
                 </div>
 
                 <ol class="border-l border-stone-300">
-                    @foreach ($teachingTimeline as $item)
+                    @forelse ($teachingTimeline as $item)
                         @if ($item['state'] === 'current')
                             <li class="relative ml-6 border border-violet-200 bg-white p-5 sm:ml-8 sm:p-6">
                                 <span class="absolute -left-[2.05rem] top-7 flex h-4 w-4 items-center justify-center rounded-full bg-violet-700 ring-4 ring-[#faf9f7]" aria-hidden="true"></span>
@@ -94,7 +94,9 @@
                                 </div>
                             </li>
                         @endif
-                    @endforeach
+                    @empty
+                        <li class="ml-6 border border-stone-200 bg-white p-6 sm:ml-8"><p class="font-bold text-stone-950">No session scheduled today.</p><p class="mt-2 text-sm text-stone-600">Open Sessions to review the full month generated from the admin schedule.</p><a href="{{ route('trainer.sessions') }}" class="mt-4 inline-flex bg-violet-700 px-4 py-2 text-sm font-bold text-white">View monthly calendar</a></li>
+                    @endforelse
                 </ol>
             </div>
 

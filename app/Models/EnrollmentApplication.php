@@ -85,6 +85,9 @@ class EnrollmentApplication extends Model
         'paymongo_checkout_reference',
         'paymongo_checkout_url',
         'payment_meta',
+        'payment_verified_by_id',
+        'payment_verified_at',
+        'payment_verification_notes',
         'admin_notes',
         'reviewed_at',
         'reviewed_by_id',
@@ -100,6 +103,7 @@ class EnrollmentApplication extends Model
             'payment_receipt_expires_at' => 'datetime',
             'payment_selected_at' => 'datetime',
             'payment_meta' => 'array',
+            'payment_verified_at' => 'datetime',
             'reviewed_at' => 'datetime',
         ];
     }
@@ -160,6 +164,11 @@ class EnrollmentApplication extends Model
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by_id');
+    }
+
+    public function paymentVerifier(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'payment_verified_by_id');
     }
 
     public function batch(): BelongsTo
