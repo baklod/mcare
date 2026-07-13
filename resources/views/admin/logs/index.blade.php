@@ -2,7 +2,7 @@
 
 @section('content')
     <section class="rounded-3xl border border-purple-100 bg-white p-7 shadow-xl shadow-purple-100/40 sm:p-8">
-        <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div class="flex flex-col gap-6">
             <div>
                 <p class="text-sm font-bold uppercase text-purple-600">Security</p>
                 <h1 class="mt-2 text-4xl font-bold leading-tight text-slate-900">Admin logs</h1>
@@ -10,10 +10,36 @@
                     Track login activity, review decisions, document downloads, and schedule changes for audit and anti-abuse review.
                 </p>
             </div>
-            <form method="GET" action="{{ route('admin.logs.index') }}" class="flex w-full gap-2 lg:w-auto">
-                <input name="search" type="search" value="{{ $search }}" placeholder="Search action, admin, IP" class="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100 lg:w-72">
-                <button class="rounded-full bg-purple-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700">Search</button>
+            <form method="GET" action="{{ route('admin.logs.index') }}" class="grid w-full gap-3 sm:grid-cols-2 lg:grid-cols-[10rem_11rem_minmax(14rem,1fr)_auto]">
+                <label class="text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Coverage
+                    <select name="period" class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-100">
+                        @foreach (['all' => 'All activity', 'daily' => 'Daily', 'weekly' => 'Weekly', 'monthly' => 'Monthly'] as $value => $label)
+                            <option value="{{ $value }}" @selected($period === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label class="text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Reference date
+                    <input name="date" type="date" value="{{ $anchorDate->format('Y-m-d') }}" class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-100">
+                </label>
+                <label class="text-xs font-bold uppercase tracking-wide text-slate-500 sm:col-span-2 lg:col-span-1">
+                    Search
+                    <input name="search" type="search" value="{{ $search }}" placeholder="Action, account, or IP" class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-100">
+                </label>
+                <button class="self-end rounded-xl bg-purple-700 px-5 py-3 text-sm font-bold text-white hover:bg-purple-800">Apply</button>
             </form>
+        </div>
+        <div class="mt-6 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-sm font-semibold text-slate-600">Showing <span class="font-black text-slate-900">{{ $rangeLabel }}</span></p>
+            <div class="flex flex-wrap gap-2">
+                <a href="{{ route('admin.logs.print', request()->query()) }}" target="_blank" rel="noopener" class="secondary-action">
+                    <i class="fa-solid fa-print mr-2" aria-hidden="true"></i>Print report
+                </a>
+                <a href="{{ route('admin.logs.export', request()->query()) }}" class="primary-action">
+                    <i class="fa-solid fa-file-excel mr-2" aria-hidden="true"></i>Export for Excel
+                </a>
+            </div>
         </div>
     </section>
 

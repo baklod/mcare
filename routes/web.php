@@ -1,9 +1,6 @@
 <?php
 
-use App\Http\Controllers\Auth\AccountSessionController;
-use App\Http\Controllers\Auth\GoogleAuthController;
-use App\Http\Controllers\EnrollmentController;
-use App\Http\Controllers\EnrollmentPaymentController;
+use App\Http\Controllers\AccountSettingsController;
 use App\Http\Controllers\Admin\AdminActivityLogController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminLearningSystemController;
@@ -11,11 +8,15 @@ use App\Http\Controllers\Admin\AdminSessionController;
 use App\Http\Controllers\Admin\BatchScheduleController;
 use App\Http\Controllers\Admin\EnrollmentReviewController;
 use App\Http\Controllers\Admin\PaymentScheduleController;
+use App\Http\Controllers\Auth\AccountSessionController;
+use App\Http\Controllers\Auth\GoogleAuthController;
+use App\Http\Controllers\EnrollmentController;
+use App\Http\Controllers\EnrollmentPaymentController;
+use App\Http\Controllers\Trainee\TraineeDashboardController;
+use App\Http\Controllers\Trainee\TraineeSessionController;
 use App\Http\Controllers\Trainer\TrainerDashboardController;
 use App\Http\Controllers\Trainer\TrainerPortalController;
 use App\Http\Controllers\Trainer\TrainerSessionController;
-use App\Http\Controllers\Trainee\TraineeDashboardController;
-use App\Http\Controllers\Trainee\TraineeSessionController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -51,6 +52,17 @@ Route::middleware('throttle:global-web')->group(function () {
     Route::post('/logout', [AccountSessionController::class, 'destroy'])
         ->middleware('throttle:sensitive-mutation')
         ->name('logout');
+
+    Route::prefix('account')
+        ->name('account.')
+        ->middleware(['auth', 'private.response'])
+        ->group(function () {
+            Route::get('/settings', [AccountSettingsController::class, 'show'])->name('settings');
+            Route::get('/help', [AccountSettingsController::class, 'help'])->name('help');
+            Route::patch('/password', [AccountSettingsController::class, 'updatePassword'])
+                ->middleware('throttle:sensitive-mutation')
+                ->name('password.update');
+        });
 
     /*
      * Enrollment can display a signed-in applicant's saved profile, so it gets
@@ -166,6 +178,14 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/logs', [AdminActivityLogController::class, 'index'])
                     ->middleware('throttle:search')
                     ->name('logs.index');
+
+                Route::get('/logs/print', [AdminActivityLogController::class, 'print'])
+                    ->middleware('throttle:document-downloads')
+                    ->name('logs.print');
+
+                Route::get('/logs/export', [AdminActivityLogController::class, 'export'])
+                    ->middleware('throttle:document-downloads')
+                    ->name('logs.export');
             });
         });
     Route::prefix('trainer')

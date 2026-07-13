@@ -62,12 +62,7 @@
                 <i class="dashboard-chevron fa-solid fa-chevron-down text-xs text-slate-500 transition" aria-hidden="true"></i>
             </summary>
             <div class="dashboard-account-menu">
-                @if (auth()->user()?->role === 'trainer')
-                    <form method="POST" action="{{ route('trainer.logout') }}">
-                        @csrf
-                        <button type="submit" class="dashboard-account-action is-danger">Sign out</button>
-                    </form>
-                @endif
+                <x-dashboard-account-actions :logout-route="route('trainer.logout')" role-label="Trainer" />
             </div>
         </details>
     </aside>
@@ -98,12 +93,7 @@
                         <i class="dashboard-chevron fa-solid fa-chevron-down text-xs text-slate-500 transition" aria-hidden="true"></i>
                     </summary>
                     <div class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
-                        @if (auth()->user()?->role === 'trainer')
-                            <form method="POST" action="{{ route('trainer.logout') }}">
-                                @csrf
-                                <button type="submit" class="dashboard-account-action is-danger">Sign out</button>
-                            </form>
-                        @endif
+                        <x-dashboard-account-actions :logout-route="route('trainer.logout')" role-label="Trainer" />
                     </div>
                 </details>
             </div>

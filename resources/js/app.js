@@ -1,5 +1,9 @@
 import './bootstrap';
 
+const dashboardThemeStorageKey = 'mcare-dashboard-theme';
+const storedDashboardTheme = window.localStorage.getItem(dashboardThemeStorageKey);
+document.documentElement.dataset.dashboardTheme = storedDashboardTheme === 'dark' ? 'dark' : 'light';
+
 document.addEventListener('DOMContentLoaded', () => {
     const sidebar = document.querySelector('[data-dashboard-sidebar]');
     const backdrop = document.querySelector('[data-dashboard-backdrop]');
@@ -8,6 +12,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const accountMenus = document.querySelectorAll('[data-dashboard-account]');
     const dashboardLinks = document.querySelectorAll('.dashboard-nav-link, .dashboard-mobile-link');
     const hashLinks = document.querySelectorAll('.dashboard-nav-link[href*="#"], .dashboard-mobile-link[href*="#"]');
+    const themeToggleButtons = document.querySelectorAll('[data-dashboard-theme-toggle]');
+
+    const updateThemeControls = () => {
+        const isDark = document.documentElement.dataset.dashboardTheme === 'dark';
+
+        themeToggleButtons.forEach((button) => {
+            button.setAttribute('aria-pressed', String(isDark));
+            const label = button.querySelector('[data-dashboard-theme-label]');
+            const icon = button.querySelector('[data-dashboard-theme-icon]');
+
+            if (label) label.textContent = isDark ? 'Light mode' : 'Night mode';
+            if (icon) {
+                icon.classList.toggle('fa-moon', !isDark);
+                icon.classList.toggle('fa-sun', isDark);
+            }
+        });
+    };
+
+    themeToggleButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            const nextTheme = document.documentElement.dataset.dashboardTheme === 'dark' ? 'light' : 'dark';
+            document.documentElement.dataset.dashboardTheme = nextTheme;
+            window.localStorage.setItem(dashboardThemeStorageKey, nextTheme);
+            updateThemeControls();
+        });
+    });
+    updateThemeControls();
 
     const setMenuOpen = (isOpen) => {
         if (!sidebar || !backdrop) {

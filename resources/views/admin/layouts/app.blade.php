@@ -93,13 +93,7 @@
                 <i class="dashboard-chevron fa-solid fa-chevron-up text-xs text-slate-400 transition" aria-hidden="true"></i>
             </summary>
             <div class="dashboard-account-menu">
-                <a href="{{ route('admin.logs.index') }}" class="dashboard-account-action">Admin logs</a>
-                @auth
-                    <form method="POST" action="{{ route('admin.logout') }}" class="mt-1 border-t border-slate-100 pt-1">
-                        @csrf
-                        <button type="submit" class="dashboard-account-action is-danger">Sign out</button>
-                    </form>
-                @endauth
+                <x-dashboard-account-actions :logout-route="route('admin.logout')" role-label="Administrator" :show-admin-logs="true" />
             </div>
         </details>
     </aside>
@@ -130,14 +124,7 @@
                             <i class="dashboard-chevron fa-solid fa-chevron-down text-xs text-slate-400 transition" aria-hidden="true"></i>
                         </summary>
                         <div class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
-                            <p class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Active admin</p>
-                            <a href="{{ route('admin.logs.index') }}" class="dashboard-account-action">Admin logs</a>
-                            @auth
-                                <form method="POST" action="{{ route('admin.logout') }}" class="mt-1 border-t border-slate-100 pt-1">
-                                    @csrf
-                                    <button type="submit" class="dashboard-account-action is-danger">Sign out</button>
-                                </form>
-                            @endauth
+                            <x-dashboard-account-actions :logout-route="route('admin.logout')" role-label="Administrator" :show-admin-logs="true" />
                         </div>
                 </details>
             </div>

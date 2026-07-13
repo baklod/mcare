@@ -312,3 +312,119 @@
         animation: none;
     }
 }
+
+html[data-dashboard-theme="dark"] {
+    color-scheme: dark;
+    background: #0b1020;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard.dashboard-shell,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-layout,
+html[data-dashboard-theme="dark"] .account-page {
+    background: #0f172a;
+    color: #e5e7eb;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-sidebar,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-topbar,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-account-menu,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-card,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-panel,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-stat,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-hero,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-table-wrap,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-mobile-bar,
+html[data-dashboard-theme="dark"] .universal-dashboard .bg-white,
+html[data-dashboard-theme="dark"] .account-header,
+html[data-dashboard-theme="dark"] .account-card {
+    background-color: #172033 !important;
+    border-color: #334155 !important;
+    color: #e5e7eb;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .bg-slate-50,
+html[data-dashboard-theme="dark"] .universal-dashboard .bg-purple-50,
+html[data-dashboard-theme="dark"] .account-page .bg-slate-50,
+html[data-dashboard-theme="dark"] .account-page .bg-purple-50 {
+    background-color: #222d42 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .text-slate-950,
+html[data-dashboard-theme="dark"] .universal-dashboard .text-slate-900,
+html[data-dashboard-theme="dark"] .universal-dashboard .text-slate-800,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-header-title,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-section-title,
+html[data-dashboard-theme="dark"] .account-page .text-slate-900,
+html[data-dashboard-theme="dark"] .account-page .text-slate-800,
+html[data-dashboard-theme="dark"] .account-page h1,
+html[data-dashboard-theme="dark"] .account-page h2 {
+    color: #f8fafc !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .text-slate-700,
+html[data-dashboard-theme="dark"] .universal-dashboard .text-slate-600,
+html[data-dashboard-theme="dark"] .universal-dashboard .text-slate-500,
+html[data-dashboard-theme="dark"] .account-page .text-slate-700,
+html[data-dashboard-theme="dark"] .account-page .text-slate-600 {
+    color: #cbd5e1 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard input,
+html[data-dashboard-theme="dark"] .universal-dashboard select,
+html[data-dashboard-theme="dark"] .universal-dashboard textarea,
+html[data-dashboard-theme="dark"] .account-page input {
+    background-color: #111827 !important;
+    border-color: #475569 !important;
+    color: #f8fafc !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-nav-link:hover,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-nav-link.is-active,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-account-action:hover {
+    background-color: #2e2350 !important;
+    color: #f5f3ff !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-nav-link,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-account-action,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-account-summary,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-stat-label,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-stat-help {
+    color: #cbd5e1 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-brand-title,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-header-title,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-stat-value,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-section-title {
+    color: #f8fafc !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-brand-subtitle,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-header-kicker,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-section-kicker {
+    color: #c4b5fd !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-nav-icon {
+    color: #94a3b8 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-search,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-menu-button {
+    background: #111827 !important;
+    border-color: #475569 !important;
+    color: #e5e7eb !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .secondary-action {
+    background: #172033 !important;
+    border-color: #475569 !important;
+    color: #ddd6fe !important;
+}
+
+html[data-dashboard-theme="dark"] .account-page .secondary-action {
+    background: #172033 !important;
+    border-color: #475569 !important;
+    color: #ddd6fe !important;
+}

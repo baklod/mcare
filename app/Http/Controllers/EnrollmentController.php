@@ -94,7 +94,7 @@ class EnrollmentController extends Controller
             'contact_number' => ['required', 'string', 'max:30', 'regex:/\A[0-9+\s().-]+\z/'],
             'nationality' => ['required', 'string', 'max:80', ...$safeText],
             'schedule_preference' => ['required', 'in:AM,PM,Weekend'],
-            'street' => ['required', 'string', 'max:180', ...$safeText],
+            'street' => ['required', 'string', 'max:100', ...$safeText],
             'barangay' => ['required', 'string', 'max:120', ...$safeText],
             'city' => ['required', 'string', 'max:120', ...$safeText],
             'province' => ['required', 'string', 'max:120', ...$safeText],

@@ -118,6 +118,14 @@
             max-height: min(58vh, 26rem);
             overflow-y: auto;
         }
+
+        .enrollment-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+        .enrollment-form select,
+        .enrollment-form textarea {
+            min-height: 3rem;
+            font-size: 1rem;
+            line-height: 1.5rem;
+        }
     </style>
 </head>
 <body class="enrollment-page min-h-screen bg-white font-sans text-slate-900 antialiased">
@@ -344,7 +352,8 @@
                     <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-6">
                         <div class="md:col-span-2">
                             <label for="street" class="mb-2 block text-sm font-semibold text-slate-800">Number, street</label>
-                            <input id="street" name="street" type="text" value="{{ old('street', $application->street ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="street" name="street" type="text" maxlength="100" value="{{ old('street', $application->street ?? '') }}" placeholder="e.g. 24 E. Corporal Street, Zone 1" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-base outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <p class="mt-2 text-xs leading-5 text-slate-500">Enter only the house/building number, street, and zone. Barangay and city belong in their own fields.</p>
                             @error('street') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>

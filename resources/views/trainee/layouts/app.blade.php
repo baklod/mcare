@@ -55,10 +55,7 @@
                 <i class="dashboard-chevron fa-solid fa-chevron-down text-xs text-slate-400 transition" aria-hidden="true"></i>
             </summary>
             <div class="dashboard-account-menu">
-                <form method="POST" action="{{ route('trainee.logout') }}">
-                    @csrf
-                    <button type="submit" class="dashboard-account-action is-danger">Sign out</button>
-                </form>
+                <x-dashboard-account-actions :logout-route="route('trainee.logout')" role-label="Trainee" />
             </div>
         </details>
     </aside>
@@ -86,10 +83,7 @@
                         <i class="dashboard-chevron fa-solid fa-chevron-down text-xs text-slate-400 transition" aria-hidden="true"></i>
                         </summary>
                         <div class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
-                            <form method="POST" action="{{ route('trainee.logout') }}">
-                                @csrf
-                                <button type="submit" class="dashboard-account-action is-danger">Sign out</button>
-                            </form>
+                            <x-dashboard-account-actions :logout-route="route('trainee.logout')" role-label="Trainee" />
                         </div>
                     </details>
                 </div>
