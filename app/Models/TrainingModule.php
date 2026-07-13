@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TrainingModule extends Model
 {
@@ -45,5 +46,10 @@ class TrainingModule extends Model
     public function targetTrainee(): BelongsTo
     {
         return $this->belongsTo(EnrollmentApplication::class, 'target_enrollment_application_id');
+    }
+
+    public function progressRecords(): HasMany
+    {
+        return $this->hasMany(ModuleProgress::class, 'training_module_id');
     }
 }

@@ -168,13 +168,14 @@
 
             <section class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm sm:p-7">
                 <h2 class="text-xl font-bold text-slate-900">Uploaded documents</h2>
+                <p class="mt-2 text-sm leading-6 text-slate-500">Open each file in the private viewer, then record whether it is accepted, missing, or needs replacement.</p>
                 <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
                     @foreach ($documents as $key => $document)
                         <div class="rounded-2xl bg-slate-50 p-4">
                             <p class="text-xs font-bold uppercase text-slate-500">{{ $document['label'] }}</p>
                             @if ($document['path'])
                                 <a href="{{ route('admin.enrollments.documents.show', [$application, $key]) }}" class="mt-3 inline-flex items-center justify-center rounded-full border border-purple-200 bg-white px-4 py-2 text-sm font-bold text-purple-700 hover:bg-purple-50">
-                                    Download file
+                                    Preview document
                                 </a>
                             @else
                                 <p class="mt-2 text-sm font-semibold text-red-600">Missing</p>
@@ -182,6 +183,24 @@
                         </div>
                     @endforeach
                 </div>
+
+                <form id="document-review" method="POST" action="{{ route('admin.enrollments.documents.review', $application) }}" class="mt-7 space-y-4 border-t border-slate-100 pt-6">
+                    @csrf
+                    @method('PATCH')
+                    <div><p class="text-sm font-bold uppercase text-purple-600">Document feedback</p><h3 class="mt-1 text-lg font-bold text-slate-950">Tell the applicant what is accepted or lacking</h3></div>
+                    @foreach($documents as $key => $document)
+                        @php
+                            $storedReview = data_get($application->document_review, $key, []);
+                            $defaultDocumentStatus = $document['path'] ? 'unreviewed' : 'missing';
+                        @endphp
+                        <div class="grid gap-3 rounded-2xl bg-slate-50 p-4 lg:grid-cols-[220px_1fr]">
+                            <div><label for="review-{{ $key }}" class="text-sm font-bold text-slate-900">{{ $document['label'] }}</label><select id="review-{{ $key }}" name="documents[{{ $key }}][status]" class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"><option value="unreviewed" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'unreviewed')>Not reviewed</option><option value="accepted" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'accepted')>Accepted</option><option value="replace" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'replace')>Needs replacement</option><option value="missing" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'missing')>Missing</option></select></div>
+                            <div><label for="note-{{ $key }}" class="text-sm font-semibold text-slate-700">Feedback or problem found</label><textarea id="note-{{ $key }}" name="documents[{{ $key }}][note]" rows="2" maxlength="500" class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" placeholder="Example: Image is blurry; upload a clear copy showing all corners.">{{ old("documents.$key.note", $storedReview['note'] ?? '') }}</textarea></div>
+                        </div>
+                    @endforeach
+                    <button type="submit" class="inline-flex items-center justify-center rounded-full bg-purple-600 px-6 py-3 text-sm font-bold text-white hover:bg-purple-700">Save document feedback</button>
+                    @if($application->documents_reviewed_at)<p class="text-xs text-slate-500">Last reviewed {{ $application->documents_reviewed_at->format('M d, Y g:i A') }} by {{ $application->documentReviewer?->name ?? 'Admin' }}</p>@endif
+                </form>
             </section>
         </div>
 

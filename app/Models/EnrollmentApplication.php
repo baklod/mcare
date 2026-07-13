@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 class EnrollmentApplication extends Model
@@ -72,6 +73,9 @@ class EnrollmentApplication extends Model
         'id_photo_path',
         'signature_type',
         'signature_path',
+        'document_review',
+        'documents_reviewed_at',
+        'documents_reviewed_by_id',
         'date_accomplished',
         'status',
         'payment_method',
@@ -104,6 +108,8 @@ class EnrollmentApplication extends Model
             'payment_selected_at' => 'datetime',
             'payment_meta' => 'array',
             'payment_verified_at' => 'datetime',
+            'document_review' => 'array',
+            'documents_reviewed_at' => 'datetime',
             'reviewed_at' => 'datetime',
         ];
     }
@@ -171,9 +177,19 @@ class EnrollmentApplication extends Model
         return $this->belongsTo(User::class, 'payment_verified_by_id');
     }
 
+    public function documentReviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'documents_reviewed_by_id');
+    }
+
     public function batch(): BelongsTo
     {
         return $this->belongsTo(TrainingBatch::class, 'training_batch_id');
+    }
+
+    public function moduleProgress(): HasMany
+    {
+        return $this->hasMany(ModuleProgress::class, 'enrollment_application_id');
     }
 
     public function effectivePaymentDeadline(): ?Carbon

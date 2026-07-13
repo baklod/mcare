@@ -206,4 +206,37 @@ class TrainerPortalTest extends TestCase
             'target_enrollment_application_id' => $application->id,
         ]);
     }
+
+    public function test_trainer_can_upload_image_and_video_learning_materials(): void
+    {
+        Storage::fake('local');
+        $trainer = User::factory()->create(['role' => 'trainer']);
+        $batch = TrainingBatch::create([
+            'name' => 'Media Batch',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+            'am_days' => 'MWF',
+            'pm_days' => 'TTS',
+        ]);
+        $files = [
+            ['title' => 'Positioning Diagram', 'file' => UploadedFile::fake()->create('positioning.png', 128, 'image/png')],
+            ['title' => 'Transfer Demonstration', 'file' => UploadedFile::fake()->create('transfer.mp4', 512, 'video/mp4')],
+        ];
+
+        foreach ($files as $material) {
+            $this->actingAs($trainer)
+                ->post(route('trainer.modules.store'), [
+                    'title' => $material['title'],
+                    'description' => 'Browser-viewable learning material.',
+                    'audience_type' => 'batch',
+                    'training_batch_id' => $batch->id,
+                    'module_file' => $material['file'],
+                ])
+                ->assertRedirect(route('trainer.resources'));
+        }
+
+        $this->assertDatabaseHas('training_modules', ['title' => 'Positioning Diagram']);
+        $this->assertDatabaseHas('training_modules', ['title' => 'Transfer Demonstration']);
+    }
 }

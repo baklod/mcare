@@ -25,11 +25,22 @@ class EnrollmentController extends Controller
         }
 
         $enrollmentBatch = $application?->batch ?: TrainingBatch::openForEnrollment();
+        $documentLabels = [
+            'birth-certificate' => 'Birth Certificate',
+            'education-document' => 'Form 137/138 or Diploma',
+            'good-moral-certificate' => 'Good Moral Certificate',
+            'id-photo' => 'ID Photo',
+            'signature' => 'E-Signature',
+        ];
+        $documentFeedback = collect($application?->document_review ?? [])
+            ->filter(fn ($item) => in_array(data_get($item, 'status'), ['replace', 'missing'], true));
 
         return view('enrollment.create', [
             'application' => $application,
             'enrollmentBatch' => $enrollmentBatch,
             'user' => $request->user(),
+            'documentLabels' => $documentLabels,
+            'documentFeedback' => $documentFeedback,
         ]);
     }
 
@@ -165,10 +176,33 @@ class EnrollmentController extends Controller
             ->merge($documentPaths)
             ->all();
 
-        EnrollmentApplication::updateOrCreate(
+        $application = EnrollmentApplication::updateOrCreate(
             ['user_id' => $user->id],
             $applicationData,
         );
+
+        if ($currentApplication) {
+            $review = $application->document_review ?? [];
+            $replacements = [
+                'birth-certificate' => $request->hasFile('birth_certificate'),
+                'education-document' => $request->hasFile('education_document'),
+                'good-moral-certificate' => $request->hasFile('good_moral_certificate'),
+                'id-photo' => $request->hasFile('id_photo'),
+                'signature' => $request->hasFile('signature_upload') || filled($request->input('signature_data')),
+            ];
+
+            // A replacement must return to the admin queue instead of retaining an old acceptance/problem result.
+            foreach ($replacements as $document => $wasReplaced) {
+                if ($wasReplaced) {
+                    $review[$document] = [
+                        'status' => 'unreviewed',
+                        'note' => 'Replacement uploaded; awaiting admin review.',
+                    ];
+                }
+            }
+
+            $application->forceFill(['document_review' => $review])->save();
+        }
 
         Auth::login($user);
 

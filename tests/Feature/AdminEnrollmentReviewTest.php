@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\EnrollmentApplication;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AdminEnrollmentReviewTest extends TestCase
@@ -155,5 +156,67 @@ class AdminEnrollmentReviewTest extends TestCase
         $this->actingAs($applicant)
             ->get(route('admin.enrollments.tesda-form', $application))
             ->assertForbidden();
+    }
+
+    public function test_admin_can_preview_documents_and_save_file_specific_feedback(): void
+    {
+        Storage::fake('local');
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->create(['role' => 'applicant']);
+        Storage::disk('local')->put('enrollment-documents/1/birth.pdf', '%PDF-1.4 sample');
+        $application = EnrollmentApplication::create([
+            'user_id' => $applicant->id,
+            'email' => $applicant->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => 'Document',
+            'last_name' => 'Applicant',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'street' => 'Street',
+            'barangay' => 'Barangay',
+            'city' => 'City',
+            'province' => 'Province',
+            'zip_code' => '1000',
+            'educational_attainment' => 'College Graduate',
+            'school_name' => 'MCARE College',
+            'year_graduated' => 2022,
+            'birth_certificate_path' => 'enrollment-documents/1/birth.pdf',
+            'status' => EnrollmentApplication::STATUS_PROFILE_SUBMITTED,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.enrollments.documents.show', [$application, 'birth-certificate']))
+            ->assertOk()
+            ->assertSee('Applicant document preview');
+
+        $this->actingAs($admin)
+            ->get(route('admin.enrollments.documents.content', [$application, 'birth-certificate']))
+            ->assertOk()
+            ->assertHeader('X-Frame-Options', 'SAMEORIGIN')
+            ->assertHeader('Content-Disposition', 'inline; filename=birth.pdf');
+
+        $this->actingAs($admin)
+            ->patch(route('admin.enrollments.documents.review', $application), [
+                'documents' => [
+                    'birth-certificate' => ['status' => 'replace', 'note' => 'Upload a clearer complete copy.'],
+                    'education-document' => ['status' => 'missing', 'note' => 'Diploma is required.'],
+                    'good-moral-certificate' => ['status' => 'unreviewed', 'note' => null],
+                    'id-photo' => ['status' => 'unreviewed', 'note' => null],
+                    'signature' => ['status' => 'unreviewed', 'note' => null],
+                ],
+            ])
+            ->assertRedirect();
+
+        $application->refresh();
+        $this->assertSame('replace', $application->document_review['birth-certificate']['status']);
+        $this->assertSame('Upload a clearer complete copy.', $application->document_review['birth-certificate']['note']);
+        $this->assertSame($admin->id, $application->documents_reviewed_by_id);
+
+        $this->actingAs($applicant)
+            ->get(route('enrollment.create'))
+            ->assertOk()
+            ->assertSee('Upload a clearer complete copy.');
     }
 }

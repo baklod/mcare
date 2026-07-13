@@ -120,9 +120,17 @@ Route::middleware('throttle:global-web')->group(function () {
                     ->middleware('throttle:document-downloads')
                     ->name('enrollments.tesda-form');
 
-                Route::get('/enrollments/{enrollmentApplication}/documents/{document}', [EnrollmentReviewController::class, 'document'])
+                Route::patch('/enrollments/{enrollmentApplication}/documents/review', [EnrollmentReviewController::class, 'updateDocumentReview'])
+                    ->middleware('throttle:sensitive-mutation')
+                    ->name('enrollments.documents.review');
+
+                Route::get('/enrollments/{enrollmentApplication}/documents/{document}', [EnrollmentReviewController::class, 'documentPreview'])
                     ->middleware('throttle:document-downloads')
                     ->name('enrollments.documents.show');
+
+                Route::get('/enrollments/{enrollmentApplication}/documents/{document}/content', [EnrollmentReviewController::class, 'documentContent'])
+                    ->middleware('throttle:document-downloads')
+                    ->name('enrollments.documents.content');
 
                 Route::get('/schedules', [BatchScheduleController::class, 'index'])
                     ->name('schedules.index');
@@ -191,9 +199,12 @@ Route::middleware('throttle:global-web')->group(function () {
                     ->middleware('throttle:8,1')
                     ->name('modules.store');
 
-                Route::get('/modules/{module}/download', [TrainerDashboardController::class, 'downloadModule'])
+                Route::get('/modules/{module}', [TrainerDashboardController::class, 'viewModule'])
+                    ->name('modules.show');
+
+                Route::get('/modules/{module}/content', [TrainerDashboardController::class, 'moduleContent'])
                     ->middleware('throttle:document-downloads')
-                    ->name('modules.download');
+                    ->name('modules.content');
             });
         });
 
@@ -216,9 +227,16 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/', [TraineeDashboardController::class, 'index'])
                     ->name('dashboard');
 
-                Route::get('/modules/{module}/download', [TraineeDashboardController::class, 'downloadModule'])
+                Route::get('/modules/{module}', [TraineeDashboardController::class, 'viewModule'])
+                    ->name('modules.show');
+
+                Route::get('/modules/{module}/content', [TraineeDashboardController::class, 'moduleContent'])
                     ->middleware('throttle:document-downloads')
-                    ->name('modules.download');
+                    ->name('modules.content');
+
+                Route::patch('/modules/{module}/progress', [TraineeDashboardController::class, 'updateProgress'])
+                    ->middleware('throttle:sensitive-mutation')
+                    ->name('modules.progress');
             });
         });
 });

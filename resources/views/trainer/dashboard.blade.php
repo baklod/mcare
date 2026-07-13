@@ -170,7 +170,7 @@
                     </div>
                     <div>
                         <label for="module-file" class="mb-2 block text-sm font-semibold text-stone-800">Training file</label>
-                        <input id="module-file" name="module_file" type="file" required accept=".pdf,.doc,.docx,.ppt,.pptx" class="w-full border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 file:mr-3 file:border-0 file:bg-violet-50 file:px-3 file:py-1.5 file:font-semibold file:text-violet-800">
+                        <input id="module-file" name="module_file" type="file" required accept=".pdf,.jpg,.jpeg,.png,.webp,.mp4,.webm" class="w-full border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 file:mr-3 file:border-0 file:bg-violet-50 file:px-3 file:py-1.5 file:font-semibold file:text-violet-800">
                     </div>
                     <div class="lg:col-span-2">
                         <label for="module-description" class="mb-2 block text-sm font-semibold text-stone-800">Description</label>
@@ -199,7 +199,7 @@
                                 <td class="px-5 py-4 font-bold text-stone-950 sm:px-6">{{ $module['title'] }}</td>
                                 <td class="px-5 py-4">{{ $module['training'] }}</td>
                                 <td class="px-5 py-4">
-                                    <a href="{{ route('trainer.modules.download', $module['id']) }}" class="font-semibold text-violet-800 hover:text-violet-950">{{ $module['file'] }}</a>
+                                    <a href="{{ route('trainer.modules.show', $module['id']) }}" class="font-semibold text-violet-800 hover:text-violet-950">Preview {{ $module['file'] }}</a>
                                 </td>
                                 <td class="px-5 py-4">{{ $module['published_at'] }}</td>
                                 <td class="px-5 py-4 sm:px-6">

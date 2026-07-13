@@ -8,11 +8,11 @@
         $roomLabel = $batch?->roomFor($application->schedule_preference) ?: 'Room TBA';
         $deadline = $application->effectivePaymentDeadline() ?: $batch?->enrollment_ends_at;
         $documents = [
-            'Birth Certificate' => $application->birth_certificate_path,
-            'Form 137/138 or Diploma' => $application->education_document_path,
-            'Good Moral Certificate' => $application->good_moral_certificate_path,
-            'ID Photo' => $application->id_photo_path,
-            'E-Signature' => $application->signature_path,
+            'birth-certificate' => ['label' => 'Birth Certificate', 'path' => $application->birth_certificate_path],
+            'education-document' => ['label' => 'Form 137/138 or Diploma', 'path' => $application->education_document_path],
+            'good-moral-certificate' => ['label' => 'Good Moral Certificate', 'path' => $application->good_moral_certificate_path],
+            'id-photo' => ['label' => 'ID Photo', 'path' => $application->id_photo_path],
+            'signature' => ['label' => 'E-Signature', 'path' => $application->signature_path],
         ];
     @endphp
 
@@ -38,7 +38,7 @@
                 <div>
                     <p class="dashboard-stat-label">Training progress</p>
                     <p class="dashboard-stat-value">{{ $stats['progress'] }}%</p>
-                    <p class="dashboard-stat-help">Progress tracking starts when module completion is enabled.</p>
+                    <p class="dashboard-stat-help">Calculated from your server-recorded module activity.</p>
                 </div>
             </div>
             <div class="dashboard-stat">
@@ -76,18 +76,21 @@
 
         <div class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             @forelse ($modules as $module)
+                @php($moduleProgress = $progressByModule->get($module->id))
                 <article class="dashboard-card p-5">
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <p class="text-xs font-black uppercase tracking-wide text-purple-600">{{ $module->batch ? $module->batch->name.' '.$module->batch->year : 'General module' }}</p>
                             <h3 class="mt-2 font-display text-xl font-black leading-tight text-slate-900">{{ $module->title }}</h3>
                         </div>
-                        <span class="dashboard-pill bg-emerald-50 text-emerald-700 ring-emerald-100">Available</span>
+                        <span class="dashboard-pill {{ $moduleProgress?->status === 'completed' ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : ($moduleProgress ? 'bg-amber-50 text-amber-700 ring-amber-100' : 'bg-slate-50 text-slate-600 ring-slate-100') }}">{{ $moduleProgress ? str($moduleProgress->status)->headline() : 'Not started' }}</span>
                     </div>
                     <p class="mt-3 line-clamp-3 text-sm leading-6 text-slate-500">{{ $module->description }}</p>
                     <p class="mt-3 text-xs font-semibold text-slate-400">Trainer: {{ $module->trainer?->name ?? 'MCARE Trainer' }}</p>
-                    <a href="{{ route('trainee.modules.download', $module) }}" class="secondary-action mt-5 w-full">
-                        Open material
+                    <div class="mt-4 h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full bg-purple-600" style="width: {{ $moduleProgress?->progress_percent ?? 0 }}%"></div></div>
+                    <p class="mt-2 text-xs font-bold text-slate-500">{{ $moduleProgress?->progress_percent ?? 0 }}% recorded</p>
+                    <a href="{{ route('trainee.modules.show', $module) }}" class="secondary-action mt-5 w-full">
+                        Open protected viewer
                     </a>
                 </article>
             @empty
@@ -171,13 +174,18 @@
         <p class="dashboard-section-kicker">My documents</p>
         <h2 class="dashboard-section-title">Submitted registration files</h2>
         <div class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-            @foreach ($documents as $label => $path)
+            @foreach ($documents as $documentKey => $document)
+                @php($documentFeedback = data_get($application->document_review, $documentKey, []))
                 <article class="rounded-2xl border border-slate-100 bg-slate-50 p-5">
-                    <p class="font-bold text-slate-900">{{ $label }}</p>
-                    @if ($path)
+                    <p class="font-bold text-slate-900">{{ $document['label'] }}</p>
+                    @if ($document['path'])
                         <span class="dashboard-pill mt-4 bg-emerald-50 text-emerald-700 ring-emerald-100">On file</span>
                     @else
                         <span class="dashboard-pill mt-4 bg-red-50 text-red-700 ring-red-100">Missing</span>
+                    @endif
+                    @if($documentFeedback)
+                        <p class="mt-3 text-xs font-black uppercase {{ ($documentFeedback['status'] ?? '') === 'accepted' ? 'text-emerald-700' : 'text-amber-700' }}">{{ str($documentFeedback['status'] ?? 'unreviewed')->headline() }}</p>
+                        @if($documentFeedback['note'] ?? null)<p class="mt-1 text-xs leading-5 text-slate-600">{{ $documentFeedback['note'] }}</p>@endif
                     @endif
                 </article>
             @endforeach

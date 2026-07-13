@@ -23,7 +23,14 @@ class SecurityHeaders
 
         // MCARE pages are not designed to be embedded in iframes. This reduces
         // clickjacking risk, where a malicious site overlays our buttons invisibly.
-        $response->headers->set('X-Frame-Options', 'DENY');
+        $response->headers->set(
+            'X-Frame-Options',
+            $request->routeIs(
+                'trainer.modules.content',
+                'trainee.modules.content',
+                'admin.enrollments.documents.content'
+            ) ? 'SAMEORIGIN' : 'DENY'
+        );
 
         /*
          * Use a safe public default, but do not overwrite a stricter policy set

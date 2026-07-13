@@ -28,7 +28,7 @@ class TrainerPortalController extends Controller
     {
         $search = trim((string) $request->query('search', ''));
         $trainees = EnrollmentApplication::query()
-            ->with(['batch', 'user'])
+            ->with(['batch', 'user', 'moduleProgress'])
             ->where('status', EnrollmentApplication::STATUS_APPROVED)
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($nested) use ($search) {
@@ -63,7 +63,7 @@ class TrainerPortalController extends Controller
     public function assessments(): View
     {
         return view('trainer.assessments', [
-            'trainees' => $this->approvedTrainees()->with('batch')->get(),
+            'trainees' => $this->approvedTrainees()->with(['batch', 'moduleProgress'])->get(),
             'publishedModules' => TrainingModule::query()->where('is_published', true)->count(),
         ]);
     }
@@ -73,7 +73,7 @@ class TrainerPortalController extends Controller
         return view('trainer.resources', [
             'batches' => TrainingBatch::query()->orderByDesc('is_active')->orderByDesc('year')->get(),
             'modules' => TrainingModule::query()
-                ->with(['batch', 'targetTrainee'])
+                ->with(['batch', 'targetTrainee', 'progressRecords.application'])
                 ->where('trainer_id', $request->user()->id)
                 ->latest('published_at')
                 ->get(),
@@ -104,6 +104,7 @@ class TrainerPortalController extends Controller
                 'pm' => $trainees->where('schedule_preference', 'PM')->count(),
                 'modules' => TrainingModule::query()->where('is_published', true)->count(),
                 'paid' => $trainees->where('payment_status', EnrollmentApplication::PAYMENT_PAID)->count(),
+                'module_completions' => \App\Models\ModuleProgress::query()->where('status', 'completed')->count(),
             ],
         ]);
     }

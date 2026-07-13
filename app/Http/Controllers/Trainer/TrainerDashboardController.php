@@ -14,7 +14,8 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 
 class TrainerDashboardController extends Controller
 {
@@ -127,7 +128,7 @@ class TrainerDashboardController extends Controller
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:160', ...$safeText],
             'description' => ['required', 'string', 'max:1200', ...$safeText],
-            'module_file' => ['required', 'file', 'mimes:pdf,doc,docx,ppt,pptx', 'max:20480'],
+            'module_file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp,mp4,webm', 'max:102400'],
             'audience_type' => ['required', Rule::in(['batch', 'trainee'])],
             'training_batch_id' => ['nullable', 'integer', 'exists:training_batches,id'],
             'target_enrollment_application_id' => [
@@ -139,8 +140,8 @@ class TrainerDashboardController extends Controller
             ],
         ], [
             'not_regex' => 'This field contains characters that are not allowed for security reasons.',
-            'module_file.mimes' => 'Training modules must be PDF, DOC, DOCX, PPT, or PPTX files.',
-            'module_file.max' => 'Training modules must not exceed 20MB.',
+            'module_file.mimes' => 'Training modules must be PDF, JPG, PNG, WEBP, MP4, or WEBM files.',
+            'module_file.max' => 'Training modules must not exceed 100MB.',
         ]);
 
         $file = $request->file('module_file');
@@ -167,7 +168,7 @@ class TrainerDashboardController extends Controller
             'description' => $validated['description'],
             'file_path' => $path,
             'original_file_name' => $file->getClientOriginalName(),
-            'mime_type' => $file->getClientMimeType(),
+            'mime_type' => $file->getMimeType(),
             'file_size' => $file->getSize() ?: 0,
             'is_published' => true,
             'published_at' => now(),
@@ -187,15 +188,35 @@ class TrainerDashboardController extends Controller
                 : 'Training module published for the selected batch.');
     }
 
-    public function downloadModule(Request $request, TrainingModule $module): StreamedResponse
+    public function viewModule(Request $request, TrainingModule $module): View
     {
         abort_unless($module->trainer_id === $request->user()->id, 403);
 
-        AdminActivityLog::record($request->user(), 'trainer.module.downloaded', $module, [
+        AdminActivityLog::record($request->user(), 'trainer.module.preview.opened', $module, [
             'title' => $module->title,
         ]);
 
-        return Storage::disk('local')->download($module->file_path, $module->original_file_name);
+        return view('trainer.modules.show', ['module' => $module->load(['batch', 'targetTrainee', 'progressRecords.application'])]);
+    }
+
+    public function moduleContent(Request $request, TrainingModule $module): BinaryFileResponse
+    {
+        abort_unless($module->trainer_id === $request->user()->id, 403);
+        abort_unless(Storage::disk('local')->exists($module->file_path), 404);
+
+        AdminActivityLog::record($request->user(), 'trainer.module.content.viewed', $module, [
+            'mime_type' => $module->mime_type,
+            'range_request' => $request->hasHeader('Range'),
+        ]);
+
+        $filename = basename($module->original_file_name);
+        $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
+
+        return response()->file(Storage::disk('local')->path($module->file_path), [
+            'Content-Type' => $module->mime_type ?: 'application/octet-stream',
+            'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_INLINE, $filename, $fallbackFilename),
+            'Accept-Ranges' => 'bytes',
+        ]);
     }
 
     private function approvedTraineesFor(?TrainingBatch $activeBatch)

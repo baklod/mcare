@@ -233,6 +233,25 @@
                 </div>
             @endif
 
+            @if ($application && ($application->admin_notes || $documentFeedback->isNotEmpty()))
+                <section class="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-950">
+                    <p class="text-sm font-black uppercase tracking-wide text-amber-700">Admin review feedback</p>
+                    @if ($application->admin_notes)
+                        <p class="mt-2 text-sm font-semibold leading-6">{{ $application->admin_notes }}</p>
+                    @endif
+                    <div class="mt-3 space-y-2">
+                        @foreach ($documentFeedback as $key => $feedback)
+                            <div class="rounded-xl bg-white/70 px-4 py-3 text-sm">
+                                <span class="font-black">{{ $documentLabels[$key] ?? 'Enrollment document' }}:</span>
+                                {{ data_get($feedback, 'status') === 'missing' ? 'Missing.' : 'Needs replacement.' }}
+                                {{ data_get($feedback, 'note') }}
+                            </div>
+                        @endforeach
+                    </div>
+                    <p class="mt-3 text-xs font-semibold text-amber-800">Upload corrected files below and submit the form again. Replaced documents return to admin review automatically.</p>
+                </section>
+            @endif
+
             <form method="POST" action="{{ route('enrollment.store') }}" enctype="multipart/form-data" class="enrollment-form space-y-10">
                 @csrf
 

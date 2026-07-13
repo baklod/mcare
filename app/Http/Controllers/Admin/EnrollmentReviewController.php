@@ -12,7 +12,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnrollmentReviewController extends Controller
@@ -126,7 +127,8 @@ class EnrollmentReviewController extends Controller
     public function show(EnrollmentApplication $enrollmentApplication): View
     {
         return view('admin.enrollments.show', [
-            'application' => $enrollmentApplication->load(['user', 'reviewer', 'batch']),
+            'application' => $enrollmentApplication->load(['user', 'reviewer', 'batch', 'documentReviewer']),
+            'documentDefinitions' => $this->documentFields(),
             'reviewableStatuses' => EnrollmentApplication::reviewableStatuses(),
             'statuses' => EnrollmentApplication::statuses(),
         ]);
@@ -199,27 +201,94 @@ class EnrollmentReviewController extends Controller
         ]);
     }
 
-    public function document(EnrollmentApplication $enrollmentApplication, string $document): StreamedResponse
+    public function updateDocumentReview(Request $request, EnrollmentApplication $enrollmentApplication): RedirectResponse
     {
-        $fields = [
-            'birth-certificate' => 'birth_certificate_path',
-            'education-document' => 'education_document_path',
-            'good-moral-certificate' => 'good_moral_certificate_path',
-            'id-photo' => 'id_photo_path',
-            'signature' => 'signature_path',
-        ];
+        $validated = $request->validate([
+            'documents' => ['required', 'array'],
+            'documents.*.status' => ['required', Rule::in(['unreviewed', 'accepted', 'replace', 'missing'])],
+            'documents.*.note' => ['nullable', 'string', 'max:500'],
+        ]);
+        $review = [];
 
-        abort_unless(array_key_exists($document, $fields), 404);
+        // Only the five known enrollment documents can enter the stored review payload.
+        foreach ($this->documentFields() as $key => $definition) {
+            $submitted = $validated['documents'][$key] ?? [];
+            $review[$key] = [
+                'status' => $submitted['status'] ?? ($enrollmentApplication->{$definition['field']} ? 'unreviewed' : 'missing'),
+                'note' => trim((string) ($submitted['note'] ?? '')) ?: null,
+            ];
+        }
 
-        $path = $enrollmentApplication->{$fields[$document]};
+        $enrollmentApplication->forceFill([
+            'document_review' => $review,
+            'documents_reviewed_at' => now(),
+            'documents_reviewed_by_id' => $request->user()->id,
+        ])->save();
+
+        AdminActivityLog::record($request->user(), 'enrollment.documents.reviewed', $enrollmentApplication, [
+            'applicant_email' => $enrollmentApplication->email,
+            'review' => $review,
+        ]);
+
+        return back()->with('saved', 'Document review and applicant feedback saved.');
+    }
+
+    public function documentPreview(EnrollmentApplication $enrollmentApplication, string $document): View
+    {
+        $definition = $this->documentDefinition($document);
+        $path = $enrollmentApplication->{$definition['field']};
 
         abort_unless($path && Storage::disk('local')->exists($path), 404);
 
-        AdminActivityLog::record(request()->user(), 'enrollment.document.downloaded', $enrollmentApplication, [
+        AdminActivityLog::record(request()->user(), 'enrollment.document.preview.opened', $enrollmentApplication, [
             'document' => $document,
             'applicant_email' => $enrollmentApplication->email,
         ]);
 
-        return Storage::disk('local')->download($path);
+        return view('admin.enrollments.document-preview', [
+            'application' => $enrollmentApplication,
+            'document' => $document,
+            'label' => $definition['label'],
+            'mimeType' => Storage::disk('local')->mimeType($path) ?: 'application/octet-stream',
+        ]);
+    }
+
+    public function documentContent(EnrollmentApplication $enrollmentApplication, string $document): BinaryFileResponse
+    {
+        $definition = $this->documentDefinition($document);
+        $path = $enrollmentApplication->{$definition['field']};
+
+        abort_unless($path && Storage::disk('local')->exists($path), 404);
+        $filename = basename($path);
+        $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
+
+        AdminActivityLog::record(request()->user(), 'enrollment.document.content.viewed', $enrollmentApplication, [
+            'document' => $document,
+            'applicant_email' => $enrollmentApplication->email,
+        ]);
+
+        return response()->file(Storage::disk('local')->path($path), [
+            'Content-Type' => Storage::disk('local')->mimeType($path) ?: 'application/octet-stream',
+            'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_INLINE, $filename, $fallbackFilename),
+        ]);
+    }
+
+    private function documentDefinition(string $document): array
+    {
+        $fields = $this->documentFields();
+        abort_unless(array_key_exists($document, $fields), 404);
+
+        return $fields[$document];
+    }
+
+    private function documentFields(): array
+    {
+        return [
+            'birth-certificate' => ['label' => 'Birth Certificate', 'field' => 'birth_certificate_path'],
+            'education-document' => ['label' => 'Form 137/138 or Diploma', 'field' => 'education_document_path'],
+            'good-moral-certificate' => ['label' => 'Good Moral Certificate', 'field' => 'good_moral_certificate_path'],
+            'id-photo' => ['label' => 'ID Photo', 'field' => 'id_photo_path'],
+            'signature' => ['label' => 'E-Signature', 'field' => 'signature_path'],
+        ];
     }
 }

@@ -7,6 +7,7 @@ use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class TraineePortalTest extends TestCase
@@ -106,8 +107,62 @@ class TraineePortalTest extends TestCase
             ->assertDontSee('Private Coaching Module');
 
         $this->actingAs($otherUser)
-            ->get(route('trainee.modules.download', $module))
+            ->get(route('trainee.modules.content', $module))
             ->assertForbidden();
+    }
+
+    public function test_module_viewing_and_completion_are_recorded_on_the_server(): void
+    {
+        Storage::fake('local');
+        $trainer = User::factory()->create(['role' => 'trainer']);
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $batch = $this->batch();
+        $application = $this->approvedReadyApplication($trainee, EnrollmentApplication::STATUS_APPROVED, $batch);
+        Storage::disk('local')->put('training-modules/lesson.pdf', '%PDF-1.4 test');
+        $module = TrainingModule::create([
+            'trainer_id' => $trainer->id,
+            'training_batch_id' => $batch->id,
+            'title' => 'Protected PDF Lesson',
+            'description' => 'Tracked learning material.',
+            'file_path' => 'training-modules/lesson.pdf',
+            'original_file_name' => 'lesson.pdf',
+            'mime_type' => 'application/pdf',
+            'is_published' => true,
+            'published_at' => now(),
+        ]);
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.modules.show', $module))
+            ->assertOk()
+            ->assertSee('Protected learning viewer');
+
+        $this->assertDatabaseHas('module_progress', [
+            'enrollment_application_id' => $application->id,
+            'training_module_id' => $module->id,
+            'status' => 'in_progress',
+            'progress_percent' => 10,
+        ]);
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.modules.content', $module))
+            ->assertOk()
+            ->assertHeader('Content-Disposition', 'inline; filename=lesson.pdf')
+            ->assertHeader('X-Frame-Options', 'SAMEORIGIN');
+
+        $this->actingAs($trainee)
+            ->patch(route('trainee.modules.progress', $module), ['action' => 'complete'])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('module_progress', [
+            'enrollment_application_id' => $application->id,
+            'training_module_id' => $module->id,
+            'status' => 'completed',
+            'progress_percent' => 100,
+        ]);
+        $this->assertDatabaseHas('admin_activity_logs', [
+            'user_id' => $trainee->id,
+            'action' => 'trainee.module.progress.updated',
+        ]);
     }
 
     private function batch(): TrainingBatch
