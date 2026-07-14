@@ -128,7 +128,7 @@ class TrainerDashboardController extends Controller
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:160', ...$safeText],
             'description' => ['required', 'string', 'max:1200', ...$safeText],
-            'module_file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp,mp4,webm', 'max:102400'],
+            'module_file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp,mp4,webm', 'extensions:pdf,jpg,jpeg,png,webp,mp4,webm', 'max:102400'],
             'audience_type' => ['required', Rule::in(['batch', 'trainee'])],
             'training_batch_id' => ['nullable', 'integer', 'exists:training_batches,id'],
             'target_enrollment_application_id' => [

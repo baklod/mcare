@@ -49,7 +49,7 @@ class AccountSettingsController extends Controller
     {
         $validated = $request->validate([
             'current_password' => ['required', 'current_password'],
-            'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
+            'password' => ['required', 'confirmed', 'max:255', Password::min(10)->mixedCase()->letters()->numbers()],
         ]);
 
         $request->user()->update(['password' => $validated['password']]);

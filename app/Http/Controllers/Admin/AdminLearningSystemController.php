@@ -139,7 +139,7 @@ class AdminLearningSystemController extends Controller
             'training_batch_id' => ['required', 'integer', 'exists:training_batches,id'],
             'title' => ['required', 'string', 'max:160'],
             'description' => ['required', 'string', 'max:1200'],
-            'module_file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp,mp4,webm', 'max:102400'],
+            'module_file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp,mp4,webm', 'extensions:pdf,jpg,jpeg,png,webp,mp4,webm', 'max:102400'],
             'is_published' => ['nullable', 'boolean'],
         ]);
 

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 class SecurityHardeningTest extends TestCase
@@ -16,6 +17,9 @@ class SecurityHardeningTest extends TestCase
             ->assertOk()
             ->assertHeader('X-Content-Type-Options', 'nosniff')
             ->assertHeader('X-Frame-Options', 'DENY')
+            ->assertHeader('X-XSS-Protection', '0')
+            ->assertHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
+            ->assertHeader('Cross-Origin-Resource-Policy', 'same-origin')
             ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
             ->assertHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
     }
@@ -34,6 +38,18 @@ class SecurityHardeningTest extends TestCase
             'no-store',
             (string) $response->headers->get('Cache-Control')
         );
+    }
+
+    public function test_production_response_has_a_restrictive_content_security_policy(): void
+    {
+        $this->app->detectEnvironment(fn () => 'production');
+
+        $policy = (string) $this->get('/')->headers->get('Content-Security-Policy');
+
+        $this->assertStringContainsString("default-src 'self'", $policy);
+        $this->assertStringContainsString("form-action 'self'", $policy);
+        $this->assertStringContainsString("frame-ancestors 'none'", $policy);
+        $this->assertStringContainsString("object-src 'none'", $policy);
     }
 
     public function test_admin_login_is_throttled_after_repeated_failures(): void
@@ -63,5 +79,52 @@ class SecurityHardeningTest extends TestCase
             ->get('/admin/logs?search='.str_repeat('a', 101))
             ->assertRedirect('/admin/logs')
             ->assertSessionHasErrors('search');
+    }
+
+    public function test_role_column_is_synchronized_with_spatie_permissions(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+
+        $this->assertTrue($user->hasRole('admin'));
+        $this->assertTrue($user->can('logs.view'));
+        $this->assertFalse($user->can('modules.view'));
+
+        $user->update(['role' => 'trainer']);
+        $user->refresh();
+
+        $this->assertTrue($user->hasRole('trainer'));
+        $this->assertFalse($user->hasRole('admin'));
+        $this->assertTrue($user->can('modules.publish'));
+        $this->assertFalse($user->can('logs.view'));
+
+        $user->update(['role' => 'unsupported-role']);
+        $user->refresh();
+
+        $this->assertTrue($user->roles->isEmpty());
+        $this->assertFalse($user->can('trainer.access'));
+    }
+
+    public function test_named_permission_is_required_for_sensitive_admin_route(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $admin->roles()->firstOrFail()->revokePermissionTo('logs.view');
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $this->actingAs($admin)
+            ->get('/admin/logs')
+            ->assertForbidden();
+
+        // The unrelated admin dashboard permission remains available.
+        $this->actingAs($admin)
+            ->get('/admin')
+            ->assertOk();
+    }
+
+    public function test_theme_uses_light_as_default_and_shared_persistent_storage_key(): void
+    {
+        $this->get('/admin/login')
+            ->assertOk()
+            ->assertSee("window.localStorage.getItem('mcare-dashboard-theme') === 'dark' ? 'dark' : 'light'", false)
+            ->assertSee('admin-login-promo', false);
     }
 }

@@ -13,7 +13,7 @@ class TraineeSessionController extends Controller
 {
     public function create(Request $request): View|RedirectResponse
     {
-        if ($request->user()?->role === 'trainee') {
+        if ($request->user()?->hasRole('trainee')) {
             return redirect()->route('trainee.dashboard');
         }
 
@@ -42,7 +42,7 @@ class TraineeSessionController extends Controller
 
         $request->session()->regenerate();
 
-        if ($request->user()?->role !== 'trainee') {
+        if (! $request->user()?->hasRole('trainee')) {
             AdminActivityLog::record($request->user(), 'trainee.login.rejected', $request->user(), [
                 'email' => $request->user()?->email,
                 'role' => $request->user()?->role,

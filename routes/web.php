@@ -79,18 +79,19 @@ Route::middleware('throttle:global-web')->group(function () {
 
         Route::middleware(['auth'])->group(function () {
             Route::get('/payment', [EnrollmentPaymentController::class, 'show'])
+                ->middleware('permission:payments.view')
                 ->name('payment.show');
 
             Route::post('/payment', [EnrollmentPaymentController::class, 'select'])
-                ->middleware('throttle:6,1')
+                ->middleware(['permission:payments.view', 'throttle:6,1'])
                 ->name('payment.select');
 
             Route::get('/payment/receipt', [EnrollmentPaymentController::class, 'receipt'])
-                ->middleware('throttle:20,1')
+                ->middleware(['permission:payments.view', 'throttle:20,1'])
                 ->name('payment.receipt');
 
             Route::get('/payment/receipt/download', [EnrollmentPaymentController::class, 'downloadReceipt'])
-                ->middleware('throttle:document-downloads')
+                ->middleware(['permission:payments.view', 'throttle:document-downloads'])
                 ->name('payment.receipt.download');
         });
     });
@@ -111,7 +112,7 @@ Route::middleware('throttle:global-web')->group(function () {
                 ->middleware('throttle:admin-login')
                 ->name('login.store');
 
-            Route::middleware(['auth', 'admin'])->group(function () {
+            Route::middleware(['auth', 'admin', 'permission:admin.access'])->group(function () {
                 Route::post('/logout', [AdminSessionController::class, 'destroy'])
                     ->middleware('throttle:sensitive-mutation')
                     ->name('logout');
@@ -119,93 +120,103 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/', AdminDashboardController::class)->name('dashboard');
 
                 Route::get('/enrollments', [EnrollmentReviewController::class, 'index'])
-                    ->middleware('throttle:search')
+                    ->middleware(['permission:enrollments.review', 'throttle:search'])
                     ->name('enrollments.index');
 
                 Route::get('/enrollments/{enrollmentApplication}', [EnrollmentReviewController::class, 'show'])
+                    ->middleware('permission:enrollments.review')
                     ->name('enrollments.show');
 
                 Route::patch('/enrollments/{enrollmentApplication}', [EnrollmentReviewController::class, 'update'])
-                    ->middleware('throttle:sensitive-mutation')
+                    ->middleware(['permission:enrollments.review', 'throttle:sensitive-mutation'])
                     ->name('enrollments.update');
 
                 Route::get('/enrollments/{enrollmentApplication}/tesda-form', [EnrollmentReviewController::class, 'tesdaForm'])
-                    ->middleware('throttle:document-downloads')
+                    ->middleware(['permission:enrollments.review', 'throttle:document-downloads'])
                     ->name('enrollments.tesda-form');
 
                 Route::patch('/enrollments/{enrollmentApplication}/documents/review', [EnrollmentReviewController::class, 'updateDocumentReview'])
-                    ->middleware('throttle:sensitive-mutation')
+                    ->middleware(['permission:enrollments.review', 'throttle:sensitive-mutation'])
                     ->name('enrollments.documents.review');
 
                 Route::get('/enrollments/{enrollmentApplication}/documents/{document}', [EnrollmentReviewController::class, 'documentPreview'])
-                    ->middleware('throttle:document-downloads')
+                    ->middleware(['permission:enrollments.review', 'throttle:document-downloads'])
                     ->name('enrollments.documents.show');
 
                 Route::get('/enrollments/{enrollmentApplication}/documents/{document}/content', [EnrollmentReviewController::class, 'documentContent'])
-                    ->middleware('throttle:document-downloads')
+                    ->middleware(['permission:enrollments.review', 'throttle:document-downloads'])
                     ->name('enrollments.documents.content');
 
                 Route::get('/schedules', [BatchScheduleController::class, 'index'])
+                    ->middleware('permission:schedules.manage')
                     ->name('schedules.index');
 
                 Route::post('/schedules', [BatchScheduleController::class, 'store'])
-                    ->middleware('throttle:sensitive-mutation')
+                    ->middleware(['permission:schedules.manage', 'throttle:sensitive-mutation'])
                     ->name('schedules.store');
 
                 Route::get('/schedules/{trainingBatch}/edit', [BatchScheduleController::class, 'edit'])
+                    ->middleware('permission:schedules.manage')
                     ->name('schedules.edit');
 
                 Route::patch('/schedules/{trainingBatch}', [BatchScheduleController::class, 'update'])
-                    ->middleware('throttle:sensitive-mutation')
+                    ->middleware(['permission:schedules.manage', 'throttle:sensitive-mutation'])
                     ->name('schedules.update');
 
                 Route::delete('/schedules/{trainingBatch}', [BatchScheduleController::class, 'destroy'])
-                    ->middleware('throttle:sensitive-mutation')
+                    ->middleware(['permission:schedules.manage', 'throttle:sensitive-mutation'])
                     ->name('schedules.destroy');
 
                 Route::get('/payment-scheduling', [PaymentScheduleController::class, 'index'])
+                    ->middleware('permission:payments.verify')
                     ->name('payment-schedules.index');
 
                 Route::patch('/payment-scheduling/{enrollmentApplication}', [PaymentScheduleController::class, 'update'])
-                    ->middleware('throttle:sensitive-mutation')
+                    ->middleware(['permission:payments.verify', 'throttle:sensitive-mutation'])
                     ->name('payment-schedules.update');
 
-                Route::get('/learning/trainees', [AdminLearningSystemController::class, 'trainees'])->name('learning.trainees');
+                Route::get('/learning/trainees', [AdminLearningSystemController::class, 'trainees'])
+                    ->middleware('permission:trainees.manage')
+                    ->name('learning.trainees');
                 Route::get('/learning/trainees/export', [AdminLearningSystemController::class, 'exportTrainees'])
-                    ->middleware('throttle:document-downloads')
+                    ->middleware(['permission:reports.export', 'throttle:document-downloads'])
                     ->name('learning.trainees.export');
                 Route::patch('/learning/trainees/{enrollmentApplication}/status', [AdminLearningSystemController::class, 'updateTraineeStatus'])
-                    ->middleware('throttle:sensitive-mutation')
+                    ->middleware(['permission:trainees.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.trainees.status');
-                Route::get('/learning/modules', [AdminLearningSystemController::class, 'modules'])->name('learning.modules');
+                Route::get('/learning/modules', [AdminLearningSystemController::class, 'modules'])
+                    ->middleware('permission:modules.manage')
+                    ->name('learning.modules');
                 Route::post('/learning/modules', [AdminLearningSystemController::class, 'storeModule'])
-                    ->middleware('throttle:sensitive-mutation')
+                    ->middleware(['permission:modules.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.modules.store');
                 Route::delete('/learning/modules/{module}', [AdminLearningSystemController::class, 'destroyModule'])
-                    ->middleware('throttle:sensitive-mutation')
+                    ->middleware(['permission:modules.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.modules.destroy');
                 Route::get('/learning/certificates', [AdminLearningSystemController::class, 'certificates'])->name('learning.certificates');
                 Route::get('/learning/alumni-jobs', [AdminLearningSystemController::class, 'alumniJobs'])->name('learning.alumni-jobs');
                 Route::get('/learning/reports', [AdminLearningSystemController::class, 'reports'])->name('learning.reports');
 
-                Route::get('/accounts', [AdminAccountController::class, 'index'])->name('accounts.index');
+                Route::get('/accounts', [AdminAccountController::class, 'index'])
+                    ->middleware('permission:accounts.manage')
+                    ->name('accounts.index');
                 Route::post('/accounts/trainers', [AdminAccountController::class, 'storeTrainer'])
-                    ->middleware('throttle:sensitive-mutation')
+                    ->middleware(['permission:accounts.manage', 'throttle:sensitive-mutation'])
                     ->name('accounts.trainers.store');
                 Route::post('/accounts/trainees', [AdminAccountController::class, 'storeTrainee'])
-                    ->middleware('throttle:sensitive-mutation')
+                    ->middleware(['permission:accounts.manage', 'throttle:sensitive-mutation'])
                     ->name('accounts.trainees.store');
 
                 Route::get('/logs', [AdminActivityLogController::class, 'index'])
-                    ->middleware('throttle:search')
+                    ->middleware(['permission:logs.view', 'throttle:search'])
                     ->name('logs.index');
 
                 Route::get('/logs/print', [AdminActivityLogController::class, 'print'])
-                    ->middleware('throttle:document-downloads')
+                    ->middleware(['permission:logs.view', 'throttle:document-downloads'])
                     ->name('logs.print');
 
                 Route::get('/logs/export', [AdminActivityLogController::class, 'export'])
-                    ->middleware('throttle:document-downloads')
+                    ->middleware(['permission:logs.view', 'permission:reports.export', 'throttle:document-downloads'])
                     ->name('logs.export');
             });
         });
@@ -220,7 +231,7 @@ Route::middleware('throttle:global-web')->group(function () {
                 ->middleware('throttle:6,1')
                 ->name('login.store');
 
-            Route::middleware(['auth', 'trainer'])->group(function () {
+            Route::middleware(['auth', 'trainer', 'permission:trainer.access'])->group(function () {
                 Route::post('/logout', [TrainerSessionController::class, 'destroy'])
                     ->middleware('throttle:sensitive-mutation')
                     ->name('logout');
@@ -229,25 +240,30 @@ Route::middleware('throttle:global-web')->group(function () {
                     ->name('dashboard');
 
                 Route::get('/trainings', [TrainerPortalController::class, 'trainings'])->name('trainings');
-                Route::get('/trainees', [TrainerPortalController::class, 'trainees'])->name('trainees');
+                Route::get('/trainees', [TrainerPortalController::class, 'trainees'])
+                    ->middleware('permission:trainees.view')
+                    ->name('trainees');
                 Route::get('/trainees/export', [TrainerPortalController::class, 'exportTrainees'])
-                    ->middleware('throttle:document-downloads')
+                    ->middleware(['permission:trainees.export', 'throttle:document-downloads'])
                     ->name('trainees.export');
                 Route::get('/sessions', [TrainerPortalController::class, 'sessions'])->name('sessions');
                 Route::get('/assessments', [TrainerPortalController::class, 'assessments'])->name('assessments');
-                Route::get('/resources', [TrainerPortalController::class, 'resources'])->name('resources');
+                Route::get('/resources', [TrainerPortalController::class, 'resources'])
+                    ->middleware('permission:modules.publish')
+                    ->name('resources');
                 Route::get('/certificates', [TrainerPortalController::class, 'certificates'])->name('certificates');
                 Route::get('/reports', [TrainerPortalController::class, 'reports'])->name('reports');
 
                 Route::post('/modules', [TrainerDashboardController::class, 'storeModule'])
-                    ->middleware('throttle:8,1')
+                    ->middleware(['permission:modules.publish', 'throttle:8,1'])
                     ->name('modules.store');
 
                 Route::get('/modules/{module}', [TrainerDashboardController::class, 'viewModule'])
+                    ->middleware('permission:modules.publish')
                     ->name('modules.show');
 
                 Route::get('/modules/{module}/content', [TrainerDashboardController::class, 'moduleContent'])
-                    ->middleware('throttle:document-downloads')
+                    ->middleware(['permission:modules.publish', 'throttle:document-downloads'])
                     ->name('modules.content');
             });
         });
@@ -263,7 +279,7 @@ Route::middleware('throttle:global-web')->group(function () {
                 ->middleware('throttle:6,1')
                 ->name('login.store');
 
-            Route::middleware(['auth', 'trainee'])->group(function () {
+            Route::middleware(['auth', 'trainee', 'permission:trainee.access'])->group(function () {
                 Route::post('/logout', [TraineeSessionController::class, 'destroy'])
                     ->middleware('throttle:sensitive-mutation')
                     ->name('logout');
@@ -272,27 +288,31 @@ Route::middleware('throttle:global-web')->group(function () {
                     ->name('dashboard');
 
                 Route::get('/modules', [TraineeDashboardController::class, 'modules'])
+                    ->middleware('permission:modules.view')
                     ->name('modules.index');
                 Route::get('/schedule', [TraineeDashboardController::class, 'schedule'])
                     ->name('schedule');
                 Route::get('/payments', [TraineeDashboardController::class, 'payments'])
+                    ->middleware('permission:payments.view')
                     ->name('payments');
                 Route::get('/documents', [TraineeDashboardController::class, 'documents'])
+                    ->middleware('permission:documents.view')
                     ->name('documents');
 
                 Route::get('/modules/{module}', [TraineeDashboardController::class, 'viewModule'])
+                    ->middleware('permission:modules.view')
                     ->name('modules.show');
 
                 Route::get('/modules/{module}/content', [TraineeDashboardController::class, 'moduleContent'])
-                    ->middleware('throttle:document-downloads')
+                    ->middleware(['permission:modules.view', 'throttle:document-downloads'])
                     ->name('modules.content');
 
                 Route::patch('/modules/{module}/progress', [TraineeDashboardController::class, 'updateProgress'])
-                    ->middleware('throttle:sensitive-mutation')
+                    ->middleware(['permission:progress.update', 'throttle:sensitive-mutation'])
                     ->name('modules.progress');
 
                 Route::post('/modules/{module}/security-event', [TraineeDashboardController::class, 'securityEvent'])
-                    ->middleware('throttle:20,1')
+                    ->middleware(['permission:modules.view', 'throttle:20,1'])
                     ->name('modules.security-event');
             });
         });

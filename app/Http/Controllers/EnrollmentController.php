@@ -66,9 +66,8 @@ class EnrollmentController extends Controller
             ]);
         }
         $safeText = ["not_regex:/[<>\"'`;{}|\\\\]/u"];
-        $safeOptionalText = ["nullable", "string", "max:120", "not_regex:/[<>\"'`;{}|\\\\]/u"];
-        $blockedPasswordCharacters = "not_regex:/[<>\"'`;{}|\\\\]/u";
-        $documentRules = ['file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'];
+        $safeOptionalText = ['nullable', 'string', 'max:120', "not_regex:/[<>\"'`;{}|\\\\]/u"];
+        $documentRules = ['file', 'mimes:pdf,jpg,jpeg,png', 'extensions:pdf,jpg,jpeg,png', 'max:5120'];
 
         $validated = $request->validate([
             'email' => [
@@ -78,7 +77,7 @@ class EnrollmentController extends Controller
                 'ends_with:@gmail.com',
                 Rule::unique('users', 'email')->ignore($currentUser?->id),
             ],
-            'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers(), $blockedPasswordCharacters],
+            'password' => ['required', 'confirmed', 'max:255', Password::min(10)->mixedCase()->letters()->numbers()],
             'first_name' => ['required', 'string', 'max:100', ...$safeText],
             'middle_name' => ['nullable', 'string', 'max:100', ...$safeText],
             'last_name' => ['required', 'string', 'max:100', ...$safeText],
@@ -102,7 +101,7 @@ class EnrollmentController extends Controller
             'zip_code' => ['required', 'string', 'max:20', 'regex:/\A[\pL\pN\s-]+\z/u'],
             'educational_attainment' => ['required', 'string', 'max:150'],
             'school_name' => ['required', 'string', 'max:180', ...$safeText],
-            'year_graduated' => ['required', 'integer', 'min:1950', 'max:' . now()->year],
+            'year_graduated' => ['required', 'integer', 'min:1950', 'max:'.now()->year],
             'guardian_name' => ['required', 'string', 'max:180', ...$safeText],
             'guardian_address' => ['required', 'string', 'max:255', ...$safeText],
             'classification' => ['nullable', 'string', 'max:120'],
@@ -114,15 +113,14 @@ class EnrollmentController extends Controller
             'birth_certificate' => [$currentApplication?->birth_certificate_path ? 'nullable' : 'required', ...$documentRules],
             'education_document' => [$currentApplication?->education_document_path ? 'nullable' : 'required', ...$documentRules],
             'good_moral_certificate' => [$currentApplication?->good_moral_certificate_path ? 'nullable' : 'required', ...$documentRules],
-            'id_photo' => [$currentApplication?->id_photo_path ? 'nullable' : 'required', 'file', 'mimes:jpg,jpeg,png', 'max:5120'],
+            'id_photo' => [$currentApplication?->id_photo_path ? 'nullable' : 'required', 'file', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:5120'],
             'signature_type' => ['required', 'in:draw,upload'],
             'signature_data' => ['exclude_unless:signature_type,draw', $currentApplication?->signature_path ? 'nullable' : 'required', 'string'],
-            'signature_upload' => ['exclude_unless:signature_type,upload', $currentApplication?->signature_path ? 'nullable' : 'required', 'file', 'mimes:jpg,jpeg,png', 'max:5120'],
+            'signature_upload' => ['exclude_unless:signature_type,upload', $currentApplication?->signature_path ? 'nullable' : 'required', 'file', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:5120'],
         ], [
             'email.ends_with' => 'Please use a Gmail address ending in @gmail.com.',
             'email.unique' => 'This Gmail account already has an applicant account. Please sign in or use a different Gmail address.',
             'not_regex' => 'This field contains characters that are not allowed for security reasons.',
-            'password.not_regex' => 'Password cannot contain <, >, quotes, backticks, semicolons, braces, pipes, or backslashes.',
             'password.confirmed' => 'Password and confirmation must match.',
             'birth_certificate.required' => 'Upload a clear birth certificate copy.',
             'education_document.required' => 'Upload Form 137/138 or diploma.',
@@ -134,11 +132,11 @@ class EnrollmentController extends Controller
             '*.max' => 'Each uploaded file must not exceed 5MB.',
         ]);
 
-        $user = $currentUser ?? new User();
+        $user = $currentUser ?? new User;
         $user->forceFill(
             [
                 'email' => $validated['email'],
-                'name' => trim($validated['first_name'] . ' ' . $validated['last_name']),
+                'name' => trim($validated['first_name'].' '.$validated['last_name']),
                 'role' => 'applicant',
                 'applicant_status' => 'profile_submitted',
                 'password' => $validated['password'],

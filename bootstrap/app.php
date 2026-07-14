@@ -1,12 +1,18 @@
 <?php
 
-use Illuminate\Foundation\Application;
+use App\Http\Middleware\EnsureAdmin;
+use App\Http\Middleware\EnsureTrainee;
+use App\Http\Middleware\EnsureTrainer;
+use App\Http\Middleware\PrivateResponseHeaders;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Session\TokenMismatchException;
 use Illuminate\Validation\ValidationException;
+use Spatie\Permission\Middleware\PermissionMiddleware;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -20,13 +26,14 @@ return Application::configure(basePath: dirname(__DIR__))
          * SecurityHeaders runs for every response. This gives the whole app a
          * common browser-security baseline instead of relying on each page.
          */
-        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+        $middleware->append(SecurityHeaders::class);
 
         $middleware->alias([
-            'admin' => \App\Http\Middleware\EnsureAdmin::class,
-            'private.response' => \App\Http\Middleware\PrivateResponseHeaders::class,
-            'trainer' => \App\Http\Middleware\EnsureTrainer::class,
-            'trainee' => \App\Http\Middleware\EnsureTrainee::class,
+            'admin' => EnsureAdmin::class,
+            'private.response' => PrivateResponseHeaders::class,
+            'permission' => PermissionMiddleware::class,
+            'trainer' => EnsureTrainer::class,
+            'trainee' => EnsureTrainee::class,
         ]);
 
         $middleware->redirectGuestsTo(fn (Request $request) => match (true) {

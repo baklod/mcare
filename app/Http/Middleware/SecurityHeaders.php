@@ -17,6 +17,11 @@ class SecurityHeaders
     public function handle(Request $request, Closure $next): Response
     {
         $response = $next($request);
+        $isEmbeddableContent = $request->routeIs(
+            'trainer.modules.content',
+            'trainee.modules.content',
+            'admin.enrollments.documents.content'
+        );
 
         // Prevent browsers from guessing a different MIME type than the server sent.
         $response->headers->set('X-Content-Type-Options', 'nosniff');
@@ -25,12 +30,17 @@ class SecurityHeaders
         // clickjacking risk, where a malicious site overlays our buttons invisibly.
         $response->headers->set(
             'X-Frame-Options',
-            $request->routeIs(
-                'trainer.modules.content',
-                'trainee.modules.content',
-                'admin.enrollments.documents.content'
-            ) ? 'SAMEORIGIN' : 'DENY'
+            $isEmbeddableContent ? 'SAMEORIGIN' : 'DENY'
         );
+
+        // Modern browsers use CSP, while this explicit value disables unsafe
+        // legacy XSS filters that could create their own injection behavior.
+        $response->headers->set('X-XSS-Protection', '0');
+
+        // Isolate MCARE from cross-origin windows and resource embedding while
+        // retaining compatibility with OAuth redirects opened by the browser.
+        $response->headers->set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+        $response->headers->set('Cross-Origin-Resource-Policy', 'same-origin');
 
         /*
          * Use a safe public default, but do not overwrite a stricter policy set
@@ -53,12 +63,15 @@ class SecurityHeaders
              * A future hardening step should move inline scripts to Vite bundles
              * and replace this with nonces or hashes.
              */
+            $frameAncestors = $isEmbeddableContent ? "'self'" : "'none'";
+
             $response->headers->set(
                 'Content-Security-Policy',
-                "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; "
-                . "img-src 'self' data: https:; font-src 'self' data:; "
-                . "style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; "
-                . "connect-src 'self' https:; upgrade-insecure-requests"
+                "default-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors {$frameAncestors}; "
+                ."frame-src 'self'; img-src 'self' data: https:; "
+                ."font-src 'self' data: https://fonts.gstatic.com; "
+                ."style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                ."script-src 'self' 'unsafe-inline'; connect-src 'self' https:; upgrade-insecure-requests"
             );
 
             // Only advertise HSTS when the current production request is really HTTPS.

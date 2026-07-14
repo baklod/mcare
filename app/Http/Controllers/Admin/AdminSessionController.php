@@ -15,7 +15,7 @@ class AdminSessionController extends Controller
     public function create(): View|RedirectResponse
     {
         // Already-authenticated admins should land on the operations dashboard.
-        if (request()->user()?->role === 'admin') {
+        if (request()->user()?->hasRole('admin')) {
             return redirect()->route('admin.dashboard');
         }
 
@@ -53,7 +53,7 @@ class AdminSessionController extends Controller
         $request->session()->regenerate();
 
         // Reject non-admin accounts even when their email and password are valid.
-        if ($request->user()?->role !== 'admin') {
+        if (! $request->user()?->hasRole('admin')) {
             AdminActivityLog::record($request->user(), 'admin.login.rejected', $request->user(), [
                 'email' => $request->user()?->email,
                 'role' => $request->user()?->role,

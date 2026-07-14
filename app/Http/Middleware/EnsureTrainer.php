@@ -10,8 +10,7 @@ class EnsureTrainer
 {
     public function handle(Request $request, Closure $next): Response
     {
-        // This guard is intentionally role-column based until Spatie Permission is migrated in.
-        if ($request->user()?->role !== 'trainer') {
+        if (! $request->user()?->hasRole('trainer')) {
             abort(403);
         }
 

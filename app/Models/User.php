@@ -3,16 +3,38 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Support\RolePermissionMatrix;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Schema;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, HasRoles, Notifiable;
+
+    protected static function booted(): void
+    {
+        static::saved(function (User $user): void {
+            if (! $user->wasRecentlyCreated && ! $user->wasChanged('role')) {
+                return;
+            }
+
+            $tables = config('permission.table_names');
+
+            // Fresh installs may create users before package tables are ready.
+            if (! Schema::hasTable($tables['roles'] ?? 'roles')
+                || ! Schema::hasTable($tables['model_has_roles'] ?? 'model_has_roles')) {
+                return;
+            }
+
+            RolePermissionMatrix::syncUser($user);
+        });
+    }
 
     /**
      * The attributes that are mass assignable.

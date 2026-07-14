@@ -1,8 +1,23 @@
 import './bootstrap';
 
 const dashboardThemeStorageKey = 'mcare-dashboard-theme';
-const storedDashboardTheme = window.localStorage.getItem(dashboardThemeStorageKey);
-document.documentElement.dataset.dashboardTheme = storedDashboardTheme === 'dark' ? 'dark' : 'light';
+
+const readDashboardTheme = () => {
+    try {
+        return window.localStorage.getItem(dashboardThemeStorageKey) === 'dark' ? 'dark' : 'light';
+    } catch (error) {
+        // Light is the safe default when storage is unavailable or blocked.
+        return 'light';
+    }
+};
+
+const applyDashboardTheme = (theme) => {
+    const resolvedTheme = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.dataset.dashboardTheme = resolvedTheme;
+    document.documentElement.style.colorScheme = resolvedTheme;
+};
+
+applyDashboardTheme(readDashboardTheme());
 
 document.addEventListener('DOMContentLoaded', () => {
     document.documentElement.classList.remove('dashboard-navigating');
@@ -37,8 +52,15 @@ document.addEventListener('DOMContentLoaded', () => {
     themeToggleButtons.forEach((button) => {
         button.addEventListener('click', () => {
             const nextTheme = document.documentElement.dataset.dashboardTheme === 'dark' ? 'light' : 'dark';
-            document.documentElement.dataset.dashboardTheme = nextTheme;
-            window.localStorage.setItem(dashboardThemeStorageKey, nextTheme);
+            applyDashboardTheme(nextTheme);
+
+            try {
+                // One shared key carries the user's choice across every role portal.
+                window.localStorage.setItem(dashboardThemeStorageKey, nextTheme);
+            } catch (error) {
+                // The current page can still change theme when storage is disabled.
+            }
+
             updateThemeControls();
         });
     });
@@ -293,6 +315,13 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 window.addEventListener('pageshow', () => {
+    applyDashboardTheme(readDashboardTheme());
     document.documentElement.classList.remove('dashboard-navigating');
     document.querySelector('.dashboard-main')?.removeAttribute('aria-busy');
+});
+
+window.addEventListener('storage', (event) => {
+    if (event.key === dashboardThemeStorageKey) {
+        applyDashboardTheme(readDashboardTheme());
+    }
 });

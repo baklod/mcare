@@ -10,8 +10,8 @@ class EnsureTrainee
 {
     public function handle(Request $request, Closure $next): Response
     {
-        // Approved applicants are promoted to this role by the admin review flow.
-        if ($request->user()?->role !== 'trainee') {
+        // Approved applicants receive this Spatie role from the review flow.
+        if (! $request->user()?->hasRole('trainee')) {
             abort(403);
         }
 

@@ -19,9 +19,9 @@ It also describes role-based access for administrators, instructors/trainers, an
 
 ## Recommended Packages
 
-### Role and Permission Control
+### Role and Permission Control — Baseline Implemented
 
-Use `spatie/laravel-permission` when we migrate from the current simple `users.role` column to full RBAC.
+`spatie/laravel-permission` is installed and now acts as a compatibility-safe RBAC layer. A migration creates the permission matrix, backfills existing accounts, and keeps new or changed `users.role` values synchronized with Spatie roles. Sensitive route groups require named permissions as well as their role middleware.
 
 ```bash
 composer require spatie/laravel-permission
@@ -30,7 +30,7 @@ php artisan optimize:clear
 php artisan migrate
 ```
 
-Why: the paper explicitly references Spatie Laravel Permission for role-specific module boundaries. It will make admin, trainer, trainee, alumni, and staff permissions easier to manage than hard-coded role checks.
+The legacy `users.role` value remains the temporary source of truth so existing screens and records continue to work. The next authorization phase is to add model policies for individual enrollments, modules, receipts, certificates, and reports.
 
 ### Certificate PDF Generation
 
@@ -53,4 +53,6 @@ Important: Browsershot requires Node 22 or newer and Puppeteer 23 or newer. Do n
 
 ## Current Implementation Choice
 
-The trainer portal added in this phase uses the existing `users.role` field so it can work immediately. Spatie Permission should be introduced as a dedicated migration once admin, trainer, trainee, and alumni permissions are finalized.
+Spatie provides route-level roles and permissions while the existing role column preserves compatibility. Browsershot remains intentionally uninstalled until certificate verification, deployment requirements, Chrome/Puppeteer sandboxing, and operational limits are designed and tested.
+
+See `docs/CYBERSECURITY_CURRENT_STATE_REPORT.md` for the verified current state and phased security roadmap.

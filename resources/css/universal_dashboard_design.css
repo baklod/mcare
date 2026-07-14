@@ -441,6 +441,18 @@ html[data-dashboard-theme="dark"] .universal-dashboard .admin-login-form {
     border-color: #475569 !important;
 }
 
+/* Keep the split login card readable even when utility styles change order. */
+html[data-dashboard-theme="dark"] body.universal-dashboard[data-dashboard-role="admin"] .dashboard-main .admin-login-promo {
+    background-color: #111827 !important;
+    background-image: none !important;
+    border-color: #334155 !important;
+}
+
+html[data-dashboard-theme="dark"] body.universal-dashboard[data-dashboard-role="admin"] .dashboard-main .admin-login-form {
+    background-color: #172033 !important;
+    background-image: none !important;
+}
+
 html[data-dashboard-theme="dark"] .universal-dashboard .bg-slate-50,
 html[data-dashboard-theme="dark"] .universal-dashboard .bg-slate-100,
 html[data-dashboard-theme="dark"] .universal-dashboard .bg-stone-50,

@@ -2,7 +2,7 @@
 
 @section('content')
     <section class="admin-login-card mx-auto grid max-w-5xl grid-cols-1 overflow-hidden rounded-3xl border border-purple-100 bg-white shadow-xl shadow-purple-100/40 lg:grid-cols-[1fr_420px]">
-        <div class="admin-login-promo bg-gradient-to-br from-purple-50 via-white to-slate-50 p-8 sm:p-10">
+        <div class="admin-login-promo border-b border-slate-200 bg-slate-50 p-8 sm:p-10 lg:border-b-0 lg:border-r">
             <div class="inline-flex items-center gap-2 rounded-full bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 ring-1 ring-purple-100">
                 Staff access
             </div>
@@ -28,7 +28,7 @@
             </div>
         </div>
 
-        <div class="admin-login-form p-8 sm:p-10">
+        <div class="admin-login-form bg-white p-8 sm:p-10">
             @include('auth.partials.current-account', ['activeUser' => $activeUser ?? auth()->user()])
 
             <h2 class="text-2xl font-bold text-slate-900">Admin login</h2>
