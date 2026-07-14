@@ -10,6 +10,7 @@ use App\Models\TrainerAnnouncement;
 use App\Models\TrainingModule;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -18,6 +19,31 @@ use Symfony\Component\HttpFoundation\HeaderUtils;
 class TraineeDashboardController extends Controller
 {
     public function index(Request $request): View|RedirectResponse
+    {
+        return $this->portalView($request, 'trainee.dashboard');
+    }
+
+    public function modules(Request $request): View|RedirectResponse
+    {
+        return $this->portalView($request, 'trainee.modules.index');
+    }
+
+    public function schedule(Request $request): View|RedirectResponse
+    {
+        return $this->portalView($request, 'trainee.schedule');
+    }
+
+    public function payments(Request $request): View|RedirectResponse
+    {
+        return $this->portalView($request, 'trainee.payments');
+    }
+
+    public function documents(Request $request): View|RedirectResponse
+    {
+        return $this->portalView($request, 'trainee.documents');
+    }
+
+    private function portalView(Request $request, string $view): View|RedirectResponse
     {
         $application = $this->approvedApplicationFor($request);
 
@@ -38,7 +64,7 @@ class TraineeDashboardController extends Controller
             ? 0
             : (int) round($modules->sum(fn ($module) => $progressByModule->get($module->id)?->progress_percent ?? 0) / $modules->count());
 
-        return view('trainee.dashboard', [
+        return view($view, [
             'application' => $application,
             'batch' => $application->batch,
             'modules' => $modules,
@@ -145,6 +171,23 @@ class TraineeDashboardController extends Controller
         ]);
 
         return back()->with('saved', $completed ? 'Module marked complete.' : 'Module returned to in progress.');
+    }
+
+    public function securityEvent(Request $request, TrainingModule $module): Response
+    {
+        $application = $this->approvedApplicationFor($request);
+        $this->authorizeModule($application, $module);
+        $validated = $request->validate([
+            'event' => ['required', 'in:context_menu,print_shortcut,save_shortcut,before_print'],
+        ]);
+
+        // This records browser-side deterrence events. It cannot observe actions below the browser layer.
+        AdminActivityLog::record($request->user(), 'trainee.module.restricted-action', $module, [
+            'trainee_email' => $application->email,
+            'event' => $validated['event'],
+        ]);
+
+        return response()->noContent();
     }
 
     private function authorizeModule(?EnrollmentApplication $application, TrainingModule $module): void

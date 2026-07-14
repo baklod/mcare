@@ -76,7 +76,9 @@
 
         <div class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             @forelse ($modules as $module)
-                @php($moduleProgress = $progressByModule->get($module->id))
+                @php
+                    $moduleProgress = $progressByModule->get($module->id);
+                @endphp
                 <article class="dashboard-card p-5">
                     <div class="flex items-start justify-between gap-4">
                         <div>
@@ -175,7 +177,9 @@
         <h2 class="dashboard-section-title">Submitted registration files</h2>
         <div class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
             @foreach ($documents as $documentKey => $document)
-                @php($documentFeedback = data_get($application->document_review, $documentKey, []))
+                @php
+                    $documentFeedback = data_get($application->document_review, $documentKey, []);
+                @endphp
                 <article class="rounded-2xl border border-slate-100 bg-slate-50 p-5">
                     <p class="font-bold text-slate-900">{{ $document['label'] }}</p>
                     @if ($document['path'])

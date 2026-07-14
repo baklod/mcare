@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'MCARE Trainee' }}</title>
+    <link rel="preload" as="image" href="{{ asset('assets/mcare-mark.png') }}" fetchpriority="high">
     <x-dashboard-theme-head />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -14,11 +16,11 @@
         $traineeName = auth()->user()?->name ?? 'Trainee';
         $traineeInitial = strtoupper(substr($traineeName, 0, 1));
         $traineeNav = [
-            ['label' => 'Dashboard', 'short' => 'Home', 'icon' => 'fa-house', 'href' => '#dashboard', 'active' => true],
-            ['label' => 'My Modules', 'short' => 'Modules', 'icon' => 'fa-book-open', 'href' => '#modules', 'active' => false],
-            ['label' => 'Schedule', 'short' => 'Schedule', 'icon' => 'fa-calendar-days', 'href' => '#schedule', 'active' => false],
-            ['label' => 'Payments', 'short' => 'Payments', 'icon' => 'fa-credit-card', 'href' => '#payments', 'active' => false],
-            ['label' => 'Documents', 'short' => 'Files', 'icon' => 'fa-folder-open', 'href' => '#documents', 'active' => false],
+            ['label' => 'Dashboard', 'short' => 'Home', 'icon' => 'fa-house', 'href' => route('trainee.dashboard'), 'active' => request()->routeIs('trainee.dashboard')],
+            ['label' => 'My Modules', 'short' => 'Modules', 'icon' => 'fa-book-open', 'href' => route('trainee.modules.index'), 'active' => request()->routeIs('trainee.modules.*')],
+            ['label' => 'Schedule', 'short' => 'Schedule', 'icon' => 'fa-calendar-days', 'href' => route('trainee.schedule'), 'active' => request()->routeIs('trainee.schedule')],
+            ['label' => 'Payments', 'short' => 'Payments', 'icon' => 'fa-credit-card', 'href' => route('trainee.payments'), 'active' => request()->routeIs('trainee.payments')],
+            ['label' => 'Documents', 'short' => 'Files', 'icon' => 'fa-folder-open', 'href' => route('trainee.documents'), 'active' => request()->routeIs('trainee.documents')],
         ];
     @endphp
 
@@ -27,7 +29,7 @@
 
     <aside class="dashboard-sidebar" data-dashboard-sidebar>
         <a href="{{ route('trainee.dashboard') }}" class="dashboard-brand">
-            <img src="{{ asset('assets/mcare-mark.png') }}" alt="MCARE mark" class="dashboard-brand-logo">
+            <img src="{{ asset('assets/mcare-mark.png') }}" alt="MCARE mark" class="dashboard-brand-logo" width="44" height="44" loading="eager" decoding="sync" fetchpriority="high">
             <span class="min-w-0">
                 <span class="dashboard-brand-title">MCARE Hub</span>
                 <span class="dashboard-brand-subtitle">Trainee Portal</span>
@@ -40,7 +42,7 @@
         <nav class="dashboard-nav" aria-label="Trainee navigation">
             <p class="dashboard-menu-label">Trainee Menu</p>
             @foreach ($traineeNav as $item)
-                <a href="{{ $item['href'] }}" data-dashboard-nav-key="trainee-{{ str($item['label'])->slug() }}" class="{{ $navItem }} {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
+                <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainee-{{ str($item['label'])->slug() }}" class="{{ $navItem }} {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
                     <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
                     <span>{{ $item['label'] }}</span>
                 </a>
@@ -105,7 +107,7 @@
 
     <nav class="dashboard-mobile-bar grid-cols-4" aria-label="Mobile trainee navigation">
         @foreach (array_slice($traineeNav, 0, 4) as $item)
-            <a href="{{ $item['href'] }}" data-dashboard-nav-key="trainee-{{ str($item['label'])->slug() }}" class="dashboard-mobile-link {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
+            <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainee-{{ str($item['label'])->slug() }}" class="dashboard-mobile-link {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
                 <x-dashboard-icon :name="$item['icon']" />
                 <span class="truncate">{{ $item['short'] }}</span>
             </a>

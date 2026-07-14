@@ -239,4 +239,46 @@ class TrainerPortalTest extends TestCase
         $this->assertDatabaseHas('training_modules', ['title' => 'Positioning Diagram']);
         $this->assertDatabaseHas('training_modules', ['title' => 'Transfer Demonstration']);
     }
+
+    public function test_trainer_can_export_a_filtered_trainee_summary(): void
+    {
+        $trainer = User::factory()->create(['role' => 'trainer']);
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $batch = TrainingBatch::create([
+            'name' => 'Export Batch',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+        ]);
+        $application = EnrollmentApplication::create([
+            'user_id' => $trainee->id,
+            'training_batch_id' => $batch->id,
+            'email' => $trainee->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => 'Export',
+            'last_name' => 'Trainee',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'street' => '1 Training Street',
+            'barangay' => 'Central',
+            'city' => 'Iriga City',
+            'province' => 'Camarines Sur',
+            'zip_code' => '4431',
+            'educational_attainment' => 'College Graduate',
+            'school_name' => 'MCARE School',
+            'year_graduated' => 2022,
+            'status' => EnrollmentApplication::STATUS_APPROVED,
+            'reviewed_at' => now(),
+        ]);
+
+        $response = $this->actingAs($trainer)->get(route('trainer.trainees.export', [
+            'batch_id' => $batch->id,
+            'schedule' => 'AM',
+        ]));
+
+        $response->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8');
+        $this->assertStringContainsString($application->email, $response->streamedContent());
+    }
 }

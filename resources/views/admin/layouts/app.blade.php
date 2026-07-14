@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $title ?? 'MCARE Admin' }}</title>
+    @php
+        $preloadedAdminBrand = request()->routeIs('admin.login') ? 'assets/official-logo.png' : 'assets/mcare-mark.png';
+    @endphp
+    <link rel="preload" as="image" href="{{ asset($preloadedAdminBrand) }}" fetchpriority="high">
     <x-dashboard-theme-head />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -31,6 +35,7 @@
             ['label' => 'Certificates', 'icon' => 'fa-award', 'href' => route('admin.learning.certificates'), 'active' => request()->routeIs('admin.learning.certificates')],
             ['label' => 'Alumni Jobs', 'icon' => 'fa-briefcase', 'href' => route('admin.learning.alumni-jobs'), 'active' => request()->routeIs('admin.learning.alumni-jobs')],
             ['label' => 'Reports', 'icon' => 'fa-chart-column', 'href' => route('admin.learning.reports'), 'active' => request()->routeIs('admin.learning.reports')],
+            ['label' => 'Accounts', 'icon' => 'fa-users', 'href' => route('admin.accounts.index'), 'active' => request()->routeIs('admin.accounts.*')],
         ];
     @endphp
 
@@ -38,7 +43,7 @@
 
     <aside class="dashboard-sidebar" data-dashboard-sidebar>
         <a href="{{ route('admin.dashboard') }}" class="dashboard-brand">
-            <img src="{{ asset($adminBrandAsset) }}" alt="{{ $adminBrandAlt }}" class="dashboard-brand-logo">
+            <img src="{{ asset($adminBrandAsset) }}" alt="{{ $adminBrandAlt }}" class="dashboard-brand-logo" width="44" height="44" loading="eager" decoding="sync" fetchpriority="high">
             <span class="min-w-0">
                 <span class="dashboard-brand-title">MCARE Hub</span>
                 <span class="dashboard-brand-subtitle">Admin Portal</span>

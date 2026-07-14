@@ -36,6 +36,8 @@
     .universal-dashboard .dashboard-brand-logo {
         @apply h-11 w-11 shrink-0 rounded-xl border border-slate-100 bg-white object-contain p-1;
         box-shadow: none;
+        view-transition-name: dashboard-brand-logo;
+        contain: paint;
     }
 
     .universal-dashboard .dashboard-brand-title {
@@ -337,7 +339,9 @@ html.dashboard-scroll-in-progress {
 ::view-transition-old(dashboard-sidebar),
 ::view-transition-new(dashboard-sidebar),
 ::view-transition-old(dashboard-topbar),
-::view-transition-new(dashboard-topbar) {
+::view-transition-new(dashboard-topbar),
+::view-transition-old(dashboard-brand-logo),
+::view-transition-new(dashboard-brand-logo) {
     animation: none;
 }
 
@@ -411,6 +415,30 @@ html[data-dashboard-theme="dark"] .account-card {
     background-color: #172033 !important;
     border-color: #334155 !important;
     color: #e5e7eb;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard :is(.dashboard-table, .dashboard-table tbody, .dashboard-table tbody tr, .dashboard-table td) {
+    background-color: #172033 !important;
+    border-color: #334155 !important;
+    color: #cbd5e1 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard :is(.dashboard-table thead, .dashboard-table th) {
+    background-color: #222d42 !important;
+    border-color: #475569 !important;
+    color: #cbd5e1 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-table tbody tr:hover {
+    background-color: #2e2350 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .admin-login-card,
+html[data-dashboard-theme="dark"] .universal-dashboard .admin-login-promo,
+html[data-dashboard-theme="dark"] .universal-dashboard .admin-login-form {
+    background-color: #172033 !important;
+    background-image: none !important;
+    border-color: #475569 !important;
 }
 
 html[data-dashboard-theme="dark"] .universal-dashboard .bg-slate-50,
@@ -608,4 +636,27 @@ html[data-dashboard-theme="dark"] .account-page .secondary-action {
 .account-page :is(.primary-action, .secondary-action, .form-field) {
     border-radius: 0.65rem !important;
     box-shadow: none !important;
+}
+
+@media print {
+    html.protected-module-printing body,
+    body:has([data-protected-module-viewer]) {
+        background: #ffffff !important;
+    }
+
+    body:has([data-protected-module-viewer]) * {
+        visibility: hidden !important;
+    }
+
+    body:has([data-protected-module-viewer])::before {
+        content: "Printing protected MCARE learning materials is disabled.";
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        visibility: visible !important;
+        color: #111827;
+        font: 700 18px/1.5 ui-sans-serif, system-ui, sans-serif;
+        text-align: center;
+    }
 }

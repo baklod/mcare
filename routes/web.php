@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountSettingsController;
+use App\Http\Controllers\Admin\AdminAccountController;
 use App\Http\Controllers\Admin\AdminActivityLogController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminLearningSystemController;
@@ -170,13 +171,30 @@ Route::middleware('throttle:global-web')->group(function () {
                     ->name('payment-schedules.update');
 
                 Route::get('/learning/trainees', [AdminLearningSystemController::class, 'trainees'])->name('learning.trainees');
+                Route::get('/learning/trainees/export', [AdminLearningSystemController::class, 'exportTrainees'])
+                    ->middleware('throttle:document-downloads')
+                    ->name('learning.trainees.export');
                 Route::patch('/learning/trainees/{enrollmentApplication}/status', [AdminLearningSystemController::class, 'updateTraineeStatus'])
                     ->middleware('throttle:sensitive-mutation')
                     ->name('learning.trainees.status');
                 Route::get('/learning/modules', [AdminLearningSystemController::class, 'modules'])->name('learning.modules');
+                Route::post('/learning/modules', [AdminLearningSystemController::class, 'storeModule'])
+                    ->middleware('throttle:sensitive-mutation')
+                    ->name('learning.modules.store');
+                Route::delete('/learning/modules/{module}', [AdminLearningSystemController::class, 'destroyModule'])
+                    ->middleware('throttle:sensitive-mutation')
+                    ->name('learning.modules.destroy');
                 Route::get('/learning/certificates', [AdminLearningSystemController::class, 'certificates'])->name('learning.certificates');
                 Route::get('/learning/alumni-jobs', [AdminLearningSystemController::class, 'alumniJobs'])->name('learning.alumni-jobs');
                 Route::get('/learning/reports', [AdminLearningSystemController::class, 'reports'])->name('learning.reports');
+
+                Route::get('/accounts', [AdminAccountController::class, 'index'])->name('accounts.index');
+                Route::post('/accounts/trainers', [AdminAccountController::class, 'storeTrainer'])
+                    ->middleware('throttle:sensitive-mutation')
+                    ->name('accounts.trainers.store');
+                Route::post('/accounts/trainees', [AdminAccountController::class, 'storeTrainee'])
+                    ->middleware('throttle:sensitive-mutation')
+                    ->name('accounts.trainees.store');
 
                 Route::get('/logs', [AdminActivityLogController::class, 'index'])
                     ->middleware('throttle:search')
@@ -212,6 +230,9 @@ Route::middleware('throttle:global-web')->group(function () {
 
                 Route::get('/trainings', [TrainerPortalController::class, 'trainings'])->name('trainings');
                 Route::get('/trainees', [TrainerPortalController::class, 'trainees'])->name('trainees');
+                Route::get('/trainees/export', [TrainerPortalController::class, 'exportTrainees'])
+                    ->middleware('throttle:document-downloads')
+                    ->name('trainees.export');
                 Route::get('/sessions', [TrainerPortalController::class, 'sessions'])->name('sessions');
                 Route::get('/assessments', [TrainerPortalController::class, 'assessments'])->name('assessments');
                 Route::get('/resources', [TrainerPortalController::class, 'resources'])->name('resources');
@@ -250,6 +271,15 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/', [TraineeDashboardController::class, 'index'])
                     ->name('dashboard');
 
+                Route::get('/modules', [TraineeDashboardController::class, 'modules'])
+                    ->name('modules.index');
+                Route::get('/schedule', [TraineeDashboardController::class, 'schedule'])
+                    ->name('schedule');
+                Route::get('/payments', [TraineeDashboardController::class, 'payments'])
+                    ->name('payments');
+                Route::get('/documents', [TraineeDashboardController::class, 'documents'])
+                    ->name('documents');
+
                 Route::get('/modules/{module}', [TraineeDashboardController::class, 'viewModule'])
                     ->name('modules.show');
 
@@ -260,6 +290,10 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::patch('/modules/{module}/progress', [TraineeDashboardController::class, 'updateProgress'])
                     ->middleware('throttle:sensitive-mutation')
                     ->name('modules.progress');
+
+                Route::post('/modules/{module}/security-event', [TraineeDashboardController::class, 'securityEvent'])
+                    ->middleware('throttle:20,1')
+                    ->name('modules.security-event');
             });
         });
 });

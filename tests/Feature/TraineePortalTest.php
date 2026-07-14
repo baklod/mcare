@@ -75,6 +75,25 @@ class TraineePortalTest extends TestCase
             ->assertSee('MWF | 8:00 AM - 12:00 PM');
     }
 
+    public function test_trainee_sidebar_destinations_are_separate_pages(): void
+    {
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $batch = $this->batch();
+        $this->approvedReadyApplication($trainee, EnrollmentApplication::STATUS_APPROVED, $batch);
+
+        foreach ([
+            'trainee.modules.index' => 'Learning materials',
+            'trainee.schedule' => 'Class schedule and notices',
+            'trainee.payments' => 'Payment summary',
+            'trainee.documents' => 'Submitted registration files',
+        ] as $routeName => $heading) {
+            $this->actingAs($trainee)
+                ->get(route($routeName))
+                ->assertOk()
+                ->assertSee($heading);
+        }
+    }
+
     public function test_private_module_is_visible_only_to_its_selected_trainee(): void
     {
         $trainer = User::factory()->create(['role' => 'trainer']);
@@ -134,7 +153,10 @@ class TraineePortalTest extends TestCase
         $this->actingAs($trainee)
             ->get(route('trainee.modules.show', $module))
             ->assertOk()
-            ->assertSee('Protected learning viewer');
+            ->assertSee('Protected learning viewer')
+            ->assertSee('data-protected-module-viewer', false)
+            ->assertSee('sandbox="allow-same-origin allow-scripts"', false)
+            ->assertSee(route('trainee.modules.security-event', $module), false);
 
         $this->assertDatabaseHas('module_progress', [
             'enrollment_application_id' => $application->id,
@@ -162,6 +184,16 @@ class TraineePortalTest extends TestCase
         $this->assertDatabaseHas('admin_activity_logs', [
             'user_id' => $trainee->id,
             'action' => 'trainee.module.progress.updated',
+        ]);
+
+        $this->actingAs($trainee)
+            ->postJson(route('trainee.modules.security-event', $module), ['event' => 'print_shortcut'])
+            ->assertNoContent();
+
+        $this->assertDatabaseHas('admin_activity_logs', [
+            'user_id' => $trainee->id,
+            'action' => 'trainee.module.restricted-action',
+            'subject_id' => $module->id,
         ]);
     }
 

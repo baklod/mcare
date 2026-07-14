@@ -57,7 +57,7 @@
             </div>
             <div><label class="mb-2 block text-xs font-bold uppercase text-slate-500">Joined from</label><input name="joined_from" type="date" value="{{ $filters['joined_from'] ?? '' }}" class="form-field"></div>
             <div><label class="mb-2 block text-xs font-bold uppercase text-slate-500">Joined to</label><input name="joined_to" type="date" value="{{ $filters['joined_to'] ?? '' }}" class="form-field"></div>
-            <div class="flex flex-wrap items-end gap-2 md:col-span-2 xl:col-span-6"><button class="primary-action">Filter trainees</button><a href="{{ route('admin.learning.trainees') }}" class="secondary-action">Reset</a></div>
+            <div class="flex flex-wrap items-end gap-2 md:col-span-2 xl:col-span-6"><button class="primary-action">Filter trainees</button><a href="{{ route('admin.learning.trainees') }}" class="secondary-action">Reset</a><a href="{{ route('admin.learning.trainees.export', request()->query()) }}" class="secondary-action">Export Excel CSV</a></div>
         </form>
 
         <div class="dashboard-table-wrap overflow-x-auto">

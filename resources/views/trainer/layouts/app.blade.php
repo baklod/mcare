@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $title ?? 'MCARE Trainer' }}</title>
+    <link rel="preload" as="image" href="{{ asset('assets/mcare-mark.png') }}" fetchpriority="high">
     <x-dashboard-theme-head />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -31,7 +32,7 @@
 
     <aside class="dashboard-sidebar" data-dashboard-sidebar>
         <a href="{{ route('trainer.dashboard') }}" class="dashboard-brand">
-            <img src="{{ asset('assets/mcare-mark.png') }}" alt="MCARE mark" class="dashboard-brand-logo">
+            <img src="{{ asset('assets/mcare-mark.png') }}" alt="MCARE mark" class="dashboard-brand-logo" width="44" height="44" loading="eager" decoding="sync" fetchpriority="high">
             <span class="min-w-0">
                 <span class="dashboard-brand-title">MCARE Hub</span>
                 <span class="dashboard-brand-subtitle">Trainer Portal</span>

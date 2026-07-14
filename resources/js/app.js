@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const themeToggleButtons = document.querySelectorAll('[data-dashboard-theme-toggle]');
     const prefetchLinks = document.querySelectorAll('a[data-dashboard-prefetch]');
     const dashboardMain = document.querySelector('.dashboard-main');
+    const protectedViewer = document.querySelector('[data-protected-module-viewer]');
 
     const updateThemeControls = () => {
         const isDark = document.documentElement.dataset.dashboardTheme === 'dark';
@@ -42,6 +43,64 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     updateThemeControls();
+
+    if (protectedViewer) {
+        const notice = protectedViewer.querySelector('[data-protected-viewer-notice]');
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+        let noticeTimer = null;
+
+        const reportRestrictedAction = (eventName) => {
+            const url = protectedViewer.dataset.securityEventUrl;
+            if (!url || !csrfToken) return;
+
+            window.fetch(url, {
+                method: 'POST',
+                keepalive: true,
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ event: eventName }),
+            }).catch(() => {});
+        };
+
+        const showRestrictedNotice = (message) => {
+            if (!notice) return;
+            notice.textContent = message;
+            notice.classList.remove('hidden');
+            window.clearTimeout(noticeTimer);
+            noticeTimer = window.setTimeout(() => notice.classList.add('hidden'), 3500);
+        };
+
+        protectedViewer.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+            showRestrictedNotice('Right-click is disabled inside the protected module viewer.');
+            reportRestrictedAction('context_menu');
+        });
+
+        protectedViewer.addEventListener('dragstart', (event) => event.preventDefault());
+
+        document.addEventListener('keydown', (event) => {
+            if (!(event.ctrlKey || event.metaKey)) return;
+            const key = event.key.toLowerCase();
+
+            if (key === 'p' || key === 's') {
+                event.preventDefault();
+                showRestrictedNotice(key === 'p'
+                    ? 'Printing is disabled for protected learning materials.'
+                    : 'Saving protected learning materials is disabled.');
+                reportRestrictedAction(key === 'p' ? 'print_shortcut' : 'save_shortcut');
+            }
+        });
+
+        window.addEventListener('beforeprint', () => {
+            document.documentElement.classList.add('protected-module-printing');
+            reportRestrictedAction('before_print');
+        });
+        window.addEventListener('afterprint', () => document.documentElement.classList.remove('protected-module-printing'));
+    }
 
     const setMenuOpen = (isOpen) => {
         if (!sidebar || !backdrop) {
