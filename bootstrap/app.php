@@ -4,6 +4,7 @@ use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureEnrollmentPaymentAccess;
 use App\Http\Middleware\EnsureTrainee;
 use App\Http\Middleware\EnsureTrainer;
+use App\Http\Middleware\EnsureTwoFactorVerified;
 use App\Http\Middleware\PrivateResponseHeaders;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Auth\AuthenticationException;
@@ -36,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => PermissionMiddleware::class,
             'trainer' => EnsureTrainer::class,
             'trainee' => EnsureTrainee::class,
+            'two-factor' => EnsureTwoFactorVerified::class,
         ]);
 
         $middleware->redirectGuestsTo(fn (Request $request) => match (true) {

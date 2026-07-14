@@ -8,7 +8,7 @@
 
 MCARE has a useful development-stage security baseline, but it should **not yet be described as production-hardened**. Authentication, CSRF protection, private file storage, response privacy headers, rate limiting, server-side validation, password hashing, session rotation, and activity logging are present. This review also activated the installed Spatie Permission package, remediated the dependency advisories found in the lockfile, strengthened upload checks, and improved browser security headers.
 
-The largest remaining risks are operational and feature-level: administrator MFA and password recovery are not implemented, PayMongo is still a UI/workflow integration without a verified webhook, uploads are not malware-scanned, authorization policies are not yet defined for every individual record, and certificate authenticity/revocation is not yet implemented. A real deployment also needs TLS, backup/restore testing, secret management, monitoring, and an independent penetration test.
+The largest remaining risks are operational and feature-level: stronger administrator MFA and password recovery are not implemented, PayMongo is still a UI/workflow integration without a verified webhook, uploads are not malware-scanned, authorization policies are not yet defined for every individual record, and certificate authenticity/revocation is not yet implemented. A real deployment also needs TLS, backup/restore testing, secret management, monitoring, and an independent penetration test.
 
 This document is an engineering assessment, not a penetration-test certificate or a guarantee that the system has no vulnerabilities.
 
@@ -23,6 +23,15 @@ the existing audit log. This client signal is only an operational hint: a
 modified browser or disabled JavaScript can omit it, so it must never be used
 as proof of misconduct or as a replacement for server-side authorization,
 rate limiting, or incident review.
+
+Administrator sign-in now uses a password plus a short-lived, six-digit email
+verification code for configured roles. The code is hashed in the encrypted
+session, expires after the configured TTL, has a maximum attempt count, and
+does not create the privileged session until verification succeeds. The generic
+account login and Google callback paths do not bypass this staff challenge.
+The admin activity log records sent, failed, expired, locked, and verified
+events without recording the code; the local \`log\` mailer still renders the
+code into the Laravel mail log and is for development only.
 
 ## Scope and Method
 
@@ -40,7 +49,7 @@ Out of scope: live infrastructure scanning, external attack simulation, social e
 
 | Area | Current implementation | Status |
 | --- | --- | --- |
-| Authentication | Laravel session authentication, Socialite OAuth state validation, session ID regeneration, logout invalidation | Implemented |
+| Authentication | Laravel session authentication, Socialite OAuth state validation, session ID regeneration, logout invalidation, and admin email 2FA before privileged session creation | Implemented baseline |
 | Role access | Spatie roles/permissions synchronized from the existing `users.role` field; role and named-permission middleware protect role portals and sensitive route groups | Implemented baseline |
 | Request integrity | Laravel CSRF protection and server-side validation | Implemented |
 | Abuse controls | Global and endpoint-specific rate limiters for login, OAuth, search, mutations, and document responses | Implemented |
@@ -56,7 +65,7 @@ Out of scope: live infrastructure scanning, external attack simulation, social e
 
 ### High Priority
 
-1. **Administrator MFA and account recovery are missing.** A stolen administrator password can expose applicant personal data and administrative actions. Add password reset, verified staff email, TOTP/WebAuthn MFA, recovery codes, and session revocation.
+1. **Stronger administrator MFA and account recovery are still needed.** Email OTP now protects the admin password flow, but a stolen mailbox or mail-delivery failure can still affect access. Add password reset, verified staff email, TOTP/WebAuthn MFA, recovery codes, and session revocation.
 2. **PayMongo is not yet a trusted payment integration.** The current application can prepare payment state, but it does not create and verify the complete server-side payment lifecycle. Payment approval must be based on PayMongo API results and a signature-verified, replay-safe webhook—not browser-submitted status.
 3. **Uploaded files are not malware scanned or content-disarmed.** MIME and extension allow-lists reduce accidental misuse but do not prove a PDF or media file is safe. Add antivirus scanning, quarantine, and PDF content disarm/reconstruction before staff or learners open uploads.
 4. **Production security is not verified.** Before real applicant data is used, verify `APP_ENV=production`, `APP_DEBUG=false`, HTTPS, secure cookies, trusted proxies, least-privilege database credentials, encrypted backups, restore drills, and secret rotation.
@@ -78,6 +87,7 @@ Out of scope: live infrastructure scanning, external attack simulation, social e
 - Added matching extension checks alongside content-MIME validation for uploaded documents and learning files.
 - Removed the unnecessary password character blacklist and applied a stronger, usable password rule.
 - Expanded browser security headers and made the production CSP compatible with same-origin protected previews.
+- Added admin email OTP 2FA on the dedicated and generic account login paths, with hashed codes, expiry, attempt limits, pre-auth sessions, audit events, and a defense-in-depth middleware check.
 
 ## Content Protection: Accurate Security Statement
 
@@ -102,7 +112,7 @@ Paper-safe wording:
 ### Phase 2 — Identity and Record Authorization (next)
 
 - Add Laravel policies for enrollments, documents, modules, receipts, reports, certificates, and audit logs
-- Add password reset, email verification for staff, admin MFA, recovery codes, and session revocation
+- Add password reset, staff email verification, stronger TOTP/WebAuthn MFA, recovery codes, and session revocation; retain email OTP as the baseline factor
 - Log denied sensitive actions with a request correlation ID, without logging passwords, tokens, or full document contents
 - Add user/session inventory and staff idle timeout
 
@@ -131,7 +141,7 @@ Paper-safe wording:
 - [ ] HTTPS, secure cookies, debug-off behavior, CSP, backups, and restore are verified in staging
 - [ ] PayMongo signed webhooks are tested with success, retry, replay, wrong amount, and invalid-signature cases
 - [ ] Upload quarantine and malware handling are tested
-- [ ] Admin MFA, recovery, and session revocation are tested
+- [ ] Admin email OTP, stronger MFA/recovery, and session revocation are tested
 - [ ] Incident contact, retention schedule, privacy notice, and breach-response procedure are documented
 
 ## Authoritative References

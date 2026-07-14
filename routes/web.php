@@ -118,7 +118,11 @@ Route::middleware('throttle:global-web')->group(function () {
                 ->middleware('throttle:admin-login')
                 ->name('login.store');
 
-            Route::middleware(['auth', 'admin', 'permission:admin.access'])->group(function () {
+            Route::post('/login/verify-2fa', [AdminSessionController::class, 'verifyTwoFactor'])
+                ->middleware('throttle:admin-login')
+                ->name('login.verify-2fa');
+
+            Route::middleware(['auth', 'admin', 'two-factor', 'permission:admin.access'])->group(function () {
                 Route::post('/logout', [AdminSessionController::class, 'destroy'])
                     ->middleware('throttle:sensitive-mutation')
                     ->name('logout');

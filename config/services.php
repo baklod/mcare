@@ -34,6 +34,16 @@ return [
         'webhook_secret' => env('PAYMONGO_WEBHOOK_SECRET'),
     ],
 
+    'two_factor' => [
+        'enabled' => (bool) env('TWO_FACTOR_ENABLED', true),
+        'roles' => array_values(array_filter(array_map(
+            static fn (string $role): string => trim($role),
+            explode(',', (string) env('TWO_FACTOR_ROLES', 'admin')),
+        ))),
+        'ttl' => (int) env('TWO_FACTOR_TTL', 10),
+        'max_attempts' => (int) env('TWO_FACTOR_MAX_ATTEMPTS', 5),
+    ],
+
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),

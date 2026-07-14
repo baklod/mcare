@@ -44,6 +44,14 @@ class GoogleAuthController extends Controller
 
         $user = User::where('email', $googleUser->getEmail())->first();
 
+        // Administrator accounts must complete the staff password + email
+        // challenge. OAuth must not create a privileged-session bypass.
+        if ($user?->hasRole('admin')) {
+            return redirect()
+                ->route('landing')
+                ->with('auth_error', 'Administrator accounts must sign in through the staff portal.');
+        }
+
         if ($user) {
             $user->forceFill([
                 'name' => $googleUser->getName() ?: $googleUser->getNickname() ?: 'MCARE Applicant',
