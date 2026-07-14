@@ -295,6 +295,19 @@
     box-shadow: 0 1px 8px rgb(124 58 237 / 45%);
 }
 
+/* Navigation links remain visually stable while a page transition is in
+ * flight and ignore accidental repeat taps/clicks. The thin progress bar
+ * communicates activity without flashing the whole dashboard. */
+.universal-dashboard a[data-dashboard-prefetch].is-loading {
+    pointer-events: none;
+    cursor: wait;
+}
+
+.universal-dashboard a[data-dashboard-prefetch].is-loading .dashboard-nav-icon,
+.universal-dashboard a[data-dashboard-prefetch].is-loading .dashboard-svg-icon {
+    opacity: 0.65;
+}
+
 html.dashboard-navigating .dashboard-navigation-progress {
     opacity: 1;
     animation: dashboard-navigation-loading 900ms ease-out both;
@@ -451,6 +464,38 @@ html[data-dashboard-theme="dark"] body.universal-dashboard[data-dashboard-role="
 html[data-dashboard-theme="dark"] body.universal-dashboard[data-dashboard-role="admin"] .dashboard-main .admin-login-form {
     background-color: #172033 !important;
     background-image: none !important;
+}
+
+/* Admin login is rendered inside the shared admin shell, so explicitly style
+ * every split-card surface in dark mode. This prevents the promo panel and
+ * its white feature tiles from becoming low-contrast or unreadable. */
+html[data-dashboard-theme="dark"] .universal-dashboard .admin-login-card {
+    background-color: #172033 !important;
+    border-color: #475569 !important;
+    color: #e5e7eb !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .admin-login-promo {
+    background-color: #111827 !important;
+    border-color: #334155 !important;
+    color: #e5e7eb !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .admin-login-promo :is(.bg-white, .bg-slate-50) {
+    background-color: #172033 !important;
+    border-color: #334155 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .admin-login-promo :is(h1, h2, .text-slate-900, .text-slate-950) {
+    color: #f8fafc !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .admin-login-promo :is(p, .text-slate-600, .text-slate-500) {
+    color: #cbd5e1 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .admin-login-form :is(h1, h2, label, .text-slate-800, .text-slate-900) {
+    color: #f8fafc !important;
 }
 
 html[data-dashboard-theme="dark"] .universal-dashboard .bg-slate-50,

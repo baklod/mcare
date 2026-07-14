@@ -1,3 +1,4 @@
+<meta name="dashboard-security-event-url" content="{{ route('account.security-event') }}">
 <script>
     try {
         const mcareTheme = window.localStorage.getItem('mcare-dashboard-theme') === 'dark' ? 'dark' : 'light';

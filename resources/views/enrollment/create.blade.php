@@ -272,7 +272,7 @@
                     <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-3">
                         <div class="md:col-span-2">
                             <label for="email" class="mb-2 block text-sm font-semibold text-slate-800">Email address</label>
-                            <input id="email" name="email" type="email" inputmode="email" pattern="^[A-Za-z0-9._%+\-]+@gmail\.com$" value="{{ old('email', $application->email ?? $user?->email ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="email" name="email" type="email" inputmode="email" autocomplete="section-applicant email" pattern="^[A-Za-z0-9._%+\-]+@gmail\.com$" value="{{ old('email', $application->email ?? $user?->email ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             <p class="mt-2 text-xs leading-5 text-slate-500">Use a Gmail address only, for example name@gmail.com.</p>
                             @error('email') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
@@ -290,11 +290,11 @@
                             <label for="password" class="mb-2 block text-sm font-semibold text-slate-800">Password</label>
                             <input id="password" name="password" type="password" autocomplete="new-password" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             <div class="mt-3 space-y-1.5 text-xs font-semibold">
-                                <p id="pw-length-check" class="flex items-center gap-2 text-slate-500"><span class="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[10px]"> </span> At least 8 characters</p>
-                                <p id="pw-letter-number-check" class="flex items-center gap-2 text-slate-500"><span class="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[10px]"> </span> Contains letters and numbers</p>
-                                <p id="pw-safe-check" class="flex items-center gap-2 text-slate-500"><span class="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[10px]"> </span> No blocked security characters</p>
+                                <p id="pw-length-check" class="flex items-center gap-2 text-slate-500"><span class="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[10px]"> </span> At least 10 characters</p>
+                                <p id="pw-letter-number-check" class="flex items-center gap-2 text-slate-500"><span class="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[10px]"> </span> Contains a number</p>
+                                <p id="pw-case-check" class="flex items-center gap-2 text-slate-500"><span class="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[10px]"> </span> Contains upper and lowercase letters</p>
                             </div>
-                            <p class="mt-2 text-xs leading-5 text-slate-500">Special characters are allowed except: &lt; &gt; quotes, backticks, semicolons, braces, pipes, and backslashes.</p>
+                            <p class="mt-2 text-xs leading-5 text-slate-500">Use a unique passphrase you do not reuse on another website.</p>
                             @error('password') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
@@ -313,32 +313,32 @@
                     <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-4">
                         <div>
                             <label for="last_name" class="mb-2 block text-sm font-semibold text-slate-800">Last name</label>
-                            <input id="last_name" name="last_name" type="text" value="{{ old('last_name', $application->last_name ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="last_name" name="last_name" type="text" autocomplete="section-applicant family-name" value="{{ old('last_name', $application->last_name ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('last_name') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label for="first_name" class="mb-2 block text-sm font-semibold text-slate-800">First name</label>
-                            <input id="first_name" name="first_name" type="text" value="{{ old('first_name', $application->first_name ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="first_name" name="first_name" type="text" autocomplete="section-applicant given-name" value="{{ old('first_name', $application->first_name ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('first_name') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label for="middle_name" class="mb-2 block text-sm font-semibold text-slate-800">Middle name</label>
-                            <input id="middle_name" name="middle_name" type="text" value="{{ old('middle_name', $application->middle_name ?? '') }}" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="middle_name" name="middle_name" type="text" autocomplete="section-applicant additional-name" value="{{ old('middle_name', $application->middle_name ?? '') }}" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('middle_name') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label for="extension_name" class="mb-2 block text-sm font-semibold text-slate-800">Extension</label>
-                            <input id="extension_name" name="extension_name" type="text" value="{{ old('extension_name', $application->extension_name ?? '') }}" placeholder="Jr., Sr." class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="extension_name" name="extension_name" type="text" autocomplete="section-applicant honorific-suffix" value="{{ old('extension_name', $application->extension_name ?? '') }}" placeholder="Jr., Sr." class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('extension_name') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label for="contact_number" class="mb-2 block text-sm font-semibold text-slate-800">Contact number</label>
-                            <input id="contact_number" name="contact_number" type="text" value="{{ old('contact_number', $application->contact_number ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="contact_number" name="contact_number" type="tel" inputmode="tel" autocomplete="section-applicant tel" value="{{ old('contact_number', $application->contact_number ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('contact_number') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label for="nationality" class="mb-2 block text-sm font-semibold text-slate-800">Nationality</label>
-                            <input id="nationality" name="nationality" type="text" value="{{ old('nationality', $application->nationality ?? 'Filipino') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="nationality" name="nationality" type="text" autocomplete="section-applicant country-name" value="{{ old('nationality', $application->nationality ?? 'Filipino') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('nationality') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
@@ -352,33 +352,33 @@
                     <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-6">
                         <div class="md:col-span-2">
                             <label for="street" class="mb-2 block text-sm font-semibold text-slate-800">Number, street</label>
-                            <input id="street" name="street" type="text" maxlength="100" value="{{ old('street', $application->street ?? '') }}" placeholder="e.g. 24 E. Corporal Street, Zone 1" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-base outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="street" name="street" type="text" autocomplete="section-address address-line1" maxlength="100" value="{{ old('street', $application->street ?? '') }}" placeholder="e.g. 24 E. Corporal Street, Zone 1" required data-address-field="street" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-base outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             <p class="mt-2 text-xs leading-5 text-slate-500">Enter only the house/building number, street, and zone. Barangay and city belong in their own fields.</p>
                             @error('street') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label for="barangay" class="mb-2 block text-sm font-semibold text-slate-800">Barangay</label>
-                            <input id="barangay" name="barangay" type="text" value="{{ old('barangay', $application->barangay ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="barangay" name="barangay" type="text" autocomplete="section-address address-level3" value="{{ old('barangay', $application->barangay ?? '') }}" required data-address-field="barangay" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('barangay') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label for="city" class="mb-2 block text-sm font-semibold text-slate-800">City/Municipality</label>
-                            <input id="city" name="city" type="text" value="{{ old('city', $application->city ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="city" name="city" type="text" autocomplete="section-address address-level2" value="{{ old('city', $application->city ?? '') }}" required data-address-field="city" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('city') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label for="province" class="mb-2 block text-sm font-semibold text-slate-800">Province</label>
-                            <input id="province" name="province" type="text" value="{{ old('province', $application->province ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="province" name="province" type="text" autocomplete="section-address address-level1" value="{{ old('province', $application->province ?? '') }}" required data-address-field="province" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('province') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label for="region" class="mb-2 block text-sm font-semibold text-slate-800">Region</label>
-                            <input id="region" name="region" type="text" value="{{ old('region', $application->region ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="region" name="region" type="text" autocomplete="off" value="{{ old('region', $application->region ?? '') }}" required data-address-field="region" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('region') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label for="zip_code" class="mb-2 block text-sm font-semibold text-slate-800">ZIP code</label>
-                            <input id="zip_code" name="zip_code" type="text" value="{{ old('zip_code', $application->zip_code ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="zip_code" name="zip_code" type="text" inputmode="numeric" autocomplete="section-address postal-code" value="{{ old('zip_code', $application->zip_code ?? '') }}" required data-address-field="zip_code" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('zip_code') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
@@ -432,7 +432,7 @@
                         </div>
                         <div>
                             <label for="birth_date" class="mb-2 block text-sm font-semibold text-slate-800">Birthdate</label>
-                            <input id="birth_date" name="birth_date" type="date" value="{{ old('birth_date', optional($application?->birth_date)->format('Y-m-d')) }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="birth_date" name="birth_date" type="date" autocomplete="section-applicant bday" value="{{ old('birth_date', optional($application?->birth_date)->format('Y-m-d')) }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('birth_date') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
@@ -481,12 +481,12 @@
                         </div>
                         <div>
                             <label for="guardian_name" class="mb-2 block text-sm font-semibold text-slate-800">Parent/Guardian name</label>
-                            <input id="guardian_name" name="guardian_name" type="text" value="{{ old('guardian_name', $application->guardian_name ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="guardian_name" name="guardian_name" type="text" autocomplete="section-guardian name" value="{{ old('guardian_name', $application->guardian_name ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('guardian_name') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div class="md:col-span-2">
                             <label for="guardian_address" class="mb-2 block text-sm font-semibold text-slate-800">Parent/Guardian permanent address</label>
-                            <input id="guardian_address" name="guardian_address" type="text" value="{{ old('guardian_address', $application->guardian_address ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="guardian_address" name="guardian_address" type="text" autocomplete="section-guardian street-address" value="{{ old('guardian_address', $application->guardian_address ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('guardian_address') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
@@ -570,6 +570,17 @@
                                 'path' => $application->id_photo_path ?? null,
                             ],
                         ];
+
+                        // Browsers cannot repopulate a file input after the server
+                        // redirects back with validation errors. The controller
+                        // stores valid files in a short-lived, session-bound draft;
+                        // include that draft in the field state so it is not asked
+                        // for again and can be previewed immediately.
+                        foreach ($uploadFields as $field => &$details) {
+                            $details['draft'] = data_get($draftUploads, $field);
+                            $details['has_file'] = filled($details['path']) || filled(data_get($details['draft'], 'path'));
+                        }
+                        unset($details);
                     @endphp
 
                     <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -578,7 +589,7 @@
                                 <label for="{{ $field }}" class="block text-sm font-bold text-slate-900">{{ $details['label'] }}</label>
                                 <p class="mt-1 text-xs leading-5 text-slate-500">{{ $details['description'] }}</p>
                                 <div data-upload-zone class="enrollment-upload-zone relative mt-4 rounded-2xl border-2 border-dashed border-purple-200 bg-white px-5 py-7 text-center transition hover:border-purple-400 hover:bg-purple-50/50">
-                                    <input id="{{ $field }}" name="{{ $field }}" type="file" accept="{{ $details['accept'] }}" @required(! $details['path']) class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0">
+                                    <input id="{{ $field }}" name="{{ $field }}" type="file" accept="{{ $details['accept'] }}" @required(! $details['has_file']) class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0">
                                     <div class="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-purple-50 text-purple-600">
                                         <svg viewBox="0 0 24 24" fill="none" class="h-6 w-6" aria-hidden="true">
                                             <path d="M12 16V4m0 0L8 8m4-4 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -586,7 +597,28 @@
                                         </svg>
                                     </div>
                                     <p class="mt-3 text-sm font-bold text-purple-700">Click to upload or drag and drop</p>
-                                    <p data-upload-name class="mt-1 text-xs font-semibold text-slate-500">{{ $details['path'] ? 'Previously uploaded. Upload a new file to replace it.' : 'No file selected' }}</p>
+                                    <p data-upload-name class="mt-1 text-xs font-semibold text-slate-500">
+                                        @if ($details['draft'])
+                                            Preserved: {{ data_get($details['draft'], 'name', 'uploaded file') }}. Upload a new file to replace it.
+                                        @elseif ($details['path'])
+                                            Previously uploaded. Upload a new file to replace it.
+                                        @else
+                                            No file selected
+                                        @endif
+                                    </p>
+                                    <div data-upload-preview class="mt-4 hidden overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-2 text-left"></div>
+                                    @if ($details['draft'])
+                                        <div data-draft-preview class="mt-4 overflow-hidden rounded-xl border border-emerald-200 bg-emerald-50/40 p-2 text-left">
+                                            <p class="mb-2 text-[11px] font-black uppercase tracking-wide text-emerald-700">Preserved upload preview</p>
+                                            @if (str_starts_with((string) data_get($details['draft'], 'mime'), 'image/'))
+                                                <img src="{{ route('enrollment.drafts.content', ['field' => $field]) }}" alt="{{ $details['label'] }} preview" class="max-h-52 w-full rounded-lg object-contain" loading="lazy">
+                                            @elseif (data_get($details['draft'], 'mime') === 'application/pdf')
+                                                <iframe src="{{ route('enrollment.drafts.content', ['field' => $field]) }}" title="{{ $details['label'] }} preview" class="h-56 w-full rounded-lg bg-white" loading="lazy"></iframe>
+                                            @else
+                                                <a href="{{ route('enrollment.drafts.content', ['field' => $field]) }}" target="_blank" rel="noopener" class="text-sm font-bold text-purple-700 underline">Open preserved file preview</a>
+                                            @endif
+                                        </div>
+                                    @endif
                                 </div>
                                 @error($field) <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                             </div>
@@ -657,7 +689,22 @@
                                     </svg>
                                 </div>
                                 <p class="mt-3 text-sm font-bold text-purple-700">Click to upload signature</p>
-                                <p data-upload-name class="mt-1 text-xs font-semibold text-slate-500">{{ ($application->signature_path ?? null) ? 'Previously uploaded/saved. Upload a new image to replace it.' : 'No file selected' }}</p>
+                                <p data-upload-name class="mt-1 text-xs font-semibold text-slate-500">
+                                    @if (data_get($draftUploads, 'signature_upload'))
+                                        Preserved: {{ data_get($draftUploads, 'signature_upload.name', 'signature image') }}. Upload a new image to replace it.
+                                    @elseif ($application->signature_path ?? null)
+                                        Previously uploaded/saved. Upload a new image to replace it.
+                                    @else
+                                        No file selected
+                                    @endif
+                                </p>
+                                <div data-upload-preview class="mt-4 hidden overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-2 text-left"></div>
+                                @if (data_get($draftUploads, 'signature_upload'))
+                                    <div data-draft-preview class="mt-4 overflow-hidden rounded-xl border border-emerald-200 bg-emerald-50/40 p-2 text-left">
+                                        <p class="mb-2 text-[11px] font-black uppercase tracking-wide text-emerald-700">Preserved signature preview</p>
+                                        <img src="{{ route('enrollment.drafts.content', ['field' => 'signature_upload']) }}" alt="Preserved signature preview" class="max-h-32 w-full rounded-lg object-contain" loading="lazy">
+                                    </div>
+                                @endif
                             </div>
                             @error('signature_upload') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
@@ -683,6 +730,7 @@
         const actionToast = document.getElementById('action-toast');
         const enrollmentJumpDetails = document.getElementById('enrollment-jump-details');
         const existingSignatureSaved = @json((bool) ($application->signature_path ?? false));
+        const serverErrorFields = @json($errors->keys());
         let signatureDrawn = false;
 
         function showActionToast(message) {
@@ -712,17 +760,14 @@
             const password = passwordInput?.value || '';
             const confirmation = passwordConfirmationInput?.value || '';
 
-            setCheckState('pw-length-check', password.length >= 8);
-            setCheckState('pw-letter-number-check', /[A-Za-z]/.test(password) && /\d/.test(password));
-            setCheckState('pw-safe-check', password.length > 0 && !blockedCharacters.test(password));
+            setCheckState('pw-length-check', password.length >= 10);
+            setCheckState('pw-letter-number-check', /\d/.test(password));
+            setCheckState('pw-case-check', /[a-z]/.test(password) && /[A-Z]/.test(password));
             setCheckState('pw-match-check', password.length > 0 && password === confirmation);
 
-            if (passwordInput) {
-                passwordInput.setCustomValidity(blockedCharacters.test(password)
-                    ? 'Password contains a blocked security character.'
-                    : ''
-                );
-            }
+            // Passwords may use punctuation; server-side Password rules handle
+            // strength while the client only mirrors the match indicator.
+            passwordInput?.setCustomValidity('');
 
             if (passwordConfirmationInput) {
                 passwordConfirmationInput.setCustomValidity(
@@ -734,7 +779,7 @@
         }
 
         function attachInputHardening() {
-            document.querySelectorAll('input[type="text"], input[type="password"]').forEach((input) => {
+            document.querySelectorAll('input[type="text"]').forEach((input) => {
                 input.addEventListener('input', () => {
                     input.setCustomValidity(blockedCharacters.test(input.value)
                         ? 'This field contains a blocked security character.'
@@ -757,16 +802,110 @@
             updatePasswordChecks();
         }
 
+        function attachAddressAutofillGuard() {
+            const street = document.getElementById('street');
+            const addressParts = ['barangay', 'city', 'province', 'region', 'zip_code']
+                .map((id) => document.getElementById(id))
+                .filter((field) => field);
+
+            if (!street || !addressParts.length) return;
+
+            const normalize = (value) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+
+            function keepStreetOnly() {
+                const value = street.value.trim();
+                if (!value.includes(',')) return;
+
+                const knownAddressParts = addressParts
+                    .map((field) => normalize(field.value))
+                    .filter((part) => part.length > 1);
+                if (!knownAddressParts.length) return;
+
+                const segments = value.split(/\s*,\s*/).map((segment) => segment.trim()).filter(Boolean);
+                const filtered = segments.filter((segment) => !knownAddressParts.includes(normalize(segment)));
+
+                // Keep a useful value if a browser profile happens to contain
+                // one shared string for every address field.
+                if (filtered.length && filtered.length !== segments.length) {
+                    street.value = filtered.join(', ');
+                }
+            }
+
+            [...addressParts, street].forEach((field) => {
+                ['input', 'change', 'blur'].forEach((eventName) => field.addEventListener(eventName, () => {
+                    // Autofill events are dispatched one field at a time. Run
+                    // again after the profile has populated the remaining
+                    // address fields so Number, street stays self-contained.
+                    keepStreetOnly();
+                    window.setTimeout(keepStreetOnly, 200);
+                    window.setTimeout(keepStreetOnly, 900);
+                }));
+            });
+
+            window.setTimeout(keepStreetOnly, 900);
+        }
+
         function attachUploadFeedback() {
             document.querySelectorAll('[data-upload-zone] input[type="file"]').forEach((input) => {
+                const zone = input.closest('[data-upload-zone]');
+                const preview = zone?.querySelector('[data-upload-preview]');
+                const draftPreview = zone?.querySelector('[data-draft-preview]');
+
+                function clearPreview() {
+                    if (!preview) return;
+                    if (preview.dataset.objectUrl) {
+                        URL.revokeObjectURL(preview.dataset.objectUrl);
+                        delete preview.dataset.objectUrl;
+                    }
+                    preview.replaceChildren();
+                    preview.classList.add('hidden');
+                }
+
+                function showPreview(file) {
+                    if (!preview || !file) return;
+
+                    clearPreview();
+                    const objectUrl = URL.createObjectURL(file);
+                    preview.dataset.objectUrl = objectUrl;
+                    preview.classList.remove('hidden');
+
+                    const heading = document.createElement('p');
+                    heading.className = 'mb-2 text-[11px] font-black uppercase tracking-wide text-purple-700';
+                    heading.textContent = 'Attached document preview';
+                    preview.appendChild(heading);
+
+                    if (file.type === 'application/pdf') {
+                        const frame = document.createElement('iframe');
+                        frame.className = 'h-56 w-full rounded-lg bg-white';
+                        frame.title = `${file.name} preview`;
+                        frame.src = objectUrl;
+                        preview.appendChild(frame);
+                    } else if (file.type.startsWith('image/')) {
+                        const image = document.createElement('img');
+                        image.className = 'max-h-64 w-full rounded-lg object-contain';
+                        image.alt = `${file.name} preview`;
+                        image.src = objectUrl;
+                        preview.appendChild(image);
+                    } else {
+                        const link = document.createElement('a');
+                        link.className = 'text-sm font-bold text-purple-700 underline';
+                        link.href = objectUrl;
+                        link.target = '_blank';
+                        link.rel = 'noopener';
+                        link.textContent = `Open ${file.name} preview`;
+                        preview.appendChild(link);
+                    }
+                }
+
                 input.addEventListener('change', () => {
-                    const zone = input.closest('[data-upload-zone]');
                     const name = zone?.querySelector('[data-upload-name]');
                     const file = input.files?.[0];
 
                     if (!file) {
                         if (name) name.textContent = 'No file selected';
                         zone?.classList.remove('border-emerald-300', 'bg-emerald-50');
+                        clearPreview();
+                        draftPreview?.classList.remove('hidden');
                         return;
                     }
 
@@ -776,12 +915,15 @@
                         input.reportValidity();
                         if (name) name.textContent = 'No file selected';
                         zone?.classList.remove('border-emerald-300', 'bg-emerald-50');
+                        clearPreview();
                         return;
                     }
 
                     input.setCustomValidity('');
                     if (name) name.textContent = `Selected: ${file.name}`;
                     zone?.classList.add('border-emerald-300', 'bg-emerald-50');
+                    draftPreview?.classList.add('hidden');
+                    showPreview(file);
                 });
             });
         }
@@ -794,6 +936,7 @@
             const drawPanel = document.getElementById('draw-signature-panel');
             const uploadPanel = document.getElementById('upload-signature-panel');
             const radios = document.querySelectorAll('input[name="signature_type"]');
+            const restoredSignatureData = signatureData.value;
 
             if (!canvas || !signatureData) return;
 
@@ -860,6 +1003,20 @@
                 uploadPanel?.classList.toggle('hidden', mode !== 'upload');
             }
 
+            function restoreSignature(data) {
+                if (!data || !data.startsWith('data:image/png;base64,')) return;
+
+                const restored = new Image();
+                restored.onload = () => {
+                    const rect = canvas.getBoundingClientRect();
+                    context.drawImage(restored, 0, 0, rect.width, rect.height);
+                    signatureDrawn = true;
+                    signatureData.value = data;
+                    if (status) status.textContent = 'Signature restored. Draw again to replace it.';
+                };
+                restored.src = data;
+            }
+
             canvas.addEventListener('pointerdown', startDrawing);
             canvas.addEventListener('pointermove', draw);
             canvas.addEventListener('pointerup', stopDrawing);
@@ -878,6 +1035,10 @@
             window.addEventListener('resize', resizeCanvas);
 
             resizeCanvas();
+            // A failed validation redirects back to this page. Restore the
+            // serialized canvas from flashed old input so the applicant does
+            // not have to sign a second time.
+            restoreSignature(restoredSignatureData);
             syncSignatureMode();
         }
 
@@ -933,11 +1094,34 @@
             });
         }
 
+        function focusFirstServerError() {
+            if (!serverErrorFields.length) return;
+
+            const aliases = {
+                signature_data: 'signature_canvas',
+            };
+            const firstField = serverErrorFields
+                .map((field) => document.getElementById(aliases[field] || field))
+                .find((field) => field);
+
+            if (!firstField) return;
+
+            firstField.setAttribute('aria-invalid', 'true');
+            window.setTimeout(() => {
+                firstField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (typeof firstField.focus === 'function') {
+                    firstField.focus({ preventScroll: true });
+                }
+            }, 80);
+        }
+
         attachInputHardening();
+        attachAddressAutofillGuard();
         attachUploadFeedback();
         attachSignaturePad();
         attachEnrollmentJumpMenu();
         attachSubmitValidation();
+        focusFirstServerError();
     </script>
 </body>
 </html>

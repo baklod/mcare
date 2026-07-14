@@ -60,26 +60,35 @@
             'Date accomplished' => $application->date_accomplished?->format('M d, Y'),
         ];
 
+        $documentMime = fn (?string $path) => $path && \Illuminate\Support\Facades\Storage::disk('local')->exists($path)
+            ? (\Illuminate\Support\Facades\Storage::disk('local')->mimeType($path) ?: 'application/octet-stream')
+            : null;
+
         $documents = [
             'birth-certificate' => [
                 'label' => 'Birth Certificate',
                 'path' => $application->birth_certificate_path,
+                'mime' => $documentMime($application->birth_certificate_path),
             ],
             'education-document' => [
                 'label' => 'Form 137/138 or Diploma',
                 'path' => $application->education_document_path,
+                'mime' => $documentMime($application->education_document_path),
             ],
             'good-moral-certificate' => [
                 'label' => 'Good Moral Certificate',
                 'path' => $application->good_moral_certificate_path,
+                'mime' => $documentMime($application->good_moral_certificate_path),
             ],
             'id-photo' => [
                 'label' => 'ID Photo',
                 'path' => $application->id_photo_path,
+                'mime' => $documentMime($application->id_photo_path),
             ],
             'signature' => [
                 'label' => 'E-Signature'.($application->signature_type ? ' ('.str($application->signature_type)->headline().')' : ''),
                 'path' => $application->signature_path,
+                'mime' => $documentMime($application->signature_path),
             ],
         ];
     @endphp
@@ -166,41 +175,69 @@
                 </section>
             @endforeach
 
-            <section class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm sm:p-7">
-                <h2 class="text-xl font-bold text-slate-900">Uploaded documents</h2>
-                <p class="mt-2 text-sm leading-6 text-slate-500">Open each file in the private viewer, then record whether it is accepted, missing, or needs replacement.</p>
-                <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-                    @foreach ($documents as $key => $document)
-                        <div class="rounded-2xl bg-slate-50 p-4">
-                            <p class="text-xs font-bold uppercase text-slate-500">{{ $document['label'] }}</p>
-                            @if ($document['path'])
-                                <a href="{{ route('admin.enrollments.documents.show', [$application, $key]) }}" class="mt-3 inline-flex items-center justify-center rounded-full border border-purple-200 bg-white px-4 py-2 text-sm font-bold text-purple-700 hover:bg-purple-50">
-                                    Preview document
-                                </a>
-                            @else
-                                <p class="mt-2 text-sm font-semibold text-red-600">Missing</p>
-                            @endif
-                        </div>
-                    @endforeach
+            <section id="document-review" class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm sm:p-7">
+                <div>
+                    <p class="text-sm font-bold uppercase text-purple-600">Applicant documents</p>
+                    <h2 class="mt-1 text-xl font-bold text-slate-900">Uploaded files and feedback</h2>
+                    <p class="mt-2 text-sm leading-6 text-slate-500">Preview files without leaving this review. Record an outcome and any problem for each document.</p>
                 </div>
 
-                <form id="document-review" method="POST" action="{{ route('admin.enrollments.documents.review', $application) }}" class="mt-7 space-y-4 border-t border-slate-100 pt-6">
-                    @csrf
-                    @method('PATCH')
-                    <div><p class="text-sm font-bold uppercase text-purple-600">Document feedback</p><h3 class="mt-1 text-lg font-bold text-slate-950">Tell the applicant what is accepted or lacking</h3></div>
-                    @foreach($documents as $key => $document)
-                        @php
-                            $storedReview = data_get($application->document_review, $key, []);
-                            $defaultDocumentStatus = $document['path'] ? 'unreviewed' : 'missing';
-                        @endphp
-                        <div class="grid gap-3 rounded-2xl bg-slate-50 p-4 lg:grid-cols-[220px_1fr]">
-                            <div><label for="review-{{ $key }}" class="text-sm font-bold text-slate-900">{{ $document['label'] }}</label><select id="review-{{ $key }}" name="documents[{{ $key }}][status]" class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"><option value="unreviewed" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'unreviewed')>Not reviewed</option><option value="accepted" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'accepted')>Accepted</option><option value="replace" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'replace')>Needs replacement</option><option value="missing" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'missing')>Missing</option></select></div>
-                            <div><label for="note-{{ $key }}" class="text-sm font-semibold text-slate-700">Feedback or problem found</label><textarea id="note-{{ $key }}" name="documents[{{ $key }}][note]" rows="2" maxlength="500" class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" placeholder="Example: Image is blurry; upload a clear copy showing all corners.">{{ old("documents.$key.note", $storedReview['note'] ?? '') }}</textarea></div>
+                <div class="mt-6 grid items-start gap-7 lg:grid-cols-2 lg:gap-8">
+                    <div aria-label="Uploaded documents" class="space-y-3">
+                        <h3 class="text-sm font-bold uppercase tracking-wide text-slate-500">Uploaded documents</h3>
+                        @foreach ($documents as $key => $document)
+                            <article id="document-card-{{ $key }}" class="rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-shadow hover:shadow-sm">
+                                <div class="flex flex-wrap items-center justify-between gap-3">
+                                    <p class="text-sm font-bold text-slate-900">{{ $document['label'] }}</p>
+                                    @if ($document['path'])
+                                        <button type="button"
+                                            class="document-preview-trigger inline-flex items-center justify-center rounded-full border border-purple-200 bg-white px-4 py-2 text-sm font-bold text-purple-700 transition hover:border-purple-300 hover:bg-purple-50 focus:outline-none focus:ring-4 focus:ring-purple-100"
+                                            data-document-key="{{ $key }}"
+                                            data-document-label="{{ $document['label'] }}"
+                                            data-document-mime="{{ $document['mime'] ?? '' }}"
+                                            data-document-url="{{ route('admin.enrollments.documents.content', [$application, $key]) }}"
+                                            aria-haspopup="dialog">
+                                            Preview document
+                                        </button>
+                                    @else
+                                        <span class="text-sm font-semibold text-red-600">Missing</span>
+                                    @endif
+                                </div>
+                                @if ($document['path'])
+                                    <p class="mt-2 text-xs text-slate-500">Private preview · access is logged</p>
+                                @endif
+                            </article>
+                        @endforeach
+                    </div>
+
+                    <form method="POST" action="{{ route('admin.enrollments.documents.review', $application) }}" class="space-y-4 lg:border-l lg:border-slate-100 lg:pl-7">
+                        @csrf
+                        @method('PATCH')
+                        <div>
+                            <p class="text-sm font-bold uppercase tracking-wide text-purple-600">Document feedback</p>
+                            <h3 class="mt-1 text-lg font-bold text-slate-950">Tell the applicant what is accepted or lacking</h3>
                         </div>
-                    @endforeach
-                    <button type="submit" class="inline-flex items-center justify-center rounded-full bg-purple-600 px-6 py-3 text-sm font-bold text-white hover:bg-purple-700">Save document feedback</button>
-                    @if($application->documents_reviewed_at)<p class="text-xs text-slate-500">Last reviewed {{ $application->documents_reviewed_at->format('M d, Y g:i A') }} by {{ $application->documentReviewer?->name ?? 'Admin' }}</p>@endif
-                </form>
+                        @foreach($documents as $key => $document)
+                            @php
+                                $storedReview = data_get($application->document_review, $key, []);
+                                $defaultDocumentStatus = $document['path'] ? 'unreviewed' : 'missing';
+                            @endphp
+                            <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                                <label for="review-{{ $key }}" class="text-sm font-bold text-slate-900">{{ $document['label'] }}</label>
+                                <select id="review-{{ $key }}" name="documents[{{ $key }}][status]" class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-purple-300 focus:ring-4 focus:ring-purple-100">
+                                    <option value="unreviewed" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'unreviewed')>Not reviewed</option>
+                                    <option value="accepted" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'accepted')>Accepted</option>
+                                    <option value="replace" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'replace')>Needs replacement</option>
+                                    <option value="missing" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'missing')>Missing</option>
+                                </select>
+                                <label for="note-{{ $key }}" class="mt-3 block text-sm font-semibold text-slate-700">Feedback or problem found</label>
+                                <textarea id="note-{{ $key }}" name="documents[{{ $key }}][note]" rows="2" maxlength="500" class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-purple-300 focus:ring-4 focus:ring-purple-100" placeholder="Example: Image is blurry; upload a clear copy showing all corners.">{{ old("documents.$key.note", $storedReview['note'] ?? '') }}</textarea>
+                            </div>
+                        @endforeach
+                        <button type="submit" class="inline-flex items-center justify-center rounded-full bg-purple-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-purple-700 focus:outline-none focus:ring-4 focus:ring-purple-200">Save document feedback</button>
+                        @if($application->documents_reviewed_at)<p class="text-xs text-slate-500">Last reviewed {{ $application->documents_reviewed_at->format('M d, Y g:i A') }} by {{ $application->documentReviewer?->name ?? 'Admin' }}</p>@endif
+                    </form>
+                </div>
             </section>
         </div>
 
@@ -275,4 +312,111 @@
             </section>
         </aside>
     </section>
+
+    <div id="document-preview-modal"
+        class="fixed inset-0 z-[100] hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="document-preview-title"
+        aria-hidden="true">
+        <div class="absolute inset-0 bg-slate-950/75 backdrop-blur-sm" data-document-modal-close></div>
+        <div class="relative mx-auto flex h-full w-full max-w-6xl flex-col p-3 sm:p-6">
+            <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/15 bg-slate-950 shadow-2xl">
+                <header class="flex shrink-0 items-center justify-between gap-4 border-b border-white/10 px-4 py-3 text-white sm:px-6">
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-purple-300">Private document preview</p>
+                        <h2 id="document-preview-title" class="truncate text-base font-bold sm:text-lg">Document</h2>
+                    </div>
+                    <button type="button" data-document-modal-close class="inline-flex shrink-0 items-center justify-center rounded-full border border-white/20 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/10 focus:outline-none focus:ring-4 focus:ring-purple-300/40">
+                        Close
+                    </button>
+                </header>
+                <div class="relative min-h-0 flex-1 overflow-hidden bg-slate-900">
+                    <div class="pointer-events-none absolute inset-0 z-20 grid grid-cols-2 grid-rows-4 overflow-hidden opacity-[0.12]" aria-hidden="true">
+                        @for($i = 0; $i < 8; $i++)
+                            <span class="grid -rotate-12 place-items-center whitespace-nowrap text-xs font-black uppercase tracking-widest text-white sm:text-sm">ADMIN REVIEW · {{ $application->email }} · {{ now()->format('Y-m-d H:i') }}</span>
+                        @endfor
+                    </div>
+                    <iframe id="document-preview-frame" class="relative z-10 hidden h-full min-h-[70vh] w-full bg-white" title="Document preview"></iframe>
+                    <div id="document-preview-image-wrap" class="relative z-10 hidden h-full overflow-auto bg-slate-100 p-4 sm:p-8">
+                        <img id="document-preview-image" src="" alt="" class="mx-auto h-auto max-w-full select-none object-contain" draggable="false">
+                    </div>
+                    <div id="document-preview-unavailable" class="relative z-10 hidden h-full min-h-[70vh] place-items-center bg-white p-8 text-center">
+                        <p class="max-w-md font-semibold leading-6 text-slate-700">This file type cannot be previewed in the browser. Ask the applicant to upload a PDF, JPG, or PNG.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (() => {
+            const modal = document.getElementById('document-preview-modal');
+            if (!modal) return;
+
+            const frame = document.getElementById('document-preview-frame');
+            const imageWrap = document.getElementById('document-preview-image-wrap');
+            const image = document.getElementById('document-preview-image');
+            const unavailable = document.getElementById('document-preview-unavailable');
+            const title = document.getElementById('document-preview-title');
+            let activeTrigger = null;
+            let previousScrollY = 0;
+
+            const resetViewer = () => {
+                frame.classList.add('hidden');
+                imageWrap.classList.add('hidden');
+                unavailable.classList.add('hidden');
+                frame.removeAttribute('src');
+                image.removeAttribute('src');
+                image.removeAttribute('alt');
+            };
+
+            const closeModal = () => {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('overflow-hidden');
+                resetViewer();
+                window.scrollTo({ top: previousScrollY, behavior: 'auto' });
+                activeTrigger?.focus({ preventScroll: true });
+            };
+
+            const openModal = (trigger) => {
+                activeTrigger = trigger;
+                previousScrollY = window.scrollY;
+                const label = trigger.dataset.documentLabel || 'Document';
+                const url = trigger.dataset.documentUrl;
+                const mime = trigger.dataset.documentMime || '';
+                title.textContent = label;
+                resetViewer();
+
+                if (mime === 'application/pdf' || url.toLowerCase().endsWith('.pdf')) {
+                    frame.src = `${url}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`;
+                    frame.title = `${label} preview`;
+                    frame.classList.remove('hidden');
+                } else if (mime.startsWith('image/')) {
+                    image.src = url;
+                    image.alt = `${label} preview`;
+                    imageWrap.classList.remove('hidden');
+                } else {
+                    unavailable.classList.remove('hidden');
+                    unavailable.classList.add('grid');
+                }
+
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('overflow-hidden');
+                modal.querySelector('[data-document-modal-close]')?.focus();
+            };
+
+            document.querySelectorAll('.document-preview-trigger').forEach((trigger) => {
+                trigger.addEventListener('click', () => openModal(trigger));
+            });
+            modal.querySelectorAll('[data-document-modal-close]').forEach((button) => {
+                button.addEventListener('click', closeModal);
+            });
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+            });
+        })();
+    </script>
 @endsection

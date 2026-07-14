@@ -7,12 +7,14 @@ use App\Models\TrainingBatch;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class EnrollmentController extends Controller
 {
@@ -41,7 +43,28 @@ class EnrollmentController extends Controller
             'user' => $request->user(),
             'documentLabels' => $documentLabels,
             'documentFeedback' => $documentFeedback,
+            'draftUploads' => $request->session()->get('enrollment.draft_uploads', []),
         ]);
+    }
+
+    public function draftContent(Request $request, string $field): BinaryFileResponse
+    {
+        abort_unless(in_array($field, $this->uploadFields(), true), 404);
+
+        $draft = data_get($request->session()->get('enrollment.draft_uploads', []), $field);
+        $path = data_get($draft, 'path');
+
+        abort_unless(is_string($path) && Storage::disk('local')->exists($path), 404);
+
+        $name = basename((string) data_get($draft, 'name', $field));
+        $mime = (string) data_get($draft, 'mime', 'application/octet-stream');
+
+        return response()
+            ->file(Storage::disk('local')->path($path), [
+                'Content-Type' => $mime,
+                'Content-Disposition' => 'inline; filename="'.$name.'"',
+                'X-Content-Type-Options' => 'nosniff',
+            ]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -68,8 +91,11 @@ class EnrollmentController extends Controller
         $safeText = ["not_regex:/[<>\"'`;{}|\\\\]/u"];
         $safeOptionalText = ['nullable', 'string', 'max:120', "not_regex:/[<>\"'`;{}|\\\\]/u"];
         $documentRules = ['file', 'mimes:pdf,jpg,jpeg,png', 'extensions:pdf,jpg,jpeg,png', 'max:5120'];
+        $draftUploads = $request->session()->get('enrollment.draft_uploads', []);
+        $hasDocument = fn (string $field, ?string $existingPath): bool => filled($existingPath)
+            || filled(data_get($draftUploads, "{$field}.path"));
 
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'email' => [
                 'required',
                 'email:rfc,dns',
@@ -110,13 +136,13 @@ class EnrollmentController extends Controller
             'scholarship_type' => ['nullable', 'string', 'max:120', ...$safeText],
             'privacy_consent' => ['accepted'],
             'signature_name' => ['required', 'string', 'max:180', ...$safeText],
-            'birth_certificate' => [$currentApplication?->birth_certificate_path ? 'nullable' : 'required', ...$documentRules],
-            'education_document' => [$currentApplication?->education_document_path ? 'nullable' : 'required', ...$documentRules],
-            'good_moral_certificate' => [$currentApplication?->good_moral_certificate_path ? 'nullable' : 'required', ...$documentRules],
-            'id_photo' => [$currentApplication?->id_photo_path ? 'nullable' : 'required', 'file', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:5120'],
+            'birth_certificate' => [$hasDocument('birth_certificate', $currentApplication?->birth_certificate_path) ? 'nullable' : 'required', ...$documentRules],
+            'education_document' => [$hasDocument('education_document', $currentApplication?->education_document_path) ? 'nullable' : 'required', ...$documentRules],
+            'good_moral_certificate' => [$hasDocument('good_moral_certificate', $currentApplication?->good_moral_certificate_path) ? 'nullable' : 'required', ...$documentRules],
+            'id_photo' => [$hasDocument('id_photo', $currentApplication?->id_photo_path) ? 'nullable' : 'required', 'file', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:5120'],
             'signature_type' => ['required', 'in:draw,upload'],
             'signature_data' => ['exclude_unless:signature_type,draw', $currentApplication?->signature_path ? 'nullable' : 'required', 'string'],
-            'signature_upload' => ['exclude_unless:signature_type,upload', $currentApplication?->signature_path ? 'nullable' : 'required', 'file', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:5120'],
+            'signature_upload' => ['exclude_unless:signature_type,upload', $hasDocument('signature_upload', $currentApplication?->signature_path) ? 'nullable' : 'required', 'file', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:5120'],
         ], [
             'email.ends_with' => 'Please use a Gmail address ending in @gmail.com.',
             'email.unique' => 'This Gmail account already has an applicant account. Please sign in or use a different Gmail address.',
@@ -131,6 +157,15 @@ class EnrollmentController extends Controller
             '*.mimes' => 'Accepted formats are PDF, JPG, JPEG, and PNG. ID photo and signature image must be JPG or PNG.',
             '*.max' => 'Each uploaded file must not exceed 5MB.',
         ]);
+
+        if ($validator->fails()) {
+            // Keep only files that passed their own validation in a private session draft.
+            $this->preserveValidUploads($request, $validator->errors()->keys());
+
+            throw new ValidationException($validator);
+        }
+
+        $validated = $validator->validated();
 
         $user = $currentUser ?? new User;
         $user->forceFill(
@@ -179,6 +214,8 @@ class EnrollmentController extends Controller
             $applicationData,
         );
 
+        $this->clearDraftUploads($request);
+
         if ($currentApplication) {
             $review = $application->document_review ?? [];
             $replacements = [
@@ -202,7 +239,12 @@ class EnrollmentController extends Controller
             $application->forceFill(['document_review' => $review])->save();
         }
 
-        Auth::login($user);
+        // Keep payment continuation private to this browser session. Creating
+        // an applicant record must not silently sign the person into the
+        // public account bar; explicit login remains the account boundary.
+        if (! $currentUser) {
+            $request->session()->put('enrollment.payment_application_id', $application->id);
+        }
 
         return redirect()
             ->route('payment.show')
@@ -211,11 +253,13 @@ class EnrollmentController extends Controller
 
     private function storeUploadedDocument(Request $request, string $field, User $user, ?string $existingPath): ?string
     {
-        if (! $request->hasFile($field)) {
-            return $existingPath;
+        if ($request->hasFile($field)) {
+            $this->forgetDraftUpload($request, $field);
+
+            return $request->file($field)->store("enrollment-documents/{$user->id}", 'local');
         }
 
-        return $request->file($field)->store("enrollment-documents/{$user->id}", 'local');
+        return $this->moveDraftUpload($request, $field, $user) ?: $existingPath;
     }
 
     private function storeSignature(Request $request, User $user, ?string $existingPath): ?string
@@ -248,5 +292,87 @@ class EnrollmentController extends Controller
         Storage::disk('local')->put($path, $decodedSignature);
 
         return $path;
+    }
+
+    /** @return array<int, string> */
+    private function uploadFields(): array
+    {
+        return [
+            'birth_certificate',
+            'education_document',
+            'good_moral_certificate',
+            'id_photo',
+            'signature_upload',
+        ];
+    }
+
+    /** @param array<int, string> $invalidFields */
+    private function preserveValidUploads(Request $request, array $invalidFields): void
+    {
+        $drafts = $request->session()->get('enrollment.draft_uploads', []);
+        $directory = 'enrollment-drafts/'.hash('sha256', $request->session()->getId());
+
+        foreach ($this->uploadFields() as $field) {
+            if (! $request->hasFile($field) || in_array($field, $invalidFields, true)) {
+                continue;
+            }
+
+            if ($oldPath = data_get($drafts, "{$field}.path")) {
+                Storage::disk('local')->delete($oldPath);
+            }
+
+            $file = $request->file($field);
+            $path = $file->storeAs($directory, Str::random(40).'.'.$file->extension(), 'local');
+            $drafts[$field] = [
+                'path' => $path,
+                'name' => basename($file->getClientOriginalName()),
+                'mime' => $file->getMimeType() ?: 'application/octet-stream',
+                'size' => $file->getSize(),
+            ];
+        }
+
+        $request->session()->put('enrollment.draft_uploads', $drafts);
+    }
+
+    private function moveDraftUpload(Request $request, string $field, User $user): ?string
+    {
+        $drafts = $request->session()->get('enrollment.draft_uploads', []);
+        $source = data_get($drafts, "{$field}.path");
+
+        if (! is_string($source) || ! Storage::disk('local')->exists($source)) {
+            return null;
+        }
+
+        $extension = pathinfo($source, PATHINFO_EXTENSION);
+        $destination = "enrollment-documents/{$user->id}/".Str::random(40).($extension ? '.'.$extension : '');
+        Storage::disk('local')->move($source, $destination);
+        unset($drafts[$field]);
+        $request->session()->put('enrollment.draft_uploads', $drafts);
+
+        return $destination;
+    }
+
+    private function forgetDraftUpload(Request $request, string $field): void
+    {
+        $drafts = $request->session()->get('enrollment.draft_uploads', []);
+        $path = data_get($drafts, "{$field}.path");
+
+        if (is_string($path)) {
+            Storage::disk('local')->delete($path);
+        }
+
+        unset($drafts[$field]);
+        $request->session()->put('enrollment.draft_uploads', $drafts);
+    }
+
+    private function clearDraftUploads(Request $request): void
+    {
+        foreach ($request->session()->get('enrollment.draft_uploads', []) as $draft) {
+            if ($path = data_get($draft, 'path')) {
+                Storage::disk('local')->delete($path);
+            }
+        }
+
+        $request->session()->forget('enrollment.draft_uploads');
     }
 }

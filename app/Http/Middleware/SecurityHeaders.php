@@ -68,7 +68,7 @@ class SecurityHeaders
             $response->headers->set(
                 'Content-Security-Policy',
                 "default-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors {$frameAncestors}; "
-                ."frame-src 'self'; img-src 'self' data: https:; "
+                ."frame-src 'self' blob:; img-src 'self' data: blob: https:; "
                 ."font-src 'self' data: https://fonts.gstatic.com; "
                 ."style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                 ."script-src 'self' 'unsafe-inline'; connect-src 'self' https:; upgrade-insecure-requests"

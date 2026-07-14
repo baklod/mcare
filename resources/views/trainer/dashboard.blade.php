@@ -6,10 +6,6 @@
     @php
         $trainerDisplayName = trim(auth()->user()?->name ?? 'Trainer');
         $followUpCount = $learnerFollowUps->where('needs_action', true)->count();
-        $moduleStatusClasses = [
-            'Published' => 'bg-emerald-50 text-emerald-800 ring-emerald-200',
-            'Draft' => 'bg-stone-100 text-stone-700 ring-stone-200',
-        ];
     @endphp
 
     <div class="mx-auto max-w-7xl space-y-8">
@@ -73,8 +69,8 @@
                                         <p class="text-xs font-bold uppercase tracking-[0.14em] text-stone-500">Session room</p>
                                         <p class="mt-2 font-semibold text-stone-950">{{ $item['room'] }}</p>
                                         <p class="mt-1 text-sm text-stone-600">Keep the learner checklist open while you deliver.</p>
-                                        <a href="#modules" class="mt-3 inline-flex min-h-10 items-center justify-center bg-violet-700 px-4 text-sm font-bold text-white transition hover:bg-violet-800">
-                                            Open session
+                                        <a href="{{ route('trainer.sessions') }}" class="mt-3 inline-flex min-h-10 items-center justify-center bg-violet-700 px-4 text-sm font-bold text-white transition hover:bg-violet-800">
+                                            Open sessions
                                         </a>
                                     </div>
                                 </div>
@@ -138,81 +134,48 @@
                         <p class="mt-1 text-sm leading-6 text-stone-600">As learner activity is recorded, any next steps will appear here.</p>
                     </div>
                 @endif
+
+                <div class="border-t border-stone-200 p-5" aria-labelledby="system-notifications-title">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-[0.14em] text-violet-700">From admin</p>
+                            <h2 id="system-notifications-title" class="mt-1 text-lg font-bold text-stone-950">System notifications</h2>
+                        </div>
+                        <x-dashboard-icon name="bell" class="mt-1 text-violet-700" />
+                    </div>
+
+                    @if ($systemNotifications->isNotEmpty())
+                        <ul class="mt-4 space-y-3">
+                            @foreach ($systemNotifications as $notification)
+                                <li class="border-l-2 border-violet-300 pl-3">
+                                    <p class="text-sm font-semibold leading-5 text-stone-900">{{ $notification['title'] }}</p>
+                                    <p class="mt-1 text-xs text-stone-500">{{ $notification['actor'] }} · {{ $notification['occurred_at'] }}</p>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p class="mt-4 text-sm leading-6 text-stone-600">No new schedule, enrollment, or module notices.</p>
+                    @endif
+                </div>
             </aside>
         </section>
 
-        <section id="modules" class="border border-stone-200 bg-white">
-            <div class="flex flex-col gap-4 border-b border-stone-200 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-6">
+        <section id="modules" class="border border-stone-200 bg-white p-5 sm:p-6" aria-labelledby="delivery-snapshot-title">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <p class="text-sm font-semibold uppercase tracking-[0.16em] text-violet-700">Training delivery</p>
-                    <h2 class="mt-2 text-xl font-bold text-stone-950">Module checklist</h2>
-                    <p class="mt-1 text-sm text-stone-600">Track the modules you are responsible for today.</p>
+                    <p class="text-sm font-semibold uppercase tracking-[0.16em] text-violet-700">Learning delivery</p>
+                    <h2 id="delivery-snapshot-title" class="mt-2 text-xl font-bold text-stone-950">Delivery snapshot</h2>
+                    <p class="mt-1 text-sm text-stone-600">Keep this page focused on today. Manage files and audiences from Resources.</p>
                 </div>
-                <a id="resources" href="#teaching-timeline" class="inline-flex min-h-10 items-center gap-2 self-start text-sm font-bold text-violet-800 hover:text-violet-950 sm:self-auto">
-                    <x-dashboard-icon name="arrow-up" /> Back to timeline
-                </a>
+                <div class="flex flex-wrap gap-2">
+                    <a href="{{ route('trainer.resources') }}" class="inline-flex min-h-10 items-center justify-center bg-violet-700 px-4 text-sm font-bold text-white hover:bg-violet-800">Manage resources</a>
+                    <a href="{{ route('trainer.trainees') }}" class="inline-flex min-h-10 items-center justify-center border border-stone-300 px-4 text-sm font-bold text-stone-800 hover:border-violet-400 hover:text-violet-800">View trainees</a>
+                </div>
             </div>
-
-            <details class="border-b border-stone-200 bg-stone-50 p-5 sm:p-6">
-                <summary class="flex cursor-pointer list-none items-center justify-between gap-4 font-bold text-stone-950">
-                    <span class="inline-flex items-center gap-2">
-                        <x-dashboard-icon name="cloud-arrow-up" class="text-violet-700" />
-                        Publish a training module
-                    </span>
-                    <x-dashboard-icon name="chevron-down" class="text-xs text-stone-500" />
-                </summary>
-
-                <form method="POST" action="{{ route('trainer.modules.store') }}" enctype="multipart/form-data" class="mt-5 grid gap-4 lg:grid-cols-2">
-                    @csrf
-                    <div>
-                        <label for="module-title" class="mb-2 block text-sm font-semibold text-stone-800">Module title</label>
-                        <input id="module-title" name="title" value="{{ old('title') }}" required maxlength="160" class="w-full border border-stone-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500" placeholder="Example: Infection Control">
-                    </div>
-                    <div>
-                        <label for="module-file" class="mb-2 block text-sm font-semibold text-stone-800">Training file</label>
-                        <input id="module-file" name="module_file" type="file" required accept=".pdf,.jpg,.jpeg,.png,.webp,.mp4,.webm" class="w-full border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 file:mr-3 file:border-0 file:bg-violet-50 file:px-3 file:py-1.5 file:font-semibold file:text-violet-800">
-                    </div>
-                    <div class="lg:col-span-2">
-                        <label for="module-description" class="mb-2 block text-sm font-semibold text-stone-800">Description</label>
-                        <textarea id="module-description" name="description" required maxlength="1200" rows="3" class="w-full border border-stone-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500" placeholder="What should learners understand after this module?">{{ old('description') }}</textarea>
-                    </div>
-                    <div class="lg:col-span-2">
-                        <button type="submit" class="inline-flex min-h-11 items-center justify-center bg-violet-700 px-5 text-sm font-bold text-white hover:bg-violet-800">Publish module</button>
-                    </div>
-                </form>
-            </details>
-
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-[44rem] text-left text-sm">
-                    <thead class="border-b border-stone-200 bg-stone-50 text-xs font-bold uppercase tracking-[0.12em] text-stone-500">
-                        <tr>
-                            <th scope="col" class="px-5 py-4 sm:px-6">Module</th>
-                            <th scope="col" class="px-5 py-4">Training</th>
-                            <th scope="col" class="px-5 py-4">File</th>
-                            <th scope="col" class="px-5 py-4">Published</th>
-                            <th scope="col" class="px-5 py-4 sm:px-6">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-stone-200">
-                        @forelse ($modules as $module)
-                            <tr class="text-stone-700">
-                                <td class="px-5 py-4 font-bold text-stone-950 sm:px-6">{{ $module['title'] }}</td>
-                                <td class="px-5 py-4">{{ $module['training'] }}</td>
-                                <td class="px-5 py-4">
-                                    <a href="{{ route('trainer.modules.show', $module['id']) }}" class="font-semibold text-violet-800 hover:text-violet-950">Preview {{ $module['file'] }}</a>
-                                </td>
-                                <td class="px-5 py-4">{{ $module['published_at'] }}</td>
-                                <td class="px-5 py-4 sm:px-6">
-                                    <span class="inline-flex px-2.5 py-1 text-xs font-bold ring-1 ring-inset {{ $moduleStatusClasses[$module['status']] ?? 'bg-stone-100 text-stone-700 ring-stone-200' }}">{{ $module['status'] }}</span>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="5" class="px-5 py-10 text-center text-stone-600 sm:px-6">No modules published yet. Use the form above to add the first private training file.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+            <div class="mt-5 grid gap-3 sm:grid-cols-3">
+                <div class="border border-stone-200 bg-stone-50 p-4"><p class="text-xs font-bold uppercase tracking-wide text-stone-500">Published modules</p><p class="mt-2 text-2xl font-bold text-stone-950">{{ $moduleCount }}</p></div>
+                <div class="border border-stone-200 bg-stone-50 p-4"><p class="text-xs font-bold uppercase tracking-wide text-stone-500">Assigned learners</p><p class="mt-2 text-2xl font-bold text-stone-950">{{ $stats['total_trainees'] ?? 0 }}</p></div>
+                <div class="border border-stone-200 bg-stone-50 p-4"><p class="text-xs font-bold uppercase tracking-wide text-stone-500">Sessions today</p><p class="mt-2 text-2xl font-bold text-stone-950">{{ $stats['sessions_today'] ?? 0 }}</p></div>
             </div>
         </section>
     </div>

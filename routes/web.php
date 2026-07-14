@@ -63,6 +63,9 @@ Route::middleware('throttle:global-web')->group(function () {
             Route::patch('/password', [AccountSettingsController::class, 'updatePassword'])
                 ->middleware('throttle:sensitive-mutation')
                 ->name('password.update');
+            Route::post('/security-event', [AccountSettingsController::class, 'securityEvent'])
+                ->middleware('throttle:sensitive-mutation')
+                ->name('security-event');
         });
 
     /*
@@ -77,21 +80,24 @@ Route::middleware('throttle:global-web')->group(function () {
             ->middleware('throttle:3,1')
             ->name('enrollment.store');
 
-        Route::middleware(['auth'])->group(function () {
+        Route::get('/enrollment/drafts/{field}/content', [EnrollmentController::class, 'draftContent'])
+            ->middleware('throttle:document-downloads')
+            ->name('enrollment.drafts.content');
+
+        Route::middleware(['enrollment.payment.access'])->group(function () {
             Route::get('/payment', [EnrollmentPaymentController::class, 'show'])
-                ->middleware('permission:payments.view')
                 ->name('payment.show');
 
             Route::post('/payment', [EnrollmentPaymentController::class, 'select'])
-                ->middleware(['permission:payments.view', 'throttle:6,1'])
+                ->middleware(['throttle:6,1'])
                 ->name('payment.select');
 
             Route::get('/payment/receipt', [EnrollmentPaymentController::class, 'receipt'])
-                ->middleware(['permission:payments.view', 'throttle:20,1'])
+                ->middleware(['throttle:20,1'])
                 ->name('payment.receipt');
 
             Route::get('/payment/receipt/download', [EnrollmentPaymentController::class, 'downloadReceipt'])
-                ->middleware(['permission:payments.view', 'throttle:document-downloads'])
+                ->middleware(['throttle:document-downloads'])
                 ->name('payment.receipt.download');
         });
     });

@@ -27,7 +27,7 @@ class EnrollmentSubmissionTest extends TestCase
 
         $signature = 'data:image/png;base64,'.base64_encode('fake-signature-bytes');
 
-        $this->post(route('enrollment.store'), [
+        $response = $this->post(route('enrollment.store'), [
             'email' => 'applicant@gmail.com',
             'password' => 'Password123',
             'password_confirmation' => 'Password123',
@@ -69,7 +69,13 @@ class EnrollmentSubmissionTest extends TestCase
             'education_document' => UploadedFile::fake()->create('diploma.pdf', 100, 'application/pdf'),
             'good_moral_certificate' => UploadedFile::fake()->create('good-moral.pdf', 100, 'application/pdf'),
             'id_photo' => UploadedFile::fake()->create('id-photo.jpg', 100, 'image/jpeg'),
-        ])->assertRedirect(route('payment.show'));
+        ]);
+
+        $response->assertRedirect(route('payment.show'));
+        // Completing the public enrollment handoff must not silently create an
+        // authenticated account session; payment continuation is session-bound.
+        $this->assertGuest();
+        $this->get(route('payment.show'))->assertOk();
 
         $this->assertDatabaseHas('enrollment_applications', [
             'email' => 'applicant@gmail.com',

@@ -6,6 +6,7 @@ use App\Models\AdminActivityLog;
 use App\Support\AccountPortal;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 
@@ -58,6 +59,26 @@ class AccountSettingsController extends Controller
         ]);
 
         return back()->with('saved', 'Your password has been changed successfully.');
+    }
+
+    /**
+     * Record a small allow-listed set of client-visible abuse signals.
+     *
+     * This is telemetry, not proof that a user acted maliciously: a modified
+     * browser can omit it, so server-side authorization and rate limits remain
+     * the real controls.
+     */
+    public function securityEvent(Request $request): Response
+    {
+        $validated = $request->validate([
+            'event' => ['required', 'in:navigation_spam,rapid_action'],
+        ]);
+
+        AdminActivityLog::record($request->user(), 'account.security.client-event', $request->user(), [
+            'event' => $validated['event'],
+        ]);
+
+        return response()->noContent();
     }
 
     private function accountContext(Request $request): array

@@ -105,9 +105,17 @@ class EnrollmentPaymentController extends Controller
 
     private function applicationFor(Request $request): ?EnrollmentApplication
     {
-        return EnrollmentApplication::where('user_id', $request->user()->id)
-            ->latest()
-            ->first();
+        if ($request->user()) {
+            return EnrollmentApplication::where('user_id', $request->user()->id)
+                ->latest()
+                ->first();
+        }
+
+        $applicationId = $request->session()->get('enrollment.payment_application_id');
+
+        return is_numeric($applicationId)
+            ? EnrollmentApplication::query()->whereKey((int) $applicationId)->first()
+            : null;
     }
 
     private function prepareOnsitePayment(EnrollmentApplication $application): void

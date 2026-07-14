@@ -339,12 +339,7 @@
         <section class="relative overflow-hidden bg-white/45 backdrop-blur-[1px]">
             <div class="mx-auto grid max-w-7xl grid-cols-1 items-center gap-8 px-4 py-8 sm:gap-10 sm:px-6 sm:py-20 lg:grid-cols-2 lg:gap-16 lg:px-8 lg:py-28">
                 <div class="phone-hero-copy sm:text-left">
-                    <div class="inline-flex items-center gap-2 rounded-full bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 ring-1 ring-purple-100 sm:px-4 sm:py-2 sm:text-sm">
-                        <span class="h-2 w-2 rounded-full bg-purple-500"></span>
-                        Direct NC II applicant registration
-                    </div>
-
-                    <h1 class="mt-5 max-w-3xl text-[2rem] font-bold leading-[2.3rem] text-slate-900 sm:mt-7 sm:text-6xl sm:leading-none">
+                    <h1 class="mt-0 max-w-3xl text-[2rem] font-bold leading-[2.3rem] text-slate-900 sm:text-6xl sm:leading-none">
                         Build a caregiving career with a training center you can trust.
                     </h1>
 

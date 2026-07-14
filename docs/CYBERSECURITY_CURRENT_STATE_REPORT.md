@@ -12,6 +12,18 @@ The largest remaining risks are operational and feature-level: administrator MFA
 
 This document is an engineering assessment, not a penetration-test certificate or a guarantee that the system has no vulnerabilities.
 
+## Latest implementation update
+
+The current working tree also includes a session-bound payment continuation for
+new enrollment submissions (the form no longer silently authenticates the
+applicant), private in-page document previews, validation-safe upload drafts,
+and a shared navigation guard that suppresses repeated sidebar requests. The
+navigation guard may send an allow-listed `navigation_spam` telemetry event to
+the existing audit log. This client signal is only an operational hint: a
+modified browser or disabled JavaScript can omit it, so it must never be used
+as proof of misconduct or as a replacement for server-side authorization,
+rate limiting, or incident review.
+
 ## Scope and Method
 
 The review covered Laravel routes, middleware, controllers, models, migrations, authentication flows, upload handling, protected document responses, audit logging, Composer and npm lockfiles, and the automated feature tests. The following checks were run:

@@ -33,6 +33,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const prefetchLinks = document.querySelectorAll('a[data-dashboard-prefetch]');
     const dashboardMain = document.querySelector('.dashboard-main');
     const protectedViewer = document.querySelector('[data-protected-module-viewer]');
+    const securityEventUrl = document.querySelector('meta[name="dashboard-security-event-url"]')?.content;
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+    let navigationLocked = false;
+    let navigationUnlockTimer = null;
+    let navigationSpamReported = false;
+
+    const reportClientSecurityEvent = (eventName) => {
+        if (!securityEventUrl || !csrfToken) return;
+
+        window.fetch(securityEventUrl, {
+            method: 'POST',
+            keepalive: true,
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({ event: eventName }),
+        }).catch(() => {});
+    };
 
     const updateThemeControls = () => {
         const isDark = document.documentElement.dataset.dashboardTheme === 'dark';
@@ -65,6 +86,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     updateThemeControls();
+    // Keep the account menu label/icon in sync when another tab changes the
+    // shared preference. The page-level storage handler below updates the
+    // document attribute; this listener updates controls without a reload.
+    window.addEventListener('storage', (event) => {
+        if (event.key === dashboardThemeStorageKey) updateThemeControls();
+    });
 
     if (protectedViewer) {
         const notice = protectedViewer.querySelector('[data-protected-viewer-notice]');
@@ -290,6 +317,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // A quick double-click (or a mobile tap burst) can otherwise queue
+            // multiple full page requests. Allow the first navigation to win,
+            // then release the lock automatically if a connection stalls.
+            if (navigationLocked) {
+                event.preventDefault();
+                if (!navigationSpamReported) {
+                    navigationSpamReported = true;
+                    reportClientSecurityEvent('navigation_spam');
+                }
+                return;
+            }
+
+            navigationLocked = true;
+            document.querySelectorAll('a[data-dashboard-prefetch]').forEach((navLink) => {
+                navLink.classList.add('is-loading');
+                navLink.setAttribute('aria-disabled', 'true');
+            });
+            window.clearTimeout(navigationUnlockTimer);
+            navigationUnlockTimer = window.setTimeout(() => {
+                navigationLocked = false;
+                document.querySelectorAll('a[data-dashboard-prefetch]').forEach((navLink) => {
+                    navLink.classList.remove('is-loading');
+                    navLink.removeAttribute('aria-disabled');
+                });
+            }, 5000);
+
             document.documentElement.classList.add('dashboard-navigating');
             dashboardMain?.setAttribute('aria-busy', 'true');
         });
@@ -318,6 +371,10 @@ window.addEventListener('pageshow', () => {
     applyDashboardTheme(readDashboardTheme());
     document.documentElement.classList.remove('dashboard-navigating');
     document.querySelector('.dashboard-main')?.removeAttribute('aria-busy');
+    document.querySelectorAll('a[data-dashboard-prefetch].is-loading').forEach((navLink) => {
+        navLink.classList.remove('is-loading');
+        navLink.removeAttribute('aria-disabled');
+    });
 });
 
 window.addEventListener('storage', (event) => {

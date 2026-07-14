@@ -50,24 +50,11 @@ class TrainerDashboardController extends Controller
             })->values();
         }
 
-        // Published modules remain backed by the private LMS storage introduced on the review branch.
-        $modules = TrainingModule::query()
-            ->with('batch')
+        // The dashboard only needs the count; the full module list belongs to
+        // Resources. Avoid loading file metadata and batch relations here.
+        $moduleCount = TrainingModule::query()
             ->where('trainer_id', $trainer->id)
-            ->latest('published_at')
-            ->get()
-            ->map(function (TrainingModule $module) {
-                return [
-                    'id' => $module->id,
-                    'title' => $module->title,
-                    'training' => $module->batch
-                        ? $module->batch->name.' '.$module->batch->year
-                        : 'Caregiving NC II',
-                    'file' => $module->original_file_name,
-                    'published_at' => $module->published_at?->format('M j, Y') ?? 'Not published',
-                    'status' => $module->is_published ? 'Published' : 'Draft',
-                ];
-            });
+            ->count();
 
         // Today's timeline is derived directly from the active admin-managed batch schedule.
         $todaySessions = $activeBatch ? $scheduleService->today($activeBatch) : collect();
@@ -101,19 +88,49 @@ class TrainerDashboardController extends Controller
             ];
         });
 
+        // Give trainers a concise view of operational changes that can affect
+        // their delivery day. We intentionally expose only admin-owned
+        // actions (not authentication or document/security events).
+        $systemNotifications = AdminActivityLog::query()
+            ->with('user')
+            ->where(function ($query) {
+                $query->where('action', 'like', 'batch.%')
+                    ->orWhere('action', 'like', 'admin.module.%')
+                    ->orWhere('action', 'like', 'enrollment.review.%');
+            })
+            ->latest()
+            ->limit(6)
+            ->get()
+            ->map(function (AdminActivityLog $log) {
+                $action = str($log->action)->replace(['.', '_', '-'], ' ')->headline()->toString();
+                $subject = data_get($log->meta, 'name')
+                    ?? data_get($log->meta, 'title')
+                    ?? data_get($log->meta, 'after.name')
+                    ?? data_get($log->meta, 'applicant_email')
+                    ?? ($log->subject_type ? str($log->subject_type)->classBasename()->headline()->toString() : null);
+
+                return [
+                    'title' => $subject ? $action.' — '.$subject : $action,
+                    'actor' => $log->user?->name ?? 'MCARE admin',
+                    'occurred_at' => $log->created_at?->diffForHumans() ?? 'Recently',
+                ];
+            })
+            ->values();
+
         return view('trainer.dashboard', [
             'activeBatch' => $activeBatch,
             'learnerFollowUps' => $learnerFollowUps,
-            'modules' => $modules,
+            'moduleCount' => $moduleCount,
             'progressRows' => $progressRows,
             'search' => $search,
             'stats' => [
-                'total_trainings' => $modules->count(),
+                'total_trainings' => $moduleCount,
                 'total_trainees' => $assignedTrainees->count(),
                 'sessions_today' => $todaySessions->count(),
             ],
             'teachingTimeline' => $teachingTimeline,
             'todaySessions' => $todaySessions,
+            'systemNotifications' => $systemNotifications,
         ]);
     }
 

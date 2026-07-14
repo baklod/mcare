@@ -10,6 +10,7 @@
         'arrow-right-from-bracket' => '<path d="M10 17l5-5-5-5m5 5H3m11-7h4a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-4"/>',
         'award' => '<circle cx="12" cy="8" r="4"/><path d="m8.8 11.2-1.3 8 4.5-2.6 4.5 2.6-1.3-8"/>',
         'bars' => '<path d="M4 7h16M4 12h16M4 17h16"/>',
+        'bell' => '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>',
         'book-open' => '<path d="M3 5.5A3.5 3.5 0 0 1 6.5 2H11v17H6.5A3.5 3.5 0 0 0 3 22V5.5ZM21 5.5A3.5 3.5 0 0 0 17.5 2H13v17h4.5A3.5 3.5 0 0 1 21 22V5.5Z"/>',
         'briefcase' => '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18M10 12v2h4v-2"/>',
         'calendar' => '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
