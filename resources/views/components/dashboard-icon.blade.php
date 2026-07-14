@@ -1,0 +1,49 @@
+@props(['name'])
+
+@php
+    $iconName = str($name)->after('fa-')->toString();
+    $icons = [
+        'arrow-left' => '<path d="M19 12H5m6 6-6-6 6-6"/>',
+        'arrow-right' => '<path d="M5 12h14m-6-6 6 6-6 6"/>',
+        'arrow-up' => '<path d="M12 19V5m-6 6 6-6 6 6"/>',
+        'arrow-up-right-from-square' => '<path d="M13 5h6v6M11 13l8-8M19 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>',
+        'arrow-right-from-bracket' => '<path d="M10 17l5-5-5-5m5 5H3m11-7h4a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-4"/>',
+        'award' => '<circle cx="12" cy="8" r="4"/><path d="m8.8 11.2-1.3 8 4.5-2.6 4.5 2.6-1.3-8"/>',
+        'bars' => '<path d="M4 7h16M4 12h16M4 17h16"/>',
+        'book-open' => '<path d="M3 5.5A3.5 3.5 0 0 1 6.5 2H11v17H6.5A3.5 3.5 0 0 0 3 22V5.5ZM21 5.5A3.5 3.5 0 0 0 17.5 2H13v17h4.5A3.5 3.5 0 0 1 21 22V5.5Z"/>',
+        'briefcase' => '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18M10 12v2h4v-2"/>',
+        'calendar' => '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
+        'calendar-days' => '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M7 14h2M11 14h2M15 14h2M7 18h2M11 18h2"/>',
+        'chart-column' => '<path d="M4 20V10h4v10M10 20V4h4v16M16 20v-7h4v7M2 20h20"/>',
+        'chevron-down' => '<path d="m6 9 6 6 6-6"/>',
+        'chevron-up' => '<path d="m18 15-6-6-6 6"/>',
+        'circle-check' => '<circle cx="12" cy="12" r="9"/><path d="m8 12 2.6 2.6L16.5 9"/>',
+        'circle-play' => '<circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4V8Z"/>',
+        'circle-question' => '<circle cx="12" cy="12" r="9"/><path d="M9.6 9a2.6 2.6 0 1 1 3.2 2.5c-.8.3-.8.9-.8 1.5M12 17h.01"/>',
+        'clipboard-list' => '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 9h6M9 13h6M9 17h4"/>',
+        'cloud-arrow-up' => '<path d="M16 16l-4-4-4 4M12 12v8M5 18a4 4 0 0 1-.7-7.9A6 6 0 0 1 16 8.7 4.5 4.5 0 0 1 18 18"/>',
+        'credit-card' => '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h3"/>',
+        'file-excel' => '<path d="M6 2h8l4 4v16H6V2Z"/><path d="M14 2v5h5M9 11l5 6M14 11l-5 6"/>',
+        'folder-open' => '<path d="M3 7h7l2 2h9l-2 10H4L3 7Z"/><path d="M3 7V5h7l2 2h5"/>',
+        'gauge-high' => '<path d="M4.9 19a9 9 0 1 1 14.2 0H4.9Z"/><path d="m12 13 4-4M7.5 15h.01M16.5 15h.01M12 7h.01"/>',
+        'gear' => '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/>',
+        'house' => '<path d="m3 11 9-8 9 8M5 10v10h14V10M9 20v-6h6v6"/>',
+        'key' => '<circle cx="8" cy="15" r="4"/><path d="m11 12 8-8M15 8l2 2M17 6l2 2"/>',
+        'magnifying-glass' => '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+        'moon' => '<path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5 8.5 8.5 0 1 0 20.5 14.5Z"/>',
+        'print' => '<path d="M7 9V3h10v6M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><path d="M7 14h10v7H7z"/>',
+        'shield-halved' => '<path d="M12 3 4 6v5c0 5 3.4 8.4 8 10 4.6-1.6 8-5 8-10V6l-8-3Z"/><path d="M12 3v18"/>',
+        'signal' => '<path d="M5 17v2M9 13v6M13 9v10M17 5v14"/>',
+        'square-check' => '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="m7 12 3 3 7-7"/>',
+        'sun' => '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+        'user-check' => '<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 14l2 2 4-4"/>',
+        'users' => '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',
+        'xmark' => '<path d="M6 6l12 12M18 6 6 18"/>',
+    ];
+
+    $icon = $icons[$iconName] ?? $icons['circle-question'];
+@endphp
+
+<svg {{ $attributes->class('dashboard-svg-icon') }} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+    {!! $icon !!}
+</svg>

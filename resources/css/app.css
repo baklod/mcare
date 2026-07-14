@@ -1,6 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Nunito:wght@700;800;900&display=swap');
 @import "tailwindcss";
-@import "@fortawesome/fontawesome-free/css/all.min.css";
 @import "./universal_dashboard_design.css";
 
 @source "../views";
@@ -26,6 +25,14 @@
 }
 
 @layer components {
+    .dashboard-svg-icon {
+        display: inline-block;
+        width: 1em;
+        height: 1em;
+        flex: none;
+        vertical-align: -0.125em;
+    }
+
     .dashboard-shell {
         @apply min-h-screen bg-[#f9f6ff] text-slate-900 antialiased;
     }

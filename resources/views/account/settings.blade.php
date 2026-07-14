@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Account Settings | MCARE</title>
+    <x-dashboard-theme-head />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="account-page min-h-screen bg-slate-50 text-slate-900 antialiased">
@@ -13,7 +14,7 @@
                 <img src="{{ asset('assets/mcare-mark.png') }}" alt="MCARE mark" class="h-11 w-11 rounded-xl border border-slate-100 object-contain p-1">
                 <span><strong class="block text-sm sm:text-base">MCARE Hub</strong><span class="text-xs font-semibold text-purple-700">{{ $roleLabel }} settings</span></span>
             </a>
-            <a href="{{ $portalUrl }}" class="secondary-action"><i class="fa-solid fa-arrow-left mr-2" aria-hidden="true"></i>Back to dashboard</a>
+            <a href="{{ $portalUrl }}" class="secondary-action"><x-dashboard-icon name="arrow-left" class="mr-2" />Back to dashboard</a>
         </div>
     </header>
 
@@ -40,7 +41,8 @@
                     <h2 class="mt-2 text-xl font-black">Theme preference</h2>
                     <p class="mt-2 text-sm leading-6 text-slate-600">Night mode is stored only on this browser and can be changed anytime.</p>
                     <button type="button" class="secondary-action mt-5 w-full" data-dashboard-theme-toggle aria-pressed="false">
-                        <i class="fa-solid fa-moon mr-2" data-dashboard-theme-icon aria-hidden="true"></i>
+                        <x-dashboard-icon name="moon" class="mr-2" data-dashboard-theme-icon="moon" />
+                        <x-dashboard-icon name="sun" class="mr-2 hidden" data-dashboard-theme-icon="sun" />
                         <span data-dashboard-theme-label>Night mode</span>
                     </button>
                 </section>
@@ -69,7 +71,7 @@
                     <label class="block text-sm font-bold text-slate-700">Confirm new password
                         <input name="password_confirmation" type="password" autocomplete="new-password" required class="form-field mt-2 text-base">
                     </label>
-                    <button type="submit" class="primary-action w-full sm:w-auto"><i class="fa-solid fa-key mr-2" aria-hidden="true"></i>Update password</button>
+                    <button type="submit" class="primary-action w-full sm:w-auto"><x-dashboard-icon name="key" class="mr-2" />Update password</button>
                 </form>
             </section>
         </div>

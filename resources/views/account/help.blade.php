@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $roleLabel }} Help | MCARE</title>
+    <x-dashboard-theme-head />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="account-page min-h-screen bg-slate-50 text-slate-900 antialiased">
@@ -13,7 +14,7 @@
                 <img src="{{ asset('assets/mcare-mark.png') }}" alt="MCARE mark" class="h-11 w-11 rounded-xl border border-slate-100 object-contain p-1">
                 <span><strong class="block">MCARE Help Center</strong><span class="text-xs font-semibold text-purple-700">{{ $roleLabel }} guide</span></span>
             </a>
-            <a href="{{ $portalUrl }}" class="secondary-action"><i class="fa-solid fa-arrow-left mr-2" aria-hidden="true"></i>Back</a>
+            <a href="{{ $portalUrl }}" class="secondary-action"><x-dashboard-icon name="arrow-left" class="mr-2" />Back</a>
         </div>
     </header>
     <main class="mx-auto max-w-5xl px-5 py-10 sm:px-8">
@@ -23,7 +24,7 @@
         <div class="mt-8 grid gap-5 md:grid-cols-3">
             @foreach ($topics as [$title, $description])
                 <section class="account-card rounded-2xl border border-slate-200 bg-white p-6">
-                    <span class="grid h-10 w-10 place-items-center rounded-xl bg-purple-50 text-purple-700"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span>
+                    <span class="grid h-10 w-10 place-items-center rounded-xl bg-purple-50 text-purple-700"><x-dashboard-icon name="circle-check" /></span>
                     <h2 class="mt-4 text-lg font-black">{{ $title }}</h2>
                     <p class="mt-2 text-sm leading-6 text-slate-600">{{ $description }}</p>
                 </section>

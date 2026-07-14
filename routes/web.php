@@ -170,6 +170,9 @@ Route::middleware('throttle:global-web')->group(function () {
                     ->name('payment-schedules.update');
 
                 Route::get('/learning/trainees', [AdminLearningSystemController::class, 'trainees'])->name('learning.trainees');
+                Route::patch('/learning/trainees/{enrollmentApplication}/status', [AdminLearningSystemController::class, 'updateTraineeStatus'])
+                    ->middleware('throttle:sensitive-mutation')
+                    ->name('learning.trainees.status');
                 Route::get('/learning/modules', [AdminLearningSystemController::class, 'modules'])->name('learning.modules');
                 Route::get('/learning/certificates', [AdminLearningSystemController::class, 'certificates'])->name('learning.certificates');
                 Route::get('/learning/alumni-jobs', [AdminLearningSystemController::class, 'alumniJobs'])->name('learning.alumni-jobs');

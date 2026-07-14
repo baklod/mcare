@@ -4,9 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $title ?? 'MCARE Admin' }}</title>
+    <x-dashboard-theme-head />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="dashboard-shell universal-dashboard" data-dashboard-role="admin">
+    <div class="dashboard-navigation-progress" aria-hidden="true"></div>
     @php
         $adminName = auth()->user()?->name ?? 'Admin User';
         $adminInitial = strtoupper(substr($adminName, 0, 1));
@@ -43,7 +45,7 @@
             </span>
         </a>
         <button type="button" class="dashboard-menu-button absolute right-4 top-5" data-dashboard-menu-close aria-label="Close navigation">
-            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            <x-dashboard-icon name="xmark" />
         </button>
 
         <nav class="dashboard-nav" aria-label="Admin navigation">
@@ -51,8 +53,8 @@
                 <p class="px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Operations</p>
                 <div class="mt-2 space-y-1">
                     @foreach ($primaryNav as $item)
-                        <a href="{{ $item['href'] }}" data-dashboard-nav-key="admin-{{ str($item['label'])->slug() }}" class="{{ $navClass }} {{ $item['active'] ? $navActive : $navIdle }}" @if($item['active']) aria-current="page" @endif>
-                            <i class="dashboard-nav-icon fa-solid {{ $item['icon'] }}" aria-hidden="true"></i>
+                        <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="admin-{{ str($item['label'])->slug() }}" class="{{ $navClass }} {{ $item['active'] ? $navActive : $navIdle }}" @if($item['active']) aria-current="page" @endif>
+                            <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
                             <span>{{ $item['label'] }}</span>
                         </a>
                     @endforeach
@@ -63,8 +65,8 @@
                 <p class="px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Learning system</p>
                 <div class="mt-2 space-y-1">
                     @foreach ($capstoneNav as $item)
-                        <a href="{{ $item['href'] }}" data-dashboard-nav-key="admin-{{ str($item['label'])->slug() }}" class="{{ $navClass }} {{ $item['active'] ? $navActive : $navIdle }}" @if($item['active']) aria-current="page" @endif>
-                            <i class="dashboard-nav-icon fa-solid {{ $item['icon'] }}" aria-hidden="true"></i>
+                        <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="admin-{{ str($item['label'])->slug() }}" class="{{ $navClass }} {{ $item['active'] ? $navActive : $navIdle }}" @if($item['active']) aria-current="page" @endif>
+                            <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
                             <span>{{ $item['label'] }}</span>
                         </a>
                     @endforeach
@@ -72,12 +74,12 @@
             </div>
 
             <div class="border-t border-slate-200 pt-4">
-                <a href="{{ route('admin.logs.index') }}" class="{{ $navClass }} {{ request()->routeIs('admin.logs.*') ? $navActive : $navIdle }}">
-                    <i class="dashboard-nav-icon fa-solid fa-shield-halved" aria-hidden="true"></i>
+                <a href="{{ route('admin.logs.index') }}" data-dashboard-prefetch class="{{ $navClass }} {{ request()->routeIs('admin.logs.*') ? $navActive : $navIdle }}">
+                    <x-dashboard-icon name="shield-halved" class="dashboard-nav-icon" />
                     <span>Admin logs</span>
                 </a>
                 <a href="{{ route('landing') }}" class="{{ $navClass }} {{ $navIdle }}">
-                    <i class="dashboard-nav-icon fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                    <x-dashboard-icon name="arrow-up-right-from-square" class="dashboard-nav-icon" />
                     <span>Public site</span>
                 </a>
             </div>
@@ -90,7 +92,7 @@
                     <span class="block truncate text-sm font-bold text-slate-950">{{ $adminName }}</span>
                     <span class="block text-xs text-slate-500">Administrator</span>
                 </span>
-                <i class="dashboard-chevron fa-solid fa-chevron-up text-xs text-slate-400 transition" aria-hidden="true"></i>
+                <x-dashboard-icon name="chevron-up" class="dashboard-chevron text-xs text-slate-400 transition" />
             </summary>
             <div class="dashboard-account-menu">
                 <x-dashboard-account-actions :logout-route="route('admin.logout')" role-label="Administrator" :show-admin-logs="true" />
@@ -103,7 +105,7 @@
             <div class="dashboard-topbar-inner">
                 <div class="flex min-w-0 items-center gap-3">
                     <button type="button" class="dashboard-menu-button" data-dashboard-menu-open aria-label="Open navigation">
-                        <i class="fa-solid fa-bars" aria-hidden="true"></i><span class="hidden sm:inline">Menu</span>
+                        <x-dashboard-icon name="bars" /><span class="hidden sm:inline">Menu</span>
                     </button>
                     <div class="min-w-0">
                         <p class="dashboard-header-kicker">Mission Care Training Center</p>
@@ -112,7 +114,7 @@
                 </div>
 
                 <form method="GET" action="{{ route('admin.enrollments.index') }}" class="dashboard-search">
-                    <i class="fa-solid fa-magnifying-glass text-sm text-slate-400" aria-hidden="true"></i>
+                    <x-dashboard-icon name="magnifying-glass" class="text-sm text-slate-400" />
                     <input name="search" type="search" placeholder="Search applicants..." class="min-w-0 flex-1 border-0 bg-transparent py-2.5 text-sm outline-none placeholder:text-slate-400">
                     <button type="submit" class="sr-only">Search</button>
                 </form>
@@ -121,7 +123,7 @@
                         <summary class="dashboard-account-summary">
                             <span class="dashboard-account-avatar h-9 w-9">{{ $adminInitial }}</span>
                             <span class="hidden max-w-36 truncate sm:block">{{ $adminName }}</span>
-                            <i class="dashboard-chevron fa-solid fa-chevron-down text-xs text-slate-400 transition" aria-hidden="true"></i>
+                            <x-dashboard-icon name="chevron-down" class="dashboard-chevron text-xs text-slate-400 transition" />
                         </summary>
                         <div class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
                             <x-dashboard-account-actions :logout-route="route('admin.logout')" role-label="Administrator" :show-admin-logs="true" />
@@ -131,8 +133,8 @@
 
             <nav class="dashboard-mobile-bar grid-cols-4" aria-label="Mobile admin navigation">
                 @foreach ($primaryNav as $item)
-                    <a href="{{ $item['href'] }}" data-dashboard-nav-key="admin-{{ str($item['label'])->slug() }}" class="dashboard-mobile-link {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
-                        <i class="fa-solid {{ $item['icon'] }}" aria-hidden="true"></i>
+                    <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="admin-{{ str($item['label'])->slug() }}" class="dashboard-mobile-link {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
+                        <x-dashboard-icon :name="$item['icon']" />
                         <span class="truncate">{{ $item['label'] }}</span>
                     </a>
                 @endforeach

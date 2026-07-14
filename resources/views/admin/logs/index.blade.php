@@ -34,10 +34,10 @@
             <p class="text-sm font-semibold text-slate-600">Showing <span class="font-black text-slate-900">{{ $rangeLabel }}</span></p>
             <div class="flex flex-wrap gap-2">
                 <a href="{{ route('admin.logs.print', request()->query()) }}" target="_blank" rel="noopener" class="secondary-action">
-                    <i class="fa-solid fa-print mr-2" aria-hidden="true"></i>Print report
+                    <x-dashboard-icon name="print" class="mr-2" />Print report
                 </a>
                 <a href="{{ route('admin.logs.export', request()->query()) }}" class="primary-action">
-                    <i class="fa-solid fa-file-excel mr-2" aria-hidden="true"></i>Export for Excel
+                    <x-dashboard-icon name="file-excel" class="mr-2" />Export for Excel
                 </a>
             </div>
         </div>

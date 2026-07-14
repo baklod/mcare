@@ -248,7 +248,7 @@
                                 <span class="block truncate text-sm font-bold text-slate-900">{{ $currentUser->name }}</span>
                                 <span class="block truncate text-xs text-slate-500">{{ $accountRoleLabel }}</span>
                             </span>
-                            <i class="fa-solid fa-chevron-down px-1 text-xs text-slate-400" aria-hidden="true"></i>
+                            <x-dashboard-icon name="chevron-down" class="mx-1 text-xs text-slate-400" />
                         </summary>
                         <div class="absolute right-0 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
                             <div class="border-b border-slate-100 px-3 py-2.5">
@@ -257,7 +257,7 @@
                             </div>
                             <a href="{{ $accountCtaUrl }}" class="mt-1 flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-semibold text-purple-700 hover:bg-purple-50">
                                 <span>{{ $accountCtaLabel }}</span>
-                                <i class="fa-solid fa-arrow-right text-xs" aria-hidden="true"></i>
+                                <x-dashboard-icon name="arrow-right" class="text-xs" />
                             </a>
                             <form method="POST" action="{{ route('logout') }}" class="mt-1 border-t border-slate-100 pt-1">
                                 @csrf
@@ -271,7 +271,7 @@
 
                 <button id="mobile-menu-open" type="button" aria-controls="mobile-sidebar" aria-expanded="false" class="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:border-purple-200 hover:text-purple-700 lg:hidden">
                     <span class="sr-only">Open navigation menu</span>
-                    <i class="fa-solid fa-bars" aria-hidden="true"></i>
+                    <x-dashboard-icon name="bars" />
                 </button>
             </div>
         </nav>
@@ -291,7 +291,7 @@
                 </a>
                 <button id="mobile-menu-close" type="button" class="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:border-purple-200 hover:text-purple-700">
                     <span class="sr-only">Close navigation menu</span>
-                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    <x-dashboard-icon name="xmark" />
                 </button>
             </div>
 

@@ -20,6 +20,14 @@ class EnrollmentApplication extends Model
 
     public const STATUS_DENIED = 'denied';
 
+    public const LEARNING_ACTIVE = 'active';
+
+    public const LEARNING_PAUSED = 'paused';
+
+    public const LEARNING_GRADUATED = 'graduated';
+
+    public const LEARNING_WITHDRAWN = 'withdrawn';
+
     public const PAYMENT_NOT_SELECTED = 'not_selected';
 
     public const PAYMENT_ONSITE_PENDING = 'onsite_pending';
@@ -78,6 +86,10 @@ class EnrollmentApplication extends Model
         'documents_reviewed_by_id',
         'date_accomplished',
         'status',
+        'learning_status',
+        'learning_status_notes',
+        'learning_status_changed_at',
+        'learning_status_changed_by_id',
         'payment_method',
         'payment_status',
         'payment_amount',
@@ -111,6 +123,7 @@ class EnrollmentApplication extends Model
             'document_review' => 'array',
             'documents_reviewed_at' => 'datetime',
             'reviewed_at' => 'datetime',
+            'learning_status_changed_at' => 'datetime',
         ];
     }
 
@@ -136,6 +149,22 @@ class EnrollmentApplication extends Model
     public function statusLabel(): string
     {
         return self::statuses()[$this->status] ?? str($this->status)->headline()->toString();
+    }
+
+    public static function learningStatuses(): array
+    {
+        return [
+            self::LEARNING_ACTIVE => 'Active',
+            self::LEARNING_PAUSED => 'Paused',
+            self::LEARNING_GRADUATED => 'Graduated',
+            self::LEARNING_WITHDRAWN => 'Withdrawn',
+        ];
+    }
+
+    public function learningStatusLabel(): string
+    {
+        return self::learningStatuses()[$this->learning_status]
+            ?? str($this->learning_status)->headline()->toString();
     }
 
     public static function paymentStatuses(): array
@@ -180,6 +209,11 @@ class EnrollmentApplication extends Model
     public function documentReviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'documents_reviewed_by_id');
+    }
+
+    public function learningStatusChangedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'learning_status_changed_by_id');
     }
 
     public function batch(): BelongsTo

@@ -4,9 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $title ?? 'MCARE Trainer' }}</title>
+    <x-dashboard-theme-head />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="dashboard-shell universal-dashboard" data-dashboard-role="trainer">
+    <div class="dashboard-navigation-progress" aria-hidden="true"></div>
     @php
         $trainerName = auth()->user()?->name ?? 'Trainer User';
         $trainerInitial = strtoupper(substr($trainerName, 0, 1));
@@ -36,18 +38,18 @@
             </span>
         </a>
         <button type="button" class="dashboard-menu-button absolute right-4 top-5" data-dashboard-menu-close aria-label="Close navigation">
-            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            <x-dashboard-icon name="xmark" />
         </button>
 
         <nav class="dashboard-nav" aria-label="Trainer navigation">
             @foreach ($trainerNav as $item)
-                <a href="{{ $item['href'] }}" data-dashboard-nav-key="trainer-{{ str($item['label'])->slug() }}" class="{{ $navClass }} {{ $item['active'] ? $navActive : $navIdle }}" @if($item['active']) aria-current="page" @endif>
-                    <i class="dashboard-nav-icon fa-solid {{ $item['icon'] }}" aria-hidden="true"></i>
+                <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainer-{{ str($item['label'])->slug() }}" class="{{ $navClass }} {{ $item['active'] ? $navActive : $navIdle }}" @if($item['active']) aria-current="page" @endif>
+                    <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
                     <span>{{ $item['label'] }}</span>
                 </a>
             @endforeach
             <a href="{{ route('landing') }}" class="{{ $navClass }} {{ $navIdle }}">
-                <i class="dashboard-nav-icon fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                <x-dashboard-icon name="arrow-up-right-from-square" class="dashboard-nav-icon" />
                 <span>Public site</span>
             </a>
         </nav>
@@ -59,7 +61,7 @@
                     <span class="block truncate text-sm font-bold text-slate-950">{{ $trainerName }}</span>
                     <span class="block text-xs text-slate-500">Caregiving NC II Trainer</span>
                 </span>
-                <i class="dashboard-chevron fa-solid fa-chevron-down text-xs text-slate-500 transition" aria-hidden="true"></i>
+                <x-dashboard-icon name="chevron-down" class="dashboard-chevron text-xs text-slate-500 transition" />
             </summary>
             <div class="dashboard-account-menu">
                 <x-dashboard-account-actions :logout-route="route('trainer.logout')" role-label="Trainer" />
@@ -72,7 +74,7 @@
             <div class="dashboard-topbar-inner">
                 <div class="flex min-w-0 items-center gap-3">
                     <button type="button" class="dashboard-menu-button" data-dashboard-menu-open aria-label="Open navigation">
-                        <i class="fa-solid fa-bars" aria-hidden="true"></i><span class="hidden sm:inline">Menu</span>
+                        <x-dashboard-icon name="bars" /><span class="hidden sm:inline">Menu</span>
                     </button>
                     <div class="min-w-0">
                         <p class="dashboard-header-kicker">Mission Care Training Center</p>
@@ -81,7 +83,7 @@
                 </div>
 
                 <form method="GET" action="{{ request()->routeIs('trainer.trainees') ? route('trainer.trainees') : route('trainer.dashboard') }}" class="dashboard-search">
-                    <i class="fa-solid fa-magnifying-glass text-sm text-slate-400" aria-hidden="true"></i>
+                    <x-dashboard-icon name="magnifying-glass" class="text-sm text-slate-400" />
                     <input name="search" value="{{ request('search') }}" type="search" placeholder="Search trainees, sessions, modules..." class="min-w-0 flex-1 border-0 bg-transparent py-2.5 text-sm outline-none placeholder:text-slate-400">
                     <button type="submit" class="sr-only">Search</button>
                 </form>
@@ -90,7 +92,7 @@
                     <summary class="dashboard-account-summary">
                         <span class="dashboard-account-avatar h-9 w-9">{{ $trainerInitial }}</span>
                         <span class="hidden max-w-32 truncate sm:block">{{ $trainerName }}</span>
-                        <i class="dashboard-chevron fa-solid fa-chevron-down text-xs text-slate-500 transition" aria-hidden="true"></i>
+                        <x-dashboard-icon name="chevron-down" class="dashboard-chevron text-xs text-slate-500 transition" />
                     </summary>
                     <div class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
                         <x-dashboard-account-actions :logout-route="route('trainer.logout')" role-label="Trainer" />
@@ -99,8 +101,8 @@
             </div>
             <nav class="dashboard-mobile-bar grid-cols-4" aria-label="Mobile trainer navigation">
                 @foreach (array_slice($trainerNav, 0, 4) as $item)
-                    <a href="{{ $item['href'] }}" data-dashboard-nav-key="trainer-{{ str($item['label'])->slug() }}" class="dashboard-mobile-link {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
-                        <i class="fa-solid {{ $item['icon'] }}" aria-hidden="true"></i>
+                    <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainer-{{ str($item['label'])->slug() }}" class="dashboard-mobile-link {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
+                        <x-dashboard-icon :name="$item['icon']" />
                         <span class="truncate">{{ $item['label'] }}</span>
                     </a>
                 @endforeach

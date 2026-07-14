@@ -5,6 +5,8 @@ const storedDashboardTheme = window.localStorage.getItem(dashboardThemeStorageKe
 document.documentElement.dataset.dashboardTheme = storedDashboardTheme === 'dark' ? 'dark' : 'light';
 
 document.addEventListener('DOMContentLoaded', () => {
+    document.documentElement.classList.remove('dashboard-navigating');
+
     const sidebar = document.querySelector('[data-dashboard-sidebar]');
     const backdrop = document.querySelector('[data-dashboard-backdrop]');
     const openButtons = document.querySelectorAll('[data-dashboard-menu-open]');
@@ -13,6 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const dashboardLinks = document.querySelectorAll('.dashboard-nav-link, .dashboard-mobile-link');
     const hashLinks = document.querySelectorAll('.dashboard-nav-link[href*="#"], .dashboard-mobile-link[href*="#"]');
     const themeToggleButtons = document.querySelectorAll('[data-dashboard-theme-toggle]');
+    const prefetchLinks = document.querySelectorAll('a[data-dashboard-prefetch]');
+    const dashboardMain = document.querySelector('.dashboard-main');
 
     const updateThemeControls = () => {
         const isDark = document.documentElement.dataset.dashboardTheme === 'dark';
@@ -20,13 +24,12 @@ document.addEventListener('DOMContentLoaded', () => {
         themeToggleButtons.forEach((button) => {
             button.setAttribute('aria-pressed', String(isDark));
             const label = button.querySelector('[data-dashboard-theme-label]');
-            const icon = button.querySelector('[data-dashboard-theme-icon]');
+            const moonIcon = button.querySelector('[data-dashboard-theme-icon="moon"]');
+            const sunIcon = button.querySelector('[data-dashboard-theme-icon="sun"]');
 
             if (label) label.textContent = isDark ? 'Light mode' : 'Night mode';
-            if (icon) {
-                icon.classList.toggle('fa-moon', !isDark);
-                icon.classList.toggle('fa-sun', isDark);
-            }
+            moonIcon?.classList.toggle('hidden', isDark);
+            sunIcon?.classList.toggle('hidden', !isDark);
         });
     };
 
@@ -110,6 +113,43 @@ document.addEventListener('DOMContentLoaded', () => {
         setActiveNavigationKey(activeKey);
     };
 
+    let dashboardScrollFrame = null;
+    const scrollDashboardTo = (target) => {
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const startPosition = window.scrollY;
+        const targetPosition = Math.max(0, target.getBoundingClientRect().top + startPosition - 96);
+        const distance = targetPosition - startPosition;
+
+        if (reduceMotion || Math.abs(distance) < 8) {
+            window.scrollTo({ top: targetPosition, left: 0 });
+            return;
+        }
+
+        if (dashboardScrollFrame) {
+            window.cancelAnimationFrame(dashboardScrollFrame);
+        }
+
+        document.documentElement.classList.add('dashboard-scroll-in-progress');
+        const duration = 240;
+        let startedAt = null;
+        const animate = (timestamp) => {
+            startedAt ??= timestamp;
+            const progress = Math.min((timestamp - startedAt) / duration, 1);
+            const easedProgress = 1 - Math.pow(1 - progress, 3);
+
+            window.scrollTo({ top: startPosition + distance * easedProgress, left: 0 });
+
+            if (progress < 1) {
+                dashboardScrollFrame = window.requestAnimationFrame(animate);
+            } else {
+                dashboardScrollFrame = null;
+                document.documentElement.classList.remove('dashboard-scroll-in-progress');
+            }
+        };
+
+        dashboardScrollFrame = window.requestAnimationFrame(animate);
+    };
+
     hashLinks.forEach((link) => {
         link.addEventListener('click', (event) => {
             const url = new URL(link.href, window.location.href);
@@ -127,7 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (target && isCurrentDocument) {
                 event.preventDefault();
                 window.history.pushState({}, '', url.hash);
-                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                scrollDashboardTo(target);
                 setMenuOpen(false);
             }
         });
@@ -136,6 +176,43 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('hashchange', setActiveHash);
     window.addEventListener('popstate', setActiveHash);
     setActiveHash();
+
+    const prefetchedUrls = new Set();
+    const prefetchDashboardPage = (link) => {
+        const url = new URL(link.href, window.location.href);
+
+        if (url.origin !== window.location.origin || url.href === window.location.href || prefetchedUrls.has(url.href)) {
+            return;
+        }
+
+        prefetchedUrls.add(url.href);
+        const hint = document.createElement('link');
+        hint.rel = 'prefetch';
+        hint.href = url.href;
+        hint.as = 'document';
+        document.head.append(hint);
+    };
+
+    prefetchLinks.forEach((link) => {
+        link.addEventListener('pointerenter', () => prefetchDashboardPage(link), { once: true });
+        link.addEventListener('focus', () => prefetchDashboardPage(link), { once: true });
+        link.addEventListener('touchstart', () => prefetchDashboardPage(link), { once: true, passive: true });
+
+        link.addEventListener('click', (event) => {
+            const url = new URL(link.href, window.location.href);
+            const isModifiedClick = event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+            const isSameDocumentHash = url.pathname === window.location.pathname
+                && url.search === window.location.search
+                && url.hash;
+
+            if (isModifiedClick || url.origin !== window.location.origin || isSameDocumentHash) {
+                return;
+            }
+
+            document.documentElement.classList.add('dashboard-navigating');
+            dashboardMain?.setAttribute('aria-busy', 'true');
+        });
+    });
 
     // Native details menus remain keyboard-friendly; close only when focus/click moves away.
     document.addEventListener('click', (event) => {
@@ -154,4 +231,9 @@ document.addEventListener('DOMContentLoaded', () => {
         setMenuOpen(false);
         accountMenus.forEach((menu) => menu.removeAttribute('open'));
     });
+});
+
+window.addEventListener('pageshow', () => {
+    document.documentElement.classList.remove('dashboard-navigating');
+    document.querySelector('.dashboard-main')?.removeAttribute('aria-busy');
 });

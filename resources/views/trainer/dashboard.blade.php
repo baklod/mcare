@@ -21,7 +21,7 @@
             </div>
             <div class="flex items-center gap-3 text-sm">
                 <span class="inline-flex items-center gap-2 font-medium text-stone-700">
-                    <i class="fa-regular fa-calendar text-violet-700" aria-hidden="true"></i>
+                    <x-dashboard-icon name="calendar" class="text-violet-700" />
                     {{ now()->format('l, F j, Y') }}
                 </span>
                 <a href="{{ route('trainer.dashboard') }}" class="inline-flex min-h-10 items-center justify-center border border-stone-300 bg-white px-4 font-semibold text-stone-800 transition hover:border-violet-400 hover:text-violet-800">
@@ -50,14 +50,14 @@
                                         <div class="flex flex-wrap items-center gap-3">
                                             <time class="text-sm font-bold text-stone-950">{{ $item['time'] }}</time>
                                             <span class="inline-flex items-center gap-1.5 bg-violet-100 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-violet-800">
-                                                <i class="fa-solid fa-circle-play" aria-hidden="true"></i> Live session
+                                                <x-dashboard-icon name="circle-play" /> Live session
                                             </span>
                                         </div>
                                         <h3 class="mt-3 text-xl font-bold text-stone-950">{{ $item['title'] }}</h3>
                                         <p class="mt-2 text-sm text-stone-600">{{ $item['duration'] }} · {{ $item['training'] }}</p>
                                     </div>
                                     <span class="inline-flex w-fit items-center gap-2 border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-800">
-                                        <i class="fa-solid fa-signal" aria-hidden="true"></i> In progress
+                                        <x-dashboard-icon name="signal" /> In progress
                                     </span>
                                 </div>
 
@@ -66,7 +66,7 @@
                                         <p class="text-xs font-bold uppercase tracking-[0.14em] text-stone-500">Attendance</p>
                                         <p class="mt-2 text-2xl font-bold text-stone-950">{{ $stats['total_trainees'] ?? 0 }} <span class="text-sm font-medium text-stone-500">learners assigned</span></p>
                                         <a href="#learner-follow-up" class="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-violet-800 hover:text-violet-950">
-                                            View learner follow-up <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                                            View learner follow-up <x-dashboard-icon name="arrow-right" />
                                         </a>
                                     </div>
                                     <div class="pt-5 sm:pl-5 sm:pt-0">
@@ -133,7 +133,7 @@
                     </ul>
                 @else
                     <div class="p-5">
-                        <i class="fa-regular fa-circle-check text-2xl text-emerald-700" aria-hidden="true"></i>
+                        <x-dashboard-icon name="circle-check" class="text-2xl text-emerald-700" />
                         <p class="mt-3 font-bold text-stone-950">No learners need follow-up yet.</p>
                         <p class="mt-1 text-sm leading-6 text-stone-600">As learner activity is recorded, any next steps will appear here.</p>
                     </div>
@@ -149,17 +149,17 @@
                     <p class="mt-1 text-sm text-stone-600">Track the modules you are responsible for today.</p>
                 </div>
                 <a id="resources" href="#teaching-timeline" class="inline-flex min-h-10 items-center gap-2 self-start text-sm font-bold text-violet-800 hover:text-violet-950 sm:self-auto">
-                    <i class="fa-solid fa-arrow-up" aria-hidden="true"></i> Back to timeline
+                    <x-dashboard-icon name="arrow-up" /> Back to timeline
                 </a>
             </div>
 
             <details class="border-b border-stone-200 bg-stone-50 p-5 sm:p-6">
                 <summary class="flex cursor-pointer list-none items-center justify-between gap-4 font-bold text-stone-950">
                     <span class="inline-flex items-center gap-2">
-                        <i class="fa-solid fa-cloud-arrow-up text-violet-700" aria-hidden="true"></i>
+                        <x-dashboard-icon name="cloud-arrow-up" class="text-violet-700" />
                         Publish a training module
                     </span>
-                    <i class="fa-solid fa-chevron-down text-xs text-stone-500" aria-hidden="true"></i>
+                    <x-dashboard-icon name="chevron-down" class="text-xs text-stone-500" />
                 </summary>
 
                 <form method="POST" action="{{ route('trainer.modules.store') }}" enctype="multipart/form-data" class="mt-5 grid gap-4 lg:grid-cols-2">

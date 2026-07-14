@@ -4,9 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $title ?? 'MCARE Trainee' }}</title>
+    <x-dashboard-theme-head />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="dashboard-shell universal-dashboard" data-dashboard-role="trainee">
+    <div class="dashboard-navigation-progress" aria-hidden="true"></div>
     @php
         $navItem = 'dashboard-nav-link';
         $traineeName = auth()->user()?->name ?? 'Trainee';
@@ -32,14 +34,14 @@
             </span>
         </a>
         <button type="button" class="dashboard-menu-button absolute right-4 top-5" data-dashboard-menu-close aria-label="Close navigation">
-            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            <x-dashboard-icon name="xmark" />
         </button>
 
         <nav class="dashboard-nav" aria-label="Trainee navigation">
             <p class="dashboard-menu-label">Trainee Menu</p>
             @foreach ($traineeNav as $item)
                 <a href="{{ $item['href'] }}" data-dashboard-nav-key="trainee-{{ str($item['label'])->slug() }}" class="{{ $navItem }} {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
-                    <i class="dashboard-nav-icon fa-solid {{ $item['icon'] }}" aria-hidden="true"></i>
+                    <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
                     <span>{{ $item['label'] }}</span>
                 </a>
             @endforeach
@@ -52,7 +54,7 @@
                     <span class="block truncate text-sm font-bold text-slate-950">{{ $traineeName }}</span>
                     <span class="block text-xs text-slate-500">{{ \App\Support\AccountPortal::roleLabelFor(auth()->user()) }}</span>
                 </span>
-                <i class="dashboard-chevron fa-solid fa-chevron-down text-xs text-slate-400 transition" aria-hidden="true"></i>
+                <x-dashboard-icon name="chevron-down" class="dashboard-chevron text-xs text-slate-400 transition" />
             </summary>
             <div class="dashboard-account-menu">
                 <x-dashboard-account-actions :logout-route="route('trainee.logout')" role-label="Trainee" />
@@ -65,7 +67,7 @@
             <div class="dashboard-topbar-inner">
                 <div class="flex items-center gap-3">
                     <button type="button" class="dashboard-menu-button" data-dashboard-menu-open aria-label="Open navigation">
-                        <i class="fa-solid fa-bars" aria-hidden="true"></i><span class="hidden sm:inline">Menu</span>
+                        <x-dashboard-icon name="bars" /><span class="hidden sm:inline">Menu</span>
                     </button>
                     <div class="min-w-0">
                         <p class="dashboard-header-kicker">Caregiving NC II Program</p>
@@ -80,7 +82,7 @@
                             <span class="block text-sm font-bold">{{ $traineeName }}</span>
                             <span class="block text-xs font-semibold text-slate-400">{{ \App\Support\AccountPortal::roleLabelFor(auth()->user()) }}</span>
                         </span>
-                        <i class="dashboard-chevron fa-solid fa-chevron-down text-xs text-slate-400 transition" aria-hidden="true"></i>
+                        <x-dashboard-icon name="chevron-down" class="dashboard-chevron text-xs text-slate-400 transition" />
                         </summary>
                         <div class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
                             <x-dashboard-account-actions :logout-route="route('trainee.logout')" role-label="Trainee" />
@@ -104,7 +106,7 @@
     <nav class="dashboard-mobile-bar grid-cols-4" aria-label="Mobile trainee navigation">
         @foreach (array_slice($traineeNav, 0, 4) as $item)
             <a href="{{ $item['href'] }}" data-dashboard-nav-key="trainee-{{ str($item['label'])->slug() }}" class="dashboard-mobile-link {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
-                <i class="fa-solid {{ $item['icon'] }}" aria-hidden="true"></i>
+                <x-dashboard-icon :name="$item['icon']" />
                 <span class="truncate">{{ $item['short'] }}</span>
             </a>
         @endforeach
