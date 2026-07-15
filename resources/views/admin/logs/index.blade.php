@@ -10,7 +10,7 @@
                     Track login activity, review decisions, document downloads, and schedule changes for audit and anti-abuse review.
                 </p>
             </div>
-            <form method="GET" action="{{ route('admin.logs.index') }}" class="grid w-full gap-3 sm:grid-cols-2 lg:grid-cols-[10rem_11rem_minmax(14rem,1fr)_auto]">
+            <form method="GET" action="{{ route('admin.logs.index') }}" data-auto-filter class="grid w-full gap-3 sm:grid-cols-2 lg:grid-cols-[10rem_11rem_minmax(14rem,1fr)_auto]">
                 <label class="text-xs font-bold uppercase tracking-wide text-slate-500">
                     Coverage
                     <select name="period" class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-100">

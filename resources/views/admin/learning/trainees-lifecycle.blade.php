@@ -29,7 +29,7 @@
             @endforeach
         </div>
 
-        <form method="GET" class="dashboard-panel grid gap-4 md:grid-cols-2 xl:grid-cols-8">
+        <form method="GET" data-auto-filter class="dashboard-panel grid gap-4 md:grid-cols-2 xl:grid-cols-8">
             <div class="md:col-span-2 xl:col-span-2">
                 <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Search trainee</label>
                 <input name="search" value="{{ $filters['search'] ?? '' }}" class="form-field" placeholder="Name or email">

@@ -25,7 +25,7 @@
         </form>
     </details>
 
-    <form method="GET" class="dashboard-panel grid gap-4 md:grid-cols-4">
+    <form method="GET" data-auto-filter class="dashboard-panel grid gap-4 md:grid-cols-4">
         <div class="md:col-span-2"><label class="mb-2 block text-xs font-bold uppercase text-slate-500">Search module or trainer</label><input name="search" value="{{ $filters['search'] ?? '' }}" class="form-field"></div>
         <div><label class="mb-2 block text-xs font-bold uppercase text-slate-500">Batch</label><select name="batch_id" class="form-field"><option value="">All batches</option>@foreach($batches as $batch)<option value="{{ $batch->id }}" @selected((int)($filters['batch_id'] ?? 0) === $batch->id)>{{ $batch->name }} {{ $batch->year }}</option>@endforeach</select></div>
         <div><label class="mb-2 block text-xs font-bold uppercase text-slate-500">Publication</label><select name="published" class="form-field"><option value="">All states</option><option value="yes" @selected(($filters['published'] ?? '') === 'yes')>Published</option><option value="no" @selected(($filters['published'] ?? '') === 'no')>Draft</option></select></div>

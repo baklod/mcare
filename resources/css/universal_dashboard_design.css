@@ -137,9 +137,18 @@
     }
 
     .universal-dashboard .dashboard-main {
-        @apply mx-auto max-w-[1440px] px-4 py-6 pb-28 sm:px-6 lg:px-8 lg:py-8 lg:pb-9;
+        @apply mx-auto w-full max-w-[1680px] px-4 py-6 pb-28 sm:px-6 lg:px-10 lg:py-8 lg:pb-9;
         animation: dashboard-content-enter 180ms ease-out both;
         view-transition-name: dashboard-main;
+    }
+
+    /* Keep role-specific pages from reintroducing a narrower max-width than
+     * the shared dashboard shell. The available viewport is the useful
+     * canvas for tables, queues, and learning-system panels. */
+    .universal-dashboard .dashboard-main > .mx-auto.max-w-7xl,
+    .universal-dashboard .dashboard-main > .max-w-7xl {
+        width: 100%;
+        max-width: none;
     }
 
     .universal-dashboard .dashboard-main :is(.rounded-2xl, .rounded-3xl) {
@@ -677,6 +686,52 @@ html[data-dashboard-theme="dark"] .universal-dashboard .secondary-action {
 
 html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-main [class*="bg-gradient-to"] {
     background-color: #172033 !important;
+}
+
+/* Calm dark theme: reduce the near-white surfaces and text that feel harsh
+ * after sunset while keeping headings and actions clearly readable. */
+html[data-dashboard-theme="dark"] {
+    background: #0d1424;
+    color: #d7dee8;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard.dashboard-shell,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-layout,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-sidebar,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-topbar,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-card,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-panel,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-stat,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-hero,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-mobile-bar {
+    background-color: #151f31 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard :is(.bg-slate-50, .bg-slate-100, .bg-stone-50, .bg-stone-100) {
+    background-color: #1d293d !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard :is(.text-slate-950, .text-slate-900, .text-slate-800, h1, h2, h3, h4) {
+    color: #e2e8f0 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard :is(.text-slate-700, .text-slate-600, .text-slate-500, .text-slate-400) {
+    color: #aeb9c9 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard :is(.text-purple-600, .text-purple-700, .text-purple-800, .text-purple-900, .text-violet-700, .text-violet-800, .text-violet-900) {
+    color: #c5b2eb !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard :is(.form-field, input, select, textarea) {
+    background-color: #101a2b !important;
+    border-color: #3b4a61 !important;
+    color: #d7dee8 !important;
+}
+
+form[data-auto-filter].is-filtering {
+    opacity: 0.72;
+    transition: opacity 160ms ease-out;
 }
 
 html[data-dashboard-theme="dark"] .account-page .secondary-action {

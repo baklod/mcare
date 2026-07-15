@@ -154,5 +154,35 @@
             @yield('content')
         </main>
     </div>
+    <script>
+        (() => {
+            // Filter selects and date fields immediately; text search waits
+            // briefly so typing does not submit a request for every letter.
+            document.querySelectorAll('form[data-auto-filter]').forEach((form) => {
+                let searchTimer = null;
+                let submitted = false;
+
+                const submitFilters = () => {
+                    if (submitted) return;
+                    submitted = true;
+                    form.classList.add('is-filtering');
+                    form.requestSubmit();
+                };
+
+                form.querySelectorAll('select, input[type="date"]').forEach((field) => {
+                    field.addEventListener('change', submitFilters);
+                });
+
+                form.querySelectorAll('input[type="search"], input[name="search"]').forEach((field) => {
+                    field.addEventListener('input', () => {
+                        window.clearTimeout(searchTimer);
+                        const value = field.value.trim();
+                        if (value.length > 0 && value.length < 2) return;
+                        searchTimer = window.setTimeout(submitFilters, 500);
+                    });
+                });
+            });
+        })();
+    </script>
 </body>
 </html>

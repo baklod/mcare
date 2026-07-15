@@ -34,7 +34,7 @@
                 </div>
             </div>
 
-            <form method="GET" action="{{ route('admin.enrollments.index') }}" class="mt-8 grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-2 xl:grid-cols-6">
+            <form method="GET" action="{{ route('admin.enrollments.index') }}" data-auto-filter class="mt-8 grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-2 xl:grid-cols-6">
                 <div class="md:col-span-2 xl:col-span-2">
                     <label for="search" class="mb-2 block text-xs font-bold uppercase text-slate-500">Search</label>
                     <input id="search" name="search" type="search" value="{{ $search }}" placeholder="Name, email, or contact number" class="form-field bg-white">

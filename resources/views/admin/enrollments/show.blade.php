@@ -178,12 +178,12 @@
             <section id="document-review" class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm sm:p-7">
                 <div>
                     <p class="text-sm font-bold uppercase text-purple-600">Applicant documents</p>
-                    <h2 class="mt-1 text-xl font-bold text-slate-900">Uploaded files and feedback</h2>
-                    <p class="mt-2 text-sm leading-6 text-slate-500">Preview files without leaving this review. Record an outcome and any problem for each document.</p>
+                    <h2 class="mt-1 text-xl font-bold text-slate-900">Documents and feedback</h2>
+                    <p class="mt-2 text-sm leading-6 text-slate-500">Preview each file and record its status and feedback in one compact review area.</p>
                 </div>
 
-                <div class="mt-6 grid items-start gap-7 lg:grid-cols-2 lg:gap-8">
-                    <div aria-label="Uploaded documents" class="space-y-3">
+                <div class="mt-6 block">
+                    <div aria-label="Uploaded documents" class="hidden">
                         <h3 class="text-sm font-bold uppercase tracking-wide text-slate-500">Uploaded documents</h3>
                         @foreach ($documents as $key => $document)
                             <article id="document-card-{{ $key }}" class="rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-shadow hover:shadow-sm">
@@ -210,7 +210,7 @@
                         @endforeach
                     </div>
 
-                    <form method="POST" action="{{ route('admin.enrollments.documents.review', $application) }}" class="space-y-4 lg:border-l lg:border-slate-100 lg:pl-7">
+                    <form method="POST" action="{{ route('admin.enrollments.documents.review', $application) }}" class="space-y-3">
                         @csrf
                         @method('PATCH')
                         <div>
@@ -222,16 +222,37 @@
                                 $storedReview = data_get($application->document_review, $key, []);
                                 $defaultDocumentStatus = $document['path'] ? 'unreviewed' : 'missing';
                             @endphp
-                            <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                                <label for="review-{{ $key }}" class="text-sm font-bold text-slate-900">{{ $document['label'] }}</label>
-                                <select id="review-{{ $key }}" name="documents[{{ $key }}][status]" class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-purple-300 focus:ring-4 focus:ring-purple-100">
+                            <div class="grid items-start gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 md:grid-cols-[minmax(14rem,0.8fr)_minmax(18rem,1.2fr)]">
+                                <div>
+                                    <div class="flex flex-wrap items-center justify-between gap-3">
+                                        <label for="review-{{ $key }}" class="text-sm font-bold text-slate-900">{{ $document['label'] }}</label>
+                                        @if ($document['path'])
+                                            <button type="button"
+                                                class="document-preview-trigger inline-flex items-center justify-center rounded-full border border-purple-200 bg-white px-3 py-1.5 text-xs font-bold text-purple-700 transition hover:border-purple-300 hover:bg-purple-50 focus:outline-none focus:ring-4 focus:ring-purple-100"
+                                                data-document-key="{{ $key }}"
+                                                data-document-label="{{ $document['label'] }}"
+                                                data-document-mime="{{ $document['mime'] ?? '' }}"
+                                                data-document-url="{{ route('admin.enrollments.documents.content', [$application, $key]) }}"
+                                                aria-haspopup="dialog">
+                                                Preview
+                                            </button>
+                                        @else
+                                            <span class="text-xs font-bold text-red-600">Missing</span>
+                                        @endif
+                                    </div>
+                                    <p class="mt-2 text-xs leading-5 text-slate-500">{{ $document['path'] ? 'Private preview; access is logged.' : 'Applicant must upload this file.' }}</p>
+                                </div>
+                                <div>
+                                    <label for="review-{{ $key }}" class="sr-only">Review status for {{ $document['label'] }}</label>
+                                    <select id="review-{{ $key }}" name="documents[{{ $key }}][status]" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-purple-300 focus:ring-4 focus:ring-purple-100">
                                     <option value="unreviewed" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'unreviewed')>Not reviewed</option>
                                     <option value="accepted" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'accepted')>Accepted</option>
                                     <option value="replace" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'replace')>Needs replacement</option>
                                     <option value="missing" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'missing')>Missing</option>
                                 </select>
-                                <label for="note-{{ $key }}" class="mt-3 block text-sm font-semibold text-slate-700">Feedback or problem found</label>
-                                <textarea id="note-{{ $key }}" name="documents[{{ $key }}][note]" rows="2" maxlength="500" class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-purple-300 focus:ring-4 focus:ring-purple-100" placeholder="Example: Image is blurry; upload a clear copy showing all corners.">{{ old("documents.$key.note", $storedReview['note'] ?? '') }}</textarea>
+                                    <label for="note-{{ $key }}" class="mt-3 block text-xs font-bold uppercase tracking-wide text-slate-500">Feedback or problem found</label>
+                                    <textarea id="note-{{ $key }}" name="documents[{{ $key }}][note]" rows="2" maxlength="500" class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-purple-300 focus:ring-4 focus:ring-purple-100" placeholder="Example: Image is blurry; upload a clear copy showing all corners.">{{ old("documents.$key.note", $storedReview['note'] ?? '') }}</textarea>
+                                </div>
                             </div>
                         @endforeach
                         <button type="submit" class="inline-flex items-center justify-center rounded-full bg-purple-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-purple-700 focus:outline-none focus:ring-4 focus:ring-purple-200">Save document feedback</button>

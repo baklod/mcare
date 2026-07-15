@@ -33,7 +33,7 @@
             @endforeach
         </div>
 
-        <form method="GET" action="{{ route('admin.payment-schedules.index') }}" class="dashboard-panel grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
+        <form method="GET" action="{{ route('admin.payment-schedules.index') }}" data-auto-filter class="dashboard-panel grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
             <div class="md:col-span-2">
                 <label for="payment-search" class="mb-2 block text-xs font-bold uppercase text-slate-500">Search enrollee or reference</label>
                 <input id="payment-search" name="search" value="{{ $filters['search'] ?? '' }}" class="form-field" placeholder="Name, email, receipt, or checkout reference">
