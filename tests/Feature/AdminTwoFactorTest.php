@@ -12,6 +12,16 @@ class AdminTwoFactorTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config()->set([
+            'services.two_factor.enabled' => true,
+            'services.two_factor.roles' => ['admin'],
+        ]);
+    }
+
     public function test_admin_password_login_requires_email_code_before_authentication(): void
     {
         Mail::fake();
