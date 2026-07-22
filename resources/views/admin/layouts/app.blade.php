@@ -52,6 +52,9 @@
         <button type="button" class="dashboard-menu-button absolute right-4 top-5" data-dashboard-menu-close aria-label="Close navigation">
             <x-dashboard-icon name="xmark" />
         </button>
+        <button type="button" class="dashboard-sidebar-collapse" data-dashboard-sidebar-collapse aria-label="Collapse navigation" title="Collapse navigation">
+            <x-dashboard-icon name="chevron-left" />
+        </button>
 
         <nav class="dashboard-nav" aria-label="Admin navigation">
             <div>

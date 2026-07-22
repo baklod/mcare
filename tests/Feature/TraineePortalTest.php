@@ -83,7 +83,7 @@ class TraineePortalTest extends TestCase
 
         foreach ([
             'trainee.modules.index' => 'Learning materials',
-            'trainee.schedule' => 'Class schedule and notices',
+            'trainee.schedule' => 'Class calendar',
             'trainee.payments' => 'Payment summary',
             'trainee.documents' => 'Submitted registration files',
         ] as $routeName => $heading) {

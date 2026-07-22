@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
+use App\Models\ModuleProgress;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
 use App\Models\User;
@@ -31,7 +32,51 @@ class AdminLearningSystemController extends Controller
             'joined_to' => ['nullable', 'date', 'after_or_equal:joined_from'],
         ]);
 
-        $query = $this->filteredTrainees($filters)->with(['batch', 'user']);
+        $query = $this->filteredTrainees($filters)->with([
+            'batch.modules' => fn ($modules) => $modules
+                ->where('is_published', true)
+                ->orderBy('published_at'),
+            'moduleProgress',
+            'user',
+        ]);
+        $trainees = $query->paginate(20)->withQueryString();
+
+        // Build one compact dashboard summary per learner from already eager-loaded
+        // payment, module, and batch data. Assessment results are deliberately not
+        // invented here because the assessment-recording phase is not implemented yet.
+        $traineeSummaries = $trainees->getCollection()->mapWithKeys(function (EnrollmentApplication $trainee) {
+            $availableModules = ($trainee->batch?->modules ?? collect())
+                ->filter(fn (TrainingModule $module) => ! $module->target_enrollment_application_id
+                    || (int) $module->target_enrollment_application_id === $trainee->id);
+            $availableModuleIds = $availableModules->pluck('id');
+            $progress = $trainee->moduleProgress
+                ->whereIn('training_module_id', $availableModuleIds->all());
+            $completedModules = $progress
+                ->where('status', ModuleProgress::STATUS_COMPLETED)
+                ->count();
+            $inProgressModules = $progress
+                ->where('status', ModuleProgress::STATUS_IN_PROGRESS)
+                ->count();
+            $totalModules = $availableModules->count();
+            $progressPercent = $totalModules > 0
+                ? (int) round($availableModules->sum(function (TrainingModule $module) use ($progress) {
+                    return (int) ($progress->firstWhere('training_module_id', $module->id)?->progress_percent ?? 0);
+                }) / $totalModules)
+                : 0;
+            $lastActivity = $progress
+                ->filter(fn (ModuleProgress $record) => $record->last_viewed_at !== null)
+                ->sortByDesc('last_viewed_at')
+                ->first()?->last_viewed_at;
+
+            return [$trainee->id => [
+                'total_modules' => $totalModules,
+                'completed_modules' => $completedModules,
+                'in_progress_modules' => $inProgressModules,
+                'progress_percent' => $progressPercent,
+                'last_activity' => $lastActivity,
+                'assessment_ready' => $totalModules > 0 && $completedModules === $totalModules,
+            ]];
+        });
 
         return view('admin.learning.trainees-lifecycle', [
             'batches' => $this->batches(),
@@ -42,7 +87,8 @@ class AdminLearningSystemController extends Controller
                 ->selectRaw('learning_status, count(*) as aggregate')
                 ->groupBy('learning_status')
                 ->pluck('aggregate', 'learning_status'),
-            'trainees' => $query->paginate(20)->withQueryString(),
+            'trainees' => $trainees,
+            'traineeSummaries' => $traineeSummaries,
         ]);
     }
 

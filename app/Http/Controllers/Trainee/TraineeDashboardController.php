@@ -8,9 +8,11 @@ use App\Models\EnrollmentApplication;
 use App\Models\ModuleProgress;
 use App\Models\TrainerAnnouncement;
 use App\Models\TrainingModule;
+use App\Services\TrainingCalendarService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -28,9 +30,33 @@ class TraineeDashboardController extends Controller
         return $this->portalView($request, 'trainee.modules.index');
     }
 
-    public function schedule(Request $request): View|RedirectResponse
+    public function schedule(Request $request, TrainingCalendarService $calendarService): View|RedirectResponse
     {
-        return $this->portalView($request, 'trainee.schedule');
+        $application = $this->approvedApplicationFor($request);
+
+        if (! $application) {
+            return redirect()
+                ->route('payment.show')
+                ->with('payment_notice', 'Your trainee dashboard opens after admin approval.');
+        }
+
+        $application->load('batch');
+        $validated = $request->validate([
+            'month' => ['nullable', 'date_format:Y-m'],
+            'date' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+        $month = isset($validated['month'])
+            ? Carbon::createFromFormat('Y-m', $validated['month'])->startOfMonth()
+            : $calendarService->suggestedMonth($application->batch);
+        $sessions = $application->batch
+            ? $calendarService->month($application->batch, $month, $application->schedule_preference)
+            : collect();
+
+        return $this->portalView($request, 'trainee.schedule', [
+            'calendarMonth' => $month,
+            'calendarSessions' => $sessions,
+            'calendarSelectedDate' => $validated['date'] ?? null,
+        ], $application);
     }
 
     public function payments(Request $request): View|RedirectResponse
@@ -43,9 +69,14 @@ class TraineeDashboardController extends Controller
         return $this->portalView($request, 'trainee.documents');
     }
 
-    private function portalView(Request $request, string $view): View|RedirectResponse
+    private function portalView(
+        Request $request,
+        string $view,
+        array $extraData = [],
+        ?EnrollmentApplication $resolvedApplication = null,
+    ): View|RedirectResponse
     {
-        $application = $this->approvedApplicationFor($request);
+        $application = $resolvedApplication ?? $this->approvedApplicationFor($request);
 
         if (! $application) {
             return redirect()
@@ -64,7 +95,7 @@ class TraineeDashboardController extends Controller
             ? 0
             : (int) round($modules->sum(fn ($module) => $progressByModule->get($module->id)?->progress_percent ?? 0) / $modules->count());
 
-        return view($view, [
+        return view($view, array_merge([
             'application' => $application,
             'batch' => $application->batch,
             'modules' => $modules,
@@ -90,7 +121,7 @@ class TraineeDashboardController extends Controller
                 ])->filter()->count(),
                 'payment' => $application->paymentStatusLabel(),
             ],
-        ]);
+        ], $extraData));
     }
 
     public function viewModule(Request $request, TrainingModule $module): View

@@ -6,8 +6,33 @@
         $formAction = $batch ? route('admin.schedules.update', $batch) : route('admin.schedules.store');
     @endphp
 
-    <section class="grid grid-cols-1 gap-6 lg:grid-cols-[420px_1fr]">
-        <aside class="rounded-3xl border border-purple-100 bg-white p-6 shadow-xl shadow-purple-100/40 sm:p-7">
+    <div class="space-y-6">
+        <header class="flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <p class="dashboard-section-kicker">Scheduling workspace</p>
+                <h1 class="dashboard-section-title mt-2 text-3xl">Training calendar</h1>
+                <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Review every batch in one calendar, select a date for its complete agenda, then create or update the recurring AM/PM schedule below.</p>
+            </div>
+            <a href="#schedule-editor" class="primary-action inline-flex w-fit items-center justify-center gap-2 text-sm font-bold">
+                <x-dashboard-icon name="calendar-days" class="h-4 w-4" />
+                {{ $batch ? 'Continue editing batch' : 'Create batch schedule' }}
+            </a>
+        </header>
+
+        <x-training-calendar
+            :month="$calendarMonth"
+            :sessions="$calendarSessions"
+            :selected-date="$calendarSelectedDate"
+            :month-route="url()->current()"
+            :editable="true"
+            eyebrow="Admin master calendar"
+            :heading="$calendarMonth->format('F Y').' schedule overview'"
+            description="AM and PM blocks from all saved batches appear together. Select a date to see the full agenda and jump directly to the recurring batch editor."
+            empty-message="No batch sessions are scheduled for this date."
+        />
+
+    <section class="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <aside id="schedule-editor" class="order-2 rounded-3xl border border-purple-100 bg-white p-6 shadow-xl shadow-purple-100/40 sm:p-7">
             <p class="text-sm font-bold uppercase text-purple-600">Batch scheduling</p>
             <h1 class="mt-2 text-3xl font-bold leading-tight text-slate-900">{{ $batch ? 'Edit batch' : 'Create batch' }}</h1>
             <p class="mt-3 text-sm leading-6 text-slate-500">
@@ -38,7 +63,6 @@
                         @error('year') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                     </div>
                 </div>
-
                 <label class="flex items-start gap-3 rounded-2xl border border-purple-100 bg-purple-50 px-4 py-3 text-sm font-semibold text-slate-700">
                     <input name="is_active" type="checkbox" value="1" @checked(old('is_active', $batch->is_active ?? false)) class="mt-1 h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500">
                     <span>Use this as the active enrollment batch for new applicants.</span>
@@ -67,6 +91,7 @@
                         @error('training_ends_at') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                     </div>
                 </div>
+                <p class="text-xs leading-5 text-slate-500">Set both training dates before sessions are published to the admin, trainer, and trainee calendars.</p>
 
                 <div class="rounded-3xl border border-slate-100 bg-slate-50 p-4">
                     <p class="text-sm font-bold uppercase text-purple-600">AM class</p>
@@ -75,8 +100,14 @@
                         <input id="am_days" name="am_days" type="text" value="{{ old('am_days', $batch->am_days ?? 'MWF') }}" required placeholder="MWF" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-purple-300 focus:ring-4 focus:ring-purple-100">
                     </div>
                     <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <input name="am_start_time" type="time" value="{{ old('am_start_time', $batch->am_start_time ?? '08:00') }}" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-purple-300 focus:ring-4 focus:ring-purple-100">
-                        <input name="am_end_time" type="time" value="{{ old('am_end_time', $batch->am_end_time ?? '12:00') }}" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-purple-300 focus:ring-4 focus:ring-purple-100">
+                        <div>
+                            <label for="am_start_time" class="mb-2 block text-xs font-bold uppercase text-slate-500">Starts</label>
+                            <input id="am_start_time" name="am_start_time" type="time" value="{{ old('am_start_time', $batch->am_start_time ?? '08:00') }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-purple-300 focus:ring-4 focus:ring-purple-100">
+                        </div>
+                        <div>
+                            <label for="am_end_time" class="mb-2 block text-xs font-bold uppercase text-slate-500">Ends</label>
+                            <input id="am_end_time" name="am_end_time" type="time" value="{{ old('am_end_time', $batch->am_end_time ?? '12:00') }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-purple-300 focus:ring-4 focus:ring-purple-100">
+                        </div>
                     </div>
                     <input name="am_room" type="text" value="{{ old('am_room', $batch->am_room ?? '') }}" placeholder="Room destination, e.g. Skills Lab A" class="mt-4 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-purple-300 focus:ring-4 focus:ring-purple-100">
                     @error('am_days') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
@@ -91,8 +122,14 @@
                         <input id="pm_days" name="pm_days" type="text" value="{{ old('pm_days', $batch->pm_days ?? 'TTS') }}" required placeholder="TTS" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-purple-300 focus:ring-4 focus:ring-purple-100">
                     </div>
                     <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <input name="pm_start_time" type="time" value="{{ old('pm_start_time', $batch->pm_start_time ?? '13:00') }}" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-purple-300 focus:ring-4 focus:ring-purple-100">
-                        <input name="pm_end_time" type="time" value="{{ old('pm_end_time', $batch->pm_end_time ?? '17:00') }}" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-purple-300 focus:ring-4 focus:ring-purple-100">
+                        <div>
+                            <label for="pm_start_time" class="mb-2 block text-xs font-bold uppercase text-slate-500">Starts</label>
+                            <input id="pm_start_time" name="pm_start_time" type="time" value="{{ old('pm_start_time', $batch->pm_start_time ?? '13:00') }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-purple-300 focus:ring-4 focus:ring-purple-100">
+                        </div>
+                        <div>
+                            <label for="pm_end_time" class="mb-2 block text-xs font-bold uppercase text-slate-500">Ends</label>
+                            <input id="pm_end_time" name="pm_end_time" type="time" value="{{ old('pm_end_time', $batch->pm_end_time ?? '17:00') }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-purple-300 focus:ring-4 focus:ring-purple-100">
+                        </div>
                     </div>
                     <input name="pm_room" type="text" value="{{ old('pm_room', $batch->pm_room ?? '') }}" placeholder="Room destination, e.g. Lecture Room 2" class="mt-4 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-purple-300 focus:ring-4 focus:ring-purple-100">
                     @error('pm_days') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
@@ -101,8 +138,9 @@
                 </div>
 
                 <div>
-                    <label for="notes" class="mb-2 block text-sm font-semibold text-slate-800">Admin notes</label>
+                    <label for="notes" class="mb-2 block text-sm font-semibold text-slate-800">Private admin notes</label>
                     <textarea id="notes" name="notes" rows="3" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">{{ old('notes', $batch->notes ?? '') }}</textarea>
+                    <p class="mt-2 text-xs leading-5 text-slate-500">Visible only to administrators; this text is never used as a learner event title.</p>
                     @error('notes') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                 </div>
 
@@ -118,7 +156,7 @@
             </form>
         </aside>
 
-        <section class="space-y-5">
+        <section class="order-1 space-y-5">
             <div class="rounded-3xl border border-purple-100 bg-white p-7 shadow-xl shadow-purple-100/40">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                     <div>
@@ -184,6 +222,7 @@
             @endif
         </section>
     </section>
+    </div>
 
     <script>
         document.querySelectorAll('[data-single-action]').forEach((form) => {

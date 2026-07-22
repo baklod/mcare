@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
+use App\Models\ModuleProgress;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
 use App\Models\User;
@@ -110,6 +111,58 @@ class AdminLearningSystemTest extends TestCase
                 'learning_status' => EnrollmentApplication::LEARNING_GRADUATED,
             ])
             ->assertForbidden();
+    }
+
+    public function test_admin_trainee_roster_shows_expandable_payment_module_and_assessment_summary(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $traineeUser = User::factory()->create(['role' => 'trainee']);
+        $trainer = User::factory()->create(['role' => 'trainer']);
+        $batch = TrainingBatch::create([
+            'name' => 'Batch Summary',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+        ]);
+        $application = $this->approvedApplication($traineeUser, $batch);
+        $application->update([
+            'payment_method' => 'online',
+            'payment_status' => EnrollmentApplication::PAYMENT_PAID,
+            'payment_amount' => 2000,
+            'payment_currency' => 'PHP',
+            'payment_reference' => 'MCARE-SUMMARY-001',
+            'payment_verified_at' => now(),
+        ]);
+        $module = TrainingModule::create([
+            'trainer_id' => $trainer->id,
+            'training_batch_id' => $batch->id,
+            'title' => 'Completed Summary Module',
+            'description' => 'Used to verify the admin trainee summary.',
+            'file_path' => 'training-modules/summary.pdf',
+            'original_file_name' => 'summary.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size' => 100,
+            'is_published' => true,
+            'published_at' => now(),
+        ]);
+        ModuleProgress::create([
+            'enrollment_application_id' => $application->id,
+            'training_module_id' => $module->id,
+            'status' => ModuleProgress::STATUS_COMPLETED,
+            'progress_percent' => 100,
+            'last_viewed_at' => now(),
+            'completed_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.trainees'))
+            ->assertOk()
+            ->assertSee('data-trainee-card', false)
+            ->assertSee('data-dashboard-sidebar-collapse', false)
+            ->assertSee('Online payment')
+            ->assertSee('1 of 1 published modules')
+            ->assertSee('Ready for trainer assessment')
+            ->assertSee('Assessment result: Not recorded yet');
     }
 
     public function test_admin_can_add_and_remove_a_training_module(): void

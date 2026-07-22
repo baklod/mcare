@@ -5,37 +5,27 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
 use App\Models\TrainingBatch;
+use App\Services\TrainingCalendarService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class BatchScheduleController extends Controller
 {
-    public function index(): View
+    public function index(Request $request, TrainingCalendarService $calendarService): View
     {
-        return view('admin.schedules.index', [
-            'batches' => TrainingBatch::query()
-                ->withCount('applications')
-                ->orderByDesc('is_active')
-                ->orderByDesc('year')
-                ->orderBy('name')
-                ->paginate(10),
-            'editingBatch' => null,
-        ]);
+        return $this->scheduleView($request, $calendarService);
     }
 
-    public function edit(TrainingBatch $trainingBatch): View
+    public function edit(
+        Request $request,
+        TrainingBatch $trainingBatch,
+        TrainingCalendarService $calendarService,
+    ): View
     {
-        return view('admin.schedules.index', [
-            'batches' => TrainingBatch::query()
-                ->withCount('applications')
-                ->orderByDesc('is_active')
-                ->orderByDesc('year')
-                ->orderBy('name')
-                ->paginate(10),
-            'editingBatch' => $trainingBatch,
-        ]);
+        return $this->scheduleView($request, $calendarService, $trainingBatch);
     }
 
     public function store(Request $request): RedirectResponse
@@ -130,8 +120,8 @@ class BatchScheduleController extends Controller
             'is_active' => ['nullable', 'boolean'],
             'enrollment_starts_at' => ['nullable', 'date'],
             'enrollment_ends_at' => ['required', 'date', 'after:now'],
-            'training_starts_at' => ['nullable', 'date'],
-            'training_ends_at' => ['nullable', 'date', 'after:training_starts_at'],
+            'training_starts_at' => ['nullable', 'required_with:training_ends_at', 'date'],
+            'training_ends_at' => ['nullable', 'required_with:training_starts_at', 'date', 'after:training_starts_at'],
             'am_start_time' => ['nullable', 'date_format:H:i'],
             'am_end_time' => ['nullable', 'date_format:H:i', 'after:am_start_time'],
             'am_room' => ['nullable', 'string', 'max:120', ...$safeText],
@@ -171,5 +161,41 @@ class BatchScheduleController extends Controller
             ->whereKeyNot($batch->id)
             ->where('is_active', true)
             ->update(['is_active' => false]);
+    }
+
+    private function scheduleView(
+        Request $request,
+        TrainingCalendarService $calendarService,
+        ?TrainingBatch $editingBatch = null,
+    ): View {
+        $validated = $request->validate([
+            'month' => ['nullable', 'date_format:Y-m'],
+            'date' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+        $activeBatch = TrainingBatch::active();
+        $defaultMonth = $calendarService->suggestedMonth($editingBatch ?? $activeBatch);
+        $month = isset($validated['month'])
+            ? Carbon::createFromFormat('Y-m', $validated['month'])->startOfMonth()
+            : $defaultMonth;
+        $calendarBatches = TrainingBatch::query()
+            ->orderByDesc('is_active')
+            ->orderByDesc('year')
+            ->orderBy('name')
+            ->get();
+        $calendarSessions = $calendarService->monthForBatches($calendarBatches, $month);
+
+        return view('admin.schedules.index', [
+            'batches' => TrainingBatch::query()
+                ->withCount('applications')
+                ->orderByDesc('is_active')
+                ->orderByDesc('year')
+                ->orderBy('name')
+                ->paginate(10)
+                ->withQueryString(),
+            'editingBatch' => $editingBatch,
+            'calendarMonth' => $month,
+            'calendarSessions' => $calendarSessions,
+            'calendarSelectedDate' => $validated['date'] ?? null,
+        ]);
     }
 }

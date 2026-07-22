@@ -8,7 +8,7 @@ use App\Models\ModuleProgress;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
 use App\Services\TraineeRosterCsv;
-use App\Services\TrainerScheduleService;
+use App\Services\TrainingCalendarService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
@@ -63,12 +63,16 @@ class TrainerPortalController extends Controller
         return $csv->download($trainees, 'mcare-trainer-trainee-summary-'.now()->format('Y-m-d').'.csv');
     }
 
-    public function sessions(Request $request, TrainerScheduleService $scheduleService): View
+    public function sessions(Request $request, TrainingCalendarService $scheduleService): View
     {
-        $validated = $request->validate(['month' => ['nullable', 'date_format:Y-m']]);
+        $validated = $request->validate([
+            'month' => ['nullable', 'date_format:Y-m'],
+            'date' => ['nullable', 'date_format:Y-m-d'],
+        ]);
         $activeBatch = TrainingBatch::active();
-        $defaultMonth = $activeBatch?->training_starts_at?->format('Y-m') ?? now()->format('Y-m');
-        $month = Carbon::createFromFormat('Y-m', $validated['month'] ?? $defaultMonth)->startOfMonth();
+        $month = isset($validated['month'])
+            ? Carbon::createFromFormat('Y-m', $validated['month'])->startOfMonth()
+            : $scheduleService->suggestedMonth($activeBatch);
         $sessions = $activeBatch ? $scheduleService->month($activeBatch, $month) : collect();
 
         return view('trainer.sessions', [
@@ -76,6 +80,7 @@ class TrainerPortalController extends Controller
             'month' => $month,
             'sessions' => $sessions,
             'sessionsByDate' => $sessions->groupBy('date_key'),
+            'calendarSelectedDate' => $validated['date'] ?? null,
         ]);
     }
 

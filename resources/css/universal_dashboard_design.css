@@ -9,6 +9,7 @@
 
     .universal-dashboard .dashboard-layout {
         @apply min-h-screen lg:pl-64;
+        transition: padding-left 200ms ease-out;
     }
 
     .universal-dashboard .dashboard-sidebar {
@@ -18,6 +19,14 @@
 
     .universal-dashboard .dashboard-sidebar.is-open {
         @apply translate-x-0;
+    }
+
+    .universal-dashboard .dashboard-sidebar-collapse {
+        @apply absolute -right-4 top-6 z-50 hidden h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-purple-700 shadow-sm outline-none transition hover:border-purple-300 hover:bg-purple-50 focus-visible:ring-2 focus-visible:ring-purple-500 lg:inline-flex;
+    }
+
+    .universal-dashboard .dashboard-sidebar-collapse .dashboard-svg-icon {
+        @apply h-4 w-4 transition-transform duration-200;
     }
 
     .universal-dashboard .dashboard-backdrop {
@@ -281,6 +290,10 @@
         @apply rotate-180;
     }
 
+    .universal-dashboard :is(.trainee-accordion-card, .trainee-filter-panel)[open] > summary .trainee-accordion-chevron {
+        @apply rotate-180;
+    }
+
     @media (prefers-reduced-motion: reduce) {
         .universal-dashboard *,
         .universal-dashboard *::before,
@@ -288,6 +301,586 @@
             scroll-behavior: auto !important;
             transition-duration: 0.01ms !important;
         }
+    }
+}
+
+.training-calendar {
+    overflow: hidden;
+    border: 1px solid #dfe4ec;
+    border-top: 4px solid #6d28d9;
+    border-radius: 0.85rem;
+    background: #ffffff;
+    color: #172033;
+}
+
+.training-calendar-toolbar {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.25rem;
+    padding: 1.25rem 1.35rem;
+    border-bottom: 1px solid #dfe4ec;
+}
+
+.training-calendar-eyebrow {
+    color: #6d28d9;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.training-calendar-heading {
+    margin-top: 0.2rem;
+    color: #0f172a;
+    font-family: "Nunito", "Inter", ui-sans-serif, system-ui, sans-serif;
+    font-size: clamp(1.35rem, 2vw, 1.8rem);
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.training-calendar-description {
+    margin-top: 0.35rem;
+    max-width: 46rem;
+    color: #64748b;
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+.training-calendar-controls,
+.training-calendar-month-form {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.training-calendar-today,
+.training-calendar-arrow,
+.training-calendar-month-form button {
+    display: inline-flex;
+    min-height: 2.65rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.65rem;
+    background: #ffffff;
+    color: #334155;
+    font-size: 0.82rem;
+    font-weight: 750;
+    transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.training-calendar-today {
+    padding-inline: 0.9rem;
+}
+
+.training-calendar-arrow {
+    width: 2.65rem;
+}
+
+.training-calendar-arrow .dashboard-svg-icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+.training-calendar-today:hover,
+.training-calendar-arrow:hover,
+.training-calendar-month-form button:hover {
+    border-color: #8b5cf6;
+    background: #f5f3ff;
+    color: #5b21b6;
+}
+
+.training-calendar :is(a, button, input):focus-visible {
+    outline: 2px solid #7c3aed;
+    outline-offset: 2px;
+}
+
+.training-calendar-month-form {
+    margin-left: 0.35rem;
+}
+
+.training-calendar-month-form input {
+    min-height: 2.65rem;
+    width: 9.3rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.65rem;
+    background: #ffffff;
+    padding-inline: 0.65rem;
+    color: #334155;
+    font-size: 0.8rem;
+    font-weight: 650;
+}
+
+.training-calendar-month-form button {
+    padding-inline: 0.75rem;
+}
+
+.training-calendar-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(19rem, 22rem);
+    min-width: 0;
+}
+
+.training-calendar-board {
+    min-width: 0;
+}
+
+.training-calendar-weekdays,
+.training-calendar-week {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.training-calendar-weekdays {
+    border-bottom: 1px solid #dfe4ec;
+    background: #f8fafc;
+}
+
+.training-calendar-weekdays span {
+    padding: 0.7rem 0.4rem;
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.training-calendar-grid {
+    background: #dfe4ec;
+}
+
+.training-calendar-week {
+    gap: 1px;
+    margin-bottom: 1px;
+}
+
+.training-calendar-week:last-child {
+    margin-bottom: 0;
+}
+
+.training-calendar-day {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    min-height: 7.25rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.45rem;
+    overflow: hidden;
+    border: 0;
+    border-radius: 0;
+    background: #ffffff;
+    padding: 0.55rem;
+    color: #334155;
+    text-align: left;
+    transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.training-calendar-day:hover {
+    background: #faf8ff;
+}
+
+.training-calendar-day.is-selected {
+    z-index: 1;
+    background: #f5f3ff;
+    box-shadow: inset 0 0 0 2px #7c3aed;
+}
+
+.training-calendar-day.is-outside-month {
+    background: #f8fafc;
+    color: #94a3b8;
+}
+
+.training-calendar-date-number {
+    display: grid;
+    width: 1.75rem;
+    height: 1.75rem;
+    place-items: center;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.training-calendar-day.is-today .training-calendar-date-number {
+    background: #6d28d9;
+    color: #ffffff;
+}
+
+.training-calendar-event-stack {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.training-calendar-event {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 0.35rem;
+    padding: 0.25rem 0.35rem;
+    font-size: 0.68rem;
+    font-weight: 750;
+    line-height: 1.25;
+}
+
+.training-calendar-event.is-am {
+    background: #ede9fe;
+    color: #5b21b6;
+}
+
+.training-calendar-event.is-pm {
+    background: #fff1d6;
+    color: #92400e;
+}
+
+.training-calendar-event-dot {
+    width: 0.42rem;
+    height: 0.42rem;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: currentColor;
+}
+
+.training-calendar-event-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.training-calendar-more {
+    color: #64748b;
+    font-size: 0.67rem;
+    font-weight: 750;
+}
+
+.training-calendar-agenda {
+    min-width: 0;
+    border-left: 1px solid #dfe4ec;
+    background: #f8fafc;
+}
+
+.training-calendar-agenda-panel {
+    padding: 1.2rem;
+}
+
+.training-calendar-agenda-panel.is-active {
+    animation: training-calendar-agenda-enter 180ms ease-out both;
+}
+
+.training-calendar-agenda-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #dfe4ec;
+}
+
+.training-calendar-agenda-heading p {
+    color: #6d28d9;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+.training-calendar-agenda-heading h3 {
+    margin-top: 0.2rem;
+    color: #0f172a;
+    font-size: 1.08rem;
+    font-weight: 800;
+}
+
+.training-calendar-agenda-heading > span {
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: #e2e8f0;
+    padding: 0.3rem 0.55rem;
+    color: #475569;
+    font-size: 0.68rem;
+    font-weight: 800;
+}
+
+.training-calendar-agenda-list {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.training-calendar-agenda-session {
+    border: 1px solid #dfe4ec;
+    border-left-width: 4px;
+    border-radius: 0.65rem;
+    background: #ffffff;
+    padding: 0.9rem;
+}
+
+.training-calendar-agenda-session.is-am {
+    border-left-color: #7c3aed;
+}
+
+.training-calendar-agenda-session.is-pm {
+    border-left-color: #d97706;
+}
+
+.training-calendar-session-time {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.7rem;
+}
+
+.training-calendar-session-time strong {
+    color: #6d28d9;
+    font-size: 0.72rem;
+    letter-spacing: 0.07em;
+}
+
+.training-calendar-agenda-session.is-pm .training-calendar-session-time strong {
+    color: #b45309;
+}
+
+.training-calendar-session-time time {
+    color: #475569;
+    font-size: 0.73rem;
+    font-weight: 750;
+}
+
+.training-calendar-agenda-session h4 {
+    margin-top: 0.6rem;
+    color: #0f172a;
+    font-size: 0.93rem;
+    font-weight: 800;
+    line-height: 1.35;
+}
+
+.training-calendar-session-batch {
+    margin-top: 0.3rem;
+    color: #64748b;
+    font-size: 0.78rem;
+    font-weight: 650;
+}
+
+.training-calendar-session-room {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+    margin-top: 0.65rem;
+    color: #64748b;
+    font-size: 0.76rem;
+    line-height: 1.4;
+}
+
+.training-calendar-session-room .dashboard-svg-icon {
+    width: 0.9rem;
+    height: 0.9rem;
+    flex: 0 0 auto;
+    margin-top: 0.08rem;
+}
+
+.training-calendar-edit-link {
+    display: inline-flex;
+    margin-top: 0.75rem;
+    color: #6d28d9;
+    font-size: 0.75rem;
+    font-weight: 800;
+}
+
+.training-calendar-edit-link:hover {
+    color: #4c1d95;
+    text-decoration: underline;
+}
+
+.training-calendar-empty {
+    display: grid;
+    min-height: 10rem;
+    place-items: center;
+    align-content: center;
+    gap: 0.65rem;
+    color: #94a3b8;
+    text-align: center;
+}
+
+.training-calendar-empty .dashboard-svg-icon {
+    width: 1.7rem;
+    height: 1.7rem;
+}
+
+.training-calendar-empty p {
+    max-width: 15rem;
+    color: #64748b;
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+
+@keyframes training-calendar-agenda-enter {
+    from { opacity: 0; transform: translateX(6px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.trainer-day-agenda {
+    position: relative;
+    display: grid;
+    gap: 0.75rem;
+    margin-left: 0.55rem;
+    padding-left: 1.35rem;
+    border-left: 2px solid #d6dce5;
+}
+
+.trainer-day-session {
+    position: relative;
+    display: flex;
+    gap: 1rem;
+    border: 1px solid #dfe4ec;
+    border-radius: 0.7rem;
+    background: #ffffff;
+    padding: 1.05rem;
+}
+
+.trainer-day-session.is-current {
+    border-color: #a78bfa;
+    background: #faf8ff;
+}
+
+.trainer-day-status-dot {
+    position: absolute;
+    top: 1.35rem;
+    left: -1.82rem;
+    width: 0.8rem;
+    height: 0.8rem;
+    border: 3px solid #f7f7fb;
+    border-radius: 999px;
+    background: #94a3b8;
+    box-sizing: content-box;
+}
+
+.trainer-day-session.is-complete .trainer-day-status-dot {
+    background: #059669;
+}
+
+.trainer-day-session.is-current .trainer-day-status-dot {
+    background: #7c3aed;
+    animation: trainer-current-session-pulse 1.8s ease-out infinite;
+}
+
+.trainer-day-state {
+    border-radius: 999px;
+    background: #e2e8f0;
+    padding: 0.23rem 0.55rem;
+    color: #475569;
+    font-size: 0.67rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.trainer-day-state.is-complete {
+    background: #d1fae5;
+    color: #047857;
+}
+
+.trainer-day-state.is-current {
+    background: #ede9fe;
+    color: #6d28d9;
+}
+
+@keyframes trainer-current-session-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgb(124 58 237 / 0); }
+    40% { box-shadow: 0 0 0 7px rgb(124 58 237 / 18%); }
+}
+
+@media (max-width: 1120px) {
+    .training-calendar-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .training-calendar-agenda {
+        border-top: 1px solid #dfe4ec;
+        border-left: 0;
+    }
+}
+
+@media (max-width: 720px) {
+    .training-calendar-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+        padding: 1rem;
+    }
+
+    .training-calendar-controls {
+        flex-wrap: wrap;
+    }
+
+    .training-calendar-month-form {
+        flex: 1 1 100%;
+        margin: 0.25rem 0 0;
+    }
+
+    .training-calendar-month-form input {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .training-calendar-day {
+        min-height: 4.15rem;
+        padding: 0.35rem;
+    }
+
+    .training-calendar-weekdays span {
+        padding-inline: 0.1rem;
+        font-size: 0.6rem;
+        letter-spacing: 0.03em;
+    }
+
+    .training-calendar-date-number {
+        width: 1.45rem;
+        height: 1.45rem;
+        font-size: 0.7rem;
+    }
+
+    .training-calendar-event-stack {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 0.2rem;
+    }
+
+    .training-calendar-event {
+        width: 0.48rem;
+        height: 0.48rem;
+        padding: 0;
+        border-radius: 999px;
+    }
+
+    .training-calendar-event-dot {
+        width: 100%;
+        height: 100%;
+    }
+
+    .training-calendar-event-label {
+        display: none;
+    }
+
+    .training-calendar-more {
+        width: 100%;
+        font-size: 0.57rem;
+    }
+
+    .training-calendar-agenda-panel {
+        padding: 1rem;
+    }
+
+    .trainer-day-agenda {
+        margin-left: 0.35rem;
+        padding-left: 1rem;
+    }
+
+    .trainer-day-status-dot {
+        left: -1.48rem;
     }
 }
 
@@ -351,6 +944,24 @@ html.dashboard-scroll-in-progress {
 @media (min-width: 1024px) {
     body.universal-dashboard {
         overflow-y: scroll;
+    }
+
+    html.dashboard-sidebar-collapsed .universal-dashboard .dashboard-sidebar {
+        transform: translateX(-100%);
+    }
+
+    html.dashboard-sidebar-collapsed .universal-dashboard .dashboard-sidebar-collapse {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+    }
+
+    html.dashboard-sidebar-collapsed .universal-dashboard .dashboard-layout {
+        padding-left: 0;
+    }
+
+    html.dashboard-sidebar-collapsed .universal-dashboard [data-dashboard-menu-open] {
+        display: inline-flex;
     }
 }
 
@@ -727,6 +1338,159 @@ html[data-dashboard-theme="dark"] .universal-dashboard :is(.form-field, input, s
     background-color: #101a2b !important;
     border-color: #3b4a61 !important;
     color: #d7dee8 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-sidebar-collapse {
+    background-color: #151f31;
+    border-color: #3b4a61;
+    color: #c5b2eb;
+}
+
+/* Keep interactive chrome calm in dark mode. The base component hover colors
+ * are intentionally light for daytime use and otherwise create a bright flash
+ * over the brand, account switcher, and sidebar control. */
+html[data-dashboard-theme="dark"] .universal-dashboard :is(.dashboard-brand:hover, .dashboard-account-summary:hover) {
+    background-color: #1d293d !important;
+    color: #d7dee8 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-sidebar-collapse:hover {
+    background-color: #243149 !important;
+    border-color: #56657c !important;
+    color: #d8c9f4 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .training-calendar {
+    border-color: #3b4a61;
+    border-top-color: #8b5cf6;
+    background: #151f31;
+    color: #d7dee8;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard :is(
+    .training-calendar-toolbar,
+    .training-calendar-weekdays,
+    .training-calendar-agenda-heading,
+    .training-calendar-agenda
+) {
+    border-color: #3b4a61;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .training-calendar-weekdays,
+html[data-dashboard-theme="dark"] .universal-dashboard .training-calendar-agenda {
+    background: #121b2c;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard :is(.training-calendar-heading, .training-calendar-agenda-heading h3, .training-calendar-agenda-session h4) {
+    color: #e2e8f0 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard :is(
+    .training-calendar-description,
+    .training-calendar-weekdays span,
+    .training-calendar-session-time time,
+    .training-calendar-session-batch,
+    .training-calendar-session-room,
+    .training-calendar-empty p,
+    .training-calendar-more
+) {
+    color: #aeb9c9 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard :is(.training-calendar-today, .training-calendar-arrow, .training-calendar-month-form button) {
+    border-color: #3b4a61;
+    background: #151f31;
+    color: #cbd5e1;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard :is(.training-calendar-today, .training-calendar-arrow, .training-calendar-month-form button):hover {
+    border-color: #6d5a94;
+    background: #243149;
+    color: #d8c9f4;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .training-calendar-grid {
+    background: #3b4a61;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .training-calendar-day {
+    background: #151f31;
+    color: #cbd5e1;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .training-calendar-day:hover {
+    background: #1d293d;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .training-calendar-day.is-selected {
+    background: #28213d;
+    box-shadow: inset 0 0 0 2px #8b5cf6;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .training-calendar-day.is-outside-month {
+    background: #101827;
+    color: #64748b;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .training-calendar-event.is-am {
+    background: #30264d;
+    color: #c4b5fd;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .training-calendar-event.is-pm {
+    background: #3c2912;
+    color: #fcd34d;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .training-calendar-agenda-heading > span {
+    background: #243149;
+    color: #b8c2d1;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .training-calendar-agenda-session {
+    border-color: #3b4a61;
+    background: #182338;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .training-calendar-agenda-session.is-am {
+    border-left-color: #8b5cf6;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .training-calendar-agenda-session.is-pm {
+    border-left-color: #d97706;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .trainer-day-agenda {
+    border-left-color: #3b4a61;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .trainer-day-session {
+    border-color: #3b4a61;
+    background: #151f31;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .trainer-day-session.is-current {
+    border-color: #6d5a94;
+    background: #28213d;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .trainer-day-status-dot {
+    border-color: #0d1424;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .trainer-day-state {
+    background: #243149;
+    color: #b8c2d1;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .trainer-day-state.is-complete {
+    background: #12352f;
+    color: #6ee7b7;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .trainer-day-state.is-current {
+    background: #30264d;
+    color: #c4b5fd;
 }
 
 form[data-auto-filter].is-filtering {

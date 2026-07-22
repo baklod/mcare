@@ -1,6 +1,7 @@
 import './bootstrap';
 
 const dashboardThemeStorageKey = 'mcare-dashboard-theme';
+const dashboardSidebarStorageKey = 'mcare-dashboard-sidebar-collapsed';
 
 const readDashboardTheme = () => {
     try {
@@ -26,15 +27,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const backdrop = document.querySelector('[data-dashboard-backdrop]');
     const openButtons = document.querySelectorAll('[data-dashboard-menu-open]');
     const closeButtons = document.querySelectorAll('[data-dashboard-menu-close]');
+    const collapseButtons = document.querySelectorAll('[data-dashboard-sidebar-collapse]');
     const accountMenus = document.querySelectorAll('[data-dashboard-account]');
     const dashboardLinks = document.querySelectorAll('.dashboard-nav-link, .dashboard-mobile-link');
     const hashLinks = document.querySelectorAll('.dashboard-nav-link[href*="#"], .dashboard-mobile-link[href*="#"]');
     const themeToggleButtons = document.querySelectorAll('[data-dashboard-theme-toggle]');
     const prefetchLinks = document.querySelectorAll('a[data-dashboard-prefetch]');
+    const trainingCalendars = document.querySelectorAll('[data-training-calendar]');
     const dashboardMain = document.querySelector('.dashboard-main');
     const protectedViewer = document.querySelector('[data-protected-module-viewer]');
     const securityEventUrl = document.querySelector('meta[name="dashboard-security-event-url"]')?.content;
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+    const desktopDashboardMedia = window.matchMedia('(min-width: 1024px)');
     let navigationLocked = false;
     let navigationUnlockTimer = null;
     let navigationSpamReported = false;
@@ -151,6 +155,21 @@ document.addEventListener('DOMContentLoaded', () => {
         window.addEventListener('afterprint', () => document.documentElement.classList.remove('protected-module-printing'));
     }
 
+    const syncSidebarAccessibility = () => {
+        if (!sidebar) return;
+
+        const isInaccessible = desktopDashboardMedia.matches
+            ? document.documentElement.classList.contains('dashboard-sidebar-collapsed')
+            : ! sidebar.classList.contains('is-open');
+
+        sidebar.inert = isInaccessible;
+        if (isInaccessible) {
+            sidebar.setAttribute('aria-hidden', 'true');
+        } else {
+            sidebar.removeAttribute('aria-hidden');
+        }
+    };
+
     const setMenuOpen = (isOpen) => {
         if (!sidebar || !backdrop) {
             return;
@@ -161,10 +180,47 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.toggle('overflow-hidden', isOpen);
 
         openButtons.forEach((button) => button.setAttribute('aria-expanded', String(isOpen)));
+        syncSidebarAccessibility();
     };
 
+    const setSidebarCollapsed = (isCollapsed) => {
+        document.documentElement.classList.toggle('dashboard-sidebar-collapsed', isCollapsed);
+        syncSidebarAccessibility();
+
+        if (isCollapsed) {
+            accountMenus.forEach((menu) => menu.removeAttribute('open'));
+            setMenuOpen(false);
+        }
+
+        collapseButtons.forEach((button) => {
+            button.setAttribute('aria-expanded', String(! isCollapsed));
+            button.setAttribute('aria-label', isCollapsed ? 'Expand navigation' : 'Collapse navigation');
+            button.setAttribute('title', isCollapsed ? 'Expand navigation' : 'Collapse navigation');
+        });
+
+        try {
+            window.localStorage.setItem(dashboardSidebarStorageKey, String(isCollapsed));
+        } catch (error) {
+            // The collapse still works for this page when storage is blocked.
+        }
+    };
+
+    setSidebarCollapsed(document.documentElement.classList.contains('dashboard-sidebar-collapsed'));
+
+    collapseButtons.forEach((button) => {
+        button.addEventListener('click', () => setSidebarCollapsed(true));
+    });
+
     openButtons.forEach((button) => {
-        button.addEventListener('click', () => setMenuOpen(true));
+        button.addEventListener('click', () => {
+            if (desktopDashboardMedia.matches
+                && document.documentElement.classList.contains('dashboard-sidebar-collapsed')) {
+                setSidebarCollapsed(false);
+                return;
+            }
+
+            setMenuOpen(true);
+        });
     });
 
     closeButtons.forEach((button) => {
@@ -172,6 +228,108 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     backdrop?.addEventListener('click', () => setMenuOpen(false));
+
+    const releaseMobileMenuOnDesktop = (event) => {
+        if (event.matches) setMenuOpen(false);
+        syncSidebarAccessibility();
+    };
+    desktopDashboardMedia.addEventListener?.('change', releaseMobileMenuOnDesktop);
+
+    // Keep the trainee roster compact: opening one learner summary closes the
+    // previously opened card while retaining native details keyboard behavior.
+    document.querySelectorAll('[data-trainee-accordion]').forEach((accordion) => {
+        const traineeCards = Array.from(accordion.querySelectorAll('[data-trainee-card]'));
+
+        traineeCards.forEach((card) => {
+            card.addEventListener('toggle', () => {
+                if (! card.open) return;
+
+                traineeCards.forEach((otherCard) => {
+                    if (otherCard !== card) otherCard.removeAttribute('open');
+                });
+            });
+        });
+    });
+
+    // Shared admin/trainer/trainee calendar behavior. Date selection swaps the
+    // complete day agenda in place, so sessions never need modal popups.
+    trainingCalendars.forEach((calendar) => {
+        const dayButtons = Array.from(calendar.querySelectorAll('[data-calendar-day]'));
+        const agendaPanels = Array.from(calendar.querySelectorAll('[data-calendar-agenda]'));
+        const agenda = calendar.querySelector('.training-calendar-agenda');
+
+        const activateDate = (date, updateHistory = true) => {
+            let selectedPanel = null;
+
+            dayButtons.forEach((button) => {
+                const isSelected = button.dataset.calendarDate === date;
+                button.classList.toggle('is-selected', isSelected);
+                button.setAttribute('aria-pressed', String(isSelected));
+            });
+
+            agendaPanels.forEach((panel) => {
+                const isSelected = panel.dataset.calendarAgenda === date;
+                panel.hidden = ! isSelected;
+                panel.classList.remove('is-active');
+                if (isSelected) selectedPanel = panel;
+            });
+
+            // Restart one short panel animation while keeping every event in
+            // the selected day visible at the same time.
+            if (selectedPanel) {
+                window.requestAnimationFrame(() => selectedPanel.classList.add('is-active'));
+            }
+
+            if (updateHistory) {
+                try {
+                    const nextUrl = new URL(window.location.href);
+                    nextUrl.searchParams.set('date', date);
+                    window.history.replaceState({}, '', nextUrl);
+                } catch (error) {
+                    // Calendar selection remains fully usable without History API access.
+                }
+            }
+        };
+
+        dayButtons.forEach((button, index) => {
+            button.addEventListener('click', () => {
+                if (button.dataset.calendarMonthUrl) {
+                    window.location.assign(button.dataset.calendarMonthUrl);
+                    return;
+                }
+
+                activateDate(button.dataset.calendarDate);
+
+                if (window.matchMedia('(max-width: 720px)').matches && agenda) {
+                    agenda.scrollIntoView({
+                        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+                        block: 'start',
+                    });
+                }
+            });
+
+            button.addEventListener('keydown', (event) => {
+                const offset = {
+                    ArrowLeft: -1,
+                    ArrowRight: 1,
+                    ArrowUp: -7,
+                    ArrowDown: 7,
+                }[event.key];
+
+                if (offset === undefined) return;
+                const target = dayButtons[index + offset];
+                if (! target) return;
+
+                event.preventDefault();
+                target.focus();
+                if (! target.dataset.calendarMonthUrl) {
+                    activateDate(target.dataset.calendarDate);
+                }
+            });
+        });
+
+        activateDate(calendar.dataset.initialDate, false);
+    });
 
     sidebar?.querySelectorAll('a, button[type="submit"]').forEach((item) => {
         item.addEventListener('click', () => setMenuOpen(false));
@@ -380,5 +538,9 @@ window.addEventListener('pageshow', () => {
 window.addEventListener('storage', (event) => {
     if (event.key === dashboardThemeStorageKey) {
         applyDashboardTheme(readDashboardTheme());
+    }
+
+    if (event.key === dashboardSidebarStorageKey) {
+        document.documentElement.classList.toggle('dashboard-sidebar-collapsed', event.newValue === 'true');
     }
 });

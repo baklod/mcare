@@ -7,7 +7,7 @@ use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
-use App\Services\TrainerScheduleService;
+use App\Services\TrainingCalendarService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -19,7 +19,7 @@ use Symfony\Component\HttpFoundation\HeaderUtils;
 
 class TrainerDashboardController extends Controller
 {
-    public function __invoke(Request $request, TrainerScheduleService $scheduleService): View
+    public function __invoke(Request $request, TrainingCalendarService $scheduleService): View
     {
         $trainer = $request->user();
         $activeBatch = TrainingBatch::active();
