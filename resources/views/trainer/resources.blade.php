@@ -1,23 +1,248 @@
-@extends('trainer.layouts.app', ['title' => 'Resources | MCARE Trainer'])
+@extends('trainer.layouts.app', ['title' => 'Classwork | MCARE Trainer'])
 
 @section('content')
-<div class="mx-auto max-w-7xl space-y-7">
-    <header class="border-b border-stone-200 pb-6"><p class="text-sm font-bold uppercase tracking-[0.16em] text-violet-700">Resources</p><h1 class="mt-2 text-3xl font-bold text-stone-950">Publish learning modules</h1><p class="mt-2 text-stone-600">Choose whether each file is visible to an entire batch or only one approved trainee.</p></header>
+@php
+    $activeBatch = $batches->firstWhere('is_active', true);
+    $publishedCount = collect($modules)->where('is_published', true)->count();
+@endphp
 
-    @if($errors->any())<div class="border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{{ $errors->first() }}</div>@endif
+<div class="lms-page" data-lms-classwork>
+    <header class="lms-class-header">
+        <div class="min-w-0">
+            <p class="lms-eyebrow">MCARE Classroom</p>
+            <h1>Classwork library</h1>
+            <p>Create learning materials, control who can see them, and revise the content without rebuilding the class page.</p>
+        </div>
+        <a href="{{ route('trainer.assessments') }}" class="secondary-action">Manage quizzes</a>
+    </header>
 
-    <form method="POST" action="{{ route('trainer.modules.store') }}" enctype="multipart/form-data" class="grid gap-5 border border-stone-200 bg-white p-6 lg:grid-cols-2">
-        @csrf
-        <div><label class="mb-2 block text-sm font-bold">Module title</label><input name="title" value="{{ old('title') }}" required maxlength="160" class="w-full border border-stone-300 px-4 py-3" placeholder="Example: Module 03 — Infection Control"></div>
-        <div><label class="mb-2 block text-sm font-bold">View-only training file</label><input name="module_file" type="file" required accept=".pdf,.jpg,.jpeg,.png,.webp,.mp4,.webm" class="w-full border border-stone-300 px-4 py-2.5"><p class="mt-2 text-xs text-stone-500">PDF, image, MP4, or WEBM · maximum 100MB</p></div>
-        <div class="lg:col-span-2"><label class="mb-2 block text-sm font-bold">Description</label><textarea name="description" required maxlength="1200" rows="3" class="w-full border border-stone-300 px-4 py-3">{{ old('description') }}</textarea></div>
-        <fieldset class="lg:col-span-2"><legend class="text-sm font-bold">Visible to</legend><div class="mt-3 grid gap-4 md:grid-cols-2">
-            <label class="border border-stone-200 p-4"><span class="flex items-center gap-2 font-bold"><input type="radio" name="audience_type" value="batch" @checked(old('audience_type', 'batch') === 'batch')> Entire batch</span><select name="training_batch_id" class="mt-3 w-full border border-stone-300 px-3 py-2"><option value="">Choose batch</option>@foreach($batches as $batch)<option value="{{ $batch->id }}" @selected((string)old('training_batch_id', $batches->firstWhere('is_active', true)?->id) === (string)$batch->id)>{{ $batch->name }} {{ $batch->year }}{{ $batch->is_active ? ' — Active' : '' }}</option>@endforeach</select></label>
-            <label class="border border-stone-200 p-4"><span class="flex items-center gap-2 font-bold"><input type="radio" name="audience_type" value="trainee" @checked(old('audience_type') === 'trainee')> Specific trainee</span><select name="target_enrollment_application_id" class="mt-3 w-full border border-stone-300 px-3 py-2"><option value="">Choose approved trainee</option>@foreach($trainees as $trainee)<option value="{{ $trainee->id }}" @selected((string)old('target_enrollment_application_id') === (string)$trainee->id)>{{ $trainee->last_name }}, {{ $trainee->first_name }} — {{ $trainee->batch?->name ?? 'No batch' }}</option>@endforeach</select></label>
-        </div></fieldset>
-        <div class="lg:col-span-2"><button class="bg-violet-700 px-6 py-3 font-bold text-white hover:bg-violet-800">Publish module</button></div>
-    </form>
+    <nav class="lms-context-tabs" aria-label="Trainer classroom sections">
+        @if(\Illuminate\Support\Facades\Route::has('trainer.stream'))
+            <a href="{{ route('trainer.stream') }}">Stream</a>
+        @endif
+        <a href="{{ route('trainer.resources') }}" class="is-active" aria-current="page">Classwork</a>
+        <a href="{{ route('trainer.trainees') }}">People</a>
+        <a href="{{ route('trainer.assessments') }}">Quizzes</a>
+    </nav>
 
-    <section class="overflow-x-auto border border-stone-200 bg-white"><table class="w-full min-w-[56rem] text-left text-sm"><thead class="bg-stone-50 text-xs uppercase text-stone-500"><tr><th class="px-5 py-4">Module</th><th class="px-5 py-4">Audience</th><th class="px-5 py-4">Batch</th><th class="px-5 py-4">Progress</th><th class="px-5 py-4">Published</th><th class="px-5 py-4">Viewer</th></tr></thead><tbody class="divide-y divide-stone-200">@forelse($modules as $module)<tr><td class="px-5 py-4"><p class="font-bold text-stone-950">{{ $module->title }}</p><p class="mt-1 text-stone-500">{{ str($module->description)->limit(80) }}</p></td><td class="px-5 py-4">{{ $module->targetTrainee ? $module->targetTrainee->first_name.' '.$module->targetTrainee->last_name : 'Entire batch' }}</td><td class="px-5 py-4">{{ $module->batch ? $module->batch->name.' '.$module->batch->year : 'All batches' }}</td><td class="px-5 py-4"><span class="font-bold text-emerald-700">{{ $module->progressRecords->where('status', 'completed')->count() }} complete</span><p class="text-xs text-stone-500">{{ $module->progressRecords->where('status', 'in_progress')->count() }} in progress</p></td><td class="px-5 py-4">{{ $module->published_at?->format('M d, Y g:i A') }}</td><td class="px-5 py-4"><a class="font-bold text-violet-700" href="{{ route('trainer.modules.show', $module) }}">Preview</a></td></tr>@empty<tr><td colspan="6" class="px-5 py-10 text-center text-stone-600">No modules published yet.</td></tr>@endforelse</tbody></table></section>
+    @if($errors->any())
+        <div class="lms-inline-alert is-danger" role="alert">
+            <strong>The classwork item was not saved.</strong>
+            <span>{{ $errors->first() }}</span>
+        </div>
+    @endif
+
+    <details class="lms-composer" data-module-composer @if($errors->any()) open @endif>
+        <summary class="lms-disclosure-summary">
+            <span class="lms-disclosure-icon" aria-hidden="true">+</span>
+            <span>
+                <strong>Create learning material</strong>
+                <small>PDF, image, or video for a class or one trainee</small>
+            </span>
+            <span class="lms-summary-action">Open composer</span>
+        </summary>
+
+        <form method="POST" action="{{ route('trainer.modules.store') }}" enctype="multipart/form-data" class="lms-form-grid lms-composer-form">
+            @csrf
+            <div class="lms-field lms-field-wide">
+                <label for="module-title">Title</label>
+                <input id="module-title" name="title" value="{{ old('title') }}" required maxlength="160" placeholder="Example: Module 03 - Infection Control">
+                @error('title')<p class="lms-field-error">{{ $message }}</p>@enderror
+            </div>
+            <div class="lms-field">
+                <label for="module-topic">Topic</label>
+                <input id="module-topic" name="topic" value="{{ old('topic') }}" maxlength="120" placeholder="Example: Basic patient care">
+            </div>
+            <div class="lms-field">
+                <label for="module-position">Order</label>
+                <input id="module-position" type="number" name="position" value="{{ old('position', 0) }}" min="0" max="999">
+            </div>
+            <div class="lms-field lms-field-wide">
+                <label for="module-description">Instructions</label>
+                <textarea id="module-description" name="description" required maxlength="1200" rows="4" placeholder="Tell trainees what to review and what they should learn.">{{ old('description') }}</textarea>
+                @error('description')<p class="lms-field-error">{{ $message }}</p>@enderror
+            </div>
+
+            <fieldset class="lms-audience-fieldset lms-field-wide" data-audience-scope>
+                <legend>Assign to</legend>
+                <div class="lms-choice-grid">
+                    <label class="lms-choice-card">
+                        <span class="lms-choice-title"><input type="radio" name="audience_type" value="batch" data-audience-control @checked(old('audience_type', 'batch') === 'batch')> Entire class</span>
+                        <span class="lms-choice-help">Everyone in one approved batch</span>
+                        <select name="training_batch_id" data-audience-batch aria-label="Choose class">
+                            <option value="">Choose class</option>
+                            @foreach($batches as $batch)
+                                <option value="{{ $batch->id }}" @selected((string) old('training_batch_id', $activeBatch?->id) === (string) $batch->id)>
+                                    {{ $batch->name }} {{ $batch->year }}{{ $batch->is_active ? ' - Active' : '' }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="lms-choice-card">
+                        <span class="lms-choice-title"><input type="radio" name="audience_type" value="trainee" data-audience-control @checked(old('audience_type') === 'trainee')> Specific trainee</span>
+                        <span class="lms-choice-help">Private support or remediation material</span>
+                        <select name="target_enrollment_application_id" data-audience-trainee aria-label="Choose trainee">
+                            <option value="">Choose approved trainee</option>
+                            @foreach($trainees as $trainee)
+                                <option value="{{ $trainee->id }}" @selected((string) old('target_enrollment_application_id') === (string) $trainee->id)>
+                                    {{ $trainee->last_name }}, {{ $trainee->first_name }} - {{ $trainee->batch?->name ?? 'No class' }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
+                </div>
+                @error('audience_type')<p class="lms-field-error">{{ $message }}</p>@enderror
+            </fieldset>
+
+            <div class="lms-field">
+                <label for="module-available-at">Available from</label>
+                <input id="module-available-at" type="datetime-local" name="available_at" value="{{ old('available_at') }}">
+            </div>
+            <div class="lms-field">
+                <label for="module-due-at">Due date</label>
+                <input id="module-due-at" type="datetime-local" name="due_at" value="{{ old('due_at') }}">
+            </div>
+            <div class="lms-field lms-field-wide">
+                <label for="module-file">Learning file</label>
+                <div class="lms-file-picker">
+                    <input id="module-file" name="module_file" type="file" required accept=".pdf,.jpg,.jpeg,.png,.webp,.mp4,.webm" data-lms-file-input>
+                    <div class="lms-file-preview" data-lms-file-preview aria-live="polite">
+                        <x-dashboard-icon name="cloud-arrow-up" />
+                        <span><strong>Choose a file</strong><small>PDF, image, MP4, or WEBM - maximum 100MB</small></span>
+                    </div>
+                </div>
+                @error('module_file')<p class="lms-field-error">{{ $message }}</p>@enderror
+            </div>
+            <div class="lms-form-options lms-field-wide">
+                <label class="lms-check">
+                    <input type="hidden" name="is_published" value="0">
+                    <input type="checkbox" name="is_published" value="1" @checked(old('is_published', true))>
+                    <span>Publish to trainees immediately</span>
+                </label>
+            </div>
+            <div class="lms-form-actions lms-field-wide">
+                <button class="primary-action">Create material</button>
+            </div>
+        </form>
+    </details>
+
+    <section aria-labelledby="classwork-list-title">
+        <div class="lms-section-heading">
+            <div>
+                <p class="lms-eyebrow">Learning materials</p>
+                <h2 id="classwork-list-title">Your classwork</h2>
+            </div>
+            <div class="lms-heading-stats">
+                <span>{{ collect($modules)->count() }} total</span>
+                <span>{{ $publishedCount }} published</span>
+            </div>
+        </div>
+
+        <div class="lms-module-grid">
+            @forelse($modules as $module)
+                @php
+                    $isPrivate = filled($module->target_enrollment_application_id);
+                    $isAvailable = ! $module->available_at || $module->available_at->isPast();
+                    $fileType = str($module->mime_type ?: pathinfo($module->original_file_name, PATHINFO_EXTENSION))->contains('pdf')
+                        ? 'PDF'
+                        : (str_starts_with((string) $module->mime_type, 'video/') ? 'Video' : 'Image');
+                @endphp
+                <article class="lms-module-card" data-module-card data-module-title="{{ str($module->title)->lower() }}">
+                    <div class="lms-module-accent" aria-hidden="true"></div>
+                    <header>
+                        <div class="lms-module-icon"><x-dashboard-icon name="book-open" /></div>
+                        <div class="lms-module-statuses">
+                            <span class="lms-status-chip {{ $module->is_published ? 'is-green' : 'is-neutral' }}">{{ $module->is_published ? 'Published' : 'Draft' }}</span>
+                            @if($isPrivate)<span class="lms-status-chip is-purple">Private</span>@endif
+                        </div>
+                    </header>
+                    <div class="lms-module-content">
+                        <p class="lms-module-topic">{{ $module->topic ?: 'Learning material' }}</p>
+                        <h3>{{ $module->title }}</h3>
+                        <p>{{ str($module->description)->limit(150) }}</p>
+                    </div>
+                    <dl class="lms-module-meta">
+                        <div><dt>Class</dt><dd>{{ $module->batch ? $module->batch->name.' '.$module->batch->year : 'General' }}</dd></div>
+                        <div><dt>Audience</dt><dd>{{ $isPrivate ? ($module->targetTrainee?->first_name.' '.$module->targetTrainee?->last_name) : 'Entire class' }}</dd></div>
+                        <div><dt>File</dt><dd>{{ $fileType }} - {{ number_format(($module->file_size ?? 0) / 1048576, 1) }} MB</dd></div>
+                        <div><dt>Due</dt><dd>{{ $module->due_at?->format('M d, Y g:i A') ?? 'No due date' }}</dd></div>
+                    </dl>
+                    <div class="lms-progress-summary">
+                        <span>{{ $module->progressRecords->where('status', 'completed')->count() }} completed</span>
+                        <span>{{ $module->progressRecords->where('status', 'in_progress')->count() }} in progress</span>
+                    </div>
+                    <footer class="lms-card-footer">
+                        <a href="{{ route('trainer.modules.show', $module) }}" class="lms-text-action">Preview</a>
+                        <div class="lms-card-actions">
+                            <form method="POST" action="{{ route('trainer.modules.update', $module) }}">
+                                @csrf
+                                @method('PATCH')
+                                <input type="hidden" name="title" value="{{ $module->title }}">
+                                <input type="hidden" name="description" value="{{ $module->description }}">
+                                <input type="hidden" name="topic" value="{{ $module->topic }}">
+                                <input type="hidden" name="position" value="{{ $module->position ?? 0 }}">
+                                <input type="hidden" name="audience_type" value="{{ $isPrivate ? 'trainee' : 'batch' }}">
+                                <input type="hidden" name="training_batch_id" value="{{ $module->training_batch_id }}">
+                                <input type="hidden" name="target_enrollment_application_id" value="{{ $module->target_enrollment_application_id }}">
+                                <input type="hidden" name="available_at" value="{{ $module->available_at?->format('Y-m-d\TH:i') }}">
+                                <input type="hidden" name="due_at" value="{{ $module->due_at?->format('Y-m-d\TH:i') }}">
+                                <input type="hidden" name="is_published" value="{{ $module->is_published ? 0 : 1 }}">
+                                <button class="lms-text-action">{{ $module->is_published ? 'Unpublish' : 'Publish' }}</button>
+                            </form>
+                            <details class="lms-inline-editor" data-module-editor>
+                                <summary>Edit</summary>
+                                <form method="POST" action="{{ route('trainer.modules.update', $module) }}" enctype="multipart/form-data" class="lms-form-grid" data-audience-scope>
+                                    @csrf
+                                    @method('PATCH')
+                                    <div class="lms-field lms-field-wide"><label for="module-{{ $module->id }}-title">Title</label><input id="module-{{ $module->id }}-title" name="title" value="{{ $module->title }}" required maxlength="160"></div>
+                                    <div class="lms-field"><label for="module-{{ $module->id }}-topic">Topic</label><input id="module-{{ $module->id }}-topic" name="topic" value="{{ $module->topic }}" maxlength="120"></div>
+                                    <div class="lms-field"><label for="module-{{ $module->id }}-position">Order</label><input id="module-{{ $module->id }}-position" type="number" name="position" value="{{ $module->position ?? 0 }}" min="0" max="999"></div>
+                                    <div class="lms-field lms-field-wide"><label for="module-{{ $module->id }}-description">Instructions</label><textarea id="module-{{ $module->id }}-description" name="description" rows="4" required maxlength="1200">{{ $module->description }}</textarea></div>
+                                    <fieldset class="lms-audience-fieldset lms-field-wide">
+                                        <legend>Assign to</legend>
+                                        <div class="lms-choice-grid">
+                                            <label class="lms-choice-card">
+                                                <span class="lms-choice-title"><input type="radio" name="audience_type" value="batch" data-audience-control @checked(! $isPrivate)> Entire class</span>
+                                                <select name="training_batch_id" data-audience-batch aria-label="Choose class">
+                                                    @foreach($batches as $batch)<option value="{{ $batch->id }}" @selected((int) $module->training_batch_id === $batch->id)>{{ $batch->name }} {{ $batch->year }}</option>@endforeach
+                                                </select>
+                                            </label>
+                                            <label class="lms-choice-card">
+                                                <span class="lms-choice-title"><input type="radio" name="audience_type" value="trainee" data-audience-control @checked($isPrivate)> Specific trainee</span>
+                                                <select name="target_enrollment_application_id" data-audience-trainee aria-label="Choose trainee">
+                                                    <option value="">Choose approved trainee</option>
+                                                    @foreach($trainees as $trainee)<option value="{{ $trainee->id }}" @selected((int) $module->target_enrollment_application_id === $trainee->id)>{{ $trainee->last_name }}, {{ $trainee->first_name }}</option>@endforeach
+                                                </select>
+                                            </label>
+                                        </div>
+                                    </fieldset>
+                                    <div class="lms-field"><label for="module-{{ $module->id }}-available">Available from</label><input id="module-{{ $module->id }}-available" type="datetime-local" name="available_at" value="{{ $module->available_at?->format('Y-m-d\TH:i') }}"></div>
+                                    <div class="lms-field"><label for="module-{{ $module->id }}-due">Due date</label><input id="module-{{ $module->id }}-due" type="datetime-local" name="due_at" value="{{ $module->due_at?->format('Y-m-d\TH:i') }}"></div>
+                                    <div class="lms-field lms-field-wide"><label for="module-{{ $module->id }}-file">Replace file (optional)</label><input id="module-{{ $module->id }}-file" name="module_file" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.mp4,.webm" data-lms-file-input><div class="lms-file-preview is-compact" data-lms-file-preview aria-live="polite"><span><strong>{{ $module->original_file_name }}</strong><small>Keep this file or choose a replacement</small></span></div></div>
+                                    <div class="lms-form-options lms-field-wide"><label class="lms-check"><input type="hidden" name="is_published" value="0"><input type="checkbox" name="is_published" value="1" @checked($module->is_published)><span>Published</span></label></div>
+                                    <div class="lms-form-actions lms-field-wide"><button type="button" class="secondary-action" data-close-inline-editor>Cancel</button><button class="primary-action">Save material</button></div>
+                                </form>
+                            </details>
+                            <form method="POST" action="{{ route('trainer.modules.destroy', $module) }}" data-confirm="Delete '{{ $module->title }}' and its recorded learner progress?">
+                                @csrf
+                                @method('DELETE')
+                                <button class="lms-text-action is-danger">Delete</button>
+                            </form>
+                        </div>
+                    </footer>
+                </article>
+            @empty
+                <div class="lms-empty-state lms-grid-empty">
+                    <x-dashboard-icon name="book-open" />
+                    <h2>No classwork yet</h2>
+                    <p>Create a learning material to begin organizing the classwork library.</p>
+                </div>
+            @endforelse
+        </div>
+
+        @if(method_exists($modules, 'hasPages') && $modules->hasPages())
+            <div class="lms-pagination">{{ $modules->links() }}</div>
+        @endif
+    </section>
 </div>
 @endsection

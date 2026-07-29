@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\ModuleProgress;
+use App\Models\Quiz;
 use App\Models\TrainerAnnouncement;
 use App\Models\TrainingModule;
 use App\Services\TrainingCalendarService;
@@ -28,6 +29,37 @@ class TraineeDashboardController extends Controller
     public function modules(Request $request): View|RedirectResponse
     {
         return $this->portalView($request, 'trainee.modules.index');
+    }
+
+    public function stream(Request $request): View|RedirectResponse
+    {
+        $application = $this->approvedApplicationFor($request);
+
+        if (! $application) {
+            return redirect()
+                ->route('payment.show')
+                ->with('payment_notice', 'Your trainee classroom opens after admin approval.');
+        }
+
+        $application->load('batch');
+
+        return view('trainee.stream', [
+            'application' => $application,
+            'announcements' => $this->visibleAnnouncementsFor($application)
+                ->with(['batch', 'trainer'])
+                ->orderByDesc('is_pinned')
+                ->orderByDesc('posted_at')
+                ->paginate(15),
+            'upcomingModules' => $this->availableModulesFor($application)
+                ->limit(5)
+                ->get(),
+            'upcomingQuizzes' => $this->availableQuizzesFor($application)
+                ->where(fn ($query) => $query->whereNull('due_at')->orWhere('due_at', '>=', now()))
+                ->orderByRaw('CASE WHEN due_at IS NULL THEN 1 ELSE 0 END')
+                ->orderBy('due_at')
+                ->limit(5)
+                ->get(),
+        ]);
     }
 
     public function schedule(Request $request, TrainingCalendarService $calendarService): View|RedirectResponse
@@ -74,8 +106,7 @@ class TraineeDashboardController extends Controller
         string $view,
         array $extraData = [],
         ?EnrollmentApplication $resolvedApplication = null,
-    ): View|RedirectResponse
-    {
+    ): View|RedirectResponse {
         $application = $resolvedApplication ?? $this->approvedApplicationFor($request);
 
         if (! $application) {
@@ -100,12 +131,9 @@ class TraineeDashboardController extends Controller
             'batch' => $application->batch,
             'modules' => $modules,
             'progressByModule' => $progressByModule,
-            'announcements' => TrainerAnnouncement::query()
+            'announcements' => $this->visibleAnnouncementsFor($application)
                 ->with(['batch', 'trainer'])
-                ->where(function ($query) use ($application) {
-                    $query->whereNull('training_batch_id')
-                        ->orWhere('training_batch_id', $application->training_batch_id);
-                })
+                ->orderByDesc('is_pinned')
                 ->latest('posted_at')
                 ->take(5)
                 ->get(),
@@ -157,10 +185,20 @@ class TraineeDashboardController extends Controller
         $this->authorizeModule($application, $module);
         abort_unless(Storage::disk('local')->exists($module->file_path), 404);
 
-        ModuleProgress::query()
-            ->where('enrollment_application_id', $application->id)
-            ->where('training_module_id', $module->id)
-            ->update(['last_viewed_at' => now()]);
+        // The protected content URL can be opened directly by the browser, so
+        // it must create the same progress baseline as the viewer page.
+        $progress = ModuleProgress::query()->firstOrCreate([
+            'enrollment_application_id' => $application->id,
+            'training_module_id' => $module->id,
+        ]);
+        if ($progress->wasRecentlyCreated || $progress->status === ModuleProgress::STATUS_NOT_STARTED) {
+            $progress->forceFill([
+                'status' => ModuleProgress::STATUS_IN_PROGRESS,
+                'progress_percent' => 10,
+                'first_opened_at' => $progress->first_opened_at ?: now(),
+            ]);
+        }
+        $progress->forceFill(['last_viewed_at' => now()])->save();
 
         AdminActivityLog::record($request->user(), 'trainee.module.content.viewed', $module, [
             'trainee_email' => $application->email,
@@ -226,6 +264,7 @@ class TraineeDashboardController extends Controller
 
         abort_unless($application, 403);
         abort_unless($module->is_published, 404);
+        abort_if($module->available_at?->isFuture(), 404);
         abort_unless(
             $module->target_enrollment_application_id === $application->id
                 || (
@@ -252,6 +291,9 @@ class TraineeDashboardController extends Controller
         return TrainingModule::query()
             ->with(['trainer', 'batch'])
             ->where('is_published', true)
+            ->where(fn ($query) => $query
+                ->whereNull('available_at')
+                ->orWhere('available_at', '<=', now()))
             ->where(function ($query) use ($application) {
                 $query->where('target_enrollment_application_id', $application->id)
                     ->orWhere(function ($batchQuery) use ($application) {
@@ -262,6 +304,41 @@ class TraineeDashboardController extends Controller
                             });
                     });
             })
+            ->orderBy('position')
             ->latest('published_at');
+    }
+
+    private function visibleAnnouncementsFor(EnrollmentApplication $application)
+    {
+        return TrainerAnnouncement::query()
+            ->where('is_published', true)
+            ->whereIn('audience', ['all', 'trainees'])
+            ->where(fn ($query) => $query
+                ->whereNull('posted_at')
+                ->orWhere('posted_at', '<=', now()))
+            ->where(fn ($query) => $query
+                ->whereNull('expires_at')
+                ->orWhere('expires_at', '>', now()))
+            ->where(function ($query) use ($application) {
+                $query->whereNull('training_batch_id')
+                    ->orWhere('training_batch_id', $application->training_batch_id);
+            });
+    }
+
+    private function availableQuizzesFor(EnrollmentApplication $application)
+    {
+        return Quiz::query()
+            ->with(['trainer', 'batch'])
+            ->released()
+            ->where(function ($query) use ($application) {
+                $query->where('target_enrollment_application_id', $application->id)
+                    ->orWhere(function ($batchQuery) use ($application) {
+                        $batchQuery->whereNull('target_enrollment_application_id')
+                            ->where(function ($scopeQuery) use ($application) {
+                                $scopeQuery->whereNull('training_batch_id')
+                                    ->orWhere('training_batch_id', $application->training_batch_id);
+                            });
+                    });
+            });
     }
 }

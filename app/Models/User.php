@@ -83,4 +83,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(TrainerAnnouncement::class, 'trainer_id');
     }
+
+    public function quizzes(): HasMany
+    {
+        return $this->hasMany(Quiz::class, 'trainer_id');
+    }
 }

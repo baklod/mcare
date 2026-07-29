@@ -1,0 +1,173 @@
+<?php
+
+namespace App\Http\Controllers\Trainee;
+
+use App\Http\Controllers\Controller;
+use App\Models\AdminActivityLog;
+use App\Models\EnrollmentApplication;
+use App\Models\Quiz;
+use App\Models\QuizAttempt;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
+
+class QuizController extends Controller
+{
+    public function index(Request $request): View|RedirectResponse
+    {
+        $application = $this->approvedApplicationFor($request);
+
+        if (! $application) {
+            return $this->approvalRedirect();
+        }
+
+        $quizzes = $this->availableQuizQuery($application)
+            ->where(fn ($query) => $query->whereNull('due_at')->orWhere('due_at', '>=', now()))
+            ->with(['trainer', 'batch'])
+            ->withCount('questions')
+            ->orderByRaw('CASE WHEN due_at IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('due_at')
+            ->latest('published_at')
+            ->get();
+        $attemptsByQuiz = QuizAttempt::query()
+            ->where('enrollment_application_id', $application->id)
+            ->whereIn('quiz_id', $quizzes->pluck('id'))
+            ->latest('attempt_number')
+            ->get()
+            ->groupBy('quiz_id');
+
+        return view('trainee.quizzes.index', [
+            'application' => $application->load('batch'),
+            'quizzes' => $quizzes,
+            'attemptsByQuiz' => $attemptsByQuiz,
+        ]);
+    }
+
+    public function show(Request $request, Quiz $quiz): View|RedirectResponse
+    {
+        $application = $this->approvedApplicationFor($request);
+
+        if (! $application) {
+            return $this->approvalRedirect();
+        }
+
+        abort_unless($quiz->isReleasedAt() && $quiz->targets($application), 404);
+        $quiz->load(['trainer', 'batch', 'questions']);
+        $attempts = $quiz->attempts()
+            ->where('enrollment_application_id', $application->id)
+            ->latest('attempt_number')
+            ->get();
+
+        return view('trainee.quizzes.show', [
+            'application' => $application,
+            'quiz' => $quiz,
+            'attempts' => $attempts,
+            'canStart' => $quiz->isOpenAt() && $quiz->attemptsRemainingFor($application) > 0,
+        ]);
+    }
+
+    public function start(Request $request, Quiz $quiz): RedirectResponse
+    {
+        $application = $this->approvedApplicationFor($request);
+
+        if (! $application) {
+            return $this->approvalRedirect();
+        }
+
+        abort_unless($quiz->isReleasedAt() && $quiz->targets($application), 404);
+
+        if (! $quiz->isOpenAt()) {
+            throw ValidationException::withMessages([
+                'quiz' => 'This quiz is closed or is not available yet.',
+            ]);
+        }
+
+        $attempt = DB::transaction(function () use ($quiz, $application): QuizAttempt {
+            $lockedQuiz = Quiz::query()->lockForUpdate()->findOrFail($quiz->id);
+
+            // Recheck the locked row so publishing or audience changes that
+            // raced with this request cannot create an unauthorized attempt.
+            abort_unless(
+                $lockedQuiz->isReleasedAt() && $lockedQuiz->targets($application),
+                404
+            );
+
+            if (! $lockedQuiz->isOpenAt()) {
+                throw ValidationException::withMessages([
+                    'quiz' => 'This quiz is closed or is not available yet.',
+                ]);
+            }
+
+            $existingAttempt = $lockedQuiz->attempts()
+                ->where('enrollment_application_id', $application->id)
+                ->where('status', QuizAttempt::STATUS_IN_PROGRESS)
+                ->latest('attempt_number')
+                ->first();
+
+            if ($existingAttempt) {
+                return $existingAttempt;
+            }
+
+            $usedAttempts = $lockedQuiz->attempts()
+                ->where('enrollment_application_id', $application->id)
+                ->count();
+
+            if ($usedAttempts >= $lockedQuiz->attempt_limit) {
+                throw ValidationException::withMessages([
+                    'quiz' => 'You have used all allowed attempts for this quiz.',
+                ]);
+            }
+
+            return QuizAttempt::create([
+                'quiz_id' => $lockedQuiz->id,
+                'enrollment_application_id' => $application->id,
+                'attempt_number' => $usedAttempts + 1,
+                'status' => QuizAttempt::STATUS_IN_PROGRESS,
+                'answers' => [],
+                'started_at' => now(),
+            ]);
+        });
+
+        AdminActivityLog::record($request->user(), 'trainee.quiz.started', $attempt, [
+            'quiz_id' => $quiz->id,
+            'quiz_title' => $quiz->title,
+            'attempt_number' => $attempt->attempt_number,
+        ]);
+
+        return redirect()->route('trainee.quiz-attempts.show', $attempt);
+    }
+
+    private function availableQuizQuery(EnrollmentApplication $application)
+    {
+        return Quiz::query()
+            ->released()
+            ->where(function ($query) use ($application) {
+                $query->where('target_enrollment_application_id', $application->id)
+                    ->orWhere(function ($batchQuery) use ($application) {
+                        $batchQuery->whereNull('target_enrollment_application_id')
+                            ->where(function ($scopeQuery) use ($application) {
+                                $scopeQuery->whereNull('training_batch_id')
+                                    ->orWhere('training_batch_id', $application->training_batch_id);
+                            });
+                    });
+            });
+    }
+
+    private function approvedApplicationFor(Request $request): ?EnrollmentApplication
+    {
+        return EnrollmentApplication::query()
+            ->where('user_id', $request->user()->id)
+            ->where('status', EnrollmentApplication::STATUS_APPROVED)
+            ->latest()
+            ->first();
+    }
+
+    private function approvalRedirect(): RedirectResponse
+    {
+        return redirect()
+            ->route('payment.show')
+            ->with('payment_notice', 'Your trainee classroom opens after admin approval.');
+    }
+}

@@ -17,12 +17,16 @@ class TrainingModule extends Model
         'target_enrollment_application_id',
         'title',
         'description',
+        'topic',
         'file_path',
         'original_file_name',
         'mime_type',
         'file_size',
         'is_published',
         'published_at',
+        'available_at',
+        'due_at',
+        'position',
     ];
 
     protected function casts(): array
@@ -30,6 +34,9 @@ class TrainingModule extends Model
         return [
             'is_published' => 'boolean',
             'published_at' => 'datetime',
+            'available_at' => 'datetime',
+            'due_at' => 'datetime',
+            'position' => 'integer',
         ];
     }
 

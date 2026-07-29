@@ -506,6 +506,331 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Use one accessible confirmation surface for destructive actions and
+    // timed quiz starts/submissions instead of browser-specific confirm boxes.
+    const confirmDialog = document.querySelector('[data-lms-confirm-dialog]');
+    const confirmMessage = confirmDialog?.querySelector('[data-lms-confirm-message]');
+    let pendingConfirmedForm = null;
+
+    document.querySelectorAll('form[data-confirm]').forEach((form) => {
+        form.addEventListener('submit', (event) => {
+            if (form.dataset.confirmed === 'true' || !confirmDialog?.showModal) {
+                delete form.dataset.confirmed;
+                return;
+            }
+
+            event.preventDefault();
+            pendingConfirmedForm = form;
+            if (confirmMessage) {
+                confirmMessage.textContent = form.dataset.confirm || 'Continue with this action?';
+            }
+            confirmDialog.showModal();
+        });
+    });
+
+    confirmDialog?.addEventListener('close', () => {
+        const form = pendingConfirmedForm;
+        pendingConfirmedForm = null;
+
+        if (confirmDialog.returnValue !== 'confirm' || !form) return;
+        form.dataset.confirmed = 'true';
+        form.requestSubmit();
+    });
+
+    // Batch and single-trainee assignment share the same form component.
+    // Disable the inactive selector so only the chosen audience reaches Laravel.
+    document.querySelectorAll('[data-audience-scope]').forEach((scope) => {
+        const controls = Array.from(scope.querySelectorAll('[data-audience-control]'));
+        const batchSelect = scope.querySelector('[data-audience-batch]');
+        const traineeSelect = scope.querySelector('[data-audience-trainee]');
+
+        const syncAudience = () => {
+            const selectedType = controls.find((control) => control.checked)?.value || 'batch';
+            if (batchSelect) batchSelect.disabled = selectedType !== 'batch';
+            if (traineeSelect) traineeSelect.disabled = selectedType !== 'trainee';
+        };
+
+        controls.forEach((control) => control.addEventListener('change', syncAudience));
+        syncAudience();
+    });
+
+    // Show the selected file immediately. This is deliberately lightweight:
+    // it previews file identity and size without reading large videos/PDFs.
+    document.querySelectorAll('[data-lms-file-input]').forEach((input) => {
+        const picker = input.closest('.lms-file-picker') || input.parentElement;
+        const preview = picker?.querySelector('[data-lms-file-preview]');
+        const activatePicker = () => input.click();
+
+        preview?.addEventListener('click', activatePicker);
+        preview?.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            activatePicker();
+        });
+        if (preview) {
+            preview.tabIndex = 0;
+            preview.setAttribute('role', 'button');
+        }
+
+        input.addEventListener('change', () => {
+            const file = input.files?.[0];
+            if (!file || !preview) return;
+
+            const sizeInMb = file.size / (1024 * 1024);
+            const strong = preview.querySelector('strong');
+            const small = preview.querySelector('small');
+            if (strong) strong.textContent = file.name;
+            if (small) small.textContent = `${sizeInMb.toFixed(sizeInMb >= 10 ? 0 : 1)} MB - ready to upload`;
+        });
+    });
+
+    document.querySelectorAll('[data-close-inline-editor]').forEach((button) => {
+        button.addEventListener('click', () => {
+            button.closest('.lms-inline-editor')?.removeAttribute('open');
+        });
+    });
+
+    document.querySelectorAll('.lms-inline-editor').forEach((editor) => {
+        editor.addEventListener('toggle', () => {
+            if (!editor.open) return;
+            window.requestAnimationFrame(() => {
+                editor.querySelector('form input:not([type="hidden"]), form textarea, form select')?.focus();
+            });
+        });
+    });
+
+    // Dynamic quiz builder. Every reindex keeps nested input names aligned
+    // with Laravel's questions[n][options][n] validation contract.
+    document.querySelectorAll('[data-quiz-builder]').forEach((builder) => {
+        const questionList = builder.querySelector('[data-quiz-question-list]');
+        const questionTemplate = builder.querySelector('[data-quiz-question-template]');
+        const addQuestionButton = builder.querySelector('[data-add-question]');
+
+        if (!questionList || !questionTemplate) return;
+
+        const updateOptionControls = (question) => {
+            const type = question.querySelector('[data-question-type]')?.value || 'multiple_choice';
+            const optionList = question.querySelector('[data-quiz-option-list]');
+            const addOptionButton = question.querySelector('[data-add-option]');
+            if (!optionList) return;
+
+            if (type === 'true_false') {
+                optionList.innerHTML = ['True', 'False'].map((label) => `
+                    <div class="lms-option-row" data-quiz-option>
+                        <span class="lms-option-letter" aria-hidden="true"></span>
+                        <label class="sr-only"></label>
+                        <input value="${label}" readonly required>
+                        <button type="button" class="lms-option-remove" data-remove-option aria-label="Remove option" hidden>x</button>
+                    </div>
+                `).join('');
+                if (addOptionButton) addOptionButton.hidden = true;
+            } else {
+                const options = Array.from(optionList.querySelectorAll('[data-quiz-option]'));
+                if (options.length < 2) {
+                    while (optionList.querySelectorAll('[data-quiz-option]').length < 4) {
+                        optionList.insertAdjacentHTML('beforeend', `
+                            <div class="lms-option-row" data-quiz-option>
+                                <span class="lms-option-letter" aria-hidden="true"></span>
+                                <label class="sr-only"></label>
+                                <input required>
+                                <button type="button" class="lms-option-remove" data-remove-option aria-label="Remove option">x</button>
+                            </div>
+                        `);
+                    }
+                }
+                optionList.querySelectorAll('input').forEach((option) => option.readOnly = false);
+                optionList.querySelectorAll('[data-remove-option]').forEach((button) => button.hidden = false);
+                if (addOptionButton) addOptionButton.hidden = false;
+            }
+        };
+
+        const reindexBuilder = () => {
+            const questions = Array.from(questionList.querySelectorAll('[data-quiz-question]'));
+
+            questions.forEach((question, questionIndex) => {
+                question.dataset.questionIndex = String(questionIndex);
+                const number = question.querySelector('.lms-question-number');
+                if (number) number.textContent = `Question ${questionIndex + 1}`;
+
+                question.querySelectorAll('[name]').forEach((field) => {
+                    field.name = field.name.replace(/questions\[(?:\d+|__INDEX__)\]/, `questions[${questionIndex}]`);
+                });
+
+                question.querySelectorAll('[id]').forEach((field) => {
+                    field.id = field.id.replace(/question-(?:\d+|__INDEX__)-/, `question-${questionIndex}-`);
+                });
+
+                const options = Array.from(question.querySelectorAll('[data-quiz-option]'));
+                const correctSelect = question.querySelector('[data-correct-option]');
+                const previousCorrect = Number(correctSelect?.value || 0);
+
+                options.forEach((option, optionIndex) => {
+                    const optionInput = option.querySelector('input');
+                    const optionLabel = option.querySelector('label');
+                    const optionLetter = option.querySelector('.lms-option-letter');
+                    const removeButton = option.querySelector('[data-remove-option]');
+                    const letter = String.fromCharCode(65 + optionIndex);
+
+                    if (optionInput) {
+                        optionInput.name = `questions[${questionIndex}][options][${optionIndex}]`;
+                        optionInput.id = `question-${questionIndex}-option-${optionIndex}`;
+                    }
+                    if (optionLabel) {
+                        optionLabel.htmlFor = optionInput?.id || '';
+                        optionLabel.textContent = `Option ${optionIndex + 1}`;
+                    }
+                    if (optionLetter) optionLetter.textContent = letter;
+                    if (removeButton) removeButton.setAttribute('aria-label', `Remove option ${optionIndex + 1}`);
+                });
+
+                if (correctSelect) {
+                    correctSelect.name = `questions[${questionIndex}][correct_option]`;
+                    correctSelect.id = `question-${questionIndex}-correct`;
+                    correctSelect.innerHTML = options.map((_, optionIndex) => {
+                        const selected = optionIndex === Math.min(previousCorrect, options.length - 1) ? ' selected' : '';
+                        return `<option value="${optionIndex}"${selected}>Option ${String.fromCharCode(65 + optionIndex)}</option>`;
+                    }).join('');
+                }
+            });
+        };
+
+        const bindQuestion = (question) => {
+            const typeSelect = question.querySelector('[data-question-type]');
+            const addOptionButton = question.querySelector('[data-add-option]');
+
+            typeSelect?.addEventListener('change', () => {
+                updateOptionControls(question);
+                reindexBuilder();
+            });
+
+            addOptionButton?.addEventListener('click', () => {
+                const optionList = question.querySelector('[data-quiz-option-list]');
+                const optionCount = optionList?.querySelectorAll('[data-quiz-option]').length || 0;
+                if (!optionList || optionCount >= 6) return;
+
+                optionList.insertAdjacentHTML('beforeend', `
+                    <div class="lms-option-row" data-quiz-option>
+                        <span class="lms-option-letter" aria-hidden="true"></span>
+                        <label class="sr-only"></label>
+                        <input required>
+                        <button type="button" class="lms-option-remove" data-remove-option aria-label="Remove option">x</button>
+                    </div>
+                `);
+                reindexBuilder();
+            });
+
+            question.addEventListener('click', (event) => {
+                const removeOptionButton = event.target.closest('[data-remove-option]');
+                if (removeOptionButton) {
+                    const options = question.querySelectorAll('[data-quiz-option]');
+                    if (options.length <= 2) return;
+                    removeOptionButton.closest('[data-quiz-option]')?.remove();
+                    reindexBuilder();
+                    return;
+                }
+
+                if (event.target.closest('[data-remove-question]')) {
+                    const questions = questionList.querySelectorAll('[data-quiz-question]');
+                    if (questions.length <= 1) {
+                        question.querySelector('textarea')?.focus();
+                        return;
+                    }
+                    question.remove();
+                    reindexBuilder();
+                }
+            });
+
+            updateOptionControls(question);
+        };
+
+        questionList.querySelectorAll('[data-quiz-question]').forEach(bindQuestion);
+
+        addQuestionButton?.addEventListener('click', () => {
+            const questionIndex = questionList.querySelectorAll('[data-quiz-question]').length;
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = questionTemplate.innerHTML
+                .replaceAll('__INDEX__', String(questionIndex))
+                .replaceAll('__NUMBER__', String(questionIndex + 1))
+                .trim();
+            const question = wrapper.firstElementChild;
+            if (!question) return;
+
+            questionList.append(question);
+            bindQuestion(question);
+            reindexBuilder();
+            question.scrollIntoView({
+                behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+                block: 'center',
+            });
+            question.querySelector('textarea')?.focus({ preventScroll: true });
+        });
+
+        reindexBuilder();
+    });
+
+    // Quiz attempts retain an authoritative server deadline. The client timer
+    // is a readable countdown only; the backend still enforces expiration.
+    document.querySelectorAll('[data-quiz-attempt]').forEach((attemptPage) => {
+        const form = attemptPage.querySelector('[data-quiz-attempt-form]');
+        const timer = attemptPage.querySelector('[data-quiz-timer]');
+        const timerValue = attemptPage.querySelector('[data-quiz-timer-value]');
+        const progress = attemptPage.querySelector('[data-answer-progress]');
+        const submitButton = attemptPage.querySelector('[data-submit-quiz]');
+        const questions = Array.from(attemptPage.querySelectorAll('[data-answer-question]'));
+        const jumps = Array.from(attemptPage.querySelectorAll('[data-question-jump]'));
+        const remainingValue = attemptPage.dataset.remainingSeconds;
+        let remainingSeconds = remainingValue === 'unlimited' ? null : Number(remainingValue || 0);
+        let autoSubmitted = false;
+
+        const updateAnswerProgress = () => {
+            const answered = questions.filter((question) => question.querySelector('input[type="radio"]:checked')).length;
+            if (progress) progress.textContent = `${answered} of ${questions.length} answered`;
+            questions.forEach((question, index) => {
+                jumps[index]?.classList.toggle('is-answered', Boolean(question.querySelector('input[type="radio"]:checked')));
+            });
+        };
+
+        const formatTime = (seconds) => {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const remainder = seconds % 60;
+            return hours > 0
+                ? `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`
+                : `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
+        };
+
+        const tick = () => {
+            if (remainingSeconds === null) {
+                timer?.classList.remove('is-warning', 'is-critical');
+                return;
+            }
+
+            if (timerValue) timerValue.textContent = formatTime(Math.max(0, remainingSeconds));
+            timer?.classList.toggle('is-warning', remainingSeconds > 60 && remainingSeconds <= 300);
+            timer?.classList.toggle('is-critical', remainingSeconds <= 60);
+
+            if (remainingSeconds <= 0) {
+                if (!autoSubmitted && form) {
+                    autoSubmitted = true;
+                    form.dataset.confirmed = 'true';
+                    form.requestSubmit();
+                }
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.textContent = 'Finalizing...';
+                }
+                return;
+            }
+
+            remainingSeconds -= 1;
+            window.setTimeout(tick, 1000);
+        };
+
+        form?.addEventListener('change', updateAnswerProgress);
+        updateAnswerProgress();
+        tick();
+    });
+
     // Native details menus remain keyboard-friendly; close only when focus/click moves away.
     document.addEventListener('click', (event) => {
         accountMenus.forEach((menu) => {
@@ -522,6 +847,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setMenuOpen(false);
         accountMenus.forEach((menu) => menu.removeAttribute('open'));
+        document.querySelectorAll('.lms-inline-editor[open]').forEach((editor) => editor.removeAttribute('open'));
     });
 });
 

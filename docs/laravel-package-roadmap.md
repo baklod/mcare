@@ -19,7 +19,7 @@ It also describes role-based access for administrators, instructors/trainers, an
 
 ## Recommended Packages
 
-### Role and Permission Control — Baseline Implemented
+### Role and Permission Control - Baseline Implemented
 
 `spatie/laravel-permission` is installed and now acts as a compatibility-safe RBAC layer. A migration creates the permission matrix, backfills existing accounts, and keeps new or changed `users.role` values synchronized with Spatie roles. Sensitive route groups require named permissions as well as their role middleware.
 
@@ -56,3 +56,9 @@ Important: Browsershot requires Node 22 or newer and Puppeteer 23 or newer. Do n
 Spatie provides route-level roles and permissions while the existing role column preserves compatibility. Browsershot remains intentionally uninstalled until certificate verification, deployment requirements, Chrome/Puppeteer sandboxing, and operational limits are designed and tested.
 
 See `docs/CYBERSECURITY_CURRENT_STATE_REPORT.md` for the verified current state and phased security roadmap.
+
+## LMS Authorization Follow-up
+
+Trainer ownership currently protects each module, announcement, and quiz after it is created. The database does not yet have an explicit trainer-to-batch assignment, so trainer authoring forms can still select any existing batch or approved trainee.
+
+Before production rollout, add a trainer/batch assignment table with effective dates and active status, then scope trainer batch lists, trainee lists, validation rules, policies, exports, announcements, modules, quizzes, and schedules through that assignment. This is intentionally separate from the current LMS lifecycle work because adding the relationship requires an administrator assignment workflow and a migration plan for existing trainer content.

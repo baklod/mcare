@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'MCARE Trainer' }}</title>
     <link rel="preload" as="image" href="{{ asset('assets/mcare-mark.png') }}" fetchpriority="high">
     <x-dashboard-theme-head />
@@ -16,13 +17,22 @@
         $navClass = 'dashboard-nav-link';
         $navIdle = '';
         $navActive = 'is-active';
-        $trainerNav = [
-            ['label' => 'Teaching Day', 'icon' => 'fa-calendar-days', 'href' => route('trainer.dashboard'), 'active' => request()->routeIs('trainer.dashboard')],
-            ['label' => 'My Trainings', 'icon' => 'fa-book-open', 'href' => route('trainer.trainings'), 'active' => request()->routeIs('trainer.trainings')],
-            ['label' => 'Trainees', 'icon' => 'fa-users', 'href' => route('trainer.trainees'), 'active' => request()->routeIs('trainer.trainees')],
-            ['label' => 'Sessions', 'icon' => 'fa-clipboard-list', 'href' => route('trainer.sessions'), 'active' => request()->routeIs('trainer.sessions')],
-            ['label' => 'Assessments', 'icon' => 'fa-square-check', 'href' => route('trainer.assessments'), 'active' => request()->routeIs('trainer.assessments')],
-            ['label' => 'Resources', 'icon' => 'fa-folder-open', 'href' => route('trainer.resources'), 'active' => request()->routeIs('trainer.resources')],
+        $trainerStreamHref = \Illuminate\Support\Facades\Route::has('trainer.stream')
+            ? route('trainer.stream')
+            : route('trainer.dashboard');
+        $trainerQuizCreateHref = \Illuminate\Support\Facades\Route::has('trainer.quizzes.create')
+            ? route('trainer.quizzes.create')
+            : route('trainer.assessments');
+        $trainerPrimaryNav = [
+            ['label' => 'Stream', 'short' => 'Stream', 'icon' => 'fa-bell', 'href' => $trainerStreamHref, 'active' => request()->routeIs('trainer.stream', 'trainer.announcements.*')],
+            ['label' => 'Classwork', 'short' => 'Classwork', 'icon' => 'fa-book-open', 'href' => route('trainer.resources'), 'active' => request()->routeIs('trainer.resources', 'trainer.modules.*')],
+            ['label' => 'Quizzes', 'short' => 'Quizzes', 'icon' => 'fa-square-check', 'href' => route('trainer.assessments'), 'active' => request()->routeIs('trainer.assessments', 'trainer.quizzes.*')],
+            ['label' => 'Calendar', 'short' => 'Calendar', 'icon' => 'fa-calendar-days', 'href' => route('trainer.sessions'), 'active' => request()->routeIs('trainer.sessions')],
+        ];
+        $trainerSecondaryNav = [
+            ['label' => 'Teaching Day', 'icon' => 'fa-gauge-high', 'href' => route('trainer.dashboard'), 'active' => request()->routeIs('trainer.dashboard')],
+            ['label' => 'Classes', 'icon' => 'fa-folder-open', 'href' => route('trainer.trainings'), 'active' => request()->routeIs('trainer.trainings')],
+            ['label' => 'People', 'icon' => 'fa-users', 'href' => route('trainer.trainees'), 'active' => request()->routeIs('trainer.trainees')],
             ['label' => 'Certificates', 'icon' => 'fa-award', 'href' => route('trainer.certificates'), 'active' => request()->routeIs('trainer.certificates')],
             ['label' => 'Reports', 'icon' => 'fa-chart-column', 'href' => route('trainer.reports'), 'active' => request()->routeIs('trainer.reports')],
         ];
@@ -46,7 +56,15 @@
         </button>
 
         <nav class="dashboard-nav" aria-label="Trainer navigation">
-            @foreach ($trainerNav as $item)
+            <p class="dashboard-menu-label">Classroom</p>
+            @foreach ($trainerPrimaryNav as $item)
+                <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainer-{{ str($item['label'])->slug() }}" class="{{ $navClass }} {{ $item['active'] ? $navActive : $navIdle }}" @if($item['active']) aria-current="page" @endif>
+                    <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
+                    <span>{{ $item['label'] }}</span>
+                </a>
+            @endforeach
+            <p class="dashboard-menu-label">Teaching tools</p>
+            @foreach ($trainerSecondaryNav as $item)
                 <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainer-{{ str($item['label'])->slug() }}" class="{{ $navClass }} {{ $item['active'] ? $navActive : $navIdle }}" @if($item['active']) aria-current="page" @endif>
                     <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
                     <span>{{ $item['label'] }}</span>
@@ -82,15 +100,20 @@
                     </button>
                     <div class="min-w-0">
                         <p class="dashboard-header-kicker">Mission Care Training Center</p>
-                        <h1 class="dashboard-header-title">{{ $title ?? 'MCARE Trainer' }}</h1>
+                        <h1 class="dashboard-header-title">
+                            <span class="dashboard-title-desktop">{{ $title ?? 'MCARE Trainer' }}</span>
+                            <span class="dashboard-title-mobile">{{ str($title ?? 'MCARE Trainer')->before('|')->trim() }}</span>
+                        </h1>
                     </div>
                 </div>
 
-                <form method="GET" action="{{ request()->routeIs('trainer.trainees') ? route('trainer.trainees') : route('trainer.dashboard') }}" class="dashboard-search">
-                    <x-dashboard-icon name="magnifying-glass" class="text-sm text-slate-400" />
-                    <input name="search" value="{{ request('search') }}" type="search" placeholder="Search trainees, sessions, modules..." class="min-w-0 flex-1 border-0 bg-transparent py-2.5 text-sm outline-none placeholder:text-slate-400">
-                    <button type="submit" class="sr-only">Search</button>
-                </form>
+                <div class="dashboard-classroom-actions">
+                    <a href="{{ $trainerStreamHref }}" class="dashboard-context-link">Open stream</a>
+                    <a href="{{ $trainerQuizCreateHref }}" class="dashboard-context-link is-primary">
+                        <span aria-hidden="true">+</span>
+                        <span>Create quiz</span>
+                    </a>
+                </div>
 
                 <details class="relative shrink-0 justify-self-end" data-dashboard-account>
                     <summary class="dashboard-account-summary">
@@ -104,10 +127,10 @@
                 </details>
             </div>
             <nav class="dashboard-mobile-bar grid-cols-4" aria-label="Mobile trainer navigation">
-                @foreach (array_slice($trainerNav, 0, 4) as $item)
+                @foreach ($trainerPrimaryNav as $item)
                     <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainer-{{ str($item['label'])->slug() }}" class="dashboard-mobile-link {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
                         <x-dashboard-icon :name="$item['icon']" />
-                        <span class="truncate">{{ $item['label'] }}</span>
+                        <span class="truncate">{{ $item['short'] }}</span>
                     </a>
                 @endforeach
             </nav>
@@ -120,5 +143,17 @@
             @yield('content')
         </main>
     </div>
+
+    <dialog class="lms-confirm-dialog" data-lms-confirm-dialog aria-labelledby="lms-confirm-title">
+        <form method="dialog" class="lms-confirm-card">
+            <span class="lms-confirm-icon" aria-hidden="true">!</span>
+            <h2 id="lms-confirm-title">Confirm action</h2>
+            <p data-lms-confirm-message>This action cannot be undone.</p>
+            <div class="lms-confirm-actions">
+                <button value="cancel" class="secondary-action">Cancel</button>
+                <button value="confirm" class="lms-danger-action">Continue</button>
+            </div>
+        </form>
+    </dialog>
 </body>
 </html>

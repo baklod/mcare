@@ -55,6 +55,11 @@ class TrainingBatch extends Model
         return $this->hasMany(TrainerAnnouncement::class);
     }
 
+    public function quizzes(): HasMany
+    {
+        return $this->hasMany(Quiz::class);
+    }
+
     public static function active(): ?self
     {
         return self::query()

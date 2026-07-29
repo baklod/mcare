@@ -231,6 +231,16 @@ class EnrollmentApplication extends Model
         return $this->hasMany(PaymentAttempt::class);
     }
 
+    public function targetedQuizzes(): HasMany
+    {
+        return $this->hasMany(Quiz::class, 'target_enrollment_application_id');
+    }
+
+    public function quizAttempts(): HasMany
+    {
+        return $this->hasMany(QuizAttempt::class, 'enrollment_application_id');
+    }
+
     public function effectivePaymentDeadline(): ?Carbon
     {
         $receiptDeadline = $this->payment_receipt_expires_at;

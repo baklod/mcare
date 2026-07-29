@@ -14,10 +14,15 @@ use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\EnrollmentPaymentController;
 use App\Http\Controllers\Trainee\TraineeDashboardController;
+use App\Http\Controllers\Trainee\QuizAttemptController as TraineeQuizAttemptController;
+use App\Http\Controllers\Trainee\QuizController as TraineeQuizController;
 use App\Http\Controllers\Trainee\TraineeSessionController;
+use App\Http\Controllers\Trainer\AnnouncementController as TrainerAnnouncementController;
+use App\Http\Controllers\Trainer\QuizController as TrainerQuizController;
 use App\Http\Controllers\Trainer\TrainerDashboardController;
 use App\Http\Controllers\Trainer\TrainerPortalController;
 use App\Http\Controllers\Trainer\TrainerSessionController;
+use App\Http\Controllers\Trainer\TrainingModuleController as TrainerTrainingModuleController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -261,6 +266,19 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/', TrainerDashboardController::class)
                     ->name('dashboard');
 
+                Route::get('/stream', [TrainerAnnouncementController::class, 'index'])
+                    ->middleware('permission:announcements.manage')
+                    ->name('stream');
+                Route::post('/announcements', [TrainerAnnouncementController::class, 'store'])
+                    ->middleware(['permission:announcements.manage', 'throttle:sensitive-mutation'])
+                    ->name('announcements.store');
+                Route::patch('/announcements/{announcement}', [TrainerAnnouncementController::class, 'update'])
+                    ->middleware(['permission:announcements.manage', 'throttle:sensitive-mutation'])
+                    ->name('announcements.update');
+                Route::delete('/announcements/{announcement}', [TrainerAnnouncementController::class, 'destroy'])
+                    ->middleware(['permission:announcements.manage', 'throttle:sensitive-mutation'])
+                    ->name('announcements.destroy');
+
                 Route::get('/trainings', [TrainerPortalController::class, 'trainings'])->name('trainings');
                 Route::get('/trainees', [TrainerPortalController::class, 'trainees'])
                     ->middleware('permission:trainees.view')
@@ -269,16 +287,45 @@ Route::middleware('throttle:global-web')->group(function () {
                     ->middleware(['permission:trainees.export', 'throttle:document-downloads'])
                     ->name('trainees.export');
                 Route::get('/sessions', [TrainerPortalController::class, 'sessions'])->name('sessions');
-                Route::get('/assessments', [TrainerPortalController::class, 'assessments'])->name('assessments');
+                Route::get('/assessments', [TrainerQuizController::class, 'index'])
+                    ->middleware('permission:quizzes.manage')
+                    ->name('assessments');
+                Route::get('/quizzes/create', [TrainerQuizController::class, 'create'])
+                    ->middleware('permission:quizzes.manage')
+                    ->name('quizzes.create');
+                Route::post('/quizzes', [TrainerQuizController::class, 'store'])
+                    ->middleware(['permission:quizzes.manage', 'throttle:sensitive-mutation'])
+                    ->name('quizzes.store');
+                Route::get('/quizzes/{quiz}/edit', [TrainerQuizController::class, 'edit'])
+                    ->middleware('permission:quizzes.manage')
+                    ->name('quizzes.edit');
+                Route::patch('/quizzes/{quiz}', [TrainerQuizController::class, 'update'])
+                    ->middleware(['permission:quizzes.manage', 'throttle:sensitive-mutation'])
+                    ->name('quizzes.update');
+                Route::patch('/quizzes/{quiz}/publication', [TrainerQuizController::class, 'publication'])
+                    ->middleware(['permission:quizzes.manage', 'throttle:sensitive-mutation'])
+                    ->name('quizzes.publication');
+                Route::delete('/quizzes/{quiz}', [TrainerQuizController::class, 'destroy'])
+                    ->middleware(['permission:quizzes.manage', 'throttle:sensitive-mutation'])
+                    ->name('quizzes.destroy');
+                Route::get('/quizzes/{quiz}/results', [TrainerQuizController::class, 'results'])
+                    ->middleware(['permission:quizzes.manage', 'permission:grades.view'])
+                    ->name('quizzes.results');
                 Route::get('/resources', [TrainerPortalController::class, 'resources'])
                     ->middleware('permission:modules.publish')
                     ->name('resources');
                 Route::get('/certificates', [TrainerPortalController::class, 'certificates'])->name('certificates');
                 Route::get('/reports', [TrainerPortalController::class, 'reports'])->name('reports');
 
-                Route::post('/modules', [TrainerDashboardController::class, 'storeModule'])
+                Route::post('/modules', [TrainerTrainingModuleController::class, 'store'])
                     ->middleware(['permission:modules.publish', 'throttle:8,1'])
                     ->name('modules.store');
+                Route::patch('/modules/{module}', [TrainerTrainingModuleController::class, 'update'])
+                    ->middleware(['permission:modules.publish', 'throttle:sensitive-mutation'])
+                    ->name('modules.update');
+                Route::delete('/modules/{module}', [TrainerTrainingModuleController::class, 'destroy'])
+                    ->middleware(['permission:modules.publish', 'throttle:sensitive-mutation'])
+                    ->name('modules.destroy');
 
                 Route::get('/modules/{module}', [TrainerDashboardController::class, 'viewModule'])
                     ->middleware('permission:modules.publish')
@@ -309,6 +356,10 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/', [TraineeDashboardController::class, 'index'])
                     ->name('dashboard');
 
+                Route::get('/stream', [TraineeDashboardController::class, 'stream'])
+                    ->middleware('permission:announcements.view')
+                    ->name('stream');
+
                 Route::get('/modules', [TraineeDashboardController::class, 'modules'])
                     ->middleware('permission:modules.view')
                     ->name('modules.index');
@@ -336,6 +387,25 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::post('/modules/{module}/security-event', [TraineeDashboardController::class, 'securityEvent'])
                     ->middleware(['permission:modules.view', 'throttle:20,1'])
                     ->name('modules.security-event');
+
+                Route::get('/quizzes', [TraineeQuizController::class, 'index'])
+                    ->middleware('permission:quizzes.take')
+                    ->name('quizzes.index');
+                Route::get('/quizzes/{quiz}', [TraineeQuizController::class, 'show'])
+                    ->middleware('permission:quizzes.take')
+                    ->name('quizzes.show');
+                Route::post('/quizzes/{quiz}/attempts', [TraineeQuizController::class, 'start'])
+                    ->middleware(['permission:quizzes.take', 'throttle:sensitive-mutation'])
+                    ->name('quizzes.start');
+                Route::get('/quiz-attempts/{attempt}', [TraineeQuizAttemptController::class, 'show'])
+                    ->middleware('permission:quizzes.take')
+                    ->name('quiz-attempts.show');
+                Route::post('/quiz-attempts/{attempt}/submit', [TraineeQuizAttemptController::class, 'submit'])
+                    ->middleware(['permission:quizzes.take', 'throttle:sensitive-mutation'])
+                    ->name('quiz-attempts.submit');
+                Route::get('/quiz-attempts/{attempt}/result', [TraineeQuizAttemptController::class, 'result'])
+                    ->middleware('permission:quizzes.take')
+                    ->name('quiz-attempts.result');
             });
         });
 });

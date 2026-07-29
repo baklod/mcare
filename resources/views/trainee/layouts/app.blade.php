@@ -15,12 +15,22 @@
         $navItem = 'dashboard-nav-link';
         $traineeName = auth()->user()?->name ?? 'Trainee';
         $traineeInitial = strtoupper(substr($traineeName, 0, 1));
-        $traineeNav = [
-            ['label' => 'Dashboard', 'short' => 'Home', 'icon' => 'fa-house', 'href' => route('trainee.dashboard'), 'active' => request()->routeIs('trainee.dashboard')],
-            ['label' => 'My Modules', 'short' => 'Modules', 'icon' => 'fa-book-open', 'href' => route('trainee.modules.index'), 'active' => request()->routeIs('trainee.modules.*')],
-            ['label' => 'Schedule', 'short' => 'Schedule', 'icon' => 'fa-calendar-days', 'href' => route('trainee.schedule'), 'active' => request()->routeIs('trainee.schedule')],
-            ['label' => 'Payments', 'short' => 'Payments', 'icon' => 'fa-credit-card', 'href' => route('trainee.payments'), 'active' => request()->routeIs('trainee.payments')],
-            ['label' => 'Documents', 'short' => 'Files', 'icon' => 'fa-folder-open', 'href' => route('trainee.documents'), 'active' => request()->routeIs('trainee.documents')],
+        $traineeStreamHref = \Illuminate\Support\Facades\Route::has('trainee.stream')
+            ? route('trainee.stream')
+            : route('trainee.dashboard');
+        $traineeQuizHref = \Illuminate\Support\Facades\Route::has('trainee.quizzes.index')
+            ? route('trainee.quizzes.index')
+            : route('trainee.modules.index');
+        $traineePrimaryNav = [
+            ['label' => 'Stream', 'short' => 'Stream', 'icon' => 'fa-bell', 'href' => $traineeStreamHref, 'active' => request()->routeIs('trainee.stream')],
+            ['label' => 'Classwork', 'short' => 'Classwork', 'icon' => 'fa-book-open', 'href' => route('trainee.modules.index'), 'active' => request()->routeIs('trainee.modules.*')],
+            ['label' => 'Quizzes', 'short' => 'Quizzes', 'icon' => 'fa-square-check', 'href' => $traineeQuizHref, 'active' => request()->routeIs('trainee.quizzes.*', 'trainee.quiz-attempts.*')],
+            ['label' => 'Calendar', 'short' => 'Calendar', 'icon' => 'fa-calendar-days', 'href' => route('trainee.schedule'), 'active' => request()->routeIs('trainee.schedule')],
+        ];
+        $traineeSecondaryNav = [
+            ['label' => 'Home', 'icon' => 'fa-house', 'href' => route('trainee.dashboard'), 'active' => request()->routeIs('trainee.dashboard')],
+            ['label' => 'Payments', 'icon' => 'fa-credit-card', 'href' => route('trainee.payments'), 'active' => request()->routeIs('trainee.payments')],
+            ['label' => 'Documents', 'icon' => 'fa-folder-open', 'href' => route('trainee.documents'), 'active' => request()->routeIs('trainee.documents')],
         ];
     @endphp
 
@@ -43,8 +53,15 @@
         </button>
 
         <nav class="dashboard-nav" aria-label="Trainee navigation">
-            <p class="dashboard-menu-label">Trainee Menu</p>
-            @foreach ($traineeNav as $item)
+            <p class="dashboard-menu-label">Classroom</p>
+            @foreach ($traineePrimaryNav as $item)
+                <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainee-{{ str($item['label'])->slug() }}" class="{{ $navItem }} {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
+                    <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
+                    <span>{{ $item['label'] }}</span>
+                </a>
+            @endforeach
+            <p class="dashboard-menu-label">My account</p>
+            @foreach ($traineeSecondaryNav as $item)
                 <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainee-{{ str($item['label'])->slug() }}" class="{{ $navItem }} {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
                     <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
                     <span>{{ $item['label'] }}</span>
@@ -70,13 +87,16 @@
     <div class="dashboard-layout">
         <header class="dashboard-topbar">
             <div class="dashboard-topbar-inner">
-                <div class="flex items-center gap-3">
+                <div class="flex min-w-0 items-center gap-3">
                     <button type="button" class="dashboard-menu-button" data-dashboard-menu-open aria-label="Open navigation">
                         <x-dashboard-icon name="bars" /><span class="hidden sm:inline">Menu</span>
                     </button>
                     <div class="min-w-0">
                         <p class="dashboard-header-kicker">Caregiving NC II Program</p>
-                        <h1 class="dashboard-header-title">{{ $title ?? 'Trainee Portal' }}</h1>
+                        <h1 class="dashboard-header-title">
+                            <span class="dashboard-title-desktop">{{ $title ?? 'Trainee Portal' }}</span>
+                            <span class="dashboard-title-mobile">{{ str($title ?? 'Trainee Portal')->before('|')->trim() }}</span>
+                        </h1>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
@@ -109,12 +129,24 @@
     </div>
 
     <nav class="dashboard-mobile-bar grid-cols-4" aria-label="Mobile trainee navigation">
-        @foreach (array_slice($traineeNav, 0, 4) as $item)
+        @foreach ($traineePrimaryNav as $item)
             <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainee-{{ str($item['label'])->slug() }}" class="dashboard-mobile-link {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
                 <x-dashboard-icon :name="$item['icon']" />
                 <span class="truncate">{{ $item['short'] }}</span>
             </a>
         @endforeach
     </nav>
+
+    <dialog class="lms-confirm-dialog" data-lms-confirm-dialog aria-labelledby="lms-confirm-title">
+        <form method="dialog" class="lms-confirm-card">
+            <span class="lms-confirm-icon" aria-hidden="true">!</span>
+            <h2 id="lms-confirm-title">Confirm action</h2>
+            <p data-lms-confirm-message>This action cannot be undone.</p>
+            <div class="lms-confirm-actions">
+                <button value="cancel" class="secondary-action">Cancel</button>
+                <button value="confirm" class="lms-danger-action">Continue</button>
+            </div>
+        </form>
+    </dialog>
 </body>
 </html>
