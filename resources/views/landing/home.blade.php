@@ -266,7 +266,8 @@
                         </div>
                     </details>
                 @else
-                    <a href="{{ route('enrollment.create') }}" class="hidden bg-purple-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-purple-800 md:inline-flex">Enroll now</a>
+                    <a href="{{ route('login') }}" class="inline-flex rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-purple-200 hover:text-purple-700">Sign in</a>
+                    <a href="{{ route('enrollment.create') }}" class="inline-flex rounded-lg bg-purple-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-purple-800">Enroll now</a>
                 @endauth
 
                 <button id="mobile-menu-open" type="button" aria-controls="mobile-sidebar" aria-expanded="false" class="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:border-purple-200 hover:text-purple-700 lg:hidden">
@@ -329,6 +330,7 @@
                         </button>
                     </form>
                 @else
+                    <a href="{{ route('login') }}" class="mb-2.5 inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 hover:border-purple-200 hover:text-purple-700">Sign in</a>
                     <a href="{{ route('enrollment.create') }}" class="inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700">Start Enrollment</a>
                 @endauth
             </div>
@@ -351,6 +353,7 @@
                         @auth
                             <a href="{{ $accountCtaUrl }}" class="inline-flex h-11 items-center justify-center rounded-full bg-purple-600 px-6 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:h-auto sm:px-7 sm:py-3.5">{{ $accountCtaLabel }}</a>
                         @else
+                            <a href="{{ route('login') }}" class="inline-flex h-11 items-center justify-center rounded-full border border-purple-200 bg-purple-50 px-6 text-sm font-bold text-purple-700 hover:bg-purple-100 sm:h-auto sm:px-7 sm:py-3.5">Sign In</a>
                             <a href="{{ route('enrollment.create') }}" class="inline-flex h-11 items-center justify-center rounded-full bg-purple-600 px-6 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:h-auto sm:px-7 sm:py-3.5">Start Enrollment</a>
                         @endauth
                         <a href="#programs" class="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 hover:border-purple-200 hover:text-purple-700 sm:h-auto sm:px-7 sm:py-3.5">View Programs</a>
