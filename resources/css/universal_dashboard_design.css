@@ -1010,14 +1010,14 @@ html.dashboard-scroll-in-progress {
 
 html[data-dashboard-theme="dark"] {
     color-scheme: dark;
-    background: #0b1020;
+    background: #080c14;
 }
 
 html[data-dashboard-theme="dark"] .universal-dashboard.dashboard-shell,
 html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-layout,
 html[data-dashboard-theme="dark"] .account-page {
-    background: #0f172a;
-    color: #e5e7eb;
+    background-color: #080c14 !important;
+    color: #f1f5f9 !important;
 }
 
 .universal-dashboard.dashboard-shell,
@@ -1032,125 +1032,94 @@ html[data-dashboard-theme="dark"] .account-page {
 .account-page,
 .account-page .account-header,
 .account-page .account-card {
-    transition-property: background-color, border-color, color;
-    transition-duration: 160ms;
+    transition-property: background-color, border-color, color, box-shadow;
+    transition-duration: 180ms;
     transition-timing-function: ease-out;
 }
 
-html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-sidebar,
-html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-topbar,
-html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-account-menu,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-sidebar {
+    background-color: #0d1322 !important;
+    border-color: #1e293b !important;
+    color: #f1f5f9 !important;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-topbar {
+    background-color: #0d1322 !important;
+    border-color: #1e293b !important;
+    color: #f1f5f9 !important;
+}
+
 html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-card,
 html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-panel,
 html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-stat,
 html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-hero,
 html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-table-wrap,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-account-menu,
 html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-mobile-bar,
 html[data-dashboard-theme="dark"] .universal-dashboard .bg-white,
 html[data-dashboard-theme="dark"] .account-header,
 html[data-dashboard-theme="dark"] .account-card {
-    background-color: #172033 !important;
-    border-color: #334155 !important;
-    color: #e5e7eb;
+    background-color: #111827 !important;
+    border-color: #1e293b !important;
+    color: #f1f5f9 !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.4) !important;
 }
 
 html[data-dashboard-theme="dark"] .universal-dashboard :is(.dashboard-table, .dashboard-table tbody, .dashboard-table tbody tr, .dashboard-table td) {
-    background-color: #172033 !important;
-    border-color: #334155 !important;
-    color: #cbd5e1 !important;
+    background-color: #111827 !important;
+    border-color: #1e293b !important;
+    color: #e2e8f0 !important;
 }
 
 html[data-dashboard-theme="dark"] .universal-dashboard :is(.dashboard-table thead, .dashboard-table th) {
-    background-color: #222d42 !important;
-    border-color: #475569 !important;
-    color: #cbd5e1 !important;
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+    color: #f8fafc !important;
 }
 
 html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-table tbody tr:hover {
-    background-color: #2e2350 !important;
-}
-
-html[data-dashboard-theme="dark"] .universal-dashboard .admin-login-card,
-html[data-dashboard-theme="dark"] .universal-dashboard .admin-login-promo,
-html[data-dashboard-theme="dark"] .universal-dashboard .admin-login-form {
-    background-color: #172033 !important;
-    background-image: none !important;
-    border-color: #475569 !important;
-}
-
-/* Keep the split login card readable even when utility styles change order. */
-html[data-dashboard-theme="dark"] body.universal-dashboard[data-dashboard-role="admin"] .dashboard-main .admin-login-promo {
-    background-color: #111827 !important;
-    background-image: none !important;
-    border-color: #334155 !important;
-}
-
-html[data-dashboard-theme="dark"] body.universal-dashboard[data-dashboard-role="admin"] .dashboard-main .admin-login-form {
-    background-color: #172033 !important;
-    background-image: none !important;
-}
-
-/* Admin login is rendered inside the shared admin shell, so explicitly style
- * every split-card surface in dark mode. This prevents the promo panel and
- * its white feature tiles from becoming low-contrast or unreadable. */
-html[data-dashboard-theme="dark"] .universal-dashboard .admin-login-card {
-    background-color: #172033 !important;
-    border-color: #475569 !important;
-    color: #e5e7eb !important;
-}
-
-html[data-dashboard-theme="dark"] .universal-dashboard .admin-login-promo {
-    background-color: #111827 !important;
-    border-color: #334155 !important;
-    color: #e5e7eb !important;
-}
-
-html[data-dashboard-theme="dark"] .universal-dashboard .admin-login-promo :is(.bg-white, .bg-slate-50) {
-    background-color: #172033 !important;
-    border-color: #334155 !important;
-}
-
-html[data-dashboard-theme="dark"] .universal-dashboard .admin-login-promo :is(h1, h2, .text-slate-900, .text-slate-950) {
-    color: #f8fafc !important;
-}
-
-html[data-dashboard-theme="dark"] .universal-dashboard .admin-login-promo :is(p, .text-slate-600, .text-slate-500) {
-    color: #cbd5e1 !important;
-}
-
-html[data-dashboard-theme="dark"] .universal-dashboard .admin-login-form :is(h1, h2, label, .text-slate-800, .text-slate-900) {
-    color: #f8fafc !important;
+    background-color: #1e1b4b !important;
 }
 
 html[data-dashboard-theme="dark"] .universal-dashboard .bg-slate-50,
 html[data-dashboard-theme="dark"] .universal-dashboard .bg-slate-100,
 html[data-dashboard-theme="dark"] .universal-dashboard .bg-stone-50,
 html[data-dashboard-theme="dark"] .universal-dashboard .bg-stone-100,
-html[data-dashboard-theme="dark"] .universal-dashboard .bg-purple-50,
 html[data-dashboard-theme="dark"] .account-page .bg-slate-50,
-html[data-dashboard-theme="dark"] .account-page .bg-slate-100,
-html[data-dashboard-theme="dark"] .account-page .bg-purple-50 {
-    background-color: #222d42 !important;
+html[data-dashboard-theme="dark"] .account-page .bg-slate-100 {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
 }
 
-html[data-dashboard-theme="dark"] :is(.universal-dashboard, .account-page) :is(.bg-purple-50\/40, .bg-purple-50\/80, .bg-violet-50, .bg-violet-100) {
-    background-color: #2e2350 !important;
+html[data-dashboard-theme="dark"] :is(.universal-dashboard, .account-page) .bg-purple-50 {
+    background-color: #2e1065 !important;
+    border-color: #581c87 !important;
+    color: #e9d5ff !important;
 }
 
-html[data-dashboard-theme="dark"] :is(.universal-dashboard, .account-page) :is(.bg-amber-50, .bg-amber-100) {
-    background-color: #422006 !important;
+html[data-dashboard-theme="dark"] :is(.universal-dashboard, .account-page) .bg-amber-50 {
+    background-color: #451a03 !important;
+    border-color: #78350f !important;
+    color: #fef3c7 !important;
 }
 
-html[data-dashboard-theme="dark"] :is(.universal-dashboard, .account-page) :is(.bg-emerald-50, .bg-emerald-100) {
-    background-color: #052e2b !important;
+html[data-dashboard-theme="dark"] :is(.universal-dashboard, .account-page) .bg-emerald-50 {
+    background-color: #064e3b !important;
+    border-color: #047857 !important;
+    color: #d1fae5 !important;
 }
 
-html[data-dashboard-theme="dark"] :is(.universal-dashboard, .account-page) :is(.bg-red-50, .bg-red-100) {
+html[data-dashboard-theme="dark"] :is(.universal-dashboard, .account-page) .bg-red-50 {
     background-color: #450a0a !important;
+    border-color: #7f1d1d !important;
+    color: #fee2e2 !important;
 }
 
-html[data-dashboard-theme="dark"] :is(.universal-dashboard, .account-page) :is(.bg-sky-50, .bg-sky-100) {
-    background-color: #082f49 !important;
+html[data-dashboard-theme="dark"] :is(.universal-dashboard, .account-page) .bg-sky-50 {
+    background-color: #0c4a6e !important;
+    border-color: #0369a1 !important;
+    color: #e0f2fe !important;
 }
 
 html[data-dashboard-theme="dark"] .universal-dashboard .text-slate-950,
@@ -1168,12 +1137,22 @@ html[data-dashboard-theme="dark"] .account-page h2 {
 html[data-dashboard-theme="dark"] .universal-dashboard .text-slate-700,
 html[data-dashboard-theme="dark"] .universal-dashboard .text-slate-600,
 html[data-dashboard-theme="dark"] .universal-dashboard .text-slate-500,
-html[data-dashboard-theme="dark"] .universal-dashboard .text-slate-400,
 html[data-dashboard-theme="dark"] .account-page .text-slate-700,
 html[data-dashboard-theme="dark"] .account-page .text-slate-600,
-html[data-dashboard-theme="dark"] .account-page .text-slate-500,
-html[data-dashboard-theme="dark"] .account-page .text-slate-400 {
-    color: #cbd5e1 !important;
+html[data-dashboard-theme="dark"] .account-page .text-slate-500 {
+    color: #94a3b8 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .secondary-action {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+    color: #f1f5f9 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .secondary-action:hover {
+    background-color: #334155 !important;
+    border-color: #475569 !important;
+    color: #ffffff !important;
 }
 
 html[data-dashboard-theme="dark"] :is(.universal-dashboard, .account-page) :is(.text-stone-950, .text-stone-900, .text-stone-800) {
