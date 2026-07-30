@@ -8,6 +8,7 @@ use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -80,39 +81,66 @@ class PaymentScheduleController extends Controller
             'payment_verification_notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        if (! $enrollmentApplication->payment_method) {
-            return back()->withErrors(['payment' => 'This enrollee has not selected a payment method.']);
+        $result = DB::transaction(function () use ($request, $validated, $enrollmentApplication): array {
+            $lockedApplication = EnrollmentApplication::query()
+                ->whereKey($enrollmentApplication->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (! $lockedApplication->payment_method) {
+                return ['error' => 'This enrollee has not selected a payment method.'];
+            }
+
+            // Recheck terminal state under the same lock used for the write.
+            if ($lockedApplication->payment_status === EnrollmentApplication::PAYMENT_PAID) {
+                return ['error' => 'This payment is already confirmed and cannot be changed from this queue.'];
+            }
+
+            if (
+                $lockedApplication->payment_method === 'online'
+                && $validated['action'] === 'verify_paid'
+            ) {
+                return ['error' => 'Online payments are confirmed only by PayMongo’s signed webhook. Admins cannot mark them paid manually.'];
+            }
+
+            $newStatus = match ($validated['action']) {
+                'verify_paid' => EnrollmentApplication::PAYMENT_PAID,
+                'mark_expired' => EnrollmentApplication::PAYMENT_EXPIRED,
+                default => $lockedApplication->payment_method === 'onsite'
+                    ? EnrollmentApplication::PAYMENT_ONSITE_PENDING
+                    : EnrollmentApplication::PAYMENT_ONLINE_PENDING,
+            };
+
+            $beforeStatus = $lockedApplication->payment_status;
+            $meta = array_merge($lockedApplication->payment_meta ?? [], [
+                'last_verification_action' => $validated['action'],
+                'last_verified_at' => now()->toIso8601String(),
+                'last_verified_by' => $request->user()->id,
+            ]);
+
+            $lockedApplication->forceFill([
+                'payment_status' => $newStatus,
+                'payment_verified_by_id' => $request->user()->id,
+                'payment_verified_at' => now(),
+                'payment_verification_notes' => $validated['payment_verification_notes'] ?? null,
+                'payment_meta' => $meta,
+            ])->save();
+
+            AdminActivityLog::record($request->user(), 'payment.verification.updated', $lockedApplication, [
+                'before' => $beforeStatus,
+                'after' => $newStatus,
+                'method' => $lockedApplication->payment_method,
+            ]);
+
+            return [
+                'name' => trim($lockedApplication->first_name.' '.$lockedApplication->last_name),
+            ];
+        }, 3);
+
+        if (isset($result['error'])) {
+            return back()->withErrors(['payment' => $result['error']]);
         }
 
-        $newStatus = match ($validated['action']) {
-            'verify_paid' => EnrollmentApplication::PAYMENT_PAID,
-            'mark_expired' => EnrollmentApplication::PAYMENT_EXPIRED,
-            default => $enrollmentApplication->payment_method === 'onsite'
-                ? EnrollmentApplication::PAYMENT_ONSITE_PENDING
-                : EnrollmentApplication::PAYMENT_ONLINE_PENDING,
-        };
-
-        $beforeStatus = $enrollmentApplication->payment_status;
-        $meta = array_merge($enrollmentApplication->payment_meta ?? [], [
-            'last_verification_action' => $validated['action'],
-            'last_verified_at' => now()->toIso8601String(),
-            'last_verified_by' => $request->user()->id,
-        ]);
-
-        $enrollmentApplication->forceFill([
-            'payment_status' => $newStatus,
-            'payment_verified_by_id' => $request->user()->id,
-            'payment_verified_at' => now(),
-            'payment_verification_notes' => $validated['payment_verification_notes'] ?? null,
-            'payment_meta' => $meta,
-        ])->save();
-
-        AdminActivityLog::record($request->user(), 'payment.verification.updated', $enrollmentApplication, [
-            'before' => $beforeStatus,
-            'after' => $newStatus,
-            'method' => $enrollmentApplication->payment_method,
-        ]);
-
-        return back()->with('saved', 'Payment verification updated for '.$enrollmentApplication->first_name.' '.$enrollmentApplication->last_name.'.');
+        return back()->with('saved', 'Payment verification updated for '.$result['name'].'.');
     }
 }

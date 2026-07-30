@@ -21,6 +21,16 @@
             'paid' => 'bg-emerald-50 text-emerald-700 ring-emerald-100',
             'expired' => 'bg-red-50 text-red-700 ring-red-100',
         ];
+        $paymentMethodLabels = [
+            'gcash' => 'GCash',
+            'card' => 'Credit / debit card',
+            'qrph' => 'QR Ph',
+            'grab_pay' => 'GrabPay',
+            'paymaya' => 'Maya',
+            'maya' => 'Maya',
+        ];
+        $paymentConfirmed = $application->payment_status === 'paid';
+        $onlineCheckoutActive = $application->payment_status === 'online_pending' && filled($activeCheckoutUrl);
     @endphp
 
     <div class="pointer-events-none fixed inset-x-0 top-0 -z-10 h-72 bg-gradient-to-b from-purple-100 via-purple-50/70 to-white"></div>
@@ -54,7 +64,7 @@
 
         @if ($errors->any())
             <div class="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold leading-6 text-red-700">
-                Please choose a valid payment method.
+                {{ $errors->first('payment') ?: 'Please choose a valid payment method.' }}
             </div>
         @endif
 
@@ -113,13 +123,17 @@
                         <p class="text-sm font-bold uppercase text-purple-600">Pay online</p>
                         <h2 class="mt-2 text-2xl font-bold text-slate-900">PayMongo secured checkout</h2>
                     </div>
-                    <span class="rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700 ring-1 ring-purple-100">GCash ready</span>
+                    <span class="rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700 ring-1 ring-purple-100">
+                        {{ $paymongoLiveMode ? 'Live checkout' : 'Test checkout' }}
+                    </span>
                 </div>
 
                 <div class="mt-6 rounded-3xl border border-slate-100 bg-slate-50 p-5">
                     <div class="grid grid-cols-2 gap-3">
-                        @foreach (['GCash', 'Cards', 'Maya', 'GrabPay'] as $method)
-                            <div class="rounded-2xl border border-slate-100 bg-white px-4 py-3 text-sm font-bold text-slate-700">{{ $method }}</div>
+                        @foreach ($paymongoMethods as $method)
+                            <div class="rounded-2xl border border-slate-100 bg-white px-4 py-3 text-sm font-bold text-slate-700">
+                                {{ $paymentMethodLabels[$method] ?? str($method)->replace('_', ' ')->title() }}
+                            </div>
                         @endforeach
                     </div>
                     <div class="mt-5 rounded-2xl border border-purple-100 bg-white p-4">
@@ -134,16 +148,46 @@
                 </div>
 
                 <div class="mt-6 space-y-3 text-sm leading-6 text-slate-600">
-                    <p class="font-semibold text-slate-700">Protected handoff: encrypted checkout session, one payment reference, and no card data stored in MCARE.</p>
-                    @unless ($paymongoConfigured)
+                    <p class="font-semibold text-slate-700">Protected handoff: server-created checkout, retry-safe payment reference, and no card or wallet credentials stored in MCARE.</p>
+                    @if (! $paymongoConfigured)
                         <p class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 font-semibold text-amber-800">
-                            PayMongo UI is prepared. Live checkout needs PayMongo API keys before real GCash/card collection.
+                            Online checkout is not configured yet. No payment will be sent until a valid server-side key is available.
                         </p>
-                    @endunless
+                    @elseif (! $paymongoWebhookConfigured)
+                        <p class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 font-semibold text-amber-800">
+                            Checkout is paused until the separate PayMongo webhook signing secret is added. This prevents an unverified browser return from being treated as paid.
+                        </p>
+                    @elseif ($paymongoModeConflict)
+                        <p class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 font-semibold text-amber-800">
+                            A checkout from a different PayMongo mode is still active. Contact MCARE before starting another checkout.
+                        </p>
+                    @elseif (! $paymongoLiveMode)
+                        <p class="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 font-semibold text-sky-800">
+                            Test mode is active. Use PayMongo test payment details only; no real funds will be collected.
+                        </p>
+                    @endif
+                    @if ($application->payment_status === 'online_pending')
+                        <p id="payment-confirmation-status" class="rounded-2xl border border-purple-200 bg-purple-50 px-4 py-3 font-semibold text-purple-800" aria-live="polite">
+                            Waiting for PayMongo’s signed confirmation. This page checks securely in the background.
+                        </p>
+                    @endif
                 </div>
 
-                <button type="submit" data-action-button class="mt-7 inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-6 py-4 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700">
-                    Choose Pay Online
+                <button
+                    type="submit"
+                    data-action-button
+                    @disabled(! $paymongoReady || $paymentConfirmed || $paymongoModeConflict)
+                    class="mt-7 inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-6 py-4 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
+                >
+                    @if ($paymentConfirmed)
+                        Payment confirmed
+                    @elseif ($onlineCheckoutActive)
+                        Continue secure checkout
+                    @elseif ($paymongoLiveMode)
+                        Open secure checkout
+                    @else
+                        Open test checkout
+                    @endif
                 </button>
             </form>
 
@@ -180,7 +224,12 @@
                 </p>
 
                 <div class="mt-7 grid gap-3 sm:grid-cols-2">
-                    <button type="submit" data-action-button class="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-4 text-sm font-bold text-white shadow-lg shadow-slate-200 hover:bg-slate-800">
+                    <button
+                        type="submit"
+                        data-action-button
+                        @disabled($paymentConfirmed || $application->payment_status === 'online_pending')
+                        class="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-4 text-sm font-bold text-white shadow-lg shadow-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
+                    >
                         Choose Pay on Site
                     </button>
                     @if ($application->payment_receipt_number)
@@ -220,6 +269,51 @@
                 });
             });
         });
+
+        @if ($application->payment_status === 'online_pending')
+            // The status endpoint reads only MCARE's server-side record; no
+            // browser query parameter can turn a pending payment into paid.
+            const paymentStatusUrl = @json(route('payment.status'));
+            const confirmationStatus = document.getElementById('payment-confirmation-status');
+            let paymentStatusChecks = 0;
+            const paymentStatusTimer = window.setInterval(async () => {
+                paymentStatusChecks += 1;
+
+                try {
+                    const response = await fetch(paymentStatusUrl, {
+                        credentials: 'same-origin',
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        cache: 'no-store',
+                    });
+
+                    if (response.ok) {
+                        const status = await response.json();
+
+                        if (status.paid === true) {
+                            window.clearInterval(paymentStatusTimer);
+                            if (confirmationStatus) {
+                                confirmationStatus.textContent = 'Payment confirmed securely. Updating your record...';
+                            }
+                            window.setTimeout(() => window.location.reload(), 500);
+                            return;
+                        }
+                    }
+                } catch (error) {
+                    // A temporary network issue leaves the payment pending and
+                    // the next bounded check can recover without user action.
+                }
+
+                if (paymentStatusChecks >= 20) {
+                    window.clearInterval(paymentStatusTimer);
+                    if (confirmationStatus) {
+                        confirmationStatus.textContent = 'Confirmation is still pending. You can safely refresh this page later.';
+                    }
+                }
+            }, 3000);
+        @endif
     </script>
 </body>
 </html>

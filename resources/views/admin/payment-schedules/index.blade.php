@@ -121,7 +121,11 @@
                                         @method('PATCH')
                                         <textarea name="payment_verification_notes" rows="2" maxlength="1000" class="form-field" placeholder="Optional verification note">{{ $application->payment_verification_notes }}</textarea>
                                         <div class="flex flex-wrap gap-2">
-                                            <button name="action" value="verify_paid" class="min-h-10 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white hover:bg-emerald-800">Verify paid</button>
+                                            @if ($application->payment_method === 'onsite')
+                                                <button name="action" value="verify_paid" class="min-h-10 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white hover:bg-emerald-800">Verify paid</button>
+                                            @else
+                                                <span class="inline-flex min-h-10 items-center rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-bold text-sky-800">Auto-verification only</span>
+                                            @endif
                                             <button name="action" value="return_pending" class="min-h-10 rounded-lg border border-amber-200 bg-white px-3 text-xs font-bold text-amber-800 hover:bg-amber-50">Pending</button>
                                             <button name="action" value="mark_expired" class="min-h-10 rounded-lg border border-red-200 bg-white px-3 text-xs font-bold text-red-700 hover:bg-red-50">Expire</button>
                                         </div>

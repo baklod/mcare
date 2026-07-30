@@ -32,6 +32,12 @@ return [
         'public_key' => env('PAYMONGO_PUBLIC_KEY'),
         'secret_key' => env('PAYMONGO_SECRET_KEY'),
         'webhook_secret' => env('PAYMONGO_WEBHOOK_SECRET'),
+        'live_mode' => (bool) env('PAYMONGO_LIVE_MODE', false),
+        'payment_methods' => array_values(array_filter(array_map(
+            static fn (string $method): string => trim($method),
+            explode(',', (string) env('PAYMONGO_PAYMENT_METHODS', 'gcash,card,qrph')),
+        ))),
+        'webhook_tolerance' => (int) env('PAYMONGO_WEBHOOK_TOLERANCE', 300),
     ],
 
     'two_factor' => [

@@ -92,6 +92,18 @@ Route::middleware('throttle:global-web')->group(function () {
                 ->middleware(['throttle:6,1'])
                 ->name('payment.select');
 
+            Route::get('/payment/return', [EnrollmentPaymentController::class, 'returned'])
+                ->middleware(['throttle:20,1'])
+                ->name('payment.return');
+
+            Route::get('/payment/cancel', [EnrollmentPaymentController::class, 'cancelled'])
+                ->middleware(['throttle:20,1'])
+                ->name('payment.cancel');
+
+            Route::get('/payment/status', [EnrollmentPaymentController::class, 'status'])
+                ->middleware(['throttle:30,1'])
+                ->name('payment.status');
+
             Route::get('/payment/receipt', [EnrollmentPaymentController::class, 'receipt'])
                 ->middleware(['throttle:20,1'])
                 ->name('payment.receipt');

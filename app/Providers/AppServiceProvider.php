@@ -81,5 +81,14 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(15)
                 ->by('document-downloads:'.$actorKey($request));
         });
+
+        /*
+         * PayMongo retries webhook delivery, so this is intentionally generous.
+         * Signature validation and the unique event ledger remain the real gates.
+         */
+        RateLimiter::for('paymongo-webhooks', function (Request $request) {
+            return Limit::perMinute(180)
+                ->by('paymongo-webhooks:'.$request->ip());
+        });
     }
 }
