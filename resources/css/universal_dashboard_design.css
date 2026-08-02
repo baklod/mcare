@@ -4,9 +4,14 @@
         max-width: 100vw;
     }
 
+    ::-webkit-scrollbar:horizontal {
+        display: none !important;
+        height: 0 !important;
+    }
+
     .universal-dashboard.dashboard-shell {
         @apply min-h-screen bg-[#f7f7fb] font-sans text-slate-900 antialiased;
-        overflow-x: hidden;
+        overflow-x: hidden !important;
         max-width: 100vw;
     }
 
@@ -17,7 +22,7 @@
     .universal-dashboard .dashboard-layout {
         @apply min-h-screen lg:pl-64;
         transition: padding-left 200ms ease-out;
-        overflow-x: hidden;
+        overflow-x: hidden !important;
         max-width: 100%;
     }
 
@@ -32,7 +37,7 @@
     }
 
     .universal-dashboard .dashboard-sidebar-collapse {
-        @apply absolute -right-4 top-6 z-50 hidden h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-purple-700 shadow-sm outline-none transition hover:border-purple-300 hover:bg-purple-50 focus-visible:ring-2 focus-visible:ring-purple-500 lg:inline-flex;
+        @apply absolute -right-3 top-6 z-50 hidden h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-purple-700 shadow-sm outline-none transition hover:border-purple-300 hover:bg-purple-50 focus-visible:ring-2 focus-visible:ring-purple-500 lg:inline-flex;
     }
 
     .universal-dashboard .dashboard-sidebar-collapse .dashboard-svg-icon {
@@ -85,7 +90,11 @@
     }
 
     .universal-dashboard .dashboard-nav-link {
-        @apply flex min-h-11 items-center justify-start gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-slate-600 outline-none transition duration-150 hover:bg-purple-50 hover:text-purple-800 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-1;
+        @apply flex min-h-11 w-full max-w-full items-center justify-start gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-slate-600 outline-none transition duration-150 overflow-x-hidden hover:bg-purple-50 hover:text-purple-800 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-1;
+    }
+
+    .universal-dashboard .dashboard-nav-link span {
+        @apply truncate min-w-0 flex-1;
     }
 
     .universal-dashboard .dashboard-nav-link .dashboard-nav-icon {
@@ -104,11 +113,11 @@
     }
 
     .universal-dashboard .dashboard-sidebar-footer {
-        @apply relative mt-4 border-t border-slate-200 pt-4;
+        @apply relative mt-4 border-t border-slate-200 pt-4 overflow-x-hidden;
     }
 
     .universal-dashboard .dashboard-account-summary {
-        @apply flex min-h-12 cursor-pointer list-none items-center gap-3 rounded-xl p-2 text-left outline-none transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-purple-500;
+        @apply flex min-h-12 w-full cursor-pointer list-none items-center gap-3 rounded-xl p-2 text-left outline-none transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-purple-500 overflow-hidden;
     }
 
     .universal-dashboard .dashboard-account-avatar {
@@ -116,7 +125,7 @@
     }
 
     .universal-dashboard .dashboard-account-menu {
-        @apply absolute bottom-full left-0 z-50 mb-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-950/10;
+        @apply absolute bottom-full left-0 z-50 mb-2 w-56 max-w-full rounded-xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-950/10;
     }
 
     .universal-dashboard .dashboard-account-action {
