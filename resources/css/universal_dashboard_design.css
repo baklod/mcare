@@ -20,24 +20,65 @@
     }
 
     .universal-dashboard .dashboard-layout {
-        @apply min-h-screen lg:pl-64;
-        transition: padding-left 200ms ease-out;
+        @apply min-h-screen lg:pl-20;
+        transition: padding-left 150ms ease-out;
         overflow-x: hidden !important;
         max-width: 100%;
     }
 
     .universal-dashboard .dashboard-sidebar {
-        @apply fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col border-r border-slate-200 bg-white px-4 py-5 text-slate-900 shadow-xl shadow-slate-950/5 transition-transform duration-200 ease-out lg:translate-x-0 lg:shadow-none;
+        @apply fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col border-r border-slate-200 bg-white px-3 py-4 text-slate-900 shadow-xl shadow-slate-950/5 transition-all duration-200 ease-out lg:w-20 lg:translate-x-0 lg:shadow-none;
         overflow-x: hidden !important;
         view-transition-name: dashboard-sidebar;
+    }
+
+    .universal-dashboard .dashboard-sidebar:hover,
+    .universal-dashboard .dashboard-sidebar.is-expanded,
+    .universal-dashboard .dashboard-sidebar.is-open {
+        @apply lg:w-64 lg:shadow-xl lg:shadow-slate-900/10 lg:border-r lg:border-slate-200;
     }
 
     .universal-dashboard .dashboard-sidebar.is-open {
         @apply translate-x-0;
     }
 
+    @media (min-width: 1024px) {
+        .universal-dashboard .dashboard-sidebar:not(:hover):not(.is-expanded):not(.is-open) .dashboard-brand-title,
+        .universal-dashboard .dashboard-sidebar:not(:hover):not(.is-expanded):not(.is-open) .dashboard-brand-subtitle,
+        .universal-dashboard .dashboard-sidebar:not(:hover):not(.is-expanded):not(.is-open) .dashboard-menu-label,
+        .universal-dashboard .dashboard-sidebar:not(:hover):not(.is-expanded):not(.is-open) .dashboard-nav-link span,
+        .universal-dashboard .dashboard-sidebar:not(:hover):not(.is-expanded):not(.is-open) .dashboard-account-summary > span.flex-1,
+        .universal-dashboard .dashboard-sidebar:not(:hover):not(.is-expanded):not(.is-open) .dashboard-chevron,
+        .universal-dashboard .dashboard-sidebar:not(:hover):not(.is-expanded):not(.is-open) p.text-\[11px\],
+        .universal-dashboard .dashboard-sidebar:not(:hover):not(.is-expanded):not(.is-open) p.text-xs {
+            display: none !important;
+            opacity: 0;
+        }
+
+        .universal-dashboard .dashboard-sidebar:not(:hover):not(.is-expanded):not(.is-open) .dashboard-brand {
+            padding: 0;
+            justify-content: center;
+        }
+
+        .universal-dashboard .dashboard-sidebar:not(:hover):not(.is-expanded):not(.is-open) .dashboard-nav-link {
+            justify-content: center;
+            padding-left: 0;
+            padding-right: 0;
+        }
+
+        .universal-dashboard .dashboard-sidebar:not(:hover):not(.is-expanded):not(.is-open) .dashboard-nav-link .dashboard-nav-icon {
+            margin: 0;
+            font-size: 1.125rem;
+        }
+
+        .universal-dashboard .dashboard-sidebar:not(:hover):not(.is-expanded):not(.is-open) .dashboard-account-summary {
+            justify-content: center;
+            padding: 0.5rem 0;
+        }
+    }
+
     .universal-dashboard .dashboard-sidebar-collapse {
-        @apply absolute -right-3 top-6 z-50 hidden h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-purple-700 shadow-sm outline-none transition hover:border-purple-300 hover:bg-purple-50 focus-visible:ring-2 focus-visible:ring-purple-500 lg:inline-flex;
+        @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 focus-visible:ring-2 focus-visible:ring-purple-500;
     }
 
     .universal-dashboard .dashboard-sidebar-collapse .dashboard-svg-icon {
