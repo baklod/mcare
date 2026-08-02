@@ -38,19 +38,18 @@
     <div class="dashboard-backdrop" data-dashboard-backdrop></div>
 
     <aside class="dashboard-sidebar" data-dashboard-sidebar>
-        <a href="{{ route('trainee.dashboard') }}" class="dashboard-brand">
-            <img src="{{ asset('assets/mcare-mark.png') }}" alt="MCARE mark" class="dashboard-brand-logo" width="44" height="44" loading="eager" decoding="sync" fetchpriority="high">
-            <span class="min-w-0">
-                <span class="dashboard-brand-title">MCARE Hub</span>
-                <span class="dashboard-brand-subtitle">Trainee Portal</span>
-            </span>
-        </a>
-        <button type="button" class="dashboard-menu-button absolute right-4 top-5" data-dashboard-menu-close aria-label="Close navigation">
-            <x-dashboard-icon name="xmark" />
-        </button>
-        <button type="button" class="dashboard-sidebar-collapse" data-dashboard-sidebar-collapse aria-label="Collapse navigation" title="Collapse navigation">
-            <x-dashboard-icon name="chevron-left" />
-        </button>
+        <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <a href="{{ route('trainee.dashboard') }}" class="dashboard-brand flex-1 min-w-0">
+                <img src="{{ asset('assets/mcare-mark.png') }}" alt="MCARE mark" class="dashboard-brand-logo" width="44" height="44" loading="eager" decoding="sync" fetchpriority="high">
+                <span class="min-w-0">
+                    <span class="dashboard-brand-title">MCARE Hub</span>
+                    <span class="dashboard-brand-subtitle">Trainee Portal</span>
+                </span>
+            </a>
+            <button type="button" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 focus-visible:ring-2 focus-visible:ring-purple-500" data-dashboard-sidebar-collapse data-dashboard-menu-close aria-label="Collapse navigation" title="Collapse navigation">
+                <x-dashboard-icon name="chevron-left" class="h-4 w-4" />
+            </button>
+        </div>
 
         <nav class="dashboard-nav" aria-label="Trainee navigation">
             <p class="dashboard-menu-label">Classroom</p>
