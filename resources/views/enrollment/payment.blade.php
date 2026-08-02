@@ -49,8 +49,23 @@
                     <span class="block text-sm text-slate-500">Payment method</span>
                 </span>
             </a>
-            <a href="{{ route('enrollment.create') }}" class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:border-purple-200 hover:text-purple-700">
-                Back to enrollment
+            @php
+                $activeUser = auth()->user();
+                $backUrl = match($activeUser?->role) {
+                    'trainee' => route('trainee.payments'),
+                    'trainer' => route('trainer.dashboard'),
+                    'admin' => route('admin.enrollments.index'),
+                    default => route('enrollment.create'),
+                };
+                $backLabel = match($activeUser?->role) {
+                    'trainee' => 'Back to Trainee Portal',
+                    'trainer' => 'Back to Trainer Portal',
+                    'admin' => 'Back to Admin Portal',
+                    default => 'Back to enrollment',
+                };
+            @endphp
+            <a href="{{ $backUrl }}" class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:border-purple-200 hover:text-purple-700">
+                {{ $backLabel }}
             </a>
         </div>
     </header>
