@@ -23,6 +23,7 @@
 
     .universal-dashboard .dashboard-sidebar {
         @apply fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col border-r border-slate-200 bg-white px-4 py-5 text-slate-900 shadow-xl shadow-slate-950/5 transition-transform duration-200 ease-out lg:translate-x-0 lg:shadow-none;
+        overflow-x: hidden !important;
         view-transition-name: dashboard-sidebar;
     }
 
@@ -72,12 +73,19 @@
     }
 
     .universal-dashboard .dashboard-nav {
-        @apply mt-5 flex-1 space-y-1 overflow-y-auto pb-5;
-        scrollbar-width: thin;
+        @apply mt-5 flex-1 space-y-1 overflow-y-auto overflow-x-hidden pb-5;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .universal-dashboard .dashboard-nav::-webkit-scrollbar {
+        display: none;
+        width: 0;
+        height: 0;
     }
 
     .universal-dashboard .dashboard-nav-link {
-        @apply flex min-h-11 items-center justify-start gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-slate-600 outline-none transition duration-150 hover:translate-x-0.5 hover:bg-purple-50 hover:text-purple-800 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-1;
+        @apply flex min-h-11 items-center justify-start gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-slate-600 outline-none transition duration-150 hover:bg-purple-50 hover:text-purple-800 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-1;
     }
 
     .universal-dashboard .dashboard-nav-link .dashboard-nav-icon {
