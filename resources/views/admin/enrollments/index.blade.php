@@ -18,154 +18,147 @@
         ];
     @endphp
 
-    <section class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
-        <div class="dashboard-hero">
-            <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                    <span class="dashboard-pill bg-purple-50 text-purple-700 ring-purple-100">Enrollment admin</span>
-                    <h1 class="mt-4">Applicant queue</h1>
-                    <p>
-                        Review submitted Caregiving NC II learner profiles and move qualified applicants into pre-enlistment, approval, or denial.
-                    </p>
-                </div>
-                <div class="rounded-xl bg-purple-50 px-5 py-4 text-right ring-1 ring-purple-100">
-                    <p class="text-xs font-bold uppercase tracking-wide text-purple-700">Total applications</p>
-                    <p class="mt-1 font-display text-3xl font-extrabold text-slate-950">{{ $totalApplications }}</p>
-                </div>
+    <div class="space-y-6">
+        
+        <!-- Header -->
+        <header class="flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-end md:justify-between">
+            <div>
+                <h1 class="font-display text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">Applicant queue</h1>
+                <p class="mt-1.5 max-w-3xl text-sm text-slate-600">
+                    Review submitted Caregiving NC II learner profiles and move qualified applicants into pre-enlistment, approval, or denial.
+                </p>
             </div>
+            <div class="rounded-xl border border-purple-100 bg-purple-50 px-5 py-3 text-right">
+                <span class="text-xs font-bold uppercase tracking-wider text-purple-700">Total Applications</span>
+                <span class="block font-display text-2xl font-extrabold text-slate-950">{{ $totalApplications }}</span>
+            </div>
+        </header>
 
-            <form method="GET" action="{{ route('admin.enrollments.index') }}" data-auto-filter class="mt-8 grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-2 xl:grid-cols-6">
-                <div class="md:col-span-2 xl:col-span-2">
-                    <label for="search" class="mb-2 block text-xs font-bold uppercase text-slate-500">Search</label>
-                    <input id="search" name="search" type="search" value="{{ $search }}" placeholder="Name, email, or contact number" class="form-field bg-white">
+        <!-- Status Summary Horizontal Cards Grid -->
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-4">
+            @foreach ($statuses as $status => $label)
+                <a href="{{ route('admin.enrollments.index', ['status' => $status]) }}" class="group flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 transition hover:border-purple-300 hover:shadow-sm @if($selectedStatus === $status) ring-2 ring-purple-500 border-purple-300 bg-purple-50/20 @endif">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500 group-hover:text-purple-700">{{ $label }}</span>
+                    <span class="mt-2 font-display text-2xl font-extrabold text-slate-900">{{ $counts[$status] ?? 0 }}</span>
+                </a>
+            @endforeach
+        </div>
+
+        <!-- Filter Controls Form -->
+        <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <form method="GET" action="{{ route('admin.enrollments.index') }}" data-auto-filter class="space-y-4">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+                    <div class="sm:col-span-2">
+                        <label for="search" class="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">Search</label>
+                        <input id="search" name="search" type="search" value="{{ $search }}" placeholder="Name, email, or contact number" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900 placeholder-slate-400 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                    </div>
+                    <div>
+                        <label for="status" class="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
+                        <select id="status" name="status" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                            <option value="">All statuses</option>
+                            @foreach ($statuses as $status => $label)
+                                <option value="{{ $status }}" @selected($selectedStatus === $status)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="batch_id" class="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">Batch</label>
+                        <select id="batch_id" name="batch_id" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                            <option value="">All batches</option>
+                            @foreach ($batches as $batch)
+                                <option value="{{ $batch->id }}" @selected($batchId === $batch->id)>{{ $batch->name }} {{ $batch->year }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="schedule" class="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">Schedule</label>
+                        <select id="schedule" name="schedule" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                            <option value="">AM and PM</option>
+                            <option value="AM" @selected($schedule === 'AM')>AM students</option>
+                            <option value="PM" @selected($schedule === 'PM')>PM students</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="enrollment_state" class="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">Window</label>
+                        <select id="enrollment_state" name="enrollment_state" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                            <option value="">Any window</option>
+                            <option value="open" @selected($enrollmentState === 'open')>Open</option>
+                            <option value="upcoming" @selected($enrollmentState === 'upcoming')>Starting soon</option>
+                            <option value="closed" @selected($enrollmentState === 'closed')>Closed</option>
+                        </select>
+                    </div>
                 </div>
-                <div>
-                    <label for="status" class="mb-2 block text-xs font-bold uppercase text-slate-500">Status</label>
-                    <select id="status" name="status" class="form-field bg-white">
-                        <option value="">All statuses</option>
-                        @foreach ($statuses as $status => $label)
-                            <option value="{{ $status }}" @selected($selectedStatus === $status)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label for="batch_id" class="mb-2 block text-xs font-bold uppercase text-slate-500">Batch</label>
-                    <select id="batch_id" name="batch_id" class="form-field bg-white">
-                        <option value="">All batches</option>
-                        @foreach ($batches as $batch)
-                            <option value="{{ $batch->id }}" @selected($batchId === $batch->id)>{{ $batch->name }} {{ $batch->year }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label for="schedule" class="mb-2 block text-xs font-bold uppercase text-slate-500">Class schedule</label>
-                    <select id="schedule" name="schedule" class="form-field bg-white">
-                        <option value="">AM and PM</option>
-                        <option value="AM" @selected($schedule === 'AM')>AM students</option>
-                        <option value="PM" @selected($schedule === 'PM')>PM students</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="enrollment_state" class="mb-2 block text-xs font-bold uppercase text-slate-500">Enrollment window</label>
-                    <select id="enrollment_state" name="enrollment_state" class="form-field bg-white">
-                        <option value="">Any window</option>
-                        <option value="open" @selected($enrollmentState === 'open')>Open</option>
-                        <option value="upcoming" @selected($enrollmentState === 'upcoming')>Starting soon</option>
-                        <option value="closed" @selected($enrollmentState === 'closed')>Closed</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="training_state" class="mb-2 block text-xs font-bold uppercase text-slate-500">Training lifecycle</label>
-                    <select id="training_state" name="training_state" class="form-field bg-white">
-                        <option value="">Any training state</option>
-                        <option value="not_started" @selected($trainingState === 'not_started')>Not started</option>
-                        <option value="in_progress" @selected($trainingState === 'in_progress')>In progress</option>
-                        <option value="completed" @selected($trainingState === 'completed')>Completed</option>
-                    </select>
-                </div>
-                <div class="flex items-end gap-2 md:col-span-2 xl:col-span-6">
-                    <button type="submit" class="primary-action w-full md:w-auto">
+
+                <div class="flex items-center gap-3 pt-2">
+                    <button type="submit" class="rounded-xl bg-purple-700 px-5 py-2 text-sm font-semibold text-white transition hover:bg-purple-800">
                         Filter
                     </button>
-                    <a href="{{ route('admin.enrollments.index') }}" class="secondary-action">
+                    <a href="{{ route('admin.enrollments.index') }}" class="rounded-xl border border-slate-200 bg-white px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                         Reset
                     </a>
                 </div>
             </form>
         </div>
 
-        <aside class="dashboard-panel">
-            <p class="dashboard-section-kicker">Status summary</p>
-            <div class="mt-5 space-y-3">
-                @foreach ($statuses as $status => $label)
-                    <a href="{{ route('admin.enrollments.index', ['status' => $status]) }}" class="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 hover:border-purple-100 hover:bg-purple-50">
-                        <span class="text-sm font-semibold text-slate-700">{{ $label }}</span>
-                        <span class="rounded-full bg-white px-3 py-1 text-sm font-bold text-slate-900">{{ $counts[$status] ?? 0 }}</span>
-                    </a>
-                @endforeach
-            </div>
-        </aside>
-    </section>
-
-    <section class="mt-8 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-xl shadow-slate-200/60">
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-slate-100">
-                <thead class="bg-slate-50">
+        <!-- Applicant Queue Data Table -->
+        <div class="w-full max-w-full overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+            <table class="w-full text-left text-sm border-collapse">
+                <thead class="bg-slate-50 border-b border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-500">
                     <tr>
-                        <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Applicant</th>
-                        <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Program</th>
-                        <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Batch</th>
-                        <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Schedule</th>
-                        <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Status</th>
-                        <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Payment</th>
-                        <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Submitted</th>
-                        <th class="px-6 py-4 text-right text-xs font-bold uppercase tracking-wide text-slate-500">Action</th>
+                        <th class="px-5 py-3.5">Applicant</th>
+                        <th class="px-5 py-3.5">Program</th>
+                        <th class="px-5 py-3.5">Batch</th>
+                        <th class="px-5 py-3.5">Schedule</th>
+                        <th class="px-5 py-3.5">Status</th>
+                        <th class="px-5 py-3.5">Payment</th>
+                        <th class="px-5 py-3.5">Submitted</th>
+                        <th class="px-5 py-3.5 text-right">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 bg-white">
                     @forelse ($applications as $application)
-                        <tr class="hover:bg-purple-50/40">
-                            <td class="px-6 py-5">
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="px-5 py-4">
                                 <p class="font-bold text-slate-900">{{ $application->last_name }}, {{ $application->first_name }}</p>
-                                <p class="mt-1 text-sm text-slate-500">{{ $application->email }}</p>
-                                <p class="mt-1 text-xs text-slate-400">{{ $application->contact_number }}</p>
+                                <p class="text-xs text-slate-500">{{ $application->email }}</p>
+                                <p class="text-xs text-slate-400">{{ $application->contact_number }}</p>
                             </td>
-                            <td class="px-6 py-5 text-sm font-semibold text-slate-700">{{ $application->program }}</td>
-                            <td class="px-6 py-5 text-sm text-slate-600">{{ $application->batch ? $application->batch->name.' '.$application->batch->year : 'Unassigned' }}</td>
-                            <td class="px-6 py-5 text-sm text-slate-600">{{ $application->schedule_preference }}</td>
-                            <td class="px-6 py-5">
-                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-bold ring-1 {{ $badgeClasses[$application->status] ?? 'bg-slate-50 text-slate-700 ring-slate-100' }}">
+                            <td class="px-5 py-4 font-semibold text-slate-700">{{ $application->program }}</td>
+                            <td class="px-5 py-4 text-slate-600">{{ $application->batch ? $application->batch->name.' '.$application->batch->year : 'Unassigned' }}</td>
+                            <td class="px-5 py-4 text-slate-600">{{ $application->schedule_preference }}</td>
+                            <td class="px-5 py-4">
+                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $badgeClasses[$application->status] ?? 'bg-slate-50 text-slate-700 ring-slate-100' }}">
                                     {{ $application->statusLabel() }}
                                 </span>
                             </td>
-                            <td class="px-6 py-5">
-                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-bold ring-1 {{ $paymentBadgeClasses[$application->payment_status] ?? 'bg-slate-50 text-slate-700 ring-slate-100' }}">
+                            <td class="px-5 py-4">
+                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 {{ $paymentBadgeClasses[$application->payment_status] ?? 'bg-slate-50 text-slate-700 ring-slate-100' }}">
                                     {{ $application->paymentStatusLabel() }}
                                 </span>
                             </td>
-                            <td class="px-6 py-5 text-sm text-slate-500">{{ $application->created_at?->format('M d, Y') }}</td>
-                            <td class="px-6 py-5 text-right">
-                                <a href="{{ route('admin.enrollments.show', $application) }}" class="inline-flex items-center justify-center rounded-full border border-purple-200 bg-white px-4 py-2 text-sm font-bold text-purple-700 hover:bg-purple-50">
+                            <td class="px-5 py-4 text-slate-500 text-xs">{{ $application->created_at?->format('M d, Y') }}</td>
+                            <td class="px-5 py-4 text-right">
+                                <a href="{{ route('admin.enrollments.show', $application) }}" class="inline-flex items-center justify-center rounded-lg border border-purple-200 bg-white px-3 py-1.5 text-xs font-bold text-purple-700 transition hover:bg-purple-50">
                                     Review
                                 </a>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="px-6 py-14 text-center">
-                                <p class="text-lg font-bold text-slate-900">No applications found</p>
-                                <p class="mt-2 text-sm text-slate-500">Try adjusting the search or status filter.</p>
+                            <td colspan="8" class="px-6 py-12 text-center text-slate-500">
+                                <p class="text-base font-bold text-slate-800">No applications found</p>
+                                <p class="mt-1 text-xs text-slate-500">Try adjusting your search query or status filter options.</p>
                             </td>
                         </tr>
                     @endforelse
                 </tbody>
             </table>
-        </div>
 
-        @if ($applications->hasPages())
-            <div class="border-t border-slate-100 px-6 py-4">
-                {{ $applications->links() }}
-            </div>
-        @endif
-    </section>
+            @if ($applications->hasPages())
+                <div class="border-t border-slate-200 px-5 py-3 bg-slate-50">
+                    {{ $applications->links() }}
+                </div>
+            @endif
+        </div>
+    </div>
 @endsection
