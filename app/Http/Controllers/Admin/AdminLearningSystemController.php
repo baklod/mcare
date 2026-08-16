@@ -13,6 +13,7 @@ use App\Services\TraineeRosterCsv;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -123,19 +124,42 @@ class AdminLearningSystemController extends Controller
 
         $previousStatus = $enrollmentApplication->learning_status ?: EnrollmentApplication::LEARNING_ACTIVE;
 
-        $enrollmentApplication->update([
-            'learning_status' => $validated['learning_status'],
-            'learning_status_notes' => filled($validated['learning_status_notes'] ?? null)
-                ? trim($validated['learning_status_notes'])
-                : null,
-            'learning_status_changed_at' => now(),
-            'learning_status_changed_by_id' => $request->user()->id,
-        ]);
+        $portalTransition = DB::transaction(function () use ($enrollmentApplication, $previousStatus, $request, $validated): array {
+            $enrollmentApplication->update([
+                'learning_status' => $validated['learning_status'],
+                'learning_status_notes' => filled($validated['learning_status_notes'] ?? null)
+                    ? trim($validated['learning_status_notes'])
+                    : null,
+                'learning_status_changed_at' => now(),
+                'learning_status_changed_by_id' => $request->user()->id,
+            ]);
+
+            $user = User::query()->lockForUpdate()->find($enrollmentApplication->user_id);
+            $fromRole = $user?->role;
+
+            // Graduation is the controlled gateway to the Alumni Career Hub.
+            if ($user && $validated['learning_status'] === EnrollmentApplication::LEARNING_GRADUATED
+                && in_array($user->role, ['trainee', 'alumni'], true)) {
+                $user->update(['role' => 'alumni']);
+            } elseif ($user && $previousStatus === EnrollmentApplication::LEARNING_GRADUATED
+                && $validated['learning_status'] !== EnrollmentApplication::LEARNING_GRADUATED
+                && $user->role === 'alumni') {
+                // Restore LMS access when an administrator corrects a graduation decision.
+                $user->update(['role' => 'trainee']);
+            }
+
+            return [
+                'from' => $fromRole,
+                'to' => $user?->fresh()->role,
+            ];
+        });
 
         AdminActivityLog::record($request->user(), 'trainee.learning-status.updated', $enrollmentApplication, [
             'from' => $previousStatus,
             'to' => $validated['learning_status'],
             'notes' => $enrollmentApplication->learning_status_notes,
+            'portal_role_from' => $portalTransition['from'],
+            'portal_role_to' => $portalTransition['to'],
         ]);
 
         return back()->with('saved', "{$enrollmentApplication->first_name} {$enrollmentApplication->last_name} is now {$enrollmentApplication->learningStatusLabel()}.");

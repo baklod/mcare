@@ -1,6 +1,10 @@
 @extends('admin.layouts.app', ['title' => 'Career Hub | MCARE Admin'])
 
 @section('content')
+@php
+    $careerCreateErrors = $errors->getBag('careerCreate');
+@endphp
+
 <section class="space-y-6">
     <header class="flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
@@ -8,10 +12,20 @@
             <h1 class="mt-2 dashboard-section-title text-3xl">Connect graduates to their next opportunity</h1>
             <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Publish verified caregiving opportunities for alumni and keep the graduate transition visible to the MCARE team.</p>
         </div>
-        <a href="{{ route('notifications.index') }}" class="secondary-action inline-flex items-center justify-center gap-2 text-sm font-bold">
-            <x-dashboard-icon name="bell" class="h-4 w-4" />
-            Notification center
-        </a>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" data-dashboard-dialog-open="career-opportunity-dialog" class="primary-action inline-flex items-center justify-center gap-2 text-sm font-bold">
+                <x-dashboard-icon name="plus" class="h-4 w-4" />
+                Add opportunity
+            </button>
+            <a href="{{ route('admin.learning.alumni-jobs.preview') }}" class="secondary-action inline-flex items-center justify-center gap-2 text-sm font-bold">
+                <x-dashboard-icon name="briefcase" class="h-4 w-4" />
+                Preview alumni portal
+            </a>
+            <a href="{{ route('notifications.index') }}" class="secondary-action inline-flex items-center justify-center gap-2 text-sm font-bold">
+                <x-dashboard-icon name="bell" class="h-4 w-4" />
+                Notification center
+            </a>
+        </div>
     </header>
 
     @if (session('saved'))
@@ -25,28 +39,30 @@
         <article class="dashboard-stat"><div><p class="dashboard-stat-label">Published opportunities</p><p class="dashboard-stat-value">{{ $publishedJobs }}</p><p class="dashboard-stat-help">Visible in the alumni portal</p></div></article>
     </div>
 
-    <section class="dashboard-panel" aria-labelledby="career-opportunity-form-title">
-        <div class="border-b border-slate-200 pb-5">
-            <p class="dashboard-section-kicker">Admin action</p>
-            <h2 id="career-opportunity-form-title" class="mt-2 dashboard-section-title text-xl">Add a career opportunity</h2>
-            <p class="mt-2 text-sm leading-6 text-slate-600">Use plain text only. Publish when the employer and application details have been confirmed.</p>
+    <dialog id="career-opportunity-dialog" data-dashboard-dialog data-auto-open="{{ $careerCreateErrors->any() ? 'true' : 'false' }}" class="m-auto max-h-[90vh] w-[min(96vw,56rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/45" aria-labelledby="career-opportunity-form-title">
+        <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4">
+            <div>
+                <h2 id="career-opportunity-form-title" class="font-display text-xl font-bold text-slate-900">Add a career opportunity</h2>
+                <p class="mt-1 text-xs text-slate-500">Publish only after employer and application details are confirmed.</p>
+            </div>
+            <button type="button" data-dashboard-dialog-close class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900" aria-label="Close career opportunity form" title="Close"><x-dashboard-icon name="xmark" class="h-4 w-4" /></button>
         </div>
 
-        <form method="POST" action="{{ route('admin.learning.alumni-jobs.store') }}" class="mt-6 grid gap-4 md:grid-cols-2">
+        <form method="POST" action="{{ route('admin.learning.alumni-jobs.store') }}" class="grid gap-4 p-6 md:grid-cols-2" data-dashboard-dialog-form data-submit-label="Saving opportunity...">
             @csrf
-            <div><label for="career-title" class="form-label">Role title</label><input id="career-title" name="title" value="{{ old('title') }}" required maxlength="160" class="form-field" placeholder="Caregiver - Home Care">@error('title')<p class="form-error">{{ $message }}</p>@enderror</div>
-            <div><label for="career-employer" class="form-label">Employer</label><input id="career-employer" name="employer" value="{{ old('employer') }}" required maxlength="160" class="form-field" placeholder="Mission Care partner facility">@error('employer')<p class="form-error">{{ $message }}</p>@enderror</div>
-            <div><label for="career-location" class="form-label">Location</label><input id="career-location" name="location" value="{{ old('location') }}" maxlength="160" class="form-field" placeholder="Iriga City, Camarines Sur">@error('location')<p class="form-error">{{ $message }}</p>@enderror</div>
-            <div><label for="career-type" class="form-label">Employment type</label><select id="career-type" name="employment_type" class="form-field"><option value="">Select type</option>@foreach ($employmentTypes as $value => $label)<option value="{{ $value }}" @selected(old('employment_type') === $value)>{{ $label }}</option>@endforeach</select>@error('employment_type')<p class="form-error">{{ $message }}</p>@enderror</div>
-            <div><label for="career-deadline" class="form-label">Application deadline</label><input id="career-deadline" name="application_deadline" type="datetime-local" value="{{ old('application_deadline') }}" class="form-field">@error('application_deadline')<p class="form-error">{{ $message }}</p>@enderror</div>
-            <div><label for="career-email" class="form-label">Application email</label><input id="career-email" name="application_email" type="email" value="{{ old('application_email') }}" maxlength="255" class="form-field" placeholder="recruitment@example.com">@error('application_email')<p class="form-error">{{ $message }}</p>@enderror</div>
-            <div class="md:col-span-2"><label for="career-url" class="form-label">Application link</label><input id="career-url" name="application_url" type="url" value="{{ old('application_url') }}" maxlength="2048" class="form-field" placeholder="https://employer.example/jobs/caregiver">@error('application_url')<p class="form-error">{{ $message }}</p>@enderror</div>
-            <div class="md:col-span-2"><label for="career-description" class="form-label">Description</label><textarea id="career-description" name="description" rows="4" required maxlength="5000" class="form-field" placeholder="Describe the role, care setting, and responsibilities.">{{ old('description') }}</textarea>@error('description')<p class="form-error">{{ $message }}</p>@enderror</div>
-            <div class="md:col-span-2"><label for="career-requirements" class="form-label">Requirements</label><textarea id="career-requirements" name="requirements" rows="4" maxlength="5000" class="form-field" placeholder="List NC II, experience, schedule, and other confirmed requirements.">{{ old('requirements') }}</textarea>@error('requirements')<p class="form-error">{{ $message }}</p>@enderror</div>
+            <div><label for="career-title" class="form-label">Role title</label><input id="career-title" name="title" value="{{ old('title') }}" required maxlength="160" class="form-field" placeholder="Caregiver - Home Care" autofocus>@error('title', 'careerCreate')<p class="form-error">{{ $message }}</p>@enderror</div>
+            <div><label for="career-employer" class="form-label">Employer</label><input id="career-employer" name="employer" value="{{ old('employer') }}" required maxlength="160" class="form-field" placeholder="Mission Care partner facility">@error('employer', 'careerCreate')<p class="form-error">{{ $message }}</p>@enderror</div>
+            <div><label for="career-location" class="form-label">Location</label><input id="career-location" name="location" value="{{ old('location') }}" maxlength="160" class="form-field" placeholder="Iriga City, Camarines Sur">@error('location', 'careerCreate')<p class="form-error">{{ $message }}</p>@enderror</div>
+            <div><label for="career-type" class="form-label">Employment type</label><select id="career-type" name="employment_type" class="form-field"><option value="">Select type</option>@foreach ($employmentTypes as $value => $label)<option value="{{ $value }}" @selected(old('employment_type') === $value)>{{ $label }}</option>@endforeach</select>@error('employment_type', 'careerCreate')<p class="form-error">{{ $message }}</p>@enderror</div>
+            <div><label for="career-deadline" class="form-label">Application deadline</label><input id="career-deadline" name="application_deadline" type="datetime-local" value="{{ old('application_deadline') }}" class="form-field">@error('application_deadline', 'careerCreate')<p class="form-error">{{ $message }}</p>@enderror</div>
+            <div><label for="career-email" class="form-label">Application email</label><input id="career-email" name="application_email" type="email" value="{{ old('application_email') }}" maxlength="255" class="form-field" placeholder="recruitment@example.com">@error('application_email', 'careerCreate')<p class="form-error">{{ $message }}</p>@enderror</div>
+            <div class="md:col-span-2"><label for="career-url" class="form-label">Application link</label><input id="career-url" name="application_url" type="url" value="{{ old('application_url') }}" maxlength="2048" class="form-field" placeholder="https://employer.example/jobs/caregiver">@error('application_url', 'careerCreate')<p class="form-error">{{ $message }}</p>@enderror</div>
+            <div class="md:col-span-2"><label for="career-description" class="form-label">Description</label><textarea id="career-description" name="description" rows="4" required maxlength="5000" class="form-field" placeholder="Describe the role, care setting, and responsibilities.">{{ old('description') }}</textarea>@error('description', 'careerCreate')<p class="form-error">{{ $message }}</p>@enderror</div>
+            <div class="md:col-span-2"><label for="career-requirements" class="form-label">Requirements</label><textarea id="career-requirements" name="requirements" rows="4" maxlength="5000" class="form-field" placeholder="List NC II, experience, schedule, and other confirmed requirements.">{{ old('requirements') }}</textarea>@error('requirements', 'careerCreate')<p class="form-error">{{ $message }}</p>@enderror</div>
             <label class="flex items-start gap-3 rounded-xl border border-purple-100 bg-purple-50/60 p-4 text-sm text-slate-700 md:col-span-2"><input type="checkbox" name="is_published" value="1" @checked(old('is_published')) class="mt-0.5 h-4 w-4 rounded border-slate-300 text-purple-700 focus:ring-purple-500"><span><span class="block font-bold text-slate-900">Publish now</span><span class="mt-1 block leading-5">Alumni accounts receive an in-app notification when this opportunity becomes visible.</span></span></label>
-            <div class="flex flex-wrap gap-2 md:col-span-2"><button type="submit" class="primary-action inline-flex items-center justify-center gap-2"><x-dashboard-icon name="briefcase" class="h-4 w-4" />Save opportunity</button><a href="{{ route('admin.learning.alumni-jobs') }}" class="secondary-action inline-flex items-center justify-center">Clear form</a></div>
+            <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 md:col-span-2 sm:flex-row sm:justify-end"><button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button><button type="submit" data-action-button class="primary-action inline-flex items-center justify-center gap-2"><x-dashboard-icon name="briefcase" class="h-4 w-4" />Save opportunity</button></div>
         </form>
-    </section>
+    </dialog>
 
     <section class="dashboard-panel" aria-labelledby="career-opportunities-title">
         <div class="flex flex-col gap-3 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">

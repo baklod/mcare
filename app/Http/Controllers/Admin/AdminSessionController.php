@@ -106,7 +106,9 @@ class AdminSessionController extends Controller
         Auth::login($user, $request->boolean('remember'));
         AdminActivityLog::record($user, 'admin.login.success', $user);
 
-        return redirect()->intended(route('admin.dashboard'));
+        // Begin every privileged session at the dashboard instead of replaying
+        // a stale intended URL from an earlier protected-page visit.
+        return redirect()->route('admin.dashboard');
     }
 
     public function verifyTwoFactor(Request $request, EmailTwoFactorService $twoFactor): RedirectResponse
@@ -180,7 +182,7 @@ class AdminSessionController extends Controller
 
         AdminActivityLog::record($user, 'admin.login.mfa.verified', $user);
 
-        return redirect()->intended(route('admin.dashboard'));
+        return redirect()->route('admin.dashboard');
     }
 
     public function destroy(Request $request): RedirectResponse

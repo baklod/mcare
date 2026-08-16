@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'MCARE Trainee' }}</title>
-    <link rel="preload" as="image" href="{{ asset('assets/mcare-mark.png') }}" fetchpriority="high">
     <x-dashboard-theme-head />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -35,20 +34,15 @@
     @endphp
 
     <div class="dashboard-gradient"></div>
-    <div class="dashboard-backdrop" data-dashboard-backdrop></div>
 
     <aside class="dashboard-sidebar" data-dashboard-sidebar>
-        <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
-            <a href="{{ route('trainee.dashboard') }}" class="dashboard-brand flex-1 min-w-0">
-                <img src="{{ asset('assets/mcare-mark.png') }}" alt="MCARE mark" class="dashboard-brand-logo" width="44" height="44" loading="eager" decoding="sync" fetchpriority="high">
+        <div class="flex min-h-11 items-center border-b border-slate-100 pb-3">
+            <div class="dashboard-brand flex-1 min-w-0">
                 <span class="min-w-0">
                     <span class="dashboard-brand-title">MCARE Hub</span>
                     <span class="dashboard-brand-subtitle">Trainee Portal</span>
                 </span>
-            </a>
-            <button type="button" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 focus-visible:ring-2 focus-visible:ring-purple-500" data-dashboard-sidebar-collapse data-dashboard-menu-close aria-label="Collapse navigation" title="Collapse navigation">
-                <x-dashboard-icon name="chevron-left" class="h-4 w-4" />
-            </button>
+            </div>
         </div>
 
         <nav class="dashboard-nav" aria-label="Trainee navigation">
@@ -87,9 +81,6 @@
         <header class="dashboard-topbar">
             <div class="dashboard-topbar-inner">
                 <div class="flex min-w-0 items-center gap-3">
-                    <button type="button" class="dashboard-menu-button" data-dashboard-menu-open aria-label="Open navigation">
-                        <x-dashboard-icon name="bars" /><span class="hidden sm:inline">Menu</span>
-                    </button>
                     <div class="min-w-0">
                         <p class="dashboard-header-kicker">Caregiving NC II Program</p>
                         <h1 class="dashboard-header-title">

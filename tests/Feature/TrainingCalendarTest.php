@@ -31,7 +31,25 @@ class TrainingCalendarTest extends TestCase
             ->assertSee('Room Alpha')
             ->assertSee('Room Beta')
             ->assertSee('data-training-calendar', false)
-            ->assertSee('data-calendar-month-url', false);
+            ->assertSee('data-calendar-month-url', false)
+            ->assertSee('data-batch-dialog', false)
+            ->assertSee('data-batch-dialog-open', false)
+            ->assertSee('data-auto-open="false"', false);
+    }
+
+    public function test_admin_batch_edit_opens_the_existing_batch_in_the_modal(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $batch = $this->scheduledBatch('Modal Edit Batch', 'MWF', '08:00', '12:00', 'Skills Lab');
+
+        $this->actingAs($admin)
+            ->get(route('admin.schedules.edit', $batch))
+            ->assertOk()
+            ->assertSee('data-batch-dialog', false)
+            ->assertSee('data-auto-open="true"', false)
+            ->assertSee('Edit batch')
+            ->assertSee('Modal Edit Batch')
+            ->assertSee(route('admin.schedules.update', $batch), false);
     }
 
     public function test_trainee_calendar_only_contains_their_assigned_period(): void

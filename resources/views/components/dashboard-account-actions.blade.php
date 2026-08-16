@@ -2,6 +2,7 @@
     'logoutRoute',
     'roleLabel',
     'showAdminLogs' => false,
+    'careerHubRoute' => null,
 ])
 
 @php
@@ -12,6 +13,12 @@
 @endphp
 
 <p class="px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-400">{{ $roleLabel }} account</p>
+
+@if ($careerHubRoute)
+    <a href="{{ $careerHubRoute }}" class="dashboard-account-action">
+        <x-dashboard-icon name="briefcase" class="mr-3 w-4" />Career Hub
+    </a>
+@endif
 
 @if ($accountNotificationUser && Route::has('notifications.index'))
     <a href="{{ route('notifications.index') }}" class="dashboard-account-action">

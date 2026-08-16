@@ -61,10 +61,6 @@
         @apply flex items-center gap-3 rounded-2xl px-2 py-2;
     }
 
-    .dashboard-brand-logo {
-        @apply h-12 w-12 rounded-xl bg-white object-contain p-1.5 shadow-lg shadow-purple-950/20;
-    }
-
     .dashboard-brand-title {
         font-family: "Nunito", "Inter", ui-sans-serif, system-ui, sans-serif;
         @apply block text-sm font-black uppercase tracking-wide text-white;

@@ -240,6 +240,9 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/learning/alumni-jobs', [AdminCareerHubController::class, 'index'])
                     ->middleware('permission:alumni.jobs.manage')
                     ->name('learning.alumni-jobs');
+                Route::get('/learning/alumni-jobs/preview', [AdminCareerHubController::class, 'preview'])
+                    ->middleware('permission:alumni.jobs.manage')
+                    ->name('learning.alumni-jobs.preview');
                 Route::post('/learning/alumni-jobs', [AdminCareerHubController::class, 'store'])
                     ->middleware(['permission:alumni.jobs.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.alumni-jobs.store');

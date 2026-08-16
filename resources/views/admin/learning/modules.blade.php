@@ -9,9 +9,8 @@
     </header>
 
     <details class="dashboard-panel" @if($errors->hasAny(['trainer_id', 'training_batch_id', 'title', 'description', 'module_file'])) open @endif>
-        <summary class="flex cursor-pointer list-none items-center justify-between gap-4 font-bold text-slate-900">
+        <summary class="flex cursor-pointer list-none items-center gap-4 font-bold text-slate-900">
             <span>Add a learning module</span>
-            <span class="dashboard-pill bg-purple-50 text-purple-700 ring-purple-100">Admin action</span>
         </summary>
         <form method="POST" action="{{ route('admin.learning.modules.store') }}" enctype="multipart/form-data" class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             @csrf

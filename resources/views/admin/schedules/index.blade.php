@@ -4,6 +4,12 @@
     @php
         $batch = $editingBatch;
         $formAction = $batch ? route('admin.schedules.update', $batch) : route('admin.schedules.store');
+        $batchFormHasErrors = collect([
+            'name', 'year', 'is_active', 'enrollment_starts_at', 'enrollment_ends_at',
+            'training_starts_at', 'training_ends_at', 'am_days', 'am_start_time',
+            'am_end_time', 'am_room', 'pm_days', 'pm_start_time', 'pm_end_time',
+            'pm_room', 'notes',
+        ])->contains(fn (string $field): bool => $errors->has($field));
     @endphp
 
     <div class="space-y-6">
@@ -12,12 +18,12 @@
         <header class="flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-end md:justify-between">
             <div>
                 <h1 class="font-display text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">Training calendar & schedules</h1>
-                <p class="mt-1.5 max-w-3xl text-sm text-slate-600">Review every batch in one master calendar, select a date for its complete agenda, and manage recurring AM/PM class schedules.</p>
+                <p class="mt-1.5 text-sm text-slate-600">Manage enrollment windows and AM/PM class schedules.</p>
             </div>
-            <a href="#schedule-editor" class="inline-flex w-fit items-center justify-center gap-2 rounded-xl bg-purple-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-purple-800">
-                <x-dashboard-icon name="calendar-days" class="h-4 w-4" />
-                {{ $batch ? 'Continue editing batch' : 'Create batch schedule' }}
-            </a>
+            <button type="button" data-batch-dialog-open class="inline-flex w-fit items-center justify-center gap-2 rounded-xl bg-purple-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-purple-800">
+                <x-dashboard-icon name="plus" class="h-4 w-4" />
+                Create batch
+            </button>
         </header>
 
         <!-- Master Calendar Component -->
@@ -29,26 +35,47 @@
             :editable="true"
             eyebrow="Admin master calendar"
             :heading="$calendarMonth->format('F Y').' schedule overview'"
-            description="AM and PM blocks from all saved batches appear together. Select a date to see the full agenda and jump directly to the recurring batch editor."
+            description="All AM and PM sessions across configured batches."
             empty-message="No batch sessions are scheduled for this date."
         />
 
-        <section class="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+        <section class="space-y-6">
             
             <!-- Batch Form Editor -->
-            <aside id="schedule-editor" class="order-2 lg:order-2 lg:col-span-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 class="font-display text-xl font-bold text-slate-900">{{ $batch ? 'Edit batch' : 'Create batch' }}</h2>
-                <p class="mt-1 text-xs text-slate-500">
-                    Set active status, enrollment deadlines, AM/PM class times, and lab destinations.
-                </p>
+            <dialog
+                id="schedule-editor"
+                data-batch-dialog
+                data-auto-open="{{ ($batch || $batchFormHasErrors) ? 'true' : 'false' }}"
+                data-cancel-url="{{ $batch ? route('admin.schedules.index') : '' }}"
+                class="m-auto max-h-[90vh] w-[min(94vw,56rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/45"
+                aria-labelledby="batch-dialog-title"
+            >
+                <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4">
+                    <div>
+                        <p class="dashboard-section-kicker">Batch scheduling</p>
+                        <h2 id="batch-dialog-title" class="mt-1 font-display text-xl font-bold text-slate-900">{{ $batch ? 'Edit batch' : 'Create batch' }}</h2>
+                        <p class="mt-1 text-xs text-slate-500">Enrollment window, class periods, and room assignments.</p>
+                    </div>
+                    @if ($batch)
+                        <a href="{{ route('admin.schedules.index') }}" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900" aria-label="Close batch editor" title="Close">
+                            <x-dashboard-icon name="xmark" class="h-4 w-4" />
+                        </a>
+                    @else
+                        <button type="button" data-batch-dialog-close class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900" aria-label="Close batch editor" title="Close">
+                            <x-dashboard-icon name="xmark" class="h-4 w-4" />
+                        </button>
+                    @endif
+                </div>
 
-                @if ($errors->any())
+                <div class="px-6 pb-6">
+
+                @if ($batchFormHasErrors)
                     <div class="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">
                         Please correct the schedule fields before saving.
                     </div>
                 @endif
 
-                <form method="POST" action="{{ $formAction }}" class="mt-5 space-y-4" data-single-action>
+                <form method="POST" action="{{ $formAction }}" class="mt-5 space-y-4" data-single-action data-batch-form>
                     @csrf
                     @if ($batch)
                         @method('PATCH')
@@ -143,7 +170,8 @@
                         <textarea id="notes" name="notes" rows="2" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">{{ old('notes', $batch->notes ?? '') }}</textarea>
                     </div>
 
-                    <button type="submit" data-action-button class="w-full rounded-xl bg-purple-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-purple-800">
+                    <button type="submit" data-action-button class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-purple-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-purple-800">
+                        <x-dashboard-icon name="save" class="h-4 w-4" />
                         {{ $batch ? 'Save batch schedule' : 'Create batch schedule' }}
                     </button>
 
@@ -151,12 +179,17 @@
                         <a href="{{ route('admin.schedules.index') }}" class="block text-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                             Cancel edit
                         </a>
+                    @else
+                        <button type="button" data-batch-dialog-close class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                            Cancel
+                        </button>
                     @endif
                 </form>
-            </aside>
+                </div>
+            </dialog>
 
             <!-- Active Batches List -->
-            <section class="order-1 lg:order-1 lg:col-span-7 space-y-4">
+            <section class="space-y-4">
                 <div class="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div>
                         <h2 class="font-display text-xl font-bold text-slate-900">Configured batches</h2>
@@ -179,11 +212,17 @@
                                 <p class="mt-1 text-xs text-slate-500">Enrollment ends {{ $item->enrollment_ends_at->format('M d, Y g:i A') }}</p>
                             </div>
                             <div class="flex gap-2">
-                                <a href="{{ route('admin.schedules.edit', $item) }}" class="rounded-lg border border-purple-200 bg-white px-3 py-1.5 text-xs font-bold text-purple-700 hover:bg-purple-50">Edit</a>
+                                <a href="{{ route('admin.schedules.edit', $item) }}" data-dashboard-prefetch class="inline-flex items-center gap-2 rounded-lg border border-purple-200 bg-white px-3 py-1.5 text-xs font-bold text-purple-700 hover:bg-purple-50">
+                                    <x-dashboard-icon name="pencil" class="h-3.5 w-3.5" />
+                                    Edit
+                                </a>
                                 <form method="POST" action="{{ route('admin.schedules.destroy', $item) }}" onsubmit="return confirm('Delete this batch schedule?')">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" @disabled($item->applications_count > 0) class="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">Delete</button>
+                                    <button type="submit" @disabled($item->applications_count > 0) class="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">
+                                        <x-dashboard-icon name="trash-2" class="h-3.5 w-3.5" />
+                                        Delete
+                                    </button>
                                 </form>
                             </div>
                         </div>
@@ -222,14 +261,59 @@
     </div>
 
     <script>
-        document.querySelectorAll('[data-single-action]').forEach((form) => {
+        (() => {
+            const dialog = document.querySelector('[data-batch-dialog]');
+            const form = document.querySelector('[data-batch-form]');
+
+            if (!dialog || !form) return;
+
+            // The native modal traps keyboard focus while Laravel remains in
+            // charge of authorization, validation, rate limiting, and saving.
+            const openDialog = () => {
+                if (!dialog.open) dialog.showModal();
+                requestAnimationFrame(() => form.querySelector('input:not([type="hidden"])')?.focus());
+            };
+
+            const closeDialog = () => {
+                if (dialog.dataset.cancelUrl) {
+                    window.location.assign(dialog.dataset.cancelUrl);
+                    return;
+                }
+
+                dialog.close();
+            };
+
+            document.querySelectorAll('[data-batch-dialog-open]').forEach((button) => {
+                button.addEventListener('click', openDialog);
+            });
+
+            dialog.querySelectorAll('[data-batch-dialog-close]').forEach((button) => {
+                button.addEventListener('click', closeDialog);
+            });
+
+            dialog.addEventListener('cancel', (event) => {
+                if (!dialog.dataset.cancelUrl) return;
+                event.preventDefault();
+                closeDialog();
+            });
+
+            dialog.addEventListener('click', (event) => {
+                const bounds = dialog.getBoundingClientRect();
+                const outside = event.clientX < bounds.left || event.clientX > bounds.right
+                    || event.clientY < bounds.top || event.clientY > bounds.bottom;
+
+                if (outside) closeDialog();
+            });
+
             form.addEventListener('submit', () => {
                 form.querySelectorAll('[data-action-button]').forEach((button) => {
                     button.disabled = true;
                     button.classList.add('cursor-not-allowed', 'opacity-70');
-                    button.textContent = 'Saving schedule...';
+                    button.textContent = '{{ $batch ? 'Saving changes...' : 'Creating batch...' }}';
                 });
             });
-        });
+
+            if (dialog.dataset.autoOpen === 'true') openDialog();
+        })();
     </script>
 @endsection

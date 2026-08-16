@@ -30,6 +30,11 @@ class AdminLearningSystemTest extends TestCase
         ] as $routeName) {
             $this->actingAs($admin)->get(route($routeName))->assertOk();
         }
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.alumni-jobs'))
+            ->assertSee('data-dashboard-nav-key="admin-career-hub"', false)
+            ->assertSee('aria-current="page"', false);
     }
 
     public function test_non_admin_cannot_open_admin_learning_destinations(): void
@@ -39,6 +44,44 @@ class AdminLearningSystemTest extends TestCase
         $this->actingAs($trainee)
             ->get(route('admin.learning.trainees'))
             ->assertForbidden();
+    }
+
+    public function test_large_admin_creation_forms_are_hidden_in_native_dialogs(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->get(route('admin.accounts.index'))
+            ->assertOk()
+            ->assertSee('data-dashboard-dialog-open="trainer-account-dialog"', false)
+            ->assertSee('<dialog id="trainer-account-dialog"', false)
+            ->assertSee('data-dashboard-dialog-open="trainee-account-dialog"', false)
+            ->assertSee('<dialog id="trainee-account-dialog"', false);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.alumni-jobs'))
+            ->assertOk()
+            ->assertSee('data-dashboard-dialog-open="career-opportunity-dialog"', false)
+            ->assertSee('<dialog id="career-opportunity-dialog"', false);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.modules'))
+            ->assertOk()
+            ->assertSee('Add a learning module')
+            ->assertDontSee('Admin action');
+    }
+
+    public function test_admin_creation_validation_uses_the_matching_dialog_error_bag(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->post(route('admin.accounts.trainers.store'), [])
+            ->assertSessionHasErrors(['name', 'email', 'password'], null, 'trainer');
+
+        $this->actingAs($admin)
+            ->post(route('admin.learning.alumni-jobs.store'), [])
+            ->assertSessionHasErrors(['title', 'employer', 'description'], null, 'careerCreate');
     }
 
     public function test_admin_can_filter_and_update_a_trainee_learning_status(): void
@@ -113,6 +156,49 @@ class AdminLearningSystemTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_graduation_promotes_a_trainee_to_alumni_and_a_correction_restores_trainee_access(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $batch = TrainingBatch::create([
+            'name' => 'Batch Alumni Transition',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+        ]);
+        $application = $this->approvedApplication($trainee, $batch);
+
+        $this->actingAs($admin)
+            ->patch(route('admin.learning.trainees.status', $application), [
+                'learning_status' => EnrollmentApplication::LEARNING_GRADUATED,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('saved');
+
+        $this->assertDatabaseHas('users', [
+            'id' => $trainee->id,
+            'role' => 'alumni',
+        ]);
+        $this->actingAs($trainee->fresh())
+            ->get(route('alumni.dashboard'))
+            ->assertOk();
+
+        $this->actingAs($admin)
+            ->patch(route('admin.learning.trainees.status', $application->fresh()), [
+                'learning_status' => EnrollmentApplication::LEARNING_ACTIVE,
+                'learning_status_notes' => 'Graduation was recorded in error.',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('users', [
+            'id' => $trainee->id,
+            'role' => 'trainee',
+        ]);
+        $this->actingAs($trainee->fresh())
+            ->get(route('alumni.dashboard'))
+            ->assertForbidden();
+    }
+
     public function test_admin_trainee_roster_shows_expandable_payment_module_and_assessment_summary(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
@@ -158,7 +244,8 @@ class AdminLearningSystemTest extends TestCase
             ->get(route('admin.learning.trainees'))
             ->assertOk()
             ->assertSee('data-trainee-card', false)
-            ->assertSee('data-dashboard-sidebar-collapse', false)
+            ->assertDontSee('data-dashboard-sidebar-collapse', false)
+            ->assertDontSee('data-dashboard-menu-open', false)
             ->assertSee('Online payment')
             ->assertSee('1 of 1 published modules')
             ->assertSee('Ready for trainer assessment')

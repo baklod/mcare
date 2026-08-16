@@ -29,7 +29,7 @@ class AdminAccountController extends Controller
 
     public function storeTrainer(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
+        $validated = $request->validateWithBag('trainer', [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'confirmed', 'max:255', Password::min(10)->mixedCase()->letters()->numbers()],
@@ -50,7 +50,7 @@ class AdminAccountController extends Controller
 
     public function storeTrainee(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
+        $validated = $request->validateWithBag('trainee', [
             'first_name' => ['required', 'string', 'max:100'],
             'middle_name' => ['nullable', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],

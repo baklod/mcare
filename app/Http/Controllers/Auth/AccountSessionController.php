@@ -83,6 +83,12 @@ class AccountSessionController extends Controller
             'role' => $request->user()?->role,
         ]);
 
+        // Admin sessions always start from the operations dashboard. A stale
+        // intended URL must not send a newly signed-in admin into a submodule.
+        if ($request->user()?->hasRole('admin')) {
+            return redirect()->route('admin.dashboard');
+        }
+
         return redirect()->intended(route(AccountPortal::routeNameFor($request->user())));
     }
 

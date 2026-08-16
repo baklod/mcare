@@ -84,9 +84,6 @@
                             <h1 class="mt-4 max-w-3xl text-3xl font-bold leading-tight text-slate-950 sm:text-4xl">
                                 Admin Operations Console
                             </h1>
-                            <p class="mt-4 max-w-2xl text-sm leading-6 text-slate-600">
-                                Monitor enrollment decisions, document verification, payments, batch schedules, certificate readiness, LMS progress, and admin security activity from one place.
-                            </p>
                         </div>
 
                         <div class="grid grid-cols-2 gap-3 sm:min-w-80">
@@ -332,9 +329,6 @@
                 <div>
                     <p class="text-xs font-black uppercase tracking-wide text-purple-600">Reports and Alumni Jobs</p>
                     <h2 class="mt-2 text-2xl font-black text-slate-950">Capstone workflow coverage</h2>
-                    <p class="mt-3 text-sm leading-6 text-slate-600">
-                        The dashboard now reserves clear admin space for reports, alumni outcomes, certificate generation, and LMS tracking while the backend modules are finalized.
-                    </p>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div class="rounded-3xl bg-slate-50 p-4">

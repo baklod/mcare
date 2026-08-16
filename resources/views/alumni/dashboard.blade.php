@@ -1,15 +1,22 @@
-@extends('alumni.layouts.app', ['title' => 'Career Hub | MCARE Alumni'])
+@extends(($isAdminPreview ?? false) ? 'admin.layouts.app' : 'alumni.layouts.app', ['title' => 'Career Hub | MCARE Alumni'])
 
 @section('content')
 <section class="space-y-6">
-    <header class="rounded-2xl border border-purple-100 bg-gradient-to-br from-purple-50 via-white to-white p-6 sm:p-8">
+    @if ($isAdminPreview ?? false)
+        <div class="flex flex-col gap-3 rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-sm font-semibold text-purple-900">Admin preview of the alumni experience</p>
+            <a href="{{ route('admin.learning.alumni-jobs') }}" class="text-sm font-bold text-purple-800 hover:text-purple-950">Back to Career Hub management</a>
+        </div>
+    @endif
+
+    <header class="rounded-lg border border-slate-200 bg-white p-6 sm:p-8">
         <p class="dashboard-section-kicker">Alumni Career Hub</p>
         <div class="mt-3 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
                 <h1 class="max-w-3xl text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">Your next caregiving opportunity starts here.</h1>
                 <p class="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">Browse opportunities shared through MCARE and keep your professional journey connected to the training center.</p>
             </div>
-            <div class="flex items-center gap-3 rounded-xl border border-white bg-white/80 px-4 py-3 shadow-sm">
+            <div class="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
                 <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-100 text-purple-700"><x-dashboard-icon name="bell" class="h-4 w-4" /></span>
                 <span><span class="block text-xs font-bold uppercase tracking-wide text-slate-500">Unread updates</span><span class="mt-1 block text-xl font-black text-slate-950">{{ $unreadNotifications }}</span></span>
             </div>

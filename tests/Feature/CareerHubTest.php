@@ -95,6 +95,31 @@ class CareerHubTest extends TestCase
         $this->assertNotNull($alumni->notifications()->firstOrFail()->fresh()->read_at);
     }
 
+    public function test_admin_can_preview_the_published_alumni_feed_without_impersonating_an_alumni(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainee = User::factory()->create(['role' => 'trainee']);
+
+        CareerOpportunity::create([
+            'created_by_id' => $admin->id,
+            'title' => 'Preview Caregiver Role',
+            'employer' => 'MCARE Preview Partner',
+            'description' => 'Published role visible in the admin preview.',
+            'is_published' => true,
+            'published_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.alumni-jobs.preview'))
+            ->assertOk()
+            ->assertSee('Admin preview of the alumni experience')
+            ->assertSee('Preview Caregiver Role');
+
+        $this->actingAs($trainee)
+            ->get(route('admin.learning.alumni-jobs.preview'))
+            ->assertForbidden();
+    }
+
     public function test_published_batch_announcement_notifies_only_approved_trainees_in_that_batch(): void
     {
         $trainer = User::factory()->create(['role' => 'trainer']);

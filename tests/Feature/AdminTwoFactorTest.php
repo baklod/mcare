@@ -52,7 +52,8 @@ class AdminTwoFactorTest extends TestCase
             ->assertOk()
             ->assertSee('Verify your sign-in');
 
-        $this->post(route('admin.login.verify-2fa'), ['code' => $code])
+        $this->withSession(['url.intended' => route('admin.enrollments.index')])
+            ->post(route('admin.login.verify-2fa'), ['code' => $code])
             ->assertRedirect(route('admin.dashboard'));
 
         $this->assertAuthenticatedAs($admin);

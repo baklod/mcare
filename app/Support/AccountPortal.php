@@ -37,7 +37,7 @@ class AccountPortal
     public static function routeNameFor(?User $user): string
     {
         return match ($user?->role) {
-            'admin' => 'admin.enrollments.index',
+            'admin' => 'admin.dashboard',
             'trainer' => 'trainer.dashboard',
             'trainee' => 'trainee.dashboard',
             'alumni' => 'alumni.dashboard',

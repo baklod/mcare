@@ -37,9 +37,24 @@ class AdminCareerHubController extends Controller
         ]);
     }
 
+    public function preview(Request $request): View
+    {
+        AdminActivityLog::record($request->user(), 'career.portal.previewed');
+
+        return view('alumni.dashboard', [
+            // Administrators see the exact published feed without impersonating an alumni account.
+            'isAdminPreview' => true,
+            'jobs' => CareerOpportunity::query()
+                ->visibleToAlumni()
+                ->latest('published_at')
+                ->paginate(12),
+            'unreadNotifications' => 0,
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
-        $validated = $this->validatedPayload($request);
+        $validated = $this->validatedPayload($request, 'careerCreate');
         $shouldPublish = $request->boolean('is_published');
 
         $opportunity = CareerOpportunity::create([
@@ -108,11 +123,11 @@ class AdminCareerHubController extends Controller
     }
 
     /** @return array<string, mixed> */
-    private function validatedPayload(Request $request): array
+    private function validatedPayload(Request $request, ?string $errorBag = null): array
     {
         $safeText = ['not_regex:/[<>]/u'];
 
-        return $request->validate([
+        $rules = [
             'title' => ['required', 'string', 'max:160', ...$safeText],
             'employer' => ['required', 'string', 'max:160', ...$safeText],
             'location' => ['nullable', 'string', 'max:160', ...$safeText],
@@ -123,7 +138,11 @@ class AdminCareerHubController extends Controller
             'application_email' => ['nullable', 'email', 'max:255'],
             'application_deadline' => ['nullable', 'date'],
             'is_published' => ['nullable', 'boolean'],
-        ]);
+        ];
+
+        return $errorBag
+            ? $request->validateWithBag($errorBag, $rules)
+            : $request->validate($rules);
     }
 
     private function notifyAlumni(CareerOpportunity $opportunity): void

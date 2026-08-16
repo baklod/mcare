@@ -4,10 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $title ?? 'MCARE Admin' }}</title>
-    @php
-        $preloadedAdminBrand = request()->routeIs('admin.login') ? 'assets/official-logo.png' : 'assets/mcare-mark.png';
-    @endphp
-    <link rel="preload" as="image" href="{{ asset($preloadedAdminBrand) }}" fetchpriority="high">
     <x-dashboard-theme-head />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -16,8 +12,6 @@
     @php
         $adminName = auth()->user()?->name ?? 'Admin User';
         $adminInitial = strtoupper(substr($adminName, 0, 1));
-        $adminBrandAsset = request()->routeIs('admin.login') ? 'assets/official-logo.png' : 'assets/mcare-mark.png';
-        $adminBrandAlt = request()->routeIs('admin.login') ? 'Mission Care Training Center logo' : 'MCARE mark';
         $navClass = 'dashboard-nav-link';
         $navIdle = '';
         $navActive = 'is-active';
@@ -39,20 +33,14 @@
         ];
     @endphp
 
-    <div class="dashboard-backdrop" data-dashboard-backdrop></div>
-
     <aside class="dashboard-sidebar" data-dashboard-sidebar>
-        <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
-            <a href="{{ route('admin.dashboard') }}" class="dashboard-brand flex-1 min-w-0">
-                <img src="{{ asset($adminBrandAsset) }}" alt="{{ $adminBrandAlt }}" class="dashboard-brand-logo" width="44" height="44" loading="eager" decoding="sync" fetchpriority="high">
+        <div class="flex min-h-11 items-center border-b border-slate-100 pb-3">
+            <div class="dashboard-brand flex-1 min-w-0">
                 <span class="min-w-0">
                     <span class="dashboard-brand-title">MCARE Hub</span>
                     <span class="dashboard-brand-subtitle">Admin Portal</span>
                 </span>
-            </a>
-            <button type="button" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 focus-visible:ring-2 focus-visible:ring-purple-500" data-dashboard-sidebar-collapse data-dashboard-menu-close aria-label="Collapse navigation" title="Collapse navigation">
-                <x-dashboard-icon name="chevron-left" class="h-4 w-4" />
-            </button>
+            </div>
         </div>
 
         <nav class="dashboard-nav" aria-label="Admin navigation">
@@ -81,7 +69,7 @@
             </div>
 
             <div class="border-t border-slate-200 pt-4">
-                <a href="{{ route('admin.logs.index') }}" data-dashboard-prefetch class="{{ $navClass }} {{ request()->routeIs('admin.logs.*') ? $navActive : $navIdle }}">
+                <a href="{{ route('admin.logs.index') }}" data-dashboard-prefetch data-dashboard-nav-key="admin-admin-logs" class="{{ $navClass }} {{ request()->routeIs('admin.logs.*') ? $navActive : $navIdle }}">
                     <x-dashboard-icon name="shield-halved" class="dashboard-nav-icon" />
                     <span>Admin logs</span>
                 </a>
@@ -111,9 +99,6 @@
         <header class="dashboard-topbar">
             <div class="dashboard-topbar-inner">
                 <div class="flex min-w-0 items-center gap-3">
-                    <button type="button" class="dashboard-menu-button" data-dashboard-menu-open aria-label="Open navigation">
-                        <x-dashboard-icon name="bars" /><span class="hidden sm:inline">Menu</span>
-                    </button>
                     <div class="min-w-0">
                         <p class="dashboard-header-kicker">Mission Care Training Center</p>
                         <h1 class="dashboard-header-title">{{ $title ?? 'MCARE Admin' }}</h1>
@@ -133,7 +118,7 @@
                             <x-dashboard-icon name="chevron-down" class="dashboard-chevron text-xs text-slate-400 transition" />
                         </summary>
                         <div class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
-                            <x-dashboard-account-actions :logout-route="route('admin.logout')" role-label="Administrator" :show-admin-logs="true" />
+                            <x-dashboard-account-actions :logout-route="route('admin.logout')" role-label="Administrator" :show-admin-logs="true" :career-hub-route="route('admin.learning.alumni-jobs')" />
                         </div>
                 </details>
             </div>

@@ -24,13 +24,10 @@
 
     .universal-dashboard .dashboard-layout {
         /*
-         * Mirror the compact rail width on the right for balanced breathing
-         * room. On hover, the left gutter grows with the sidebar so neither
-         * the header nor the page content is covered by the expanded panel.
+         * Reserve the sidebar's full expanded lane at all times. Hovering the
+         * compact rail can reveal labels without moving dashboard content.
          */
-        @apply min-h-screen lg:pl-20 lg:pr-20;
-        transition: padding-left var(--dashboard-sidebar-motion-duration) var(--dashboard-sidebar-motion-easing);
-        transition-delay: 0ms;
+        @apply min-h-screen lg:pl-64 lg:pr-20;
         overflow-x: hidden !important;
         max-width: 100%;
     }
@@ -47,7 +44,6 @@
         will-change: width;
         overflow-x: hidden !important;
         contain: layout style;
-        view-transition-name: dashboard-sidebar;
     }
 
     .universal-dashboard .dashboard-sidebar:hover {
@@ -61,29 +57,7 @@
         transition-delay: 0ms;
     }
 
-    .universal-dashboard .dashboard-sidebar.is-expanded,
-    .universal-dashboard .dashboard-sidebar.is-open {
-        @apply lg:w-64 lg:shadow-2xl lg:shadow-slate-950/10 lg:border-r lg:border-slate-200;
-        transition-delay: 0ms;
-    }
-
-    .universal-dashboard .dashboard-sidebar.is-open {
-        @apply translate-x-0;
-    }
-
     @media (min-width: 1024px) {
-        .universal-dashboard .dashboard-sidebar:hover ~ .dashboard-layout {
-            padding-left: 16rem;
-            transition-delay: var(--dashboard-sidebar-hover-delay);
-        }
-
-        .universal-dashboard .dashboard-sidebar:focus-within ~ .dashboard-layout,
-        .universal-dashboard .dashboard-sidebar.is-expanded ~ .dashboard-layout,
-        .universal-dashboard .dashboard-sidebar.is-open ~ .dashboard-layout {
-            padding-left: 16rem;
-            transition-delay: 0ms;
-        }
-
         .universal-dashboard .dashboard-sidebar .dashboard-brand-title,
         .universal-dashboard .dashboard-sidebar .dashboard-brand-subtitle,
         .universal-dashboard .dashboard-sidebar .dashboard-menu-label,
@@ -136,30 +110,7 @@
             transition-delay: 0ms;
         }
 
-        .universal-dashboard .dashboard-sidebar.is-expanded .dashboard-brand-title,
-        .universal-dashboard .dashboard-sidebar.is-expanded .dashboard-brand-subtitle,
-        .universal-dashboard .dashboard-sidebar.is-expanded .dashboard-menu-label,
-        .universal-dashboard .dashboard-sidebar.is-expanded .dashboard-nav-link span,
-        .universal-dashboard .dashboard-sidebar.is-expanded .dashboard-account-summary > span.flex-1,
-        .universal-dashboard .dashboard-sidebar.is-expanded .dashboard-chevron,
-        .universal-dashboard .dashboard-sidebar.is-expanded p.text-\[11px\],
-        .universal-dashboard .dashboard-sidebar.is-expanded p.text-xs,
-        .universal-dashboard .dashboard-sidebar.is-open .dashboard-brand-title,
-        .universal-dashboard .dashboard-sidebar.is-open .dashboard-brand-subtitle,
-        .universal-dashboard .dashboard-sidebar.is-open .dashboard-menu-label,
-        .universal-dashboard .dashboard-sidebar.is-open .dashboard-nav-link span,
-        .universal-dashboard .dashboard-sidebar.is-open .dashboard-account-summary > span.flex-1,
-        .universal-dashboard .dashboard-sidebar.is-open .dashboard-chevron,
-        .universal-dashboard .dashboard-sidebar.is-open p.text-\[11px\],
-        .universal-dashboard .dashboard-sidebar.is-open p.text-xs {
-            opacity: 1;
-            max-width: 200px;
-            transform: translateX(0);
-            pointer-events: auto;
-            transition-delay: 0ms;
-        }
-        .universal-dashboard .dashboard-sidebar .dashboard-brand > span,
-        .universal-dashboard .dashboard-sidebar .dashboard-sidebar-collapse {
+        .universal-dashboard .dashboard-sidebar .dashboard-brand > span {
             white-space: nowrap;
             overflow: hidden;
             opacity: 0;
@@ -173,8 +124,7 @@
             pointer-events: none;
         }
 
-        .universal-dashboard .dashboard-sidebar:hover .dashboard-brand > span,
-        .universal-dashboard .dashboard-sidebar:hover .dashboard-sidebar-collapse {
+        .universal-dashboard .dashboard-sidebar:hover .dashboard-brand > span {
             opacity: 1;
             max-width: 160px;
             transform: translateX(0);
@@ -182,8 +132,7 @@
             transition-delay: var(--dashboard-sidebar-hover-delay);
         }
 
-        .universal-dashboard .dashboard-sidebar:focus-within .dashboard-brand > span,
-        .universal-dashboard .dashboard-sidebar:focus-within .dashboard-sidebar-collapse {
+        .universal-dashboard .dashboard-sidebar:focus-within .dashboard-brand > span {
             opacity: 1;
             max-width: 160px;
             transform: translateX(0);
@@ -191,44 +140,10 @@
             transition-delay: 0ms;
         }
 
-        .universal-dashboard .dashboard-sidebar.is-expanded .dashboard-brand > span,
-        .universal-dashboard .dashboard-sidebar.is-expanded .dashboard-sidebar-collapse,
-        .universal-dashboard .dashboard-sidebar.is-open .dashboard-brand > span,
-        .universal-dashboard .dashboard-sidebar.is-open .dashboard-sidebar-collapse {
-            opacity: 1;
-            max-width: 160px;
-            transform: translateX(0);
-            pointer-events: auto;
-            transition-delay: 0ms;
-        }
-    }
-
-    .universal-dashboard .dashboard-sidebar-collapse {
-        @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 focus-visible:ring-2 focus-visible:ring-purple-500;
-    }
-
-    .universal-dashboard .dashboard-sidebar-collapse .dashboard-svg-icon {
-        @apply h-4 w-4 transition-transform duration-200;
-    }
-
-    .universal-dashboard .dashboard-backdrop {
-        @apply fixed inset-0 z-30 hidden bg-slate-950/45 lg:hidden;
-        backdrop-filter: none;
-    }
-
-    .universal-dashboard .dashboard-backdrop.is-open {
-        @apply block;
     }
 
     .universal-dashboard .dashboard-brand {
         @apply flex min-w-0 items-center gap-3 rounded-xl px-1.5 py-1 outline-none transition hover:bg-purple-50 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2;
-    }
-
-    .universal-dashboard .dashboard-brand-logo {
-        @apply h-10 w-10 shrink-0 rounded-xl border border-slate-100 bg-white object-contain p-1;
-        box-shadow: none;
-        view-transition-name: dashboard-brand-logo;
-        contain: paint;
     }
 
     .universal-dashboard .dashboard-brand-title {
@@ -307,7 +222,6 @@
     .universal-dashboard .dashboard-topbar {
         @apply sticky top-0 z-20 border-b border-slate-200 bg-white;
         backdrop-filter: none;
-        view-transition-name: dashboard-topbar;
     }
 
     .universal-dashboard .dashboard-topbar-inner {
@@ -317,10 +231,6 @@
     .universal-dashboard[data-dashboard-role="trainee"] .dashboard-topbar-inner,
     .universal-dashboard[data-dashboard-role="alumni"] .dashboard-topbar-inner {
         @apply md:grid-cols-[minmax(0,1fr)_auto];
-    }
-
-    .universal-dashboard .dashboard-menu-button {
-        @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-purple-800 outline-none transition hover:border-purple-300 hover:bg-purple-50 focus-visible:ring-2 focus-visible:ring-purple-500 lg:hidden;
     }
 
     .universal-dashboard .dashboard-header-kicker {
@@ -348,8 +258,6 @@
         @apply mx-auto w-full max-w-[1680px] px-6 py-6 pb-28 sm:px-8 lg:px-12 lg:py-10 lg:pb-12;
         overflow-x: hidden;
         max-width: 100%;
-        animation: dashboard-content-enter 180ms ease-out both;
-        view-transition-name: dashboard-main;
     }
 
     /* Keep role-specific pages from reintroducing a narrower max-width than
@@ -1116,26 +1024,10 @@ html.dashboard-navigating .dashboard-navigation-progress {
     animation: dashboard-navigation-loading 900ms ease-out both;
 }
 
-html.dashboard-navigating .universal-dashboard .dashboard-main {
-    opacity: 0.78;
-    transition: opacity 120ms ease-out;
-}
-
 @keyframes dashboard-navigation-loading {
     0% { transform: scaleX(0); }
     55% { transform: scaleX(0.72); }
     100% { transform: scaleX(0.92); }
-}
-
-@keyframes dashboard-content-enter {
-    from {
-        opacity: 0;
-        transform: translateY(4px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
 }
 
 html.dashboard-scroll-in-progress {
@@ -1146,60 +1038,9 @@ html.dashboard-scroll-in-progress {
     body.universal-dashboard {
         overflow-y: scroll;
     }
-
-    html.dashboard-sidebar-collapsed .universal-dashboard .dashboard-sidebar {
-        transform: translateX(-100%);
-    }
-
-    html.dashboard-sidebar-collapsed .universal-dashboard .dashboard-sidebar-collapse {
-        opacity: 0;
-        visibility: hidden;
-        pointer-events: none;
-    }
-
-    html.dashboard-sidebar-collapsed .universal-dashboard .dashboard-layout {
-        padding-left: 0;
-    }
-
-    html.dashboard-sidebar-collapsed .universal-dashboard [data-dashboard-menu-open] {
-        display: inline-flex;
-    }
-}
-
-@view-transition {
-    navigation: auto;
-}
-
-::view-transition-old(dashboard-sidebar),
-::view-transition-new(dashboard-sidebar),
-::view-transition-old(dashboard-topbar),
-::view-transition-new(dashboard-topbar),
-::view-transition-old(dashboard-brand-logo),
-::view-transition-new(dashboard-brand-logo) {
-    animation: none;
-}
-
-::view-transition-old(dashboard-main) {
-    animation: 120ms ease-out both dashboard-view-fade-out;
-}
-
-::view-transition-new(dashboard-main) {
-    animation: 180ms ease-out both dashboard-content-enter;
-}
-
-@keyframes dashboard-view-fade-out {
-    to {
-        opacity: 0;
-    }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .universal-dashboard .dashboard-main,
-    ::view-transition-old(dashboard-main),
-    ::view-transition-new(dashboard-main) {
-        animation: none;
-    }
-
     .dashboard-navigation-progress {
         display: none;
     }
@@ -1461,8 +1302,7 @@ html[data-dashboard-theme="dark"] .universal-dashboard :is(.dashboard-nav-link:h
     color: #d8b4fe !important;
 }
 
-html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-search,
-html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-menu-button {
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-search {
     background: #111827 !important;
     border-color: #475569 !important;
     color: #e5e7eb !important;
@@ -1519,24 +1359,12 @@ html[data-dashboard-theme="dark"] .universal-dashboard :is(.form-field, input, s
     color: #d7dee8 !important;
 }
 
-html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-sidebar-collapse {
-    background-color: #151f31;
-    border-color: #3b4a61;
-    color: #c5b2eb;
-}
-
 /* Keep interactive chrome calm in dark mode. The base component hover colors
  * are intentionally light for daytime use and otherwise create a bright flash
  * over the brand, account switcher, and sidebar control. */
 html[data-dashboard-theme="dark"] .universal-dashboard :is(.dashboard-brand:hover, .dashboard-account-summary:hover) {
     background-color: #1d293d !important;
     color: #d7dee8 !important;
-}
-
-html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-sidebar-collapse:hover {
-    background-color: #243149 !important;
-    border-color: #56657c !important;
-    color: #d8c9f4 !important;
 }
 
 html[data-dashboard-theme="dark"] .universal-dashboard .training-calendar {
@@ -3628,12 +3456,6 @@ html[data-dashboard-theme="dark"] .universal-dashboard .lms-status-chip.is-red {
         line-height: 1.2;
     }
 
-    .universal-dashboard .dashboard-menu-button {
-        width: 42px;
-        min-height: 42px;
-        padding-inline: 0;
-    }
-
     .universal-dashboard .dashboard-topbar .dashboard-account-summary {
         min-height: 42px;
         gap: 4px;
@@ -3645,16 +3467,10 @@ html[data-dashboard-theme="dark"] .universal-dashboard .lms-status-chip.is-red {
         height: 36px;
     }
 
-    .universal-dashboard .dashboard-sidebar:not(.is-open) {
+    .universal-dashboard .dashboard-sidebar {
         transform: translateX(-105%);
         visibility: hidden;
         pointer-events: none;
-    }
-
-    .universal-dashboard .dashboard-sidebar.is-open {
-        transform: translateX(0);
-        visibility: visible;
-        pointer-events: auto;
     }
 
     .universal-dashboard .lms-page > * + * {

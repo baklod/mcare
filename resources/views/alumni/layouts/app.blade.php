@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'MCARE Alumni' }}</title>
-    <link rel="preload" as="image" href="{{ asset('assets/mcare-mark.png') }}" fetchpriority="high">
     <x-dashboard-theme-head />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -20,23 +19,17 @@
         ];
     @endphp
 
-    <div class="dashboard-backdrop" data-dashboard-backdrop></div>
-
     <aside class="dashboard-sidebar" data-dashboard-sidebar>
-        <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
-            <a href="{{ route('alumni.dashboard') }}" class="dashboard-brand flex-1 min-w-0">
-                <img src="{{ asset('assets/mcare-mark.png') }}" alt="MCARE mark" class="dashboard-brand-logo" width="44" height="44" loading="eager" decoding="sync" fetchpriority="high">
+        <div class="flex min-h-11 items-center border-b border-slate-100 pb-3">
+            <div class="dashboard-brand flex-1 min-w-0">
                 <span class="min-w-0"><span class="dashboard-brand-title">MCARE Hub</span><span class="dashboard-brand-subtitle">Alumni Portal</span></span>
-            </a>
-            <button type="button" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 focus-visible:ring-2 focus-visible:ring-purple-500" data-dashboard-sidebar-collapse data-dashboard-menu-close aria-label="Collapse navigation" title="Collapse navigation">
-                <x-dashboard-icon name="chevron-left" class="h-4 w-4" />
-            </button>
+            </div>
         </div>
 
         <nav class="dashboard-nav" aria-label="Alumni navigation">
             <p class="dashboard-menu-label">Alumni services</p>
             @foreach ($alumniNav as $item)
-                <a href="{{ $item['href'] }}" data-dashboard-prefetch class="dashboard-nav-link {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
+                <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="alumni-{{ str($item['label'])->slug() }}" class="dashboard-nav-link {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
                     <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
                     <span>{{ $item['label'] }}</span>
                 </a>
@@ -58,7 +51,6 @@
         <header class="dashboard-topbar">
             <div class="dashboard-topbar-inner">
                 <div class="flex min-w-0 items-center gap-3">
-                    <button type="button" class="dashboard-menu-button" data-dashboard-menu-open aria-label="Open navigation"><x-dashboard-icon name="bars" /><span class="hidden sm:inline">Menu</span></button>
                     <div class="min-w-0"><p class="dashboard-header-kicker">Mission Care Training Center</p><h1 class="dashboard-header-title">{{ $title ?? 'MCARE Alumni' }}</h1></div>
                 </div>
                 <div class="flex items-center gap-2">
@@ -68,7 +60,7 @@
                             <span class="hidden text-left sm:block"><span class="block text-sm font-bold">{{ $alumniName }}</span><span class="block text-xs font-semibold text-slate-400">Alumni</span></span>
                             <x-dashboard-icon name="chevron-down" class="dashboard-chevron text-xs text-slate-400 transition" />
                         </summary>
-                        <div class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl"><x-dashboard-account-actions :logout-route="route('logout')" role-label="Alumni" /></div>
+                        <div class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl"><x-dashboard-account-actions :logout-route="route('logout')" role-label="Alumni" :career-hub-route="route('alumni.dashboard')" /></div>
                     </details>
                 </div>
             </div>
@@ -82,7 +74,7 @@
 
     <nav class="dashboard-mobile-bar grid-cols-2" aria-label="Mobile alumni navigation">
         @foreach ($alumniNav as $item)
-            <a href="{{ $item['href'] }}" data-dashboard-prefetch class="dashboard-mobile-link {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif><x-dashboard-icon :name="$item['icon']" /><span class="truncate">{{ $item['label'] }}</span></a>
+            <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="alumni-{{ str($item['label'])->slug() }}" class="dashboard-mobile-link {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif><x-dashboard-icon :name="$item['icon']" /><span class="truncate">{{ $item['label'] }}</span></a>
         @endforeach
     </nav>
 </body>

@@ -18,6 +18,23 @@ class AccountSettingsTest extends TestCase
         $this->get(route('account.settings'))->assertRedirect(route('login'));
     }
 
+    public function test_shared_admin_login_lands_on_the_dashboard(): void
+    {
+        config()->set('services.two_factor.enabled', false);
+
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'password' => 'Password123!',
+        ]);
+
+        $this->withSession(['url.intended' => route('admin.enrollments.index')])
+            ->post(route('login.store'), [
+                'email' => $admin->email,
+                'password' => 'Password123!',
+            ])
+            ->assertRedirect(route('admin.dashboard'));
+    }
+
     public function test_admin_trainer_and_trainee_can_open_role_aware_settings_and_help(): void
     {
         foreach (['admin', 'trainer', 'trainee'] as $role) {

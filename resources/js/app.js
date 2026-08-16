@@ -1,7 +1,6 @@
 import './bootstrap';
 
 const dashboardThemeStorageKey = 'mcare-dashboard-theme';
-const dashboardSidebarStorageKey = 'mcare-dashboard-sidebar-collapsed';
 
 const readDashboardTheme = () => {
     try {
@@ -24,10 +23,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.documentElement.classList.remove('dashboard-navigating');
 
     const sidebar = document.querySelector('[data-dashboard-sidebar]');
-    const backdrop = document.querySelector('[data-dashboard-backdrop]');
-    const openButtons = document.querySelectorAll('[data-dashboard-menu-open]');
-    const closeButtons = document.querySelectorAll('[data-dashboard-menu-close]');
-    const collapseButtons = document.querySelectorAll('[data-dashboard-sidebar-collapse]');
     const accountMenus = document.querySelectorAll('[data-dashboard-account]');
     const dashboardLinks = document.querySelectorAll('.dashboard-nav-link, .dashboard-mobile-link');
     const hashLinks = document.querySelectorAll('.dashboard-nav-link[href*="#"], .dashboard-mobile-link[href*="#"]');
@@ -42,6 +37,51 @@ document.addEventListener('DOMContentLoaded', () => {
     let navigationLocked = false;
     let navigationUnlockTimer = null;
     let navigationSpamReported = false;
+
+    // Shared native dialogs keep large creation forms outside the normal page flow.
+    const dashboardDialogs = document.querySelectorAll('dialog[data-dashboard-dialog]');
+    const openDashboardDialog = (dialog) => {
+        if (!dialog?.showModal || dialog.open) return;
+
+        dialog.showModal();
+        window.requestAnimationFrame(() => {
+            dialog.querySelector('[autofocus], input:not([type="hidden"]), select, textarea, button')?.focus();
+        });
+    };
+
+    document.querySelectorAll('[data-dashboard-dialog-open]').forEach((button) => {
+        button.addEventListener('click', () => {
+            openDashboardDialog(document.getElementById(button.dataset.dashboardDialogOpen));
+        });
+    });
+
+    dashboardDialogs.forEach((dialog) => {
+        dialog.querySelectorAll('[data-dashboard-dialog-close]').forEach((button) => {
+            button.addEventListener('click', () => dialog.close());
+        });
+
+        dialog.addEventListener('click', (event) => {
+            const bounds = dialog.getBoundingClientRect();
+            const outside = event.clientX < bounds.left || event.clientX > bounds.right
+                || event.clientY < bounds.top || event.clientY > bounds.bottom;
+
+            if (outside) dialog.close();
+        });
+
+        if (dialog.dataset.autoOpen === 'true') {
+            openDashboardDialog(dialog);
+        }
+    });
+
+    document.querySelectorAll('[data-dashboard-dialog-form]').forEach((form) => {
+        form.addEventListener('submit', () => {
+            form.querySelectorAll('[data-action-button]').forEach((button) => {
+                button.disabled = true;
+                button.classList.add('cursor-not-allowed', 'opacity-70');
+                button.textContent = form.dataset.submitLabel || 'Saving...';
+            });
+        });
+    });
 
     const reportClientSecurityEvent = (eventName) => {
         if (!securityEventUrl || !csrfToken) return;
@@ -158,82 +198,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const syncSidebarAccessibility = () => {
         if (!sidebar) return;
 
-        const isInaccessible = desktopDashboardMedia.matches
-            ? document.documentElement.classList.contains('dashboard-sidebar-collapsed')
-            : ! sidebar.classList.contains('is-open');
-
+        // Header and collapse controls were removed. The bottom navigation is
+        // the mobile entry surface, while the full sidebar remains desktop-only.
+        const isInaccessible = ! desktopDashboardMedia.matches;
         sidebar.inert = isInaccessible;
-        if (isInaccessible) {
-            sidebar.setAttribute('aria-hidden', 'true');
-        } else {
-            sidebar.removeAttribute('aria-hidden');
-        }
+        sidebar.toggleAttribute('aria-hidden', isInaccessible);
     };
 
-    const setMenuOpen = (isOpen) => {
-        if (!sidebar || !backdrop) {
-            return;
-        }
-
-        sidebar.classList.toggle('is-open', isOpen);
-        backdrop.classList.toggle('is-open', isOpen);
-        document.body.classList.toggle('overflow-hidden', isOpen);
-
-        openButtons.forEach((button) => button.setAttribute('aria-expanded', String(isOpen)));
-        syncSidebarAccessibility();
-    };
-
-    const setSidebarCollapsed = (isCollapsed) => {
-        document.documentElement.classList.toggle('dashboard-sidebar-collapsed', isCollapsed);
-        syncSidebarAccessibility();
-
-        if (isCollapsed) {
-            accountMenus.forEach((menu) => menu.removeAttribute('open'));
-            setMenuOpen(false);
-        }
-
-        collapseButtons.forEach((button) => {
-            button.setAttribute('aria-expanded', String(! isCollapsed));
-            button.setAttribute('aria-label', isCollapsed ? 'Expand navigation' : 'Collapse navigation');
-            button.setAttribute('title', isCollapsed ? 'Expand navigation' : 'Collapse navigation');
-        });
-
-        try {
-            window.localStorage.setItem(dashboardSidebarStorageKey, String(isCollapsed));
-        } catch (error) {
-            // The collapse still works for this page when storage is blocked.
-        }
-    };
-
-    setSidebarCollapsed(document.documentElement.classList.contains('dashboard-sidebar-collapsed'));
-
-    collapseButtons.forEach((button) => {
-        button.addEventListener('click', () => setSidebarCollapsed(true));
-    });
-
-    openButtons.forEach((button) => {
-        button.addEventListener('click', () => {
-            if (desktopDashboardMedia.matches
-                && document.documentElement.classList.contains('dashboard-sidebar-collapsed')) {
-                setSidebarCollapsed(false);
-                return;
-            }
-
-            setMenuOpen(true);
-        });
-    });
-
-    closeButtons.forEach((button) => {
-        button.addEventListener('click', () => setMenuOpen(false));
-    });
-
-    backdrop?.addEventListener('click', () => setMenuOpen(false));
-
-    const releaseMobileMenuOnDesktop = (event) => {
-        if (event.matches) setMenuOpen(false);
-        syncSidebarAccessibility();
-    };
-    desktopDashboardMedia.addEventListener?.('change', releaseMobileMenuOnDesktop);
+    syncSidebarAccessibility();
+    desktopDashboardMedia.addEventListener?.('change', syncSidebarAccessibility);
 
     // Keep the trainee roster compact: opening one learner summary closes the
     // previously opened card while retaining native details keyboard behavior.
@@ -329,10 +302,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         activateDate(calendar.dataset.initialDate, false);
-    });
-
-    sidebar?.querySelectorAll('a, button[type="submit"]').forEach((item) => {
-        item.addEventListener('click', () => setMenuOpen(false));
     });
 
     const setActiveNavigationKey = (activeKey) => {
@@ -434,7 +403,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 event.preventDefault();
                 window.history.pushState({}, '', url.hash);
                 scrollDashboardTo(target);
-                setMenuOpen(false);
             }
         });
     });
@@ -473,6 +441,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (isModifiedClick || url.origin !== window.location.origin || isSameDocumentHash) {
                 return;
+            }
+
+            if (link.dataset.dashboardNavKey) {
+                setActiveNavigationKey(link.dataset.dashboardNavKey);
             }
 
             // A quick double-click (or a mobile tap burst) can otherwise queue
@@ -845,7 +817,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        setMenuOpen(false);
         accountMenus.forEach((menu) => menu.removeAttribute('open'));
         document.querySelectorAll('.lms-inline-editor[open]').forEach((editor) => editor.removeAttribute('open'));
     });
@@ -866,7 +837,4 @@ window.addEventListener('storage', (event) => {
         applyDashboardTheme(readDashboardTheme());
     }
 
-    if (event.key === dashboardSidebarStorageKey) {
-        document.documentElement.classList.toggle('dashboard-sidebar-collapsed', event.newValue === 'true');
-    }
 });
