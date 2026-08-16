@@ -7,9 +7,12 @@ use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\TrainerAnnouncement;
 use App\Models\TrainingBatch;
+use App\Models\User;
+use App\Notifications\LmsAnnouncementPublished;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -78,6 +81,10 @@ class AnnouncementController extends Controller
             'published' => $announcement->is_published,
         ]);
 
+        if ($this->shouldNotifyTrainees($announcement)) {
+            $this->notifyTrainees($announcement);
+        }
+
         return redirect()
             ->route('trainer.stream')
             ->with('saved', $announcement->is_published
@@ -91,6 +98,7 @@ class AnnouncementController extends Controller
     ): RedirectResponse {
         $this->authorize('update', $announcement);
 
+        $wasPublished = $announcement->is_published;
         $validated = $this->validatedPayload($request);
         $published = $request->has('is_published')
             ? $request->boolean('is_published')
@@ -110,6 +118,10 @@ class AnnouncementController extends Controller
             'batch_id' => $announcement->training_batch_id,
             'published' => $announcement->is_published,
         ]);
+
+        if (! $wasPublished && $this->shouldNotifyTrainees($announcement)) {
+            $this->notifyTrainees($announcement);
+        }
 
         return redirect()
             ->route('trainer.stream')
@@ -170,5 +182,34 @@ class AnnouncementController extends Controller
         }
 
         return $validated;
+    }
+
+    private function shouldNotifyTrainees(TrainerAnnouncement $announcement): bool
+    {
+        // Scheduled announcements should notify when they become visible, not before.
+        return $announcement->isVisibleNow()
+            && in_array($announcement->audience, ['all', 'trainees'], true);
+    }
+
+    private function notifyTrainees(TrainerAnnouncement $announcement): void
+    {
+        $traineeIds = EnrollmentApplication::query()
+            ->where('status', EnrollmentApplication::STATUS_APPROVED)
+            ->when(
+                $announcement->training_batch_id,
+                fn ($query) => $query->where('training_batch_id', $announcement->training_batch_id)
+            )
+            ->whereNotNull('user_id')
+            ->pluck('user_id')
+            ->unique();
+
+        $trainees = User::query()
+            ->where('role', 'trainee')
+            ->whereIn('id', $traineeIds)
+            ->get();
+
+        if ($trainees->isNotEmpty()) {
+            Notification::send($trainees, new LmsAnnouncementPublished($announcement));
+        }
     }
 }

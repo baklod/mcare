@@ -35,6 +35,10 @@ class AccountSettingsController extends Controller
                 ['Documents', 'Review admin feedback and replace enrollment documents that need correction.'],
                 ['Schedule and payment', 'Your dashboard shows your assigned batch and current payment status.'],
             ],
+            'alumni' => [
+                ['Career Hub', 'Review current caregiving opportunities shared by the center.'],
+                ['Notifications', 'Open the notification center to revisit career and MCARE updates.'],
+            ],
             default => [
                 ['Enrollment', 'Complete your profile, upload requirements, and monitor the application status.'],
             ],
@@ -87,6 +91,7 @@ class AccountSettingsController extends Controller
             'admin' => route('admin.dashboard'),
             'trainer' => route('trainer.dashboard'),
             'trainee' => route('trainee.dashboard'),
+            'alumni' => route('alumni.dashboard'),
             default => AccountPortal::urlFor($request->user()),
         };
 

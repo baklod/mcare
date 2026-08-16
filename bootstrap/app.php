@@ -45,6 +45,7 @@ return Application::configure(basePath: dirname(__DIR__))
             $request->is('admin') || $request->is('admin/*') => route('admin.login'),
             $request->is('trainer') || $request->is('trainer/*') => route('trainer.login'),
             $request->is('trainee') || $request->is('trainee/*') => route('trainee.login'),
+            $request->is('alumni') || $request->is('alumni/*') => route('login'),
             default => route('login'),
         });
     })

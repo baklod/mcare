@@ -32,6 +32,7 @@ class RolePermissionMatrix
                 'accounts.manage',
                 'reports.export',
                 'logs.view',
+                'alumni.jobs.manage',
             ],
             'trainer' => [
                 'trainer.access',

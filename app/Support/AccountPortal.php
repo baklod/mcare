@@ -40,8 +40,7 @@ class AccountPortal
             'admin' => 'admin.enrollments.index',
             'trainer' => 'trainer.dashboard',
             'trainee' => 'trainee.dashboard',
-            // Alumni is intentionally mapped to the main login until the alumni portal exists.
-            'alumni' => 'login',
+            'alumni' => 'alumni.dashboard',
             default => self::applicantHasApplication($user) ? 'payment.show' : 'enrollment.create',
         };
     }

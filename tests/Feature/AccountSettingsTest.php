@@ -60,11 +60,21 @@ class AccountSettingsTest extends TestCase
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $this->actingAs($admin)->get(route('admin.dashboard'))
-            ->assertOk()->assertSee('Night mode')->assertSee('Settings')->assertSee('Help');
+            ->assertOk()
+            ->assertSee('Notifications')
+            ->assertSee('Night mode')
+            ->assertSee('Settings')
+            ->assertSee('Help')
+            ->assertDontSee('data-dashboard-notifications', false);
 
         $trainer = User::factory()->create(['role' => 'trainer']);
         $this->actingAs($trainer)->get(route('trainer.dashboard'))
-            ->assertOk()->assertSee('Night mode')->assertSee('Settings')->assertSee('Help');
+            ->assertOk()
+            ->assertSee('Notifications')
+            ->assertSee('Night mode')
+            ->assertSee('Settings')
+            ->assertSee('Help')
+            ->assertDontSee('data-dashboard-notifications', false);
 
         $trainee = User::factory()->create(['role' => 'trainee']);
         EnrollmentApplication::query()->create([
@@ -88,6 +98,11 @@ class AccountSettingsTest extends TestCase
             'status' => EnrollmentApplication::STATUS_APPROVED,
         ]);
         $this->actingAs($trainee)->get(route('trainee.dashboard'))
-            ->assertOk()->assertSee('Night mode')->assertSee('Settings')->assertSee('Help');
+            ->assertOk()
+            ->assertSee('Notifications')
+            ->assertSee('Night mode')
+            ->assertSee('Settings')
+            ->assertSee('Help')
+            ->assertDontSee('data-dashboard-notifications', false);
     }
 }

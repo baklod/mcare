@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountSettingsController;
 use App\Http\Controllers\Admin\AdminAccountController;
 use App\Http\Controllers\Admin\AdminActivityLogController;
+use App\Http\Controllers\Admin\AdminCareerHubController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminLearningSystemController;
 use App\Http\Controllers\Admin\AdminSessionController;
@@ -11,8 +12,10 @@ use App\Http\Controllers\Admin\EnrollmentReviewController;
 use App\Http\Controllers\Admin\PaymentScheduleController;
 use App\Http\Controllers\Auth\AccountSessionController;
 use App\Http\Controllers\Auth\GoogleAuthController;
+use App\Http\Controllers\Alumni\AlumniCareerHubController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\EnrollmentPaymentController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Trainee\TraineeDashboardController;
 use App\Http\Controllers\Trainee\QuizAttemptController as TraineeQuizAttemptController;
 use App\Http\Controllers\Trainee\QuizController as TraineeQuizController;
@@ -71,6 +74,19 @@ Route::middleware('throttle:global-web')->group(function () {
             Route::post('/security-event', [AccountSettingsController::class, 'securityEvent'])
                 ->middleware('throttle:sensitive-mutation')
                 ->name('security-event');
+        });
+
+    Route::prefix('notifications')
+        ->name('notifications.')
+        ->middleware(['auth', 'private.response'])
+        ->group(function () {
+            Route::get('/', [NotificationController::class, 'index'])->name('index');
+            Route::patch('/{notification}/read', [NotificationController::class, 'markRead'])
+                ->middleware('throttle:sensitive-mutation')
+                ->name('read');
+            Route::post('/read-all', [NotificationController::class, 'markAllRead'])
+                ->middleware('throttle:sensitive-mutation')
+                ->name('read-all');
         });
 
     /*
@@ -221,7 +237,18 @@ Route::middleware('throttle:global-web')->group(function () {
                     ->middleware(['permission:modules.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.modules.destroy');
                 Route::get('/learning/certificates', [AdminLearningSystemController::class, 'certificates'])->name('learning.certificates');
-                Route::get('/learning/alumni-jobs', [AdminLearningSystemController::class, 'alumniJobs'])->name('learning.alumni-jobs');
+                Route::get('/learning/alumni-jobs', [AdminCareerHubController::class, 'index'])
+                    ->middleware('permission:alumni.jobs.manage')
+                    ->name('learning.alumni-jobs');
+                Route::post('/learning/alumni-jobs', [AdminCareerHubController::class, 'store'])
+                    ->middleware(['permission:alumni.jobs.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.alumni-jobs.store');
+                Route::patch('/learning/alumni-jobs/{careerOpportunity}', [AdminCareerHubController::class, 'update'])
+                    ->middleware(['permission:alumni.jobs.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.alumni-jobs.update');
+                Route::delete('/learning/alumni-jobs/{careerOpportunity}', [AdminCareerHubController::class, 'destroy'])
+                    ->middleware(['permission:alumni.jobs.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.alumni-jobs.destroy');
                 Route::get('/learning/reports', [AdminLearningSystemController::class, 'reports'])->name('learning.reports');
 
                 Route::get('/accounts', [AdminAccountController::class, 'index'])
@@ -406,6 +433,15 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/quiz-attempts/{attempt}/result', [TraineeQuizAttemptController::class, 'result'])
                     ->middleware('permission:quizzes.take')
                     ->name('quiz-attempts.result');
+            });
+        });
+
+    Route::prefix('alumni')
+        ->name('alumni.')
+        ->middleware('private.response')
+        ->group(function () {
+            Route::middleware(['auth', 'permission:alumni.jobs.view'])->group(function () {
+                Route::get('/', [AlumniCareerHubController::class, 'index'])->name('dashboard');
             });
         });
 });
