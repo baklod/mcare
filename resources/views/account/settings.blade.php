@@ -20,7 +20,7 @@
 
     <main class="mx-auto max-w-5xl px-5 py-8 sm:px-8 sm:py-12">
         @if (session('saved'))
-            <div class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-800">{{ session('saved') }}</div>
+            <div class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-800" role="status" aria-live="polite" data-auto-dismiss="5000">{{ session('saved') }}</div>
         @endif
         <div class="mb-8">
             <p class="text-sm font-bold uppercase tracking-wide text-purple-700">Account preferences</p>

@@ -81,7 +81,11 @@ class AdminLearningSystemTest extends TestCase
 
         $this->actingAs($admin)
             ->post(route('admin.learning.alumni-jobs.store'), [])
-            ->assertSessionHasErrors(['title', 'employer', 'description'], null, 'careerCreate');
+            ->assertSessionHasErrors([
+                'estimated_start_date',
+                'patient_gender',
+                'mobility_status',
+            ], null, 'careerCreate');
     }
 
     public function test_admin_can_filter_and_update_a_trainee_learning_status(): void

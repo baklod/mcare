@@ -187,4 +187,20 @@
     .secondary-action {
         @apply inline-flex items-center justify-center rounded-full border border-purple-200 bg-white px-5 py-3 text-sm font-bold text-purple-700 hover:bg-purple-50;
     }
+
+    [data-auto-dismiss] {
+        transition: opacity 220ms ease, transform 220ms ease;
+    }
+
+    [data-auto-dismiss].is-dismissing {
+        pointer-events: none;
+        opacity: 0;
+        transform: translateY(-0.25rem);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        [data-auto-dismiss] {
+            transition-duration: 0.01ms;
+        }
+    }
 }

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureAdmin;
+use App\Http\Middleware\EnsureAlumni;
 use App\Http\Middleware\EnsureEnrollmentPaymentAccess;
 use App\Http\Middleware\EnsureTrainee;
 use App\Http\Middleware\EnsureTrainer;
@@ -33,6 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'admin' => EnsureAdmin::class,
+            'alumni' => EnsureAlumni::class,
             'enrollment.payment.access' => EnsureEnrollmentPaymentAccess::class,
             'private.response' => PrivateResponseHeaders::class,
             'permission' => PermissionMiddleware::class,

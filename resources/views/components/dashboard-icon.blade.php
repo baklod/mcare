@@ -21,6 +21,7 @@
         'chevron-right' => '<path d="m9 18 6-6-6-6"/>',
         'chevron-up' => '<path d="m18 15-6-6-6 6"/>',
         'circle-check' => '<circle cx="12" cy="12" r="9"/><path d="m8 12 2.6 2.6L16.5 9"/>',
+        'circle-minus' => '<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>',
         'circle-play' => '<circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4V8Z"/>',
         'circle-question' => '<circle cx="12" cy="12" r="9"/><path d="M9.6 9a2.6 2.6 0 1 1 3.2 2.5c-.8.3-.8.9-.8 1.5M12 17h.01"/>',
         'clipboard-list' => '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 9h6M9 13h6M9 17h4"/>',

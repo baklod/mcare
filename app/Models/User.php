@@ -7,6 +7,7 @@ use App\Support\RolePermissionMatrix;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Schema;
@@ -87,5 +88,10 @@ class User extends Authenticatable
     public function quizzes(): HasMany
     {
         return $this->hasMany(Quiz::class, 'trainer_id');
+    }
+
+    public function alumniProfile(): HasOne
+    {
+        return $this->hasOne(AlumniProfile::class);
     }
 }

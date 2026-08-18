@@ -109,7 +109,7 @@
 
         <main class="dashboard-main pb-28 lg:pb-9">
             @if (session('saved'))
-                <div class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold leading-6 text-emerald-700">
+                <div class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold leading-6 text-emerald-700" role="status" aria-live="polite" data-auto-dismiss="5000">
                     {{ session('saved') }}
                 </div>
             @endif

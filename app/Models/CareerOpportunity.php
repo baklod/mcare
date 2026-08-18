@@ -11,25 +11,28 @@ class CareerOpportunity extends Model
 {
     use HasFactory;
 
-    public const TYPE_FULL_TIME = 'full-time';
+    public const GENDER_FEMALE = 'female';
 
-    public const TYPE_PART_TIME = 'part-time';
+    public const GENDER_MALE = 'male';
 
-    public const TYPE_CONTRACT = 'contract';
+    public const GENDER_NOT_SPECIFIED = 'not-specified';
 
-    public const TYPE_TEMPORARY = 'temporary';
+    public const MOBILITY_AMBULATORY = 'ambulatory';
+
+    public const MOBILITY_BEDRIDDEN = 'bedridden';
 
     protected $fillable = [
         'created_by_id',
+        'estimated_start_date',
+        'patient_gender',
+        'mobility_status',
+        'patient_age',
+        'specific_contraptions',
+        'condition_summary',
+        // These neutral values keep records compatible with the original schema.
         'title',
         'employer',
-        'location',
-        'employment_type',
         'description',
-        'requirements',
-        'application_url',
-        'application_email',
-        'application_deadline',
         'is_published',
         'published_at',
     ];
@@ -37,20 +40,28 @@ class CareerOpportunity extends Model
     protected function casts(): array
     {
         return [
-            'application_deadline' => 'datetime',
+            'estimated_start_date' => 'date',
             'is_published' => 'boolean',
             'published_at' => 'datetime',
         ];
     }
 
     /** @return array<string, string> */
-    public static function employmentTypes(): array
+    public static function patientGenders(): array
     {
         return [
-            self::TYPE_FULL_TIME => 'Full-time',
-            self::TYPE_PART_TIME => 'Part-time',
-            self::TYPE_CONTRACT => 'Contract',
-            self::TYPE_TEMPORARY => 'Temporary',
+            self::GENDER_FEMALE => 'Female',
+            self::GENDER_MALE => 'Male',
+            self::GENDER_NOT_SPECIFIED => 'Not specified',
+        ];
+    }
+
+    /** @return array<string, string> */
+    public static function mobilityStatuses(): array
+    {
+        return [
+            self::MOBILITY_AMBULATORY => 'Ambulatory',
+            self::MOBILITY_BEDRIDDEN => 'Bedridden',
         ];
     }
 
@@ -61,24 +72,24 @@ class CareerOpportunity extends Model
 
     public function scopeVisibleToAlumni(Builder $query): Builder
     {
-        // Expired listings stay in the admin history but leave the alumni feed.
+        // Legacy broad job records stay private until an admin supplies the approved fields.
         return $query
             ->where('is_published', true)
-            ->where(function (Builder $builder): void {
-                $builder
-                    ->whereNull('application_deadline')
-                    ->orWhere('application_deadline', '>=', now());
-            });
+            ->whereNotNull('estimated_start_date')
+            ->whereNotNull('patient_gender')
+            ->whereNotNull('mobility_status')
+            ->whereDate('estimated_start_date', '>=', today());
     }
 
-    public function employmentTypeLabel(): string
+    public function patientGenderLabel(): string
     {
-        return self::employmentTypes()[$this->employment_type]
-            ?? str($this->employment_type ?: 'Not specified')->headline()->toString();
+        return self::patientGenders()[$this->patient_gender]
+            ?? str($this->patient_gender ?: 'Not specified')->headline()->toString();
     }
 
-    public function isExpired(): bool
+    public function mobilityStatusLabel(): string
     {
-        return $this->application_deadline?->isPast() ?? false;
+        return self::mobilityStatuses()[$this->mobility_status]
+            ?? str($this->mobility_status ?: 'Not specified')->headline()->toString();
     }
 }

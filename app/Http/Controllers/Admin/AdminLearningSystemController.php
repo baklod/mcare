@@ -141,10 +141,15 @@ class AdminLearningSystemController extends Controller
             if ($user && $validated['learning_status'] === EnrollmentApplication::LEARNING_GRADUATED
                 && in_array($user->role, ['trainee', 'alumni'], true)) {
                 $user->update(['role' => 'alumni']);
+                $user->alumniProfile()->firstOrCreate([], ['is_available_for_duty' => false]);
             } elseif ($user && $previousStatus === EnrollmentApplication::LEARNING_GRADUATED
                 && $validated['learning_status'] !== EnrollmentApplication::LEARNING_GRADUATED
                 && $user->role === 'alumni') {
                 // Restore LMS access when an administrator corrects a graduation decision.
+                $user->alumniProfile()->update([
+                    'is_available_for_duty' => false,
+                    'availability_updated_at' => now(),
+                ]);
                 $user->update(['role' => 'trainee']);
             }
 

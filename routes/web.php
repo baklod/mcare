@@ -443,8 +443,11 @@ Route::middleware('throttle:global-web')->group(function () {
         ->name('alumni.')
         ->middleware('private.response')
         ->group(function () {
-            Route::middleware(['auth', 'permission:alumni.jobs.view'])->group(function () {
+            Route::middleware(['auth', 'alumni', 'permission:alumni.jobs.view'])->group(function () {
                 Route::get('/', [AlumniCareerHubController::class, 'index'])->name('dashboard');
+                Route::patch('/availability', [AlumniCareerHubController::class, 'updateAvailability'])
+                    ->middleware('throttle:sensitive-mutation')
+                    ->name('availability.update');
             });
         });
 });

@@ -22,8 +22,8 @@ class CareerOpportunityPublished extends Notification
     public function toDatabase(object $notifiable): array
     {
         return [
-            'title' => 'New caregiving opportunity',
-            'message' => $this->opportunity->title.' is now available from '.$this->opportunity->employer.'.',
+            'title' => 'New caregiving duty available',
+            'message' => 'Estimated start '.$this->opportunity->estimated_start_date?->format('M d, Y').'. Open the Alumni Job Board for the approved care summary.',
             'url' => route('alumni.dashboard'),
             'icon' => 'briefcase',
             'opportunity_id' => $this->opportunity->id,
@@ -37,8 +37,8 @@ class CareerOpportunityPublished extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('New MCARE career opportunity')
-            ->line($this->opportunity->title.' at '.$this->opportunity->employer.'.')
+            ->subject('New MCARE caregiving duty')
+            ->line('A privacy-reviewed caregiving duty is available in the MCARE Alumni Job Board.')
             ->action('Open Career Hub', route('alumni.dashboard'));
     }
 }

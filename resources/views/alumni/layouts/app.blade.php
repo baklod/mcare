@@ -67,7 +67,16 @@
         </header>
 
         <main class="dashboard-main pb-28 lg:pb-9">
-            @if (session('saved'))<div class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold leading-6 text-emerald-700">{{ session('saved') }}</div>@endif
+            @if (session('saved'))
+                @php
+                    $savedIcon = session('saved_icon', 'circle-check');
+                    $savedIsAvailable = session('saved_tone', 'available') === 'available';
+                @endphp
+                <div class="mb-6 flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-semibold leading-6 {{ $savedIsAvailable ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-100 text-slate-700' }}" role="status" aria-live="polite" data-auto-dismiss="5000" data-flash-icon="{{ $savedIcon }}">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg {{ $savedIsAvailable ? 'bg-emerald-100 text-emerald-700' : 'bg-white text-slate-600' }}"><x-dashboard-icon :name="$savedIcon" class="h-4 w-4" /></span>
+                    <span>{{ session('saved') }}</span>
+                </div>
+            @endif
             @yield('content')
         </main>
     </div>

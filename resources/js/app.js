@@ -38,6 +38,43 @@ document.addEventListener('DOMContentLoaded', () => {
     let navigationUnlockTimer = null;
     let navigationSpamReported = false;
 
+    // Successful action feedback stays long enough to read, pauses during
+    // interaction, then leaves the interface without requiring another click.
+    document.querySelectorAll('[data-auto-dismiss]').forEach((notice) => {
+        const configuredDelay = Number(notice.dataset.autoDismiss || 5000);
+        const delay = Number.isFinite(configuredDelay)
+            ? Math.min(Math.max(configuredDelay, 2500), 15000)
+            : 5000;
+        let dismissTimer = null;
+        let removeTimer = null;
+
+        const dismiss = () => {
+            if (!notice.isConnected || notice.classList.contains('is-dismissing')) return;
+
+            notice.classList.add('is-dismissing');
+            removeTimer = window.setTimeout(() => notice.remove(), 300);
+        };
+
+        const pauseDismissal = () => window.clearTimeout(dismissTimer);
+        const scheduleDismissal = () => {
+            window.clearTimeout(dismissTimer);
+            dismissTimer = window.setTimeout(dismiss, delay);
+        };
+
+        notice.addEventListener('mouseenter', pauseDismissal);
+        notice.addEventListener('mouseleave', scheduleDismissal);
+        notice.addEventListener('focusin', pauseDismissal);
+        notice.addEventListener('focusout', scheduleDismissal);
+        notice.addEventListener('transitionend', () => {
+            if (!notice.classList.contains('is-dismissing')) return;
+
+            window.clearTimeout(removeTimer);
+            notice.remove();
+        }, { once: true });
+
+        scheduleDismissal();
+    });
+
     // Shared native dialogs keep large creation forms outside the normal page flow.
     const dashboardDialogs = document.querySelectorAll('dialog[data-dashboard-dialog]');
     const openDashboardDialog = (dialog) => {

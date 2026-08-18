@@ -23,25 +23,40 @@ class CareerHubTest extends TestCase
 
         $this->actingAs($admin)
             ->post(route('admin.learning.alumni-jobs.store'), [
-                'title' => 'Home Caregiver',
-                'employer' => 'MCARE Partner Home',
-                'location' => 'Iriga City',
-                'employment_type' => CareerOpportunity::TYPE_FULL_TIME,
-                'description' => 'Provide respectful daily care under the employer care plan.',
-                'requirements' => 'Caregiving NC II and a valid government ID.',
-                'application_url' => 'https://example.test/careers/home-caregiver',
-                'application_deadline' => now()->addMonth()->format('Y-m-d H:i:s'),
+                'estimated_start_date' => now()->addWeek()->toDateString(),
+                'patient_gender' => CareerOpportunity::GENDER_FEMALE,
+                'mobility_status' => CareerOpportunity::MOBILITY_AMBULATORY,
+                'patient_age' => 72,
+                'specific_contraptions' => 'Walker',
+                'condition_summary' => 'Needs mobility support during daily routines.',
+                // Unapproved fields are ignored even when a crafted request sends them.
+                'medical_history' => 'Must never be stored.',
+                'application_email' => 'private@example.test',
+                'requirements' => 'Upload patient records.',
                 'is_published' => '1',
             ])
             ->assertRedirect()
             ->assertSessionHas('saved', 'Career opportunity published and alumni were notified.');
+
+        $adminPage = $this->actingAs($admin)->get(route('admin.learning.alumni-jobs'));
+        $adminPage
+            ->assertOk()
+            ->assertSee('data-auto-dismiss="5000"', false);
+        $this->assertSame(1, substr_count(
+            $adminPage->getContent(),
+            'Career opportunity published and alumni were notified.'
+        ));
 
         $opportunity = CareerOpportunity::query()->firstOrFail();
 
         $this->assertDatabaseHas('career_opportunities', [
             'id' => $opportunity->id,
             'is_published' => true,
-            'employer' => 'MCARE Partner Home',
+            'patient_gender' => CareerOpportunity::GENDER_FEMALE,
+            'mobility_status' => CareerOpportunity::MOBILITY_AMBULATORY,
+            'patient_age' => 72,
+            'application_email' => null,
+            'requirements' => null,
         ]);
         $this->assertDatabaseHas('notifications', [
             'notifiable_type' => User::class,
@@ -52,8 +67,10 @@ class CareerHubTest extends TestCase
         $this->actingAs($alumni)
             ->get(route('alumni.dashboard'))
             ->assertOk()
-            ->assertSee('Home Caregiver')
-            ->assertSee('MCARE Partner Home');
+            ->assertSee('Estimated start')
+            ->assertSee('Ambulatory')
+            ->assertDontSee('private@example.test')
+            ->assertDontSee('Must never be stored');
     }
 
     public function test_alumni_cannot_see_a_career_draft_or_read_another_account_notification(): void
@@ -63,16 +80,18 @@ class CareerHubTest extends TestCase
         $otherAlumni = User::factory()->create(['role' => 'alumni']);
 
         $this->actingAs($admin)->post(route('admin.learning.alumni-jobs.store'), [
-            'title' => 'Published Caregiver',
-            'employer' => 'Open Care',
-            'description' => 'A published opportunity.',
+            'estimated_start_date' => now()->addDays(5)->toDateString(),
+            'patient_gender' => CareerOpportunity::GENDER_FEMALE,
+            'mobility_status' => CareerOpportunity::MOBILITY_AMBULATORY,
+            'patient_age' => 70,
             'is_published' => '1',
         ])->assertRedirect();
 
         $this->actingAs($admin)->post(route('admin.learning.alumni-jobs.store'), [
-            'title' => 'Draft Caregiver',
-            'employer' => 'Pending Care',
-            'description' => 'A listing waiting for confirmation.',
+            'estimated_start_date' => now()->addDays(6)->toDateString(),
+            'patient_gender' => CareerOpportunity::GENDER_MALE,
+            'mobility_status' => CareerOpportunity::MOBILITY_BEDRIDDEN,
+            'patient_age' => 80,
         ])->assertRedirect();
 
         $notification = $alumni->notifications()->firstOrFail();
@@ -80,8 +99,8 @@ class CareerHubTest extends TestCase
         $this->actingAs($alumni)
             ->get(route('alumni.dashboard'))
             ->assertOk()
-            ->assertSee('Published Caregiver')
-            ->assertDontSee('Draft Caregiver');
+            ->assertSee(now()->addDays(5)->format('M d, Y'))
+            ->assertDontSee(now()->addDays(6)->format('M d, Y'));
 
         $this->actingAs($otherAlumni)
             ->patch(route('notifications.read', $notification))
@@ -102,9 +121,13 @@ class CareerHubTest extends TestCase
 
         CareerOpportunity::create([
             'created_by_id' => $admin->id,
-            'title' => 'Preview Caregiver Role',
-            'employer' => 'MCARE Preview Partner',
-            'description' => 'Published role visible in the admin preview.',
+            'estimated_start_date' => now()->addDays(10)->toDateString(),
+            'patient_gender' => CareerOpportunity::GENDER_MALE,
+            'mobility_status' => CareerOpportunity::MOBILITY_BEDRIDDEN,
+            'patient_age' => 81,
+            'title' => 'Caregiving Duty - Male, Bedridden',
+            'employer' => 'MCARE-Coordinated Placement',
+            'description' => 'Privacy-minimal duty posting managed through the MCARE Alumni Hub.',
             'is_published' => true,
             'published_at' => now(),
         ]);
@@ -113,10 +136,62 @@ class CareerHubTest extends TestCase
             ->get(route('admin.learning.alumni-jobs.preview'))
             ->assertOk()
             ->assertSee('Admin preview of the alumni experience')
-            ->assertSee('Preview Caregiver Role');
+            ->assertSee(now()->addDays(10)->format('M d, Y'));
 
         $this->actingAs($trainee)
             ->get(route('admin.learning.alumni-jobs.preview'))
+            ->assertForbidden();
+    }
+
+    public function test_alumni_can_set_availability_while_trainees_are_kept_out(): void
+    {
+        $alumni = User::factory()->create(['role' => 'alumni']);
+        $trainee = User::factory()->create(['role' => 'trainee']);
+
+        $this->actingAs($alumni)
+            ->patch(route('alumni.availability.update'), ['is_available_for_duty' => '1'])
+            ->assertRedirect()
+            ->assertSessionHas('saved', 'You are now marked Available for Duty.')
+            ->assertSessionHas('saved_icon', 'circle-check');
+
+        $this->assertDatabaseHas('alumni_profiles', [
+            'user_id' => $alumni->id,
+            'is_available_for_duty' => true,
+        ]);
+
+        $availablePage = $this->actingAs($alumni)->get(route('alumni.dashboard'));
+        $availablePage
+            ->assertOk()
+            ->assertSee('data-availability-state="available"', false)
+            ->assertSee('data-auto-dismiss="5000"', false)
+            ->assertSee('data-flash-icon="circle-check"', false);
+        $this->assertSame(1, substr_count(
+            $availablePage->getContent(),
+            'You are now marked Available for Duty.'
+        ));
+
+        $this->actingAs($alumni)
+            ->patch(route('alumni.availability.update'), ['is_available_for_duty' => '0'])
+            ->assertRedirect()
+            ->assertSessionHas('saved', 'Your availability is now set to unavailable.')
+            ->assertSessionHas('saved_icon', 'circle-minus');
+
+        $unavailablePage = $this->actingAs($alumni)->get(route('alumni.dashboard'));
+        $unavailablePage
+            ->assertOk()
+            ->assertSee('data-availability-state="unavailable"', false)
+            ->assertSee('data-flash-icon="circle-minus"', false);
+        $this->assertSame(1, substr_count(
+            $unavailablePage->getContent(),
+            'Your availability is now set to unavailable.'
+        ));
+
+        $this->actingAs($trainee)
+            ->get(route('alumni.dashboard'))
+            ->assertForbidden();
+
+        $this->actingAs($trainee)
+            ->patch(route('alumni.availability.update'), ['is_available_for_duty' => '1'])
             ->assertForbidden();
     }
 

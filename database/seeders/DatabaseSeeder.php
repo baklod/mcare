@@ -70,36 +70,42 @@ class DatabaseSeeder extends Seeder
             ]
         );
         RolePermissionMatrix::syncUser($alumni);
+        $alumni->alumniProfile()->updateOrCreate([], [
+            'is_available_for_duty' => true,
+            'availability_updated_at' => now(),
+        ]);
 
-        // Local demo opportunities keep the graduate portal reviewable before client data is available.
+        // Demo records follow the client's privacy-minimal caregiving duty format.
         foreach ([
             [
-                'title' => 'Home Caregiver',
-                'employer' => 'Mission Care Partner Residence',
-                'location' => 'Iriga City',
-                'employment_type' => CareerOpportunity::TYPE_FULL_TIME,
-                'description' => 'Support daily living activities and provide respectful, person-centered home care.',
-                'requirements' => 'Caregiving NC II, valid identification, and willingness to work rotating schedules.',
+                'estimated_start_date' => now()->addDays(14)->toDateString(),
+                'patient_gender' => CareerOpportunity::GENDER_FEMALE,
+                'mobility_status' => CareerOpportunity::MOBILITY_AMBULATORY,
+                'patient_age' => 72,
+                'specific_contraptions' => 'Walker',
+                'condition_summary' => 'Needs mobility support during daily routines.',
             ],
             [
-                'title' => 'Care Support Associate',
-                'employer' => 'Bicol Senior Wellness Center',
-                'location' => 'Naga City',
-                'employment_type' => CareerOpportunity::TYPE_PART_TIME,
-                'description' => 'Assist the care team with mobility support, comfort routines, and client documentation.',
-                'requirements' => 'Caregiving NC II graduate with current first-aid knowledge.',
+                'estimated_start_date' => now()->addDays(21)->toDateString(),
+                'patient_gender' => CareerOpportunity::GENDER_MALE,
+                'mobility_status' => CareerOpportunity::MOBILITY_BEDRIDDEN,
+                'patient_age' => 80,
+                'specific_contraptions' => 'Hospital bed',
+                'condition_summary' => 'Requires assistance with repositioning and comfort routines.',
             ],
         ] as $opportunity) {
+            $gender = CareerOpportunity::patientGenders()[$opportunity['patient_gender']];
+            $mobility = CareerOpportunity::mobilityStatuses()[$opportunity['mobility_status']];
+
             CareerOpportunity::updateOrCreate(
                 [
-                    'title' => $opportunity['title'],
-                    'employer' => $opportunity['employer'],
+                    'title' => "Caregiving Duty - {$gender}, {$mobility}",
+                    'employer' => 'MCARE-Coordinated Placement',
                 ],
                 [
                     ...$opportunity,
                     'created_by_id' => $seededUsers['admin']->id,
-                    'application_email' => 'careers@mcare.com',
-                    'application_deadline' => now()->addDays(60),
+                    'description' => 'Privacy-minimal duty posting managed through the MCARE Alumni Hub.',
                     'is_published' => true,
                     'published_at' => now(),
                 ]
