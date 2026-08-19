@@ -29,6 +29,8 @@ class RolePermissionMatrix
                 'announcements.view',
                 'quizzes.manage',
                 'grades.view',
+                'competencies.assess',
+                'official-documents.manage',
                 'accounts.manage',
                 'reports.export',
                 'logs.view',
@@ -43,6 +45,7 @@ class RolePermissionMatrix
                 'announcements.view',
                 'quizzes.manage',
                 'grades.view',
+                'competencies.assess',
                 'sessions.view',
             ],
             'trainee' => [
@@ -53,6 +56,7 @@ class RolePermissionMatrix
                 'grades.view',
                 'progress.update',
                 'documents.view',
+                'cotc.download',
                 'payments.view',
             ],
             'applicant' => [

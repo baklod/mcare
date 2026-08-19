@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\ModuleProgress;
+use App\Models\OfficialDocument;
 use App\Models\Quiz;
 use App\Models\TrainerAnnouncement;
 use App\Models\TrainingModule;
+use App\Services\CompletionEligibilityService;
 use App\Services\TrainingCalendarService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -96,9 +98,27 @@ class TraineeDashboardController extends Controller
         return $this->portalView($request, 'trainee.payments');
     }
 
-    public function documents(Request $request): View|RedirectResponse
-    {
-        return $this->portalView($request, 'trainee.documents');
+    public function documents(
+        Request $request,
+        CompletionEligibilityService $eligibility,
+    ): View|RedirectResponse {
+        $application = $this->approvedApplicationFor($request);
+
+        if (! $application) {
+            return redirect()
+                ->route('payment.show')
+                ->with('payment_notice', 'Your trainee dashboard opens after admin approval.');
+        }
+
+        return $this->portalView($request, 'trainee.documents', [
+            'cotc' => OfficialDocument::query()
+                ->where('enrollment_application_id', $application->id)
+                ->where('type', OfficialDocument::TYPE_COTC)
+                ->where('status', '!=', OfficialDocument::STATUS_REVOKED)
+                ->latest('version')
+                ->first(),
+            'completionEligibility' => $eligibility->evaluate($application),
+        ], $application);
     }
 
     private function portalView(

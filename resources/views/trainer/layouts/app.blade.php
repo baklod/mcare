@@ -32,6 +32,7 @@
             ['label' => 'Teaching Day', 'icon' => 'fa-gauge-high', 'href' => route('trainer.dashboard'), 'active' => request()->routeIs('trainer.dashboard')],
             ['label' => 'Classes', 'icon' => 'fa-folder-open', 'href' => route('trainer.trainings'), 'active' => request()->routeIs('trainer.trainings')],
             ['label' => 'People', 'icon' => 'fa-users', 'href' => route('trainer.trainees'), 'active' => request()->routeIs('trainer.trainees')],
+            ['label' => 'Competency Records', 'icon' => 'fa-clipboard-list', 'href' => route('trainer.competencies.index'), 'active' => request()->routeIs('trainer.competencies.*')],
             ['label' => 'Certificates', 'icon' => 'fa-award', 'href' => route('trainer.certificates'), 'active' => request()->routeIs('trainer.certificates')],
             ['label' => 'Reports', 'icon' => 'fa-chart-column', 'href' => route('trainer.reports'), 'active' => request()->routeIs('trainer.reports')],
         ];

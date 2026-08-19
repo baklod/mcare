@@ -8,19 +8,23 @@ use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminLearningSystemController;
 use App\Http\Controllers\Admin\AdminSessionController;
 use App\Http\Controllers\Admin\BatchScheduleController;
+use App\Http\Controllers\Admin\CertificationController;
 use App\Http\Controllers\Admin\EnrollmentReviewController;
 use App\Http\Controllers\Admin\PaymentScheduleController;
+use App\Http\Controllers\Alumni\AlumniCareerHubController;
 use App\Http\Controllers\Auth\AccountSessionController;
 use App\Http\Controllers\Auth\GoogleAuthController;
-use App\Http\Controllers\Alumni\AlumniCareerHubController;
+use App\Http\Controllers\CompetencyWorkbookController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\EnrollmentPaymentController;
 use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\Trainee\TraineeDashboardController;
+use App\Http\Controllers\Trainee\CertificateController as TraineeCertificateController;
 use App\Http\Controllers\Trainee\QuizAttemptController as TraineeQuizAttemptController;
 use App\Http\Controllers\Trainee\QuizController as TraineeQuizController;
+use App\Http\Controllers\Trainee\TraineeDashboardController;
 use App\Http\Controllers\Trainee\TraineeSessionController;
 use App\Http\Controllers\Trainer\AnnouncementController as TrainerAnnouncementController;
+use App\Http\Controllers\Trainer\CompetencyRecordController as TrainerCompetencyRecordController;
 use App\Http\Controllers\Trainer\QuizController as TrainerQuizController;
 use App\Http\Controllers\Trainer\TrainerDashboardController;
 use App\Http\Controllers\Trainer\TrainerPortalController;
@@ -236,7 +240,32 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::delete('/learning/modules/{module}', [AdminLearningSystemController::class, 'destroyModule'])
                     ->middleware(['permission:modules.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.modules.destroy');
-                Route::get('/learning/certificates', [AdminLearningSystemController::class, 'certificates'])->name('learning.certificates');
+                Route::get('/learning/certificates', [CertificationController::class, 'index'])
+                    ->middleware('permission:official-documents.manage')
+                    ->name('learning.certificates');
+                Route::get('/learning/competency-records/excel', [CompetencyWorkbookController::class, 'downloadForAdmin'])
+                    ->middleware(['permission:reports.export', 'throttle:document-downloads'])
+                    ->name('learning.competency-workbooks.download');
+                Route::post('/learning/certificates/{enrollmentApplication}/{type}', [CertificationController::class, 'generate'])
+                    ->middleware(['permission:official-documents.manage', 'throttle:sensitive-mutation'])
+                    ->whereIn('type', ['cotc', 'tor'])
+                    ->name('learning.documents.generate');
+                Route::patch('/learning/official-documents/{officialDocument}/release', [CertificationController::class, 'release'])
+                    ->middleware(['permission:official-documents.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.documents.release');
+                Route::post('/learning/certificates/{enrollmentApplication}/{type}/reissue', [CertificationController::class, 'reissue'])
+                    ->middleware(['permission:official-documents.manage', 'throttle:sensitive-mutation'])
+                    ->whereIn('type', ['cotc', 'tor'])
+                    ->name('learning.documents.reissue');
+                Route::get('/learning/official-documents/{officialDocument}/download', [CertificationController::class, 'download'])
+                    ->middleware(['permission:official-documents.manage', 'throttle:document-downloads'])
+                    ->name('learning.documents.download');
+                Route::post('/learning/batch-tor-exports', [CertificationController::class, 'requestBatchTorExport'])
+                    ->middleware(['permission:official-documents.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.batch-exports.store');
+                Route::get('/learning/batch-tor-exports/{batchDocumentExport}/download', [CertificationController::class, 'downloadBatchExport'])
+                    ->middleware(['permission:official-documents.manage', 'throttle:document-downloads'])
+                    ->name('learning.batch-exports.download');
                 Route::get('/learning/alumni-jobs', [AdminCareerHubController::class, 'index'])
                     ->middleware('permission:alumni.jobs.manage')
                     ->name('learning.alumni-jobs');
@@ -316,6 +345,25 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/trainees/export', [TrainerPortalController::class, 'exportTrainees'])
                     ->middleware(['permission:trainees.export', 'throttle:document-downloads'])
                     ->name('trainees.export');
+                Route::get('/competency-records', [TrainerCompetencyRecordController::class, 'index'])
+                    ->middleware('permission:competencies.assess')
+                    ->name('competencies.index');
+                Route::get('/competency-records/batches/{trainingBatch}/{chart}', [TrainerCompetencyRecordController::class, 'chart'])
+                    ->whereIn('chart', ['progress', 'achievement'])
+                    ->middleware(['permission:competencies.assess', 'throttle:document-downloads'])
+                    ->name('competencies.chart');
+                Route::get('/competency-records/batches/{trainingBatch}/excel', [CompetencyWorkbookController::class, 'downloadForTrainer'])
+                    ->middleware(['permission:trainees.export', 'throttle:document-downloads'])
+                    ->name('competencies.export');
+                Route::patch('/competency-records/bulk', [TrainerCompetencyRecordController::class, 'bulkUpdate'])
+                    ->middleware(['permission:competencies.assess', 'throttle:sensitive-mutation'])
+                    ->name('competencies.bulk-update');
+                Route::get('/competency-records/{enrollmentApplication}', [TrainerCompetencyRecordController::class, 'edit'])
+                    ->middleware('permission:competencies.assess')
+                    ->name('competencies.edit');
+                Route::patch('/competency-records/{enrollmentApplication}', [TrainerCompetencyRecordController::class, 'update'])
+                    ->middleware(['permission:competencies.assess', 'throttle:sensitive-mutation'])
+                    ->name('competencies.update');
                 Route::get('/sessions', [TrainerPortalController::class, 'sessions'])->name('sessions');
                 Route::get('/assessments', [TrainerQuizController::class, 'index'])
                     ->middleware('permission:quizzes.manage')
@@ -401,6 +449,9 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/documents', [TraineeDashboardController::class, 'documents'])
                     ->middleware('permission:documents.view')
                     ->name('documents');
+                Route::get('/documents/cotc/{officialDocument}/download', [TraineeCertificateController::class, 'download'])
+                    ->middleware(['permission:cotc.download', 'throttle:document-downloads'])
+                    ->name('cotc.download');
 
                 Route::get('/modules/{module}', [TraineeDashboardController::class, 'viewModule'])
                     ->middleware('permission:modules.view')

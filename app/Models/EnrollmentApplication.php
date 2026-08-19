@@ -226,6 +226,16 @@ class EnrollmentApplication extends Model
         return $this->hasMany(ModuleProgress::class, 'enrollment_application_id');
     }
 
+    public function competencyRecords(): HasMany
+    {
+        return $this->hasMany(TraineeCompetencyRecord::class, 'enrollment_application_id');
+    }
+
+    public function officialDocuments(): HasMany
+    {
+        return $this->hasMany(OfficialDocument::class, 'enrollment_application_id');
+    }
+
     public function paymentAttempts(): HasMany
     {
         return $this->hasMany(PaymentAttempt::class);

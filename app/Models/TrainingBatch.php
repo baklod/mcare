@@ -60,6 +60,16 @@ class TrainingBatch extends Model
         return $this->hasMany(Quiz::class);
     }
 
+    public function officialDocuments(): HasMany
+    {
+        return $this->hasMany(OfficialDocument::class);
+    }
+
+    public function documentExports(): HasMany
+    {
+        return $this->hasMany(BatchDocumentExport::class);
+    }
+
     public static function active(): ?self
     {
         return self::query()

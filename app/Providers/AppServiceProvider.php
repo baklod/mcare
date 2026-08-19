@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Contracts\OfficialDocumentRenderer;
+use App\Services\BrowsershotOfficialDocumentRenderer;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -15,7 +17,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Keep PDF generation replaceable so queue jobs and tests do not depend on a web controller.
+        $this->app->bind(OfficialDocumentRenderer::class, BrowsershotOfficialDocumentRenderer::class);
     }
 
     /**

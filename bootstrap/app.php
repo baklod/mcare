@@ -1,5 +1,6 @@
 <?php
 
+use App\Console\Commands\PrepareDemoGraduate;
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureAlumni;
 use App\Http\Middleware\EnsureEnrollmentPaymentAccess;
@@ -25,6 +26,9 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withCommands([
+        PrepareDemoGraduate::class,
+    ])
     ->withMiddleware(function (Middleware $middleware): void {
         /*
          * SecurityHeaders runs for every response. This gives the whole app a

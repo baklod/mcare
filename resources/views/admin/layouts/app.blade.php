@@ -26,7 +26,7 @@
         $capstoneNav = [
             ['label' => 'Trainees', 'icon' => 'fa-users', 'href' => route('admin.learning.trainees'), 'active' => request()->routeIs('admin.learning.trainees')],
             ['label' => 'LMS Modules', 'icon' => 'fa-book-open', 'href' => route('admin.learning.modules'), 'active' => request()->routeIs('admin.learning.modules')],
-            ['label' => 'Certificates', 'icon' => 'fa-award', 'href' => route('admin.learning.certificates'), 'active' => request()->routeIs('admin.learning.certificates')],
+            ['label' => 'Training Records', 'icon' => 'fa-award', 'href' => route('admin.learning.certificates'), 'active' => request()->routeIs('admin.learning.certificates', 'admin.learning.documents.*', 'admin.learning.batch-exports.*')],
             ['label' => 'Career Hub', 'icon' => 'fa-briefcase', 'href' => route('admin.learning.alumni-jobs'), 'active' => request()->routeIs('admin.learning.alumni-jobs')],
             ['label' => 'Reports', 'icon' => 'fa-chart-column', 'href' => route('admin.learning.reports'), 'active' => request()->routeIs('admin.learning.reports')],
             ['label' => 'Accounts', 'icon' => 'fa-users', 'href' => route('admin.accounts.index'), 'active' => request()->routeIs('admin.accounts.*')],

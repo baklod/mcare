@@ -875,3 +875,165 @@ window.addEventListener('storage', (event) => {
     }
 
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+    const board = document.querySelector('[data-competency-board]');
+    if (!board) return;
+
+    const scroller = board.querySelector('[data-competency-scroller]');
+    board.querySelectorAll('[data-competency-scroll]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const direction = button.dataset.competencyScroll === 'left' ? -1 : 1;
+            scroller?.scrollBy({ left: direction * Math.max(scroller.clientWidth * 0.7, 420), behavior: 'smooth' });
+        });
+    });
+
+    const selectors = [...board.querySelectorAll('[data-trainee-selector]')];
+    const selectAll = board.querySelector('[data-select-all-trainees]');
+    const bulkButton = board.querySelector('[data-bulk-update-open]');
+    const selectedCount = board.querySelector('[data-selected-trainee-count]');
+    const dialogCount = board.querySelector('[data-bulk-dialog-count]');
+
+    const updateSelectionState = () => {
+        const checked = selectors.filter((selector) => selector.checked).length;
+        if (selectedCount) selectedCount.textContent = `${checked} selected`;
+        if (dialogCount) dialogCount.textContent = `${checked} trainee${checked === 1 ? '' : 's'} selected`;
+        if (bulkButton) bulkButton.disabled = checked === 0;
+        if (selectAll) {
+            selectAll.checked = selectors.length > 0 && checked === selectors.length;
+            selectAll.indeterminate = checked > 0 && checked < selectors.length;
+        }
+    };
+
+    selectors.forEach((selector) => selector.addEventListener('change', updateSelectionState));
+    selectAll?.addEventListener('change', () => {
+        selectors.forEach((selector) => {
+            selector.checked = selectAll.checked;
+        });
+        updateSelectionState();
+    });
+    updateSelectionState();
+
+    const bulkStatus = board.querySelector('[data-bulk-status]');
+    const bulkScoreWrap = board.querySelector('[data-bulk-score-wrap]');
+    const bulkScore = board.querySelector('[data-bulk-score]');
+    const updateBulkScore = () => {
+        const needsScore = bulkStatus?.value === 'competent';
+        bulkScoreWrap?.classList.toggle('hidden', !needsScore);
+        if (bulkScore) bulkScore.required = needsScore;
+    };
+    bulkStatus?.addEventListener('change', updateBulkScore);
+    updateBulkScore();
+
+    const drawer = board.querySelector('[data-competency-drawer]');
+    const drawerBackdrop = board.querySelector('[data-competency-drawer-backdrop]');
+    const drawerForm = board.querySelector('[data-competency-drawer-form]');
+    const drawerUnitCode = board.querySelector('[data-drawer-unit-code]');
+    const drawerTrainee = board.querySelector('[data-drawer-trainee]');
+    const drawerUnitTitle = board.querySelector('[data-drawer-unit-title]');
+    const drawerUnitId = board.querySelector('[data-drawer-unit-id]');
+    const drawerStatus = board.querySelector('[data-drawer-status]');
+    const drawerScore = board.querySelector('[data-drawer-score]');
+    const drawerNotes = board.querySelector('[data-drawer-notes]');
+    const drawerOutcomes = board.querySelector('[data-drawer-outcomes]');
+    const drawerLockNotice = board.querySelector('[data-drawer-lock-notice]');
+    const drawerSave = board.querySelector('[data-drawer-save]');
+    const drawerFullRecord = board.querySelector('[data-drawer-full-record]');
+
+    const decodeRecordPayload = (encoded) => {
+        const bytes = Uint8Array.from(window.atob(encoded), (character) => character.charCodeAt(0));
+        return JSON.parse(new TextDecoder().decode(bytes));
+    };
+
+    const closeDrawer = () => {
+        drawer?.classList.remove('is-open');
+        drawer?.setAttribute('aria-hidden', 'true');
+        drawerBackdrop?.classList.remove('is-open');
+        document.body.classList.remove('competency-drawer-open');
+        window.setTimeout(() => {
+            if (drawerBackdrop && !drawerBackdrop.classList.contains('is-open')) drawerBackdrop.hidden = true;
+        }, 220);
+    };
+
+    const buildOutcomeRow = (outcome, unitId, locked) => {
+        const row = document.createElement('div');
+        row.className = 'grid gap-3 py-3 sm:grid-cols-[1fr_11rem] sm:items-center';
+        const label = document.createElement('label');
+        label.className = 'text-sm font-medium text-slate-800';
+        label.htmlFor = `drawer-outcome-${outcome.id}`;
+        label.textContent = outcome.title;
+        const select = document.createElement('select');
+        select.id = `drawer-outcome-${outcome.id}`;
+        select.name = `records[${unitId}][outcomes][${outcome.id}]`;
+        select.className = 'form-field';
+        select.disabled = locked;
+        [...drawerStatus.options].forEach((sourceOption) => {
+            const option = sourceOption.cloneNode(true);
+            option.selected = option.value === outcome.status;
+            select.append(option);
+        });
+        row.append(label, select);
+        return row;
+    };
+
+    const openDrawer = (payload) => {
+        if (!drawer || !drawerForm || !drawerOutcomes) return;
+        drawerForm.action = payload.update_url;
+        drawerUnitCode.textContent = payload.unit_code;
+        drawerTrainee.textContent = payload.trainee_name;
+        drawerUnitTitle.textContent = payload.unit_title;
+        drawerUnitId.name = `records[${payload.unit_id}][unit_id]`;
+        drawerUnitId.value = payload.unit_id;
+        drawerStatus.name = `records[${payload.unit_id}][status]`;
+        drawerStatus.value = payload.status;
+        drawerScore.name = `records[${payload.unit_id}][percentage_score]`;
+        drawerScore.value = payload.score ?? '';
+        drawerNotes.name = `records[${payload.unit_id}][notes]`;
+        drawerNotes.value = payload.notes ?? '';
+        drawerFullRecord.href = payload.full_url;
+        drawerOutcomes.replaceChildren(...payload.outcomes.map(
+            (outcome) => buildOutcomeRow(outcome, payload.unit_id, payload.locked)
+        ));
+        [drawerUnitId, drawerStatus, drawerScore, drawerNotes].forEach((field) => {
+            field.disabled = payload.locked;
+        });
+        drawerLockNotice?.classList.toggle('hidden', !payload.locked);
+        drawerSave?.classList.toggle('hidden', payload.locked);
+        drawerSave.disabled = payload.locked;
+        drawerBackdrop.hidden = false;
+        window.requestAnimationFrame(() => {
+            drawerBackdrop.classList.add('is-open');
+            drawer.classList.add('is-open');
+            drawer.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('competency-drawer-open');
+            drawerStatus.focus();
+        });
+    };
+
+    board.querySelectorAll('[data-competency-cell]').forEach((cell) => {
+        cell.addEventListener('click', () => {
+            try {
+                openDrawer(decodeRecordPayload(cell.dataset.recordPayload));
+            } catch (error) {
+                closeDrawer();
+            }
+        });
+    });
+
+    drawerStatus?.addEventListener('change', () => {
+        drawerOutcomes?.querySelectorAll('select').forEach((select) => {
+            select.value = drawerStatus.value;
+        });
+        if (drawerStatus.value === 'competent' && !drawerScore.value) drawerScore.value = '75';
+        if (drawerStatus.value === 'not_assessed') drawerScore.value = '';
+    });
+    drawerForm?.addEventListener('submit', () => {
+        drawerSave.disabled = true;
+        drawerSave.textContent = 'Saving...';
+    });
+    board.querySelectorAll('[data-competency-drawer-close]').forEach((button) => button.addEventListener('click', closeDrawer));
+    drawerBackdrop?.addEventListener('click', closeDrawer);
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && drawer?.classList.contains('is-open')) closeDrawer();
+    });
+});

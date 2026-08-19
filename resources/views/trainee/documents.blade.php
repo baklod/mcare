@@ -11,7 +11,43 @@
     ];
 @endphp
 <section class="space-y-6">
-    <header class="border-b border-slate-200 pb-6"><p class="dashboard-section-kicker">My documents</p><h1 class="dashboard-section-title mt-2 text-3xl">Submitted registration files</h1><p class="mt-2 text-sm text-slate-600">Review the status and admin feedback for each enrollment document.</p></header>
+    <header class="border-b border-slate-200 pb-6"><p class="dashboard-section-kicker">My documents</p><h1 class="dashboard-section-title mt-2 text-3xl">Training and registration records</h1></header>
+
+    <article class="dashboard-panel">
+        <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div class="max-w-2xl">
+                <p class="dashboard-section-kicker">Certificate of Training Completion</p>
+                <h2 class="mt-2 text-xl font-bold text-slate-950">Caregiving NC II COTC</h2>
+                @if($cotc)
+                    <p class="mt-2 text-sm text-slate-600">Document {{ $cotc->document_number }} · {{ str($cotc->status)->headline() }}</p>
+                @else
+                    <p class="mt-2 text-sm text-slate-600">The admin will release this after every completion check passes.</p>
+                @endif
+            </div>
+            <div class="shrink-0">
+                @if($cotc?->isDownloadableByTrainee())
+                    <a class="primary-action" href="{{ route('trainee.cotc.download', $cotc) }}">Download COTC once</a>
+                @elseif($cotc?->downloaded_at)
+                    <span class="dashboard-pill bg-slate-100 text-slate-700 ring-slate-200">Downloaded {{ $cotc->downloaded_at->format('M j, Y g:i A') }}</span>
+                @elseif($cotc)
+                    <span class="dashboard-pill bg-amber-50 text-amber-700 ring-amber-100">{{ str($cotc->status)->headline() }}</span>
+                @else
+                    <span class="dashboard-pill bg-slate-100 text-slate-600 ring-slate-200">Not issued</span>
+                @endif
+            </div>
+        </div>
+        <div class="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            @foreach($completionEligibility['checks'] as $check)
+                <div class="flex items-start gap-3 border border-slate-200 p-3">
+                    <span class="mt-0.5 text-xs font-black {{ $check['passed'] ? 'text-emerald-600' : 'text-slate-400' }}">{{ $check['passed'] ? 'PASS' : 'WAIT' }}</span>
+                    <span><span class="block text-sm font-bold text-slate-900">{{ $check['label'] }}</span><span class="mt-1 block text-xs text-slate-500">{{ $check['detail'] }}</span></span>
+                </div>
+            @endforeach
+        </div>
+        <p class="mt-4 text-xs text-slate-500">For security, the trainee download can be claimed once. An interrupted or lost copy requires an admin reissue with a recorded reason.</p>
+    </article>
+
+    <div><p class="dashboard-section-kicker">Enrollment files</p><h2 class="mt-2 text-xl font-bold text-slate-950">Submitted registration files</h2></div>
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         @foreach ($documents as $documentKey => $document)
             @php
