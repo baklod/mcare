@@ -17,7 +17,7 @@ class AlumniCareerHubController extends Controller
             'is_available_for_duty' => false,
         ]);
 
-        return view('alumni.dashboard', [
+        return view('trainee.career-hub', [
             'jobs' => CareerOpportunity::query()
                 ->visibleToAlumni()
                 ->orderBy('estimated_start_date')

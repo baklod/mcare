@@ -19,7 +19,7 @@ class CareerHubTest extends TestCase
     public function test_admin_can_publish_a_career_opportunity_and_notify_alumni(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
-        $alumni = User::factory()->create(['role' => 'alumni']);
+        $alumni = $this->graduatedUser();
 
         $this->actingAs($admin)
             ->post(route('admin.learning.alumni-jobs.store'), [
@@ -76,8 +76,8 @@ class CareerHubTest extends TestCase
     public function test_alumni_cannot_see_a_career_draft_or_read_another_account_notification(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
-        $alumni = User::factory()->create(['role' => 'alumni']);
-        $otherAlumni = User::factory()->create(['role' => 'alumni']);
+        $alumni = $this->graduatedUser();
+        $otherAlumni = $this->graduatedUser();
 
         $this->actingAs($admin)->post(route('admin.learning.alumni-jobs.store'), [
             'estimated_start_date' => now()->addDays(5)->toDateString(),
@@ -135,7 +135,7 @@ class CareerHubTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.learning.alumni-jobs.preview'))
             ->assertOk()
-            ->assertSee('Admin preview of the alumni experience')
+            ->assertSee('Admin preview of the shared graduate Career Hub')
             ->assertSee(now()->addDays(10)->format('M d, Y'));
 
         $this->actingAs($trainee)
@@ -145,7 +145,7 @@ class CareerHubTest extends TestCase
 
     public function test_alumni_can_set_availability_while_trainees_are_kept_out(): void
     {
-        $alumni = User::factory()->create(['role' => 'alumni']);
+        $alumni = $this->graduatedUser();
         $trainee = User::factory()->create(['role' => 'trainee']);
 
         $this->actingAs($alumni)
@@ -251,5 +251,41 @@ class CareerHubTest extends TestCase
             'notifiable_id' => $otherTrainee->id,
             'type' => LmsAnnouncementPublished::class,
         ]);
+    }
+
+    private function graduatedUser(): User
+    {
+        $user = User::factory()->create(['role' => 'trainee']);
+        $batch = TrainingBatch::create([
+            'name' => 'Career Batch '.$user->id,
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+        ]);
+
+        EnrollmentApplication::create([
+            'user_id' => $user->id,
+            'training_batch_id' => $batch->id,
+            'email' => $user->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => 'Graduate',
+            'last_name' => 'User',
+            'birth_date' => '1995-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'street' => '1 Training Street',
+            'barangay' => 'Central',
+            'city' => 'Iriga City',
+            'province' => 'Camarines Sur',
+            'zip_code' => '4431',
+            'educational_attainment' => 'College Graduate',
+            'school_name' => 'MCARE School',
+            'year_graduated' => 2022,
+            'status' => EnrollmentApplication::STATUS_APPROVED,
+            'learning_status' => EnrollmentApplication::LEARNING_GRADUATED,
+        ]);
+
+        return $user;
     }
 }

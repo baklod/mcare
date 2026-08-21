@@ -8,7 +8,7 @@
             'name', 'year', 'is_active', 'enrollment_starts_at', 'enrollment_ends_at',
             'training_starts_at', 'training_ends_at', 'am_days', 'am_start_time',
             'am_end_time', 'am_room', 'pm_days', 'pm_start_time', 'pm_end_time',
-            'pm_room', 'notes',
+            'pm_room', 'trainer_id', 'notes',
         ])->contains(fn (string $field): bool => $errors->has($field));
     @endphp
 
@@ -69,9 +69,14 @@
 
                 <div class="px-6 pb-6">
 
-                @if ($batchFormHasErrors)
-                    <div class="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">
-                        Please correct the schedule fields before saving.
+                @if ($batchFormHasErrors || $errors->any())
+                    <div class="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-800 space-y-1.5">
+                        <p class="font-bold">Please correct the schedule fields before saving:</p>
+                        <ul class="list-disc pl-5 space-y-0.5 font-medium">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
                     </div>
                 @endif
 
@@ -94,10 +99,24 @@
                         </div>
                     </div>
 
-                    <label class="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs font-medium text-slate-700 cursor-pointer">
-                        <input name="is_active" type="checkbox" value="1" @checked(old('is_active', $batch->is_active ?? false)) class="mt-0.5 h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500">
-                        <span>Active enrollment batch for new applicants</span>
-                    </label>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <label class="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs font-medium text-slate-700 cursor-pointer">
+                            <input name="is_active" type="checkbox" value="1" @checked(old('is_active', $batch->is_active ?? false)) class="mt-0.5 h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500">
+                            <span>Enable this batch for enrollment</span>
+                        </label>
+                        <div>
+                            <label for="trainer_id" class="mb-1 block text-xs font-semibold text-slate-700">Assigned trainer</label>
+                            <select id="trainer_id" name="trainer_id" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                                <option value="">Needs trainer assignment</option>
+                                @foreach($trainers as $trainer)
+                                    <option value="{{ $trainer->id }}" @selected((string) old('trainer_id', $batch->trainer_id ?? '') === (string) $trainer->id)>
+                                        {{ $trainer->name }} ({{ $trainer->email }})
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('trainer_id') <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
 
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
@@ -131,18 +150,22 @@
                         <div>
                             <label for="am_days" class="mb-1 block text-xs font-medium text-slate-600">Days (e.g. MWF)</label>
                             <input id="am_days" name="am_days" type="text" value="{{ old('am_days', $batch->am_days ?? 'MWF') }}" required placeholder="MWF" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                            @error('am_days') <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label for="am_start_time" class="mb-1 block text-xs font-medium text-slate-600">Starts</label>
-                                <input id="am_start_time" name="am_start_time" type="time" value="{{ old('am_start_time', $batch->am_start_time ?? '08:00') }}" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                                <input id="am_start_time" name="am_start_time" type="time" value="{{ old('am_start_time', $batch?->am_start_time ? substr($batch->am_start_time, 0, 5) : '08:00') }}" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                                @error('am_start_time') <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label for="am_end_time" class="mb-1 block text-xs font-medium text-slate-600">Ends</label>
-                                <input id="am_end_time" name="am_end_time" type="time" value="{{ old('am_end_time', $batch->am_end_time ?? '12:00') }}" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                                <input id="am_end_time" name="am_end_time" type="time" value="{{ old('am_end_time', $batch?->am_end_time ? substr($batch->am_end_time, 0, 5) : '12:00') }}" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                                @error('am_end_time') <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p> @enderror
                             </div>
                         </div>
                         <input name="am_room" type="text" value="{{ old('am_room', $batch->am_room ?? '') }}" placeholder="Room / Skills Lab" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                        @error('am_room') <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p> @enderror
                     </div>
 
                     <!-- PM Class Details -->
@@ -151,18 +174,22 @@
                         <div>
                             <label for="pm_days" class="mb-1 block text-xs font-medium text-slate-600">Days (e.g. TTH)</label>
                             <input id="pm_days" name="pm_days" type="text" value="{{ old('pm_days', $batch->pm_days ?? 'TTH') }}" required placeholder="TTH" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                            @error('pm_days') <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label for="pm_start_time" class="mb-1 block text-xs font-medium text-slate-600">Starts</label>
-                                <input id="pm_start_time" name="pm_start_time" type="time" value="{{ old('pm_start_time', $batch->pm_start_time ?? '13:00') }}" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                                <input id="pm_start_time" name="pm_start_time" type="time" value="{{ old('pm_start_time', $batch?->pm_start_time ? substr($batch->pm_start_time, 0, 5) : '13:00') }}" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                                @error('pm_start_time') <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label for="pm_end_time" class="mb-1 block text-xs font-medium text-slate-600">Ends</label>
-                                <input id="pm_end_time" name="pm_end_time" type="time" value="{{ old('pm_end_time', $batch->pm_end_time ?? '17:00') }}" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                                <input id="pm_end_time" name="pm_end_time" type="time" value="{{ old('pm_end_time', $batch?->pm_end_time ? substr($batch->pm_end_time, 0, 5) : '17:00') }}" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                                @error('pm_end_time') <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p> @enderror
                             </div>
                         </div>
                         <input name="pm_room" type="text" value="{{ old('pm_room', $batch->pm_room ?? '') }}" placeholder="Room / Lecture Room" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                        @error('pm_room') <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
@@ -210,16 +237,20 @@
                                     <span class="rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-bold text-purple-700 ring-1 ring-purple-100">{{ $item->trainingStateLabel() }}</span>
                                 </div>
                                 <p class="mt-1 text-xs text-slate-500">Enrollment ends {{ $item->enrollment_ends_at->format('M d, Y g:i A') }}</p>
+                                <p class="mt-1 text-xs font-semibold {{ $item->trainer ? 'text-violet-700' : 'text-amber-700' }}">
+                                    Trainer: {{ $item->trainer?->name ?? 'Needs assignment' }}
+                                </p>
                             </div>
                             <div class="flex gap-2">
                                 <a href="{{ route('admin.schedules.edit', $item) }}" data-dashboard-prefetch class="inline-flex items-center gap-2 rounded-lg border border-purple-200 bg-white px-3 py-1.5 text-xs font-bold text-purple-700 hover:bg-purple-50">
                                     <x-dashboard-icon name="pencil" class="h-3.5 w-3.5" />
                                     Edit
                                 </a>
-                                <form method="POST" action="{{ route('admin.schedules.destroy', $item) }}" onsubmit="return confirm('Delete this batch schedule?')">
+                                @php($batchHasRelatedRecords = ($item->applications_count + $item->modules_count + $item->announcements_count + $item->quizzes_count + $item->official_documents_count + $item->document_exports_count) > 0)
+                                <form method="POST" action="{{ route('admin.schedules.destroy', $item) }}" data-confirm="{{ $batchHasRelatedRecords ? 'This batch has related records and cannot be deleted.' : 'Delete this batch schedule? This cannot be undone.' }}">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" @disabled($item->applications_count > 0) class="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">
+                                    <button type="submit" @disabled($batchHasRelatedRecords) class="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40" title="{{ $batchHasRelatedRecords ? 'Delete is disabled while related records exist.' : 'Delete batch schedule' }}">
                                         <x-dashboard-icon name="trash-2" class="h-3.5 w-3.5" />
                                         Delete
                                     </button>
@@ -241,6 +272,7 @@
                             <div class="rounded-xl border border-slate-100 bg-slate-50 p-3">
                                 <span class="text-xs font-bold uppercase text-slate-500">Applicants</span>
                                 <p class="mt-1 text-xl font-bold text-slate-900">{{ $item->applications_count }}</p>
+                                @if($batchHasRelatedRecords)<p class="mt-1 text-xs font-semibold text-amber-700">Deletion protected by related records.</p>@endif
                             </div>
                         </div>
                     </article>

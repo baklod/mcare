@@ -278,19 +278,19 @@ class EnrollmentPaymentController extends Controller
                 return false;
             }
 
-            if ($lockedApplication->hasActiveOnsiteReceipt()) {
-                return true;
-            }
+            $ticketNumber = $lockedApplication->payment_receipt_number ?: $this->uniqueReference('MCR');
+            $refNumber = $lockedApplication->payment_reference ?: $this->uniqueReference('MCARE-SITE');
+            $expiresAt = $lockedApplication->payment_receipt_expires_at ?: $this->defaultDeadlineFor($lockedApplication);
 
             $lockedApplication->forceFill([
                 'payment_method' => 'onsite',
-                'payment_status' => EnrollmentApplication::PAYMENT_ONSITE_PENDING,
-                'payment_amount' => self::DEFAULT_DOWNPAYMENT,
+                'payment_status' => $lockedApplication->payment_status === EnrollmentApplication::PAYMENT_PAID ? EnrollmentApplication::PAYMENT_PAID : EnrollmentApplication::PAYMENT_ONSITE_PENDING,
+                'payment_amount' => $lockedApplication->payment_amount ?: self::DEFAULT_DOWNPAYMENT,
                 'payment_currency' => 'PHP',
-                'payment_reference' => $this->uniqueReference('MCARE-SITE'),
-                'payment_receipt_number' => $this->uniqueReference('MCR'),
-                'payment_receipt_expires_at' => $this->defaultDeadlineFor($lockedApplication),
-                'payment_selected_at' => now(),
+                'payment_reference' => $refNumber,
+                'payment_receipt_number' => $ticketNumber,
+                'payment_receipt_expires_at' => $expiresAt,
+                'payment_selected_at' => $lockedApplication->payment_selected_at ?: now(),
                 'paymongo_checkout_reference' => null,
                 'paymongo_checkout_url' => null,
                 'payment_meta' => [
@@ -301,6 +301,22 @@ class EnrollmentPaymentController extends Controller
                     'batch_deadline' => $lockedApplication->batch?->enrollment_ends_at?->toDateTimeString(),
                 ],
             ])->save();
+
+            \App\Models\PaymentTransaction::firstOrCreate(
+                [
+                    'enrollment_application_id' => $lockedApplication->id,
+                    'payment_channel' => \App\Models\PaymentTransaction::CHANNEL_ONSITE,
+                    'transaction_type' => \App\Models\PaymentTransaction::TYPE_DOWNPAYMENT,
+                    'ticket_number' => $ticketNumber,
+                ],
+                [
+                    'user_id' => $lockedApplication->user_id,
+                    'amount' => self::DEFAULT_DOWNPAYMENT,
+                    'status' => \App\Models\PaymentTransaction::STATUS_PENDING,
+                    'paid_at' => now(),
+                    'notes' => 'On-site downpayment order (₱2,000.00) for cashier verification.',
+                ]
+            );
 
             return true;
         }, 3);

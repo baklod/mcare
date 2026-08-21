@@ -6,7 +6,7 @@
         <div>
             <p class="dashboard-section-kicker">Sessions</p>
             <h1 class="dashboard-section-title mt-2 text-3xl">Teaching schedule</h1>
-            <p class="mt-2 max-w-3xl text-sm leading-6 text-stone-600">The calendar updates from the active batch schedule maintained by the administrator. Select any date to see every class for that day together.</p>
+            <p class="mt-2 max-w-3xl text-sm leading-6 text-stone-600">The calendar updates from the current batch assigned by the administrator. Select any date to see every class for that day together.</p>
         </div>
         @if ($activeBatch)
             <div class="rounded-lg border border-violet-200 bg-violet-50 px-4 py-3 text-sm">
@@ -30,8 +30,8 @@
     @else
         <section class="dashboard-panel text-center">
             <x-dashboard-icon name="calendar-days" class="mx-auto h-9 w-9 text-stone-400" />
-            <h2 class="mt-4 text-xl font-bold text-stone-950">No active training batch</h2>
-            <p class="mt-2 text-sm text-stone-600">The calendar will appear after the administrator activates and schedules a batch.</p>
+            <h2 class="mt-4 text-xl font-bold text-stone-950">No assigned training batch</h2>
+            <p class="mt-2 text-sm text-stone-600">The calendar will appear after the administrator assigns and schedules a batch for this trainer.</p>
         </section>
     @endif
 </div>

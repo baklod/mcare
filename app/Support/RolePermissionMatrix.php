@@ -58,12 +58,18 @@ class RolePermissionMatrix
                 'documents.view',
                 'cotc.download',
                 'payments.view',
+                'alumni.jobs.view',
             ],
             'applicant' => [
                 'enrollment.submit',
                 'payments.view',
             ],
+            // Compatibility only for records created before graduation became
+            // a learning-status feature. Legacy alumni use the trainee layout.
             'alumni' => [
+                'trainee.access',
+                'documents.view',
+                'cotc.download',
                 'alumni.jobs.view',
             ],
         ];

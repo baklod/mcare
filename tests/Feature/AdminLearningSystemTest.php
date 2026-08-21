@@ -160,7 +160,7 @@ class AdminLearningSystemTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_graduation_promotes_a_trainee_to_alumni_and_a_correction_restores_trainee_access(): void
+    public function test_graduation_unlocks_career_hub_on_the_same_trainee_account_and_a_correction_locks_it_again(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $trainee = User::factory()->create(['role' => 'trainee']);
@@ -181,7 +181,7 @@ class AdminLearningSystemTest extends TestCase
 
         $this->assertDatabaseHas('users', [
             'id' => $trainee->id,
-            'role' => 'alumni',
+            'role' => 'trainee',
         ]);
         $this->actingAs($trainee->fresh())
             ->get(route('alumni.dashboard'))
@@ -271,13 +271,17 @@ class AdminLearningSystemTest extends TestCase
         $this->actingAs($admin)->post(route('admin.learning.modules.store'), [
             'trainer_id' => $trainer->id,
             'training_batch_id' => $batch->id,
-            'title' => 'Admin Published Module',
+            'module_code' => 'HCS323302',
+            'title' => 'Provide Care and Support to Children',
+            'topic' => 'Bathe and dress children',
             'description' => 'A module uploaded by the administrator.',
             'module_file' => UploadedFile::fake()->create('lesson.pdf', 100, 'application/pdf'),
             'is_published' => '1',
         ])->assertRedirect()->assertSessionHas('saved');
 
-        $module = TrainingModule::query()->where('title', 'Admin Published Module')->firstOrFail();
+        $module = TrainingModule::query()->where('title', 'Provide Care and Support to Children')->firstOrFail();
+        $this->assertEquals('HCS323302', $module->module_code);
+        $this->assertEquals('Bathe and dress children', $module->topic);
         Storage::disk('local')->assertExists($module->file_path);
 
         $this->actingAs($admin)

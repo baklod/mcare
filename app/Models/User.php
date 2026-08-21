@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Support\RolePermissionMatrix;
 use Database\Factories\UserFactory;
+use Illuminate\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -13,10 +14,10 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmailContract
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasRoles, Notifiable;
+    use HasFactory, HasRoles, MustVerifyEmail, Notifiable;
 
     protected static function booted(): void
     {
@@ -80,6 +81,11 @@ class User extends Authenticatable
         return $this->hasMany(TrainingModule::class, 'trainer_id');
     }
 
+    public function trainingBatches(): HasMany
+    {
+        return $this->hasMany(TrainingBatch::class, 'trainer_id');
+    }
+
     public function trainerAnnouncements(): HasMany
     {
         return $this->hasMany(TrainerAnnouncement::class, 'trainer_id');
@@ -93,5 +99,30 @@ class User extends Authenticatable
     public function alumniProfile(): HasOne
     {
         return $this->hasOne(AlumniProfile::class);
+    }
+
+    public function enrollmentApplication(): HasOne
+    {
+        return $this->hasOne(EnrollmentApplication::class);
+    }
+
+    public function paymentTransactions(): HasMany
+    {
+        return $this->hasMany(PaymentTransaction::class);
+    }
+
+    public function adminAnnouncements(): HasMany
+    {
+        return $this->hasMany(AdminAnnouncement::class, 'author_id');
+    }
+
+    public function isGraduate(): bool
+    {
+        $application = $this->relationLoaded('enrollmentApplication')
+            ? $this->enrollmentApplication
+            : $this->enrollmentApplication()->first();
+
+        return $application?->status === EnrollmentApplication::STATUS_APPROVED
+            && $application->learning_status === EnrollmentApplication::LEARNING_GRADUATED;
     }
 }

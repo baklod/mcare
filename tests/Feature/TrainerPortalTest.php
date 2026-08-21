@@ -95,15 +95,19 @@ class TrainerPortalTest extends TestCase
 
         $this->actingAs($trainer)
             ->post(route('trainer.modules.store'), [
-                'title' => '03 - Infection Control',
-                'description' => 'Safe infection prevention lesson for Caregiving NC II trainees.',
+                'module_code' => 'HCS323301',
+                'title' => 'Provide Care and Support to Infants and Toddlers',
+                'topic' => 'Comfort infants and toddlers',
+                'description' => 'Safe infant care lesson for Caregiving NC II trainees.',
                 'module_file' => $file,
             ])
             ->assertRedirect(route('trainer.resources'));
 
         $this->assertDatabaseHas('training_modules', [
             'trainer_id' => $trainer->id,
-            'title' => '03 - Infection Control',
+            'module_code' => 'HCS323301',
+            'title' => 'Provide Care and Support to Infants and Toddlers',
+            'topic' => 'Comfort infants and toddlers',
             'original_file_name' => 'infection-control.pdf',
         ]);
 

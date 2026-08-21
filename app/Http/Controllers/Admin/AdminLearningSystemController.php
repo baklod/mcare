@@ -9,7 +9,9 @@ use App\Models\ModuleProgress;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
 use App\Models\User;
+use App\Rules\TrainingModuleFileType;
 use App\Services\TraineeRosterCsv;
+use App\Support\TrainingModuleFiles;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -33,22 +35,19 @@ class AdminLearningSystemController extends Controller
             'joined_to' => ['nullable', 'date', 'after_or_equal:joined_from'],
         ]);
 
-        $query = $this->filteredTrainees($filters)->with([
-            'batch.modules' => fn ($modules) => $modules
-                ->where('is_published', true)
-                ->orderBy('published_at'),
-            'moduleProgress',
-            'user',
-        ]);
+        $query = $this->filteredTrainees($filters)->with(['batch', 'moduleProgress', 'user']);
         $trainees = $query->paginate(20)->withQueryString();
 
         // Build one compact dashboard summary per learner from already eager-loaded
         // payment, module, and batch data. Assessment results are deliberately not
         // invented here because the assessment-recording phase is not implemented yet.
         $traineeSummaries = $trainees->getCollection()->mapWithKeys(function (EnrollmentApplication $trainee) {
-            $availableModules = ($trainee->batch?->modules ?? collect())
-                ->filter(fn (TrainingModule $module) => ! $module->target_enrollment_application_id
-                    || (int) $module->target_enrollment_application_id === $trainee->id);
+            // Use the exact same audience query as the trainee portal so an
+            // individual, batch, or future global module cannot drift between dashboards.
+            $availableModules = TrainingModule::query()
+                ->availableTo($trainee)
+                ->orderBy('position')
+                ->get();
             $availableModuleIds = $availableModules->pluck('id');
             $progress = $trainee->moduleProgress
                 ->whereIn('training_module_id', $availableModuleIds->all());
@@ -124,7 +123,7 @@ class AdminLearningSystemController extends Controller
 
         $previousStatus = $enrollmentApplication->learning_status ?: EnrollmentApplication::LEARNING_ACTIVE;
 
-        $portalTransition = DB::transaction(function () use ($enrollmentApplication, $previousStatus, $request, $validated): array {
+        DB::transaction(function () use ($enrollmentApplication, $previousStatus, $request, $validated): void {
             $enrollmentApplication->update([
                 'learning_status' => $validated['learning_status'],
                 'learning_status_notes' => filled($validated['learning_status_notes'] ?? null)
@@ -135,36 +134,29 @@ class AdminLearningSystemController extends Controller
             ]);
 
             $user = User::query()->lockForUpdate()->find($enrollmentApplication->user_id);
-            $fromRole = $user?->role;
 
-            // Graduation is the controlled gateway to the Alumni Career Hub.
-            if ($user && $validated['learning_status'] === EnrollmentApplication::LEARNING_GRADUATED
-                && in_array($user->role, ['trainee', 'alumni'], true)) {
-                $user->update(['role' => 'alumni']);
+            if ($user && $validated['learning_status'] === EnrollmentApplication::LEARNING_GRADUATED) {
+                // Graduation unlocks Career Hub on the same trainee account.
+                // Normalize old alumni-role records without replacing credentials or history.
+                if ($user->role === 'alumni') {
+                    $user->update(['role' => 'trainee']);
+                }
                 $user->alumniProfile()->firstOrCreate([], ['is_available_for_duty' => false]);
             } elseif ($user && $previousStatus === EnrollmentApplication::LEARNING_GRADUATED
-                && $validated['learning_status'] !== EnrollmentApplication::LEARNING_GRADUATED
-                && $user->role === 'alumni') {
-                // Restore LMS access when an administrator corrects a graduation decision.
+                && $validated['learning_status'] !== EnrollmentApplication::LEARNING_GRADUATED) {
                 $user->alumniProfile()->update([
                     'is_available_for_duty' => false,
                     'availability_updated_at' => now(),
                 ]);
-                $user->update(['role' => 'trainee']);
             }
-
-            return [
-                'from' => $fromRole,
-                'to' => $user?->fresh()->role,
-            ];
         });
 
         AdminActivityLog::record($request->user(), 'trainee.learning-status.updated', $enrollmentApplication, [
             'from' => $previousStatus,
             'to' => $validated['learning_status'],
             'notes' => $enrollmentApplication->learning_status_notes,
-            'portal_role_from' => $portalTransition['from'],
-            'portal_role_to' => $portalTransition['to'],
+            'portal_role' => 'trainee',
+            'career_hub_unlocked' => $validated['learning_status'] === EnrollmentApplication::LEARNING_GRADUATED,
         ]);
 
         return back()->with('saved', "{$enrollmentApplication->first_name} {$enrollmentApplication->last_name} is now {$enrollmentApplication->learningStatusLabel()}.");
@@ -191,6 +183,7 @@ class AdminLearningSystemController extends Controller
         if ($search = trim((string) ($filters['search'] ?? ''))) {
             $query->where(fn ($builder) => $builder
                 ->where('title', 'like', "%{$search}%")
+                ->orWhere('module_code', 'like', "%{$search}%")
                 ->orWhere('description', 'like', "%{$search}%")
                 ->orWhereHas('trainer', fn ($trainer) => $trainer->where('name', 'like', "%{$search}%")));
         }
@@ -200,6 +193,8 @@ class AdminLearningSystemController extends Controller
             'trainers' => User::query()->where('role', 'trainer')->orderBy('name')->get(),
             'filters' => $filters,
             'modules' => $query->paginate(15)->withQueryString(),
+            'catalogUnits' => \App\Support\CaregivingNcIiCatalog::units(),
+            'coreUnits' => \App\Support\CaregivingNcIiCatalog::coreUnits(),
         ]);
     }
 
@@ -212,10 +207,20 @@ class AdminLearningSystemController extends Controller
                 Rule::exists('users', 'id')->where(fn ($query) => $query->where('role', 'trainer')),
             ],
             'training_batch_id' => ['required', 'integer', 'exists:training_batches,id'],
+            'module_code' => ['nullable', 'string', 'max:50'],
             'title' => ['required', 'string', 'max:160'],
+            'topic' => ['nullable', 'string', 'max:120'],
             'description' => ['required', 'string', 'max:1200'],
-            'module_file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp,mp4,webm', 'extensions:pdf,jpg,jpeg,png,webp,mp4,webm', 'max:102400'],
+            'module_file' => [
+                'required',
+                'file',
+                'max:'.TrainingModuleFiles::MAX_UPLOAD_KB,
+                new TrainingModuleFileType,
+            ],
             'is_published' => ['nullable', 'boolean'],
+        ], [
+            'module_file.max' => 'Learning materials must not exceed 38MB on the current MCARE server.',
+            'module_file.uploaded' => 'The upload did not reach MCARE. Check the server upload limit and try a smaller file.',
         ]);
 
         /** @var UploadedFile $file */
@@ -235,6 +240,7 @@ class AdminLearningSystemController extends Controller
         AdminActivityLog::record($request->user(), 'admin.module.created', $module, [
             'trainer_id' => $module->trainer_id,
             'batch_id' => $module->training_batch_id,
+            'module_code' => $module->module_code,
         ]);
 
         return back()->with('saved', "Module {$module->title} was added.");
@@ -293,7 +299,11 @@ class AdminLearningSystemController extends Controller
         return view('admin.learning.alumni-jobs', [
             'approvedTrainees' => EnrollmentApplication::query()->where('status', EnrollmentApplication::STATUS_APPROVED)->count(),
             'completedBatches' => TrainingBatch::query()->where('training_ends_at', '<=', now())->count(),
-            'alumniAccounts' => User::query()->where('role', 'alumni')->count(),
+            'alumniAccounts' => User::query()
+                ->whereHas('enrollmentApplication', fn ($query) => $query
+                    ->where('status', EnrollmentApplication::STATUS_APPROVED)
+                    ->where('learning_status', EnrollmentApplication::LEARNING_GRADUATED))
+                ->count(),
         ]);
     }
 

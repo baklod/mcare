@@ -8,6 +8,23 @@
 @endphp
 
 <section class="space-y-6">
+    @if ($isGraduate ?? false)
+        <header class="flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
+            <div><p class="dashboard-section-kicker">Graduate calendar</p><h1 class="dashboard-section-title mt-2 text-3xl">Career opportunities calendar</h1><p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">This calendar shows estimated start dates for privacy-reviewed caregiving duties.</p></div>
+            <a href="{{ route('trainee.career-hub') }}" class="secondary-action inline-flex items-center gap-2"><x-dashboard-icon name="briefcase" class="h-4 w-4" />Career Hub</a>
+        </header>
+        <x-training-calendar
+            :month="$calendarMonth"
+            :sessions="$calendarSessions"
+            :selected-date="$calendarSelectedDate"
+            :month-route="route('trainee.schedule')"
+            :show-batch="false"
+            eyebrow="Read-only career calendar"
+            :heading="$calendarMonth->format('F Y').' opportunities'"
+            description="Career dates are estimates. Open the Career Hub for the privacy-reviewed duty details."
+            empty-message="No career opportunity starts on this date."
+        />
+    @else
     <header class="flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
             <p class="dashboard-section-kicker">My schedule</p>
@@ -74,5 +91,6 @@
             </div>
         </aside>
     </div>
+    @endif
 </section>
 @endsection

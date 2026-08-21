@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TrainingBatch extends Model
@@ -13,6 +15,7 @@ class TrainingBatch extends Model
     protected $fillable = [
         'name',
         'year',
+        'trainer_id',
         'is_active',
         'enrollment_starts_at',
         'enrollment_ends_at',
@@ -43,6 +46,50 @@ class TrainingBatch extends Model
     public function applications(): HasMany
     {
         return $this->hasMany(EnrollmentApplication::class);
+    }
+
+    public function trainer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'trainer_id');
+    }
+
+    public function scopeAssignedTo(Builder $query, User $trainer): Builder
+    {
+        return $query->where('trainer_id', $trainer->id);
+    }
+
+    public function isAssignedTo(User $trainer): bool
+    {
+        return (int) $this->trainer_id === (int) $trainer->id;
+    }
+
+    /**
+     * Return the trainer's current batch. Existing installations may have
+     * batches created before trainer assignment existed, so the earliest
+     * active unassigned batch remains a temporary compatibility fallback.
+     * Admin assignment removes this ambiguity for the live system.
+     */
+    public static function assignedTo(User $trainer): ?self
+    {
+        $assigned = self::query()
+            ->assignedTo($trainer)
+            ->orderByDesc('is_active')
+            ->orderByDesc('training_starts_at')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($assigned) {
+            return $assigned;
+        }
+
+        $legacyActiveBatches = self::query()
+            ->whereNull('trainer_id')
+            ->where('is_active', true)
+            ->orderBy('training_starts_at')
+            ->orderBy('id')
+            ->get();
+
+        return $legacyActiveBatches->first();
     }
 
     public function modules(): HasMany

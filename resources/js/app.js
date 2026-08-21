@@ -1,4 +1,8 @@
 import './bootstrap';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 const dashboardThemeStorageKey = 'mcare-dashboard-theme';
 
@@ -21,6 +25,26 @@ applyDashboardTheme(readDashboardTheme());
 
 document.addEventListener('DOMContentLoaded', () => {
     document.documentElement.classList.remove('dashboard-navigating');
+
+    // Account forms use one accessible toggle so temporary passwords are easy to verify without exposing them by default.
+    document.querySelectorAll('[data-password-toggle]').forEach((button) => {
+        const input = document.getElementById(button.dataset.passwordToggle);
+        const icon = button.querySelector('svg');
+        if (!input) return;
+
+        button.addEventListener('click', () => {
+            const visible = input.type === 'password';
+            input.type = visible ? 'text' : 'password';
+            button.setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
+            button.title = visible ? 'Hide password' : 'Show password';
+            icon?.replaceChildren();
+            if (icon) {
+                icon.innerHTML = visible
+                    ? '<path d="m3 3 18 18M10.6 6.1A10.8 10.8 0 0 1 12 6c6.5 0 10 6 10 6a18.5 18.5 0 0 1-3.2 3.8M6.2 6.3C3.5 8.1 2 12 2 12s3.5 6 10 6c1.4 0 2.6-.3 3.7-.8"/>'
+                    : '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"/><circle cx="12" cy="12" r="2.5"/>';
+            }
+        });
+    });
 
     const sidebar = document.querySelector('[data-dashboard-sidebar]');
     const accountMenus = document.querySelectorAll('[data-dashboard-account]');
@@ -231,6 +255,160 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         window.addEventListener('afterprint', () => document.documentElement.classList.remove('protected-module-printing'));
     }
+
+    const initPdfCanvasViewer = (container) => {
+        const url = container.dataset.pdfUrl;
+        const watermarkText = container.dataset.watermark || '';
+        const canvas = container.querySelector('[data-pdf-canvas]');
+        if (!url || !canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        const prevBtn = container.querySelector('[data-pdf-prev]');
+        const nextBtn = container.querySelector('[data-pdf-next]');
+        const currentPageEl = container.querySelector('[data-pdf-current-page]');
+        const totalPagesEl = container.querySelector('[data-pdf-total-pages]');
+        const zoomLevelEl = container.querySelector('[data-pdf-zoom-level]');
+        const zoomInBtn = container.querySelector('[data-pdf-zoom-in]');
+        const zoomOutBtn = container.querySelector('[data-pdf-zoom-out]');
+        const fitWidthBtn = container.querySelector('[data-pdf-fit-width]');
+        const loadingEl = container.querySelector('[data-pdf-loading]');
+        const containerWrapper = container.querySelector('[data-pdf-canvas-container]');
+
+        let pdfDoc = null;
+        let pageNum = 1;
+        let pageRendering = false;
+        let pageNumPending = null;
+        let scale = 1.25;
+
+        const drawCanvasWatermark = (context, width, height) => {
+            if (!watermarkText) return;
+            context.save();
+            context.font = 'bold 13px sans-serif';
+            context.fillStyle = 'rgba(15, 23, 42, 0.22)';
+            context.rotate(-25 * Math.PI / 180);
+            const stepX = 360;
+            const stepY = 160;
+            for (let x = -width; x < width * 2; x += stepX) {
+                for (let y = -height; y < height * 2; y += stepY) {
+                    context.fillText(watermarkText, x, y);
+                }
+            }
+            context.restore();
+        };
+
+        const renderPage = (num) => {
+            pageRendering = true;
+            if (loadingEl) loadingEl.style.display = 'flex';
+
+            pdfDoc.getPage(num).then((page) => {
+                const viewport = page.getViewport({ scale });
+                const outputScale = window.devicePixelRatio || 1;
+
+                canvas.width = Math.floor(viewport.width * outputScale);
+                canvas.height = Math.floor(viewport.height * outputScale);
+                canvas.style.width = Math.floor(viewport.width) + 'px';
+                canvas.style.height = Math.floor(viewport.height) + 'px';
+
+                const transform = outputScale !== 1
+                    ? [outputScale, 0, 0, outputScale, 0, 0]
+                    : null;
+
+                const renderContext = {
+                    canvasContext: ctx,
+                    transform: transform,
+                    viewport: viewport,
+                };
+
+                const renderTask = page.render(renderContext);
+
+                renderTask.promise.then(() => {
+                    drawCanvasWatermark(ctx, canvas.width, canvas.height);
+                    pageRendering = false;
+                    if (loadingEl) loadingEl.style.display = 'none';
+
+                    if (pageNumPending !== null) {
+                        renderPage(pageNumPending);
+                        pageNumPending = null;
+                    }
+                }).catch(() => {
+                    pageRendering = false;
+                    if (loadingEl) loadingEl.style.display = 'none';
+                });
+            }).catch(() => {
+                pageRendering = false;
+                if (loadingEl) loadingEl.style.display = 'none';
+            });
+
+            if (currentPageEl) currentPageEl.textContent = String(num);
+            if (prevBtn) prevBtn.disabled = num <= 1;
+            if (nextBtn) nextBtn.disabled = num >= (pdfDoc ? pdfDoc.numPages : 1);
+            if (zoomLevelEl) zoomLevelEl.textContent = Math.round(scale * 100) + '%';
+        };
+
+        const queueRenderPage = (num) => {
+            if (pageRendering) {
+                pageNumPending = num;
+            } else {
+                renderPage(num);
+            }
+        };
+
+        prevBtn?.addEventListener('click', () => {
+            if (pageNum <= 1) return;
+            pageNum--;
+            queueRenderPage(pageNum);
+        });
+
+        nextBtn?.addEventListener('click', () => {
+            if (!pdfDoc || pageNum >= pdfDoc.numPages) return;
+            pageNum++;
+            queueRenderPage(pageNum);
+        });
+
+        zoomInBtn?.addEventListener('click', () => {
+            if (scale >= 3.0) return;
+            scale = Math.min(3.0, scale + 0.25);
+            queueRenderPage(pageNum);
+        });
+
+        zoomOutBtn?.addEventListener('click', () => {
+            if (scale <= 0.5) return;
+            scale = Math.max(0.5, scale - 0.25);
+            queueRenderPage(pageNum);
+        });
+
+        fitWidthBtn?.addEventListener('click', () => {
+            if (!pdfDoc || !containerWrapper) return;
+            pdfDoc.getPage(pageNum).then((page) => {
+                const unscaledViewport = page.getViewport({ scale: 1.0 });
+                const containerWidth = containerWrapper.clientWidth - 48;
+                if (containerWidth > 0 && unscaledViewport.width > 0) {
+                    scale = Math.max(0.5, Math.min(2.5, containerWidth / unscaledViewport.width));
+                    queueRenderPage(pageNum);
+                }
+            });
+        });
+
+        container.addEventListener('contextmenu', (event) => event.preventDefault());
+        container.addEventListener('dragstart', (event) => event.preventDefault());
+
+        const loadingTask = pdfjsLib.getDocument({
+            url: url,
+            withCredentials: true,
+        });
+
+        loadingTask.promise.then((pdf) => {
+            pdfDoc = pdf;
+            if (totalPagesEl) totalPagesEl.textContent = String(pdf.numPages);
+            renderPage(pageNum);
+        }).catch(() => {
+            if (loadingEl) {
+                loadingEl.innerHTML = `<div class="p-6 text-center text-sm text-red-300">Unable to load document in canvas viewer. <a href="${url}" target="_blank" class="underline font-bold text-white">Open file directly</a></div>`;
+            }
+        });
+    };
+
+    document.querySelectorAll('[data-pdf-canvas-viewer]').forEach(initPdfCanvasViewer);
 
     const syncSidebarAccessibility = () => {
         if (!sidebar) return;

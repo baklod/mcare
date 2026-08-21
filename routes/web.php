@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountSettingsController;
 use App\Http\Controllers\Admin\AdminAccountController;
 use App\Http\Controllers\Admin\AdminActivityLogController;
+use App\Http\Controllers\Admin\AdminAnnouncementController;
 use App\Http\Controllers\Admin\AdminCareerHubController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminLearningSystemController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\Admin\EnrollmentReviewController;
 use App\Http\Controllers\Admin\PaymentScheduleController;
 use App\Http\Controllers\Alumni\AlumniCareerHubController;
 use App\Http\Controllers\Auth\AccountSessionController;
+use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\CompetencyWorkbookController;
 use App\Http\Controllers\EnrollmentController;
@@ -65,6 +67,10 @@ Route::middleware('throttle:global-web')->group(function () {
     Route::post('/logout', [AccountSessionController::class, 'destroy'])
         ->middleware('throttle:sensitive-mutation')
         ->name('logout');
+
+    Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
+        ->middleware(['signed', 'throttle:6,1', 'private.response'])
+        ->name('verification.verify');
 
     Route::prefix('account')
         ->name('account.')
@@ -222,6 +228,26 @@ Route::middleware('throttle:global-web')->group(function () {
                     ->middleware(['permission:payments.verify', 'throttle:sensitive-mutation'])
                     ->name('payment-schedules.update');
 
+                Route::post('/payment-scheduling/{enrollmentApplication}/transactions', [PaymentScheduleController::class, 'storeTransaction'])
+                    ->middleware(['permission:payments.verify', 'throttle:sensitive-mutation'])
+                    ->name('payment-schedules.transactions.store');
+
+                Route::patch('/payment-scheduling/transactions/{transaction}/verify', [PaymentScheduleController::class, 'verifyTransaction'])
+                    ->middleware(['permission:payments.verify', 'throttle:sensitive-mutation'])
+                    ->name('payment-schedules.transactions.verify');
+
+                Route::get('/announcements', [AdminAnnouncementController::class, 'index'])
+                    ->middleware('permission:announcements.view')
+                    ->name('announcements.index');
+
+                Route::post('/announcements', [AdminAnnouncementController::class, 'store'])
+                    ->middleware(['permission:announcements.view', 'throttle:sensitive-mutation'])
+                    ->name('announcements.store');
+
+                Route::delete('/announcements/{announcement}', [AdminAnnouncementController::class, 'destroy'])
+                    ->middleware(['permission:announcements.view', 'throttle:sensitive-mutation'])
+                    ->name('announcements.destroy');
+
                 Route::get('/learning/trainees', [AdminLearningSystemController::class, 'trainees'])
                     ->middleware('permission:trainees.manage')
                     ->name('learning.trainees');
@@ -292,6 +318,10 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::post('/accounts/trainees', [AdminAccountController::class, 'storeTrainee'])
                     ->middleware(['permission:accounts.manage', 'throttle:sensitive-mutation'])
                     ->name('accounts.trainees.store');
+                Route::delete('/accounts/{user}', [AdminAccountController::class, 'destroy'])
+                    ->middleware(['permission:accounts.manage', 'throttle:sensitive-mutation'])
+                    ->whereNumber('user')
+                    ->name('accounts.destroy');
 
                 Route::get('/logs', [AdminActivityLogController::class, 'index'])
                     ->middleware(['permission:logs.view', 'throttle:search'])
@@ -412,6 +442,9 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/modules/{module}/content', [TrainerDashboardController::class, 'moduleContent'])
                     ->middleware(['permission:modules.publish', 'throttle:document-downloads'])
                     ->name('modules.content');
+                Route::get('/modules/{module}/download', [TrainerDashboardController::class, 'moduleDownload'])
+                    ->middleware(['permission:modules.publish', 'throttle:document-downloads'])
+                    ->name('modules.download');
             });
         });
 
@@ -433,19 +466,8 @@ Route::middleware('throttle:global-web')->group(function () {
 
                 Route::get('/', [TraineeDashboardController::class, 'index'])
                     ->name('dashboard');
-
-                Route::get('/stream', [TraineeDashboardController::class, 'stream'])
-                    ->middleware('permission:announcements.view')
-                    ->name('stream');
-
-                Route::get('/modules', [TraineeDashboardController::class, 'modules'])
-                    ->middleware('permission:modules.view')
-                    ->name('modules.index');
                 Route::get('/schedule', [TraineeDashboardController::class, 'schedule'])
                     ->name('schedule');
-                Route::get('/payments', [TraineeDashboardController::class, 'payments'])
-                    ->middleware('permission:payments.view')
-                    ->name('payments');
                 Route::get('/documents', [TraineeDashboardController::class, 'documents'])
                     ->middleware('permission:documents.view')
                     ->name('documents');
@@ -453,52 +475,73 @@ Route::middleware('throttle:global-web')->group(function () {
                     ->middleware(['permission:cotc.download', 'throttle:document-downloads'])
                     ->name('cotc.download');
 
-                Route::get('/modules/{module}', [TraineeDashboardController::class, 'viewModule'])
-                    ->middleware('permission:modules.view')
-                    ->name('modules.show');
+                Route::middleware('active.training')->group(function () {
+                    Route::get('/stream', [TraineeDashboardController::class, 'stream'])
+                        ->middleware('permission:announcements.view')
+                        ->name('stream');
+                    Route::get('/modules', [TraineeDashboardController::class, 'modules'])
+                        ->middleware('permission:modules.view')
+                        ->name('modules.index');
+                    Route::get('/payments', [TraineeDashboardController::class, 'payments'])
+                        ->middleware('permission:payments.view')
+                        ->name('payments');
+                    Route::post('/payments/tickets', [TraineeDashboardController::class, 'generateOnsiteTicket'])
+                        ->middleware(['permission:payments.view', 'throttle:sensitive-mutation'])
+                        ->name('payments.tickets.store');
+                    Route::post('/payments/upload-proof', [TraineeDashboardController::class, 'uploadPaymentProof'])
+                        ->middleware(['permission:payments.view', 'throttle:sensitive-mutation'])
+                        ->name('payments.upload-proof');
+                    Route::get('/modules/{module}', [TraineeDashboardController::class, 'viewModule'])
+                        ->middleware('permission:modules.view')
+                        ->name('modules.show');
+                    Route::get('/modules/{module}/content', [TraineeDashboardController::class, 'moduleContent'])
+                        ->middleware(['permission:modules.view', 'throttle:document-downloads'])
+                        ->name('modules.content');
+                    Route::get('/modules/{module}/download', [TraineeDashboardController::class, 'moduleDownload'])
+                        ->middleware(['permission:modules.view', 'throttle:document-downloads'])
+                        ->name('modules.download');
+                    Route::patch('/modules/{module}/progress', [TraineeDashboardController::class, 'updateProgress'])
+                        ->middleware(['permission:progress.update', 'throttle:sensitive-mutation'])
+                        ->name('modules.progress');
+                    Route::post('/modules/{module}/security-event', [TraineeDashboardController::class, 'securityEvent'])
+                        ->middleware(['permission:modules.view', 'throttle:20,1'])
+                        ->name('modules.security-event');
+                    Route::get('/quizzes', [TraineeQuizController::class, 'index'])
+                        ->middleware('permission:quizzes.take')
+                        ->name('quizzes.index');
+                    Route::get('/quizzes/{quiz}', [TraineeQuizController::class, 'show'])
+                        ->middleware('permission:quizzes.take')
+                        ->name('quizzes.show');
+                    Route::post('/quizzes/{quiz}/attempts', [TraineeQuizController::class, 'start'])
+                        ->middleware(['permission:quizzes.take', 'throttle:sensitive-mutation'])
+                        ->name('quizzes.start');
+                    Route::get('/quiz-attempts/{attempt}', [TraineeQuizAttemptController::class, 'show'])
+                        ->middleware('permission:quizzes.take')
+                        ->name('quiz-attempts.show');
+                    Route::post('/quiz-attempts/{attempt}/submit', [TraineeQuizAttemptController::class, 'submit'])
+                        ->middleware(['permission:quizzes.take', 'throttle:sensitive-mutation'])
+                        ->name('quiz-attempts.submit');
+                    Route::get('/quiz-attempts/{attempt}/result', [TraineeQuizAttemptController::class, 'result'])
+                        ->middleware('permission:quizzes.take')
+                        ->name('quiz-attempts.result');
+                });
 
-                Route::get('/modules/{module}/content', [TraineeDashboardController::class, 'moduleContent'])
-                    ->middleware(['permission:modules.view', 'throttle:document-downloads'])
-                    ->name('modules.content');
-
-                Route::patch('/modules/{module}/progress', [TraineeDashboardController::class, 'updateProgress'])
-                    ->middleware(['permission:progress.update', 'throttle:sensitive-mutation'])
-                    ->name('modules.progress');
-
-                Route::post('/modules/{module}/security-event', [TraineeDashboardController::class, 'securityEvent'])
-                    ->middleware(['permission:modules.view', 'throttle:20,1'])
-                    ->name('modules.security-event');
-
-                Route::get('/quizzes', [TraineeQuizController::class, 'index'])
-                    ->middleware('permission:quizzes.take')
-                    ->name('quizzes.index');
-                Route::get('/quizzes/{quiz}', [TraineeQuizController::class, 'show'])
-                    ->middleware('permission:quizzes.take')
-                    ->name('quizzes.show');
-                Route::post('/quizzes/{quiz}/attempts', [TraineeQuizController::class, 'start'])
-                    ->middleware(['permission:quizzes.take', 'throttle:sensitive-mutation'])
-                    ->name('quizzes.start');
-                Route::get('/quiz-attempts/{attempt}', [TraineeQuizAttemptController::class, 'show'])
-                    ->middleware('permission:quizzes.take')
-                    ->name('quiz-attempts.show');
-                Route::post('/quiz-attempts/{attempt}/submit', [TraineeQuizAttemptController::class, 'submit'])
-                    ->middleware(['permission:quizzes.take', 'throttle:sensitive-mutation'])
-                    ->name('quiz-attempts.submit');
-                Route::get('/quiz-attempts/{attempt}/result', [TraineeQuizAttemptController::class, 'result'])
-                    ->middleware('permission:quizzes.take')
-                    ->name('quiz-attempts.result');
+                Route::middleware(['graduate', 'permission:alumni.jobs.view'])->group(function () {
+                    Route::get('/career-hub', [AlumniCareerHubController::class, 'index'])
+                        ->name('career-hub');
+                    Route::patch('/career-hub/availability', [AlumniCareerHubController::class, 'updateAvailability'])
+                        ->middleware('throttle:sensitive-mutation')
+                        ->name('career-hub.availability');
+                });
             });
         });
 
-    Route::prefix('alumni')
-        ->name('alumni.')
-        ->middleware('private.response')
-        ->group(function () {
-            Route::middleware(['auth', 'alumni', 'permission:alumni.jobs.view'])->group(function () {
-                Route::get('/', [AlumniCareerHubController::class, 'index'])->name('dashboard');
-                Route::patch('/availability', [AlumniCareerHubController::class, 'updateAvailability'])
-                    ->middleware('throttle:sensitive-mutation')
-                    ->name('availability.update');
-            });
-        });
+    // Legacy URL aliases render the shared trainee-based Career Hub; they do not create a second portal.
+    Route::get('/alumni', [AlumniCareerHubController::class, 'index'])
+        ->middleware(['auth', 'trainee', 'graduate', 'permission:alumni.jobs.view', 'private.response'])
+        ->name('alumni.dashboard');
+
+    Route::patch('/alumni/availability', [AlumniCareerHubController::class, 'updateAvailability'])
+        ->middleware(['auth', 'trainee', 'graduate', 'permission:alumni.jobs.view', 'throttle:sensitive-mutation', 'private.response'])
+        ->name('alumni.availability.update');
 });

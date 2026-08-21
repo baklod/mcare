@@ -7,6 +7,8 @@ use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
+use App\Rules\TrainingModuleFileType;
+use App\Support\TrainingModuleFiles;
 use App\Services\TrainingCalendarService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,7 +24,7 @@ class TrainerDashboardController extends Controller
     public function __invoke(Request $request, TrainingCalendarService $scheduleService): View
     {
         $trainer = $request->user();
-        $activeBatch = TrainingBatch::active();
+        $activeBatch = TrainingBatch::assignedTo($trainer);
 
         // Approved applications in the active batch are the trainer's official learner list.
         $assignedTrainees = $this->approvedTraineesFor($activeBatch)
@@ -54,6 +56,8 @@ class TrainerDashboardController extends Controller
         // Resources. Avoid loading file metadata and batch relations here.
         $moduleCount = TrainingModule::query()
             ->where('trainer_id', $trainer->id)
+            ->when($activeBatch, fn ($query) => $query->where('training_batch_id', $activeBatch->id))
+            ->when(! $activeBatch, fn ($query) => $query->whereRaw('1 = 0'))
             ->count();
 
         // Today's timeline is derived directly from the active admin-managed batch schedule.
@@ -136,7 +140,7 @@ class TrainerDashboardController extends Controller
 
     public function storeModule(Request $request): RedirectResponse
     {
-        $activeBatch = TrainingBatch::active();
+        $activeBatch = TrainingBatch::assignedTo($request->user());
         $request->merge([
             'audience_type' => $request->input('audience_type', 'batch'),
             'training_batch_id' => $request->input('training_batch_id', $activeBatch?->id),
@@ -145,7 +149,7 @@ class TrainerDashboardController extends Controller
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:160', ...$safeText],
             'description' => ['required', 'string', 'max:1200', ...$safeText],
-            'module_file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp,mp4,webm', 'extensions:pdf,jpg,jpeg,png,webp,mp4,webm', 'max:102400'],
+            'module_file' => ['required', 'file', 'max:'.TrainingModuleFiles::MAX_UPLOAD_KB, new TrainingModuleFileType],
             'audience_type' => ['required', Rule::in(['batch', 'trainee'])],
             'training_batch_id' => ['nullable', 'integer', 'exists:training_batches,id'],
             'target_enrollment_application_id' => [
@@ -157,8 +161,8 @@ class TrainerDashboardController extends Controller
             ],
         ], [
             'not_regex' => 'This field contains characters that are not allowed for security reasons.',
-            'module_file.mimes' => 'Training modules must be PDF, JPG, PNG, WEBP, MP4, or WEBM files.',
-            'module_file.max' => 'Training modules must not exceed 100MB.',
+            'module_file.max' => 'Training modules must not exceed 38MB on the current MCARE server.',
+            'module_file.uploaded' => 'The upload did not reach MCARE. Check the server upload limit and try a smaller file.',
         ]);
 
         $file = $request->file('module_file');
@@ -171,6 +175,18 @@ class TrainerDashboardController extends Controller
         if (! $batchId || ($validated['audience_type'] === 'trainee' && ! $targetTrainee)) {
             throw ValidationException::withMessages([
                 'audience_type' => 'Choose a batch or an approved trainee before publishing.',
+            ]);
+        }
+
+        if (! $activeBatch || (int) $batchId !== (int) $activeBatch->id) {
+            throw ValidationException::withMessages([
+                'training_batch_id' => 'Learning materials can only be published to the trainer\'s assigned batch.',
+            ]);
+        }
+
+        if ($targetTrainee && (int) $targetTrainee->training_batch_id !== (int) $activeBatch->id) {
+            throw ValidationException::withMessages([
+                'target_enrollment_application_id' => 'The selected trainee is outside the trainer\'s assigned batch.',
             ]);
         }
 
@@ -229,10 +245,35 @@ class TrainerDashboardController extends Controller
         $filename = basename($module->original_file_name);
         $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
 
+        return $this->moduleFileResponse($module, HeaderUtils::DISPOSITION_INLINE, $filename, $fallbackFilename);
+    }
+
+    public function moduleDownload(Request $request, TrainingModule $module): BinaryFileResponse
+    {
+        abort_unless($module->trainer_id === $request->user()->id, 403);
+        abort_unless(Storage::disk('local')->exists($module->file_path), 404);
+
+        AdminActivityLog::record($request->user(), 'trainer.module.content.downloaded', $module, [
+            'mime_type' => $module->mime_type,
+        ]);
+
+        $filename = basename($module->original_file_name);
+        $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
+
+        return $this->moduleFileResponse($module, HeaderUtils::DISPOSITION_ATTACHMENT, $filename, $fallbackFilename);
+    }
+
+    private function moduleFileResponse(
+        TrainingModule $module,
+        string $disposition,
+        string $filename,
+        string $fallbackFilename,
+    ): BinaryFileResponse {
         return response()->file(Storage::disk('local')->path($module->file_path), [
             'Content-Type' => $module->mime_type ?: 'application/octet-stream',
-            'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_INLINE, $filename, $fallbackFilename),
+            'Content-Disposition' => HeaderUtils::makeDisposition($disposition, $filename, $fallbackFilename),
             'Accept-Ranges' => 'bytes',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 
@@ -242,6 +283,7 @@ class TrainerDashboardController extends Controller
             ->with(['batch', 'user'])
             ->where('status', EnrollmentApplication::STATUS_APPROVED)
             ->when($activeBatch, fn ($query) => $query->where('training_batch_id', $activeBatch->id))
+            ->when(! $activeBatch, fn ($query) => $query->whereRaw('1 = 0'))
             ->orderBy('last_name')
             ->orderBy('first_name');
     }

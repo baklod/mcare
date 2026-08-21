@@ -21,19 +21,16 @@ class CompetencyRecordController extends Controller
 {
     public function index(Request $request): View
     {
+        $assignedBatch = TrainingBatch::assignedTo($request->user());
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
             'batch_id' => ['nullable', 'integer', 'exists:training_batches,id'],
             'schedule' => ['nullable', Rule::in(['AM', 'PM'])],
         ]);
-        $batches = TrainingBatch::query()
-            ->orderByDesc('is_active')
-            ->orderByDesc('year')
-            ->orderBy('name')
-            ->get();
-        $selectedBatchId = isset($validated['batch_id'])
-            ? (int) $validated['batch_id']
-            : $batches->first()?->id;
+        $batches = $assignedBatch ? collect([$assignedBatch]) : collect();
+        $requestedBatchId = isset($validated['batch_id']) ? (int) $validated['batch_id'] : null;
+        $this->assertBatchAccess($request, $requestedBatchId);
+        $selectedBatchId = $requestedBatchId ?? $assignedBatch?->id;
         $units = CompetencyUnit::query()
             ->with('outcomes')
             ->where('program_code', CaregivingNcIiCatalog::PROGRAM_CODE)
@@ -94,9 +91,10 @@ class CompetencyRecordController extends Controller
         ]);
     }
 
-    public function edit(EnrollmentApplication $enrollmentApplication): View
+    public function edit(Request $request, EnrollmentApplication $enrollmentApplication): View
     {
         $this->assertApproved($enrollmentApplication);
+        $this->assertBatchAccess($request, (int) $enrollmentApplication->training_batch_id);
         $enrollmentApplication->load(['batch', 'competencyRecords.outcomeResults']);
 
         return view('trainer.competencies.edit', [
@@ -115,6 +113,7 @@ class CompetencyRecordController extends Controller
     public function chart(Request $request, TrainingBatch $trainingBatch, string $chart): View
     {
         abort_unless(in_array($chart, ['progress', 'achievement'], true), 404);
+        $this->assertBatchAccess($request, (int) $trainingBatch->id);
 
         $validated = $request->validate([
             'schedule' => ['nullable', Rule::in(['AM', 'PM'])],
@@ -155,6 +154,7 @@ class CompetencyRecordController extends Controller
         CompetencyRecordUpdater $updater,
     ): RedirectResponse {
         $this->assertApproved($enrollmentApplication);
+        $this->assertBatchAccess($request, (int) $enrollmentApplication->training_batch_id);
         $statuses = array_keys(TraineeCompetencyRecord::statuses());
         $validated = $request->validate([
             'records' => ['required', 'array'],
@@ -212,6 +212,8 @@ class CompetencyRecordController extends Controller
             'percentage_score' => ['nullable', 'numeric', 'between:0,100'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
+        $this->assertBatchAccess($request, (int) $validated['batch_id']);
+
         $unit = CompetencyUnit::query()
             ->with('outcomes')
             ->where('program_code', CaregivingNcIiCatalog::PROGRAM_CODE)
@@ -281,5 +283,20 @@ class CompetencyRecordController extends Controller
     private function assertApproved(EnrollmentApplication $application): void
     {
         abort_unless($application->status === EnrollmentApplication::STATUS_APPROVED, 404);
+    }
+
+    private function assertBatchAccess(Request $request, ?int $batchId): void
+    {
+        if ($batchId === null) {
+            return;
+        }
+
+        $assignedBatch = TrainingBatch::assignedTo($request->user());
+
+        if (! $assignedBatch || ! $batchId || (int) $assignedBatch->id !== $batchId) {
+            throw ValidationException::withMessages([
+                'batch_id' => 'This trainer can only access competency records for the assigned batch.',
+            ]);
+        }
     }
 }

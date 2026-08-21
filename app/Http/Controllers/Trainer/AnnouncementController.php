@@ -22,13 +22,18 @@ class AnnouncementController extends Controller
     public function index(Request $request): View
     {
         $trainer = $request->user();
+        $assignedBatch = TrainingBatch::assignedTo($trainer);
         $filters = $request->validate([
             'batch_id' => ['nullable', 'integer', 'exists:training_batches,id'],
         ]);
+        $requestedBatchId = isset($filters['batch_id']) ? (int) $filters['batch_id'] : null;
+        $this->assertBatchFilter($assignedBatch, $requestedBatchId);
+        $selectedBatchId = $requestedBatchId ?? $assignedBatch?->id;
         $announcements = TrainerAnnouncement::query()
             ->with(['batch', 'trainer'])
             ->where('trainer_id', $trainer->id)
-            ->when($filters['batch_id'] ?? null, fn ($query, $batchId) => $query->where('training_batch_id', $batchId))
+            ->when($selectedBatchId, fn ($query, $batchId) => $query->where('training_batch_id', $batchId))
+            ->when(! $selectedBatchId, fn ($query) => $query->whereRaw('1 = 0'))
             ->orderByDesc('is_pinned')
             ->orderByDesc('posted_at')
             ->orderByDesc('created_at')
@@ -36,11 +41,7 @@ class AnnouncementController extends Controller
 
         return view('trainer.stream', [
             'announcements' => $announcements,
-            'batches' => TrainingBatch::query()
-                ->orderByDesc('is_active')
-                ->orderByDesc('year')
-                ->orderBy('name')
-                ->get(),
+            'batches' => $assignedBatch ? collect([$assignedBatch]) : collect(),
             'streamStats' => [
                 'total' => TrainerAnnouncement::query()->where('trainer_id', $trainer->id)->count(),
                 'published' => TrainerAnnouncement::query()
@@ -55,7 +56,8 @@ class AnnouncementController extends Controller
                     ->count(),
                 'learners' => EnrollmentApplication::query()
                     ->where('status', EnrollmentApplication::STATUS_APPROVED)
-                    ->when($filters['batch_id'] ?? null, fn ($query, $batchId) => $query->where('training_batch_id', $batchId))
+                    ->when($selectedBatchId, fn ($query, $batchId) => $query->where('training_batch_id', $batchId))
+                    ->when(! $selectedBatchId, fn ($query) => $query->whereRaw('1 = 0'))
                     ->count(),
             ],
         ]);
@@ -181,7 +183,32 @@ class AnnouncementController extends Controller
             ]);
         }
 
+        $assignedBatch = TrainingBatch::assignedTo($request->user());
+
+        if (! $assignedBatch) {
+            throw ValidationException::withMessages([
+                'training_batch_id' => 'Assign a current batch to this trainer before posting class updates.',
+            ]);
+        }
+
+        $validated['training_batch_id'] ??= $assignedBatch->id;
+
+        if ((int) $validated['training_batch_id'] !== (int) $assignedBatch->id) {
+            throw ValidationException::withMessages([
+                'training_batch_id' => 'Announcements can only be posted to the trainer\'s assigned batch.',
+            ]);
+        }
+
         return $validated;
+    }
+
+    private function assertBatchFilter(?TrainingBatch $assignedBatch, ?int $requestedBatchId): void
+    {
+        if ($requestedBatchId && (! $assignedBatch || $requestedBatchId !== (int) $assignedBatch->id)) {
+            throw ValidationException::withMessages([
+                'batch_id' => 'This trainer can only access the currently assigned batch.',
+            ]);
+        }
     }
 
     private function shouldNotifyTrainees(TrainerAnnouncement $announcement): bool

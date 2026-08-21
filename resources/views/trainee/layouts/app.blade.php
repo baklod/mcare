@@ -14,19 +14,26 @@
         $navItem = 'dashboard-nav-link';
         $traineeName = auth()->user()?->name ?? 'Trainee';
         $traineeInitial = strtoupper(substr($traineeName, 0, 1));
+        $isGraduate = auth()->user()?->isGraduate() ?? false;
         $traineeStreamHref = \Illuminate\Support\Facades\Route::has('trainee.stream')
             ? route('trainee.stream')
             : route('trainee.dashboard');
         $traineeQuizHref = \Illuminate\Support\Facades\Route::has('trainee.quizzes.index')
             ? route('trainee.quizzes.index')
             : route('trainee.modules.index');
-        $traineePrimaryNav = [
+        $traineePrimaryNav = $isGraduate ? [
+            ['label' => 'Career Hub', 'short' => 'Career Hub', 'icon' => 'fa-briefcase', 'href' => route('trainee.career-hub'), 'active' => request()->routeIs('trainee.career-hub')],
+            ['label' => 'Calendar', 'short' => 'Calendar', 'icon' => 'fa-calendar-days', 'href' => route('trainee.schedule'), 'active' => request()->routeIs('trainee.schedule')],
+        ] : [
             ['label' => 'Stream', 'short' => 'Stream', 'icon' => 'fa-bell', 'href' => $traineeStreamHref, 'active' => request()->routeIs('trainee.stream')],
             ['label' => 'Classwork', 'short' => 'Classwork', 'icon' => 'fa-book-open', 'href' => route('trainee.modules.index'), 'active' => request()->routeIs('trainee.modules.*')],
             ['label' => 'Quizzes', 'short' => 'Quizzes', 'icon' => 'fa-square-check', 'href' => $traineeQuizHref, 'active' => request()->routeIs('trainee.quizzes.*', 'trainee.quiz-attempts.*')],
             ['label' => 'Calendar', 'short' => 'Calendar', 'icon' => 'fa-calendar-days', 'href' => route('trainee.schedule'), 'active' => request()->routeIs('trainee.schedule')],
         ];
-        $traineeSecondaryNav = [
+        $traineeSecondaryNav = $isGraduate ? [
+            ['label' => 'Home', 'icon' => 'fa-house', 'href' => route('trainee.dashboard'), 'active' => request()->routeIs('trainee.dashboard')],
+            ['label' => 'Documents', 'icon' => 'fa-folder-open', 'href' => route('trainee.documents'), 'active' => request()->routeIs('trainee.documents')],
+        ] : [
             ['label' => 'Home', 'icon' => 'fa-house', 'href' => route('trainee.dashboard'), 'active' => request()->routeIs('trainee.dashboard')],
             ['label' => 'Payments', 'icon' => 'fa-credit-card', 'href' => route('trainee.payments'), 'active' => request()->routeIs('trainee.payments')],
             ['label' => 'Documents', 'icon' => 'fa-folder-open', 'href' => route('trainee.documents'), 'active' => request()->routeIs('trainee.documents')],
@@ -109,7 +116,8 @@
 
         <main class="dashboard-main pb-28 lg:pb-9">
             @if (session('saved'))
-                <div class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold leading-6 text-emerald-700" role="status" aria-live="polite" data-auto-dismiss="5000">
+                <div class="mb-6 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold leading-6 text-emerald-700" role="status" aria-live="polite" data-auto-dismiss="5000" data-flash-icon="{{ session('saved_icon', 'circle-check') }}">
+                    <x-dashboard-icon :name="session('saved_icon', 'circle-check')" class="h-5 w-5 shrink-0" />
                     {{ session('saved') }}
                 </div>
             @endif
@@ -118,7 +126,7 @@
         </main>
     </div>
 
-    <nav class="dashboard-mobile-bar grid-cols-4" aria-label="Mobile trainee navigation">
+    <nav class="dashboard-mobile-bar {{ $isGraduate ? 'grid-cols-2' : 'grid-cols-4' }}" aria-label="Mobile trainee navigation">
         @foreach ($traineePrimaryNav as $item)
             <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainee-{{ str($item['label'])->slug() }}" class="dashboard-mobile-link {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
                 <x-dashboard-icon :name="$item['icon']" />

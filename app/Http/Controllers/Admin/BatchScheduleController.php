@@ -5,11 +5,14 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
 use App\Models\TrainingBatch;
+use App\Models\User;
 use App\Services\TrainingCalendarService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class BatchScheduleController extends Controller
@@ -33,12 +36,12 @@ class BatchScheduleController extends Controller
         $validated = $this->validated($request);
 
         $batch = TrainingBatch::create($validated);
-        $this->syncActiveBatch($batch);
 
         AdminActivityLog::record($request->user(), 'batch.created', $batch, [
             'name' => $batch->name,
             'year' => $batch->year,
             'active' => $batch->is_active,
+            'trainer_id' => $batch->trainer_id,
             'enrollment_ends_at' => $batch->enrollment_ends_at?->toDateTimeString(),
         ]);
 
@@ -54,6 +57,7 @@ class BatchScheduleController extends Controller
         $before = $trainingBatch->only([
             'name',
             'year',
+            'trainer_id',
             'is_active',
             'enrollment_starts_at',
             'enrollment_ends_at',
@@ -70,7 +74,6 @@ class BatchScheduleController extends Controller
         ]);
 
         $trainingBatch->update($validated);
-        $this->syncActiveBatch($trainingBatch);
 
         AdminActivityLog::record($request->user(), 'batch.updated', $trainingBatch, [
             'before' => $before,
@@ -84,27 +87,65 @@ class BatchScheduleController extends Controller
 
     public function destroy(Request $request, TrainingBatch $trainingBatch): RedirectResponse
     {
-        if ($trainingBatch->applications()->exists()) {
+        $relatedRecords = collect([
+            'applicants' => $trainingBatch->applications()->count(),
+            'learning modules' => $trainingBatch->modules()->count(),
+            'announcements' => $trainingBatch->announcements()->count(),
+            'quizzes' => $trainingBatch->quizzes()->count(),
+            'official documents' => $trainingBatch->officialDocuments()->count(),
+            'batch exports' => $trainingBatch->documentExports()->count(),
+        ])->filter();
+
+        if ($relatedRecords->isNotEmpty()) {
             return back()->withErrors([
-                'batch' => 'This batch already has applicants and cannot be deleted.',
+                'batch' => 'This batch cannot be deleted because it has related records: '
+                    .$relatedRecords->map(fn (int $count, string $label) => "{$count} {$label}")->implode(', ').'.',
             ]);
         }
 
-        AdminActivityLog::record($request->user(), 'batch.deleted', $trainingBatch, [
-            'name' => $trainingBatch->name,
-            'year' => $trainingBatch->year,
-        ]);
+        $batchLabel = "{$trainingBatch->name} {$trainingBatch->year}";
 
-        $trainingBatch->delete();
+        DB::transaction(function () use ($request, $trainingBatch): void {
+            $lockedBatch = TrainingBatch::query()->lockForUpdate()->findOrFail($trainingBatch->id);
+
+            // Re-check inside the transaction so a concurrent enrollment cannot leave an orphaned batch relation.
+            if ($lockedBatch->applications()->exists()
+                || $lockedBatch->modules()->exists()
+                || $lockedBatch->announcements()->exists()
+                || $lockedBatch->quizzes()->exists()
+                || $lockedBatch->officialDocuments()->exists()
+                || $lockedBatch->documentExports()->exists()) {
+                abort(409, 'This batch received a related record while deletion was in progress.');
+            }
+
+            AdminActivityLog::record($request->user(), 'batch.deleted', $lockedBatch, [
+                'name' => $lockedBatch->name,
+                'year' => $lockedBatch->year,
+                'trainer_id' => $lockedBatch->trainer_id,
+            ]);
+
+            $lockedBatch->delete();
+        });
 
         return redirect()
             ->route('admin.schedules.index')
-            ->with('saved', 'Batch schedule deleted.');
+            ->with('saved', "Batch schedule {$batchLabel} deleted.");
     }
 
     private function validated(Request $request, ?TrainingBatch $batch = null): array
     {
         $safeText = ['not_regex:/[<>"\'`;{}|\\\\]/u'];
+
+        // Normalize time inputs by trimming seconds if present (e.g. "08:00:00" -> "08:00")
+        foreach (['am_start_time', 'am_end_time', 'pm_start_time', 'pm_end_time'] as $timeField) {
+            if ($request->filled($timeField)) {
+                $rawTime = trim((string) $request->input($timeField));
+                $normalized = preg_match('/^(\d{1,2}:\d{2})(:\d{2})?$/', $rawTime, $matches)
+                    ? str_pad($matches[1], 5, '0', STR_PAD_LEFT)
+                    : $rawTime;
+                $request->merge([$timeField => $normalized]);
+            }
+        }
 
         $validated = $request->validate([
             'name' => [
@@ -117,11 +158,23 @@ class BatchScheduleController extends Controller
                     ->ignore($batch?->id),
             ],
             'year' => ['required', 'integer', 'min:2024', 'max:2100'],
+            'trainer_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('users', 'id')->where(fn ($query) => $query->where('role', 'trainer')),
+            ],
             'is_active' => ['nullable', 'boolean'],
             'enrollment_starts_at' => ['nullable', 'date'],
-            'enrollment_ends_at' => ['required', 'date', 'after:now'],
+            // A new batch must open a future enrollment window. Existing
+            // batches may have closed enrollment deadlines and still need
+            // schedule, room, or trainer edits afterward.
+            'enrollment_ends_at' => [
+                'required',
+                'date',
+                ...($batch ? [] : ['after:now']),
+            ],
             'training_starts_at' => ['nullable', 'required_with:training_ends_at', 'date'],
-            'training_ends_at' => ['nullable', 'required_with:training_starts_at', 'date', 'after:training_starts_at'],
+            'training_ends_at' => ['nullable', 'required_with:training_starts_at', 'date', 'after_or_equal:training_starts_at'],
             'am_start_time' => ['nullable', 'date_format:H:i'],
             'am_end_time' => ['nullable', 'date_format:H:i', 'after:am_start_time'],
             'am_room' => ['nullable', 'string', 'max:120', ...$safeText],
@@ -135,9 +188,10 @@ class BatchScheduleController extends Controller
             'name.unique' => 'A batch with this name and year already exists.',
             'not_regex' => 'This field contains characters that are not allowed for security reasons.',
             'enrollment_ends_at.after' => 'Enrollment deadline must be a future date and time.',
-            'training_ends_at.after' => 'Training end must be later than the training start.',
+            'training_ends_at.after_or_equal' => 'Training end must be on or later than the training start date.',
             'am_end_time.after' => 'AM end time must be later than AM start time.',
             'pm_end_time.after' => 'PM end time must be later than PM start time.',
+            'trainer_id.exists' => 'The selected trainer is invalid or does not have trainer permissions.',
         ]);
 
         $validated['is_active'] = $request->boolean('is_active');
@@ -145,22 +199,6 @@ class BatchScheduleController extends Controller
         $validated['pm_days'] = strtoupper(trim($validated['pm_days']));
 
         return $validated;
-    }
-
-    private function syncActiveBatch(TrainingBatch $batch): void
-    {
-        $batch->forceFill([
-            'is_active' => (bool) $batch->is_active,
-        ])->save();
-
-        if (! $batch->is_active) {
-            return;
-        }
-
-        TrainingBatch::query()
-            ->whereKeyNot($batch->id)
-            ->where('is_active', true)
-            ->update(['is_active' => false]);
     }
 
     private function scheduleView(
@@ -186,12 +224,24 @@ class BatchScheduleController extends Controller
 
         return view('admin.schedules.index', [
             'batches' => TrainingBatch::query()
-                ->withCount('applications')
+                ->with('trainer')
+                ->withCount([
+                    'applications',
+                    'modules',
+                    'announcements',
+                    'quizzes',
+                    'officialDocuments',
+                    'documentExports',
+                ])
                 ->orderByDesc('is_active')
                 ->orderByDesc('year')
                 ->orderBy('name')
                 ->paginate(10)
                 ->withQueryString(),
+            'trainers' => User::query()
+                ->where('role', 'trainer')
+                ->orderBy('name')
+                ->get(['id', 'name', 'email']),
             'editingBatch' => $editingBatch,
             'calendarMonth' => $month,
             'calendarSessions' => $calendarSessions,

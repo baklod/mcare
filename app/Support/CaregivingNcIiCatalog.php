@@ -19,68 +19,68 @@ class CaregivingNcIiCatalog
                 'Obtain and convey workplace information',
                 'Perform duties following workplace instructions',
                 'Complete relevant work-related documents',
-            ]),
+            ], '500311105'),
             self::unit('basic', 'Work in a Team Environment', [
                 'Describe team role and scope',
                 "Identify one's role and responsibility within a team",
                 'Work as a team member',
-            ]),
+            ], '500311106'),
             self::unit('basic', 'Solve and Address General Workplace Problems', [
                 'Identify routine problems',
                 'Look for solutions to routine problems',
                 'Recommend solutions to problems',
-            ]),
+            ], '500311107'),
             self::unit('basic', 'Develop Career and Life Decisions', [
                 "Manage one's emotion",
                 'Develop reflective practice',
                 'Boost self-confidence and develop self-regulation',
-            ]),
+            ], '500311108'),
             self::unit('basic', 'Contribute to Workplace Innovation', [
                 'Identify opportunities to do things better',
                 'Discuss and develop ideas with others',
                 'Integrate ideas for change in the workplace',
-            ]),
+            ], '500311109'),
             self::unit('basic', 'Present Relevant Information', [
                 'Gather data and information',
                 'Assess gathered data and information',
                 'Record and present information',
-            ]),
+            ], '500311110'),
             self::unit('basic', 'Practice Occupational Safety and Health Policies and Procedures', [
                 'Identify OSH compliance requirements',
                 'Prepare OSH requirements for compliance',
                 'Perform tasks in accordance with relevant OSH policies and procedures',
-            ]),
+            ], '500311111'),
             self::unit('basic', 'Exercise Efficient and Effective Sustainable Practices in the Workplace', [
                 'Identify the efficiency and effectiveness of resource utilization',
                 'Determine causes of inefficient or ineffective resource utilization',
                 'Convey inefficient and ineffective environmental practices',
-            ]),
+            ], '500311112'),
             self::unit('basic', 'Practice Entrepreneurial Skills in the Workplace', [
                 'Apply entrepreneurial workplace best practices',
                 'Communicate entrepreneurial workplace best practices',
                 'Implement cost-effective operations',
-            ]),
+            ], '500311113'),
             self::unit('common', 'Implement and Monitor Infection Control Policies and Procedures', [
                 "Provide information about the organization's infection control policies and procedures",
                 "Integrate the organization's infection control policies and procedures into work practices",
                 'Monitor infection control performance and implement improvements in practices',
-            ]),
+            ], 'HCS323201'),
             self::unit('common', 'Respond Effectively to Difficult or Challenging Behavior', [
                 'Plan responses',
                 'Apply responses',
                 'Report and review incidents',
-            ]),
+            ], 'HCS323202'),
             self::unit('common', 'Apply Basic First Aid', [
                 'Assess the situation',
                 'Apply basic first aid techniques',
                 'Communicate details of the incident',
-            ]),
+            ], 'HCS323203'),
             self::unit('common', 'Maintain a High Standard of Patient Services', [
                 'Communicate appropriately with patients',
                 'Establish and maintain good interpersonal relationships with patients',
                 'Act in a respectful manner at all times',
                 'Evaluate own work to maintain a high standard of patient services',
-            ]),
+            ], 'HCS323204'),
             self::unit('core', 'Provide Care and Support to Infants and Toddlers', [
                 'Comfort infants and toddlers',
                 'Bathe and dress infants and toddlers',
@@ -143,7 +143,7 @@ class CaregivingNcIiCatalog
                 'Maintain laundry room, equipment, and machines',
                 'Dry clothes, linens, and fabrics',
                 'Iron clothes, linens, and fabrics',
-            ], 'HCS3233010', true),
+            ], 'HCS323310', true),
             self::unit('core', 'Prepare Hot and Cold Meals', [
                 'Prepare ingredients according to recipes',
                 'Cook meals and dishes according to recipes',
@@ -153,8 +153,19 @@ class CaregivingNcIiCatalog
                 'Prepare desserts and salads',
                 'Prepare sandwiches',
                 'Store excess food and ingredients',
-            ], 'HCS3233011', true),
+            ], 'HCS323311', true),
         ];
+    }
+
+    /**
+     * @return list<array{category: string, code: string, title: string, outcomes: list<string>}>
+     */
+    public static function coreUnits(): array
+    {
+        return collect(self::units())
+            ->where('category', 'core')
+            ->values()
+            ->all();
     }
 
     /**

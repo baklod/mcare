@@ -34,6 +34,8 @@ class EnrollmentApplication extends Model
 
     public const PAYMENT_ONLINE_PENDING = 'online_pending';
 
+    public const PAYMENT_PARTIALLY_PAID = 'partially_paid';
+
     public const PAYMENT_PAID = 'paid';
 
     public const PAYMENT_EXPIRED = 'expired';
@@ -91,6 +93,9 @@ class EnrollmentApplication extends Model
         'learning_status_changed_at',
         'learning_status_changed_by_id',
         'payment_method',
+        'total_program_fee',
+        'downpayment_amount',
+        'total_paid_amount',
         'payment_status',
         'payment_amount',
         'payment_currency',
@@ -115,6 +120,9 @@ class EnrollmentApplication extends Model
             'birth_date' => 'date',
             'date_accomplished' => 'date',
             'privacy_consent' => 'boolean',
+            'total_program_fee' => 'decimal:2',
+            'downpayment_amount' => 'decimal:2',
+            'total_paid_amount' => 'decimal:2',
             'payment_amount' => 'decimal:2',
             'payment_receipt_expires_at' => 'datetime',
             'payment_selected_at' => 'datetime',
@@ -173,7 +181,8 @@ class EnrollmentApplication extends Model
             self::PAYMENT_NOT_SELECTED => 'Not selected',
             self::PAYMENT_ONSITE_PENDING => 'Pay on site',
             self::PAYMENT_ONLINE_PENDING => 'Online pending',
-            self::PAYMENT_PAID => 'Paid',
+            self::PAYMENT_PARTIALLY_PAID => 'Partially paid',
+            self::PAYMENT_PAID => 'Fully paid',
             self::PAYMENT_EXPIRED => 'Expired',
         ];
     }
@@ -183,12 +192,55 @@ class EnrollmentApplication extends Model
         return self::paymentStatuses()[$this->payment_status] ?? str($this->payment_status)->headline()->toString();
     }
 
+    public function remainingBalance(): float
+    {
+        $fee = (float) ($this->total_program_fee ?? 22000.00);
+        $paid = (float) ($this->total_paid_amount ?? 0.00);
+
+        return max(0.0, round($fee - $paid, 2));
+    }
+
+    public function isDownpaymentSatisfied(): bool
+    {
+        if ($this->payment_status === self::PAYMENT_PAID) {
+            return true;
+        }
+
+        $downpayment = (float) ($this->downpayment_amount ?? 2000.00);
+        $paid = (float) ($this->total_paid_amount ?? 0.00);
+
+        return $paid >= $downpayment;
+    }
+
+    public function recalculatePaymentStatus(): void
+    {
+        $totalPaid = (float) $this->paymentTransactions()
+            ->where('status', PaymentTransaction::STATUS_VERIFIED)
+            ->sum('amount');
+
+        // Include legacy payment amount if verified paid previously without transaction row
+        if ($totalPaid <= 0 && $this->payment_status === self::PAYMENT_PAID && (float) $this->payment_amount > 0) {
+            $totalPaid = (float) $this->payment_amount;
+        }
+
+        $totalFee = (float) ($this->total_program_fee ?? 22000.00);
+        $downpayment = (float) ($this->downpayment_amount ?? 2000.00);
+
+        $this->total_paid_amount = $totalPaid;
+
+        if ($totalPaid >= $totalFee) {
+            $this->payment_status = self::PAYMENT_PAID;
+        } elseif ($totalPaid >= $downpayment || $totalPaid > 0) {
+            $this->payment_status = self::PAYMENT_PARTIALLY_PAID;
+        }
+
+        $this->save();
+    }
+
     public function hasActiveOnsiteReceipt(): bool
     {
-        return $this->payment_method === 'onsite'
-            && filled($this->payment_receipt_number)
-            && $this->payment_receipt_expires_at
-            && $this->payment_receipt_expires_at->isFuture();
+        return filled($this->payment_receipt_number)
+            && (! $this->payment_receipt_expires_at || $this->payment_receipt_expires_at->isFuture());
     }
 
     public function user(): BelongsTo
@@ -239,6 +291,11 @@ class EnrollmentApplication extends Model
     public function paymentAttempts(): HasMany
     {
         return $this->hasMany(PaymentAttempt::class);
+    }
+
+    public function paymentTransactions(): HasMany
+    {
+        return $this->hasMany(PaymentTransaction::class)->latest('paid_at');
     }
 
     public function targetedQuizzes(): HasMany

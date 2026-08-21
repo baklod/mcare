@@ -46,7 +46,14 @@
                             <span class="lms-classwork-icon"><x-dashboard-icon name="book-open" /></span>
                             <div class="lms-classwork-main">
                                 <div class="lms-classwork-title-line">
-                                    <h3>{{ $module->title }}</h3>
+                                    <div class="flex items-center gap-2">
+                                        @if($module->module_code)
+                                            <span class="rounded bg-purple-100 px-2 py-0.5 text-xs font-mono font-bold text-purple-900 ring-1 ring-purple-300">
+                                                {{ $module->module_code }}
+                                            </span>
+                                        @endif
+                                        <h3>{{ $module->title }}</h3>
+                                    </div>
                                     <span class="lms-status-chip {{ $isCompleted ? 'is-green' : ($moduleProgress ? 'is-amber' : 'is-neutral') }}">
                                         {{ $moduleProgress ? str($moduleProgress->status)->headline() : 'Not started' }}
                                     </span>

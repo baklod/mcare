@@ -12,6 +12,7 @@ use App\Services\TrainingCalendarService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -19,22 +20,30 @@ class TrainerPortalController extends Controller
 {
     public function trainings(Request $request): View
     {
+        $trainer = $request->user();
+
         return view('trainer.trainings', [
             'batches' => TrainingBatch::query()
+                ->with('trainer')
                 ->withCount(['applications', 'modules'])
                 ->orderByDesc('is_active')
                 ->orderByDesc('year')
                 ->get(),
+            'assignedBatch' => TrainingBatch::assignedTo($trainer),
         ]);
     }
 
     public function trainees(Request $request): View
     {
+        $trainer = $request->user();
+        $assignedBatch = TrainingBatch::assignedTo($trainer);
         $search = trim((string) $request->query('search', ''));
         $batchId = $request->integer('batch_id') ?: null;
         $schedule = in_array($request->query('schedule'), ['AM', 'PM'], true) ? $request->query('schedule') : null;
-        $trainees = $this->traineeRosterQuery($search, $batchId, $schedule)
-            ->with(['batch', 'user', 'moduleProgress'])
+        $this->assertBatchFilter($assignedBatch, $batchId);
+        $batchId ??= $assignedBatch?->id;
+        $trainees = $this->traineeRosterQuery($search, $batchId, $schedule, $assignedBatch)
+            ->with(['batch', 'user', 'moduleProgress', 'paymentTransactions.recordedByAdmin', 'paymentTransactions.verifier'])
             ->paginate(15)
             ->withQueryString();
 
@@ -42,23 +51,28 @@ class TrainerPortalController extends Controller
             'search' => $search,
             'batchId' => $batchId,
             'schedule' => $schedule,
-            'batches' => TrainingBatch::query()->orderByDesc('year')->orderBy('name')->get(),
+            'batches' => $assignedBatch ? collect([$assignedBatch]) : collect(),
             'trainees' => $trainees,
+            'assignedBatch' => $assignedBatch,
         ]);
     }
 
     public function exportTrainees(Request $request, TraineeRosterCsv $csv): StreamedResponse
     {
+        $assignedBatch = TrainingBatch::assignedTo($request->user());
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
             'batch_id' => ['nullable', 'integer', 'exists:training_batches,id'],
             'schedule' => ['nullable', Rule::in(['AM', 'PM'])],
         ]);
+        $requestedBatchId = isset($validated['batch_id']) ? (int) $validated['batch_id'] : null;
+        $this->assertBatchFilter($assignedBatch, $requestedBatchId);
         $trainees = $this->traineeRosterQuery(
             trim((string) ($validated['search'] ?? '')),
-            isset($validated['batch_id']) ? (int) $validated['batch_id'] : null,
+            $requestedBatchId ?? $assignedBatch?->id,
             $validated['schedule'] ?? null,
-        )->with(['batch', 'moduleProgress'])->get();
+            $assignedBatch,
+        )->with(['batch', 'moduleProgress', 'paymentTransactions'])->get();
 
         return $csv->download($trainees, 'mcare-trainer-trainee-summary-'.now()->format('Y-m-d').'.csv');
     }
@@ -69,7 +83,7 @@ class TrainerPortalController extends Controller
             'month' => ['nullable', 'date_format:Y-m'],
             'date' => ['nullable', 'date_format:Y-m-d'],
         ]);
-        $activeBatch = TrainingBatch::active();
+        $activeBatch = TrainingBatch::assignedTo($request->user());
         $month = isset($validated['month'])
             ? Carbon::createFromFormat('Y-m', $validated['month'])->startOfMonth()
             : $scheduleService->suggestedMonth($activeBatch);
@@ -86,29 +100,44 @@ class TrainerPortalController extends Controller
 
     public function assessments(): View
     {
+        $assignedBatch = TrainingBatch::assignedTo(request()->user());
+
         return view('trainer.assessments', [
-            'trainees' => $this->approvedTrainees()->with(['batch', 'moduleProgress'])->get(),
-            'publishedModules' => TrainingModule::query()->where('is_published', true)->count(),
+            'trainees' => $this->approvedTrainees($assignedBatch)->with(['batch', 'moduleProgress'])->get(),
+            'publishedModules' => TrainingModule::query()
+                ->where('is_published', true)
+                ->when($assignedBatch, fn ($query) => $query->where('training_batch_id', $assignedBatch->id))
+                ->when(! $assignedBatch, fn ($query) => $query->whereRaw('1 = 0'))
+                ->count(),
         ]);
     }
 
     public function resources(Request $request): View
     {
+        $assignedBatch = TrainingBatch::assignedTo($request->user());
+
         return view('trainer.resources', [
-            'batches' => TrainingBatch::query()->orderByDesc('is_active')->orderByDesc('year')->get(),
+            'batches' => $assignedBatch ? collect([$assignedBatch]) : collect(),
             'modules' => TrainingModule::query()
                 ->with(['batch', 'targetTrainee', 'progressRecords.application'])
                 ->where('trainer_id', $request->user()->id)
+                ->when($assignedBatch, fn ($query) => $query->where('training_batch_id', $assignedBatch->id))
+                ->when(! $assignedBatch, fn ($query) => $query->whereRaw('1 = 0'))
                 ->latest('published_at')
                 ->get(),
-            'trainees' => $this->approvedTrainees()->with('batch')->get(),
+            'trainees' => $this->approvedTrainees($assignedBatch)->with('batch')->get(),
+            'assignedBatch' => $assignedBatch,
+            'catalogUnits' => \App\Support\CaregivingNcIiCatalog::units(),
+            'coreUnits' => \App\Support\CaregivingNcIiCatalog::coreUnits(),
         ]);
     }
 
     public function certificates(): View
     {
+        $assignedBatch = TrainingBatch::assignedTo(request()->user());
+
         return view('trainer.certificates', [
-            'trainees' => $this->approvedTrainees()
+            'trainees' => $this->approvedTrainees($assignedBatch)
                 ->with('batch')
                 ->orderBy('last_name')
                 ->get(),
@@ -117,8 +146,8 @@ class TrainerPortalController extends Controller
 
     public function reports(): View
     {
-        $activeBatch = TrainingBatch::active();
-        $trainees = $this->approvedTrainees()->get();
+        $activeBatch = TrainingBatch::assignedTo(request()->user());
+        $trainees = $this->approvedTrainees($activeBatch)->get();
 
         return view('trainer.reports', [
             'activeBatch' => $activeBatch,
@@ -126,22 +155,38 @@ class TrainerPortalController extends Controller
                 'trainees' => $trainees->count(),
                 'am' => $trainees->where('schedule_preference', 'AM')->count(),
                 'pm' => $trainees->where('schedule_preference', 'PM')->count(),
-                'modules' => TrainingModule::query()->where('is_published', true)->count(),
+                'modules' => TrainingModule::query()
+                    ->where('is_published', true)
+                    ->when($activeBatch, fn ($query) => $query->where('training_batch_id', $activeBatch->id))
+                    ->when(! $activeBatch, fn ($query) => $query->whereRaw('1 = 0'))
+                    ->count(),
                 'paid' => $trainees->where('payment_status', EnrollmentApplication::PAYMENT_PAID)->count(),
-                'module_completions' => ModuleProgress::query()->where('status', 'completed')->count(),
+                'module_completions' => ModuleProgress::query()
+                    ->where('status', 'completed')
+                    ->when($activeBatch, fn ($query) => $query->whereHas('application', fn ($nested) => $nested->where('training_batch_id', $activeBatch->id)))
+                    ->when(! $activeBatch, fn ($query) => $query->whereRaw('1 = 0'))
+                    ->count(),
             ],
+            'assignedBatch' => $activeBatch,
         ]);
     }
 
-    private function approvedTrainees()
+    private function approvedTrainees(?TrainingBatch $batch = null)
     {
         return EnrollmentApplication::query()
-            ->where('status', EnrollmentApplication::STATUS_APPROVED);
+            ->where('status', EnrollmentApplication::STATUS_APPROVED)
+            ->when($batch, fn ($query) => $query->where('training_batch_id', $batch->id))
+            ->when(! $batch, fn ($query) => $query->whereRaw('1 = 0'));
     }
 
-    private function traineeRosterQuery(string $search, ?int $batchId, ?string $schedule)
+    private function traineeRosterQuery(
+        string $search,
+        ?int $batchId,
+        ?string $schedule,
+        ?TrainingBatch $assignedBatch,
+    )
     {
-        return $this->approvedTrainees()
+        return $this->approvedTrainees($assignedBatch)
             ->when($batchId, fn ($query) => $query->where('training_batch_id', $batchId))
             ->when($schedule, fn ($query) => $query->where('schedule_preference', $schedule))
             ->when($search !== '', function ($query) use ($search) {
@@ -153,5 +198,14 @@ class TrainerPortalController extends Controller
             })
             ->orderBy('last_name')
             ->orderBy('first_name');
+    }
+
+    private function assertBatchFilter(?TrainingBatch $assignedBatch, ?int $requestedBatchId): void
+    {
+        if ($requestedBatchId && (! $assignedBatch || $requestedBatchId !== (int) $assignedBatch->id)) {
+            throw ValidationException::withMessages([
+                'batch_id' => 'This trainer can only access the currently assigned batch.',
+            ]);
+        }
     }
 }

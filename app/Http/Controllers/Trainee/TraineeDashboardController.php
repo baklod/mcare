@@ -4,9 +4,13 @@ namespace App\Http\Controllers\Trainee;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
+use App\Models\AdminAnnouncement;
+use App\Models\CareerOpportunity;
 use App\Models\EnrollmentApplication;
 use App\Models\ModuleProgress;
 use App\Models\OfficialDocument;
+use App\Models\PaymentAttempt;
+use App\Models\PaymentTransaction;
 use App\Models\Quiz;
 use App\Models\TrainerAnnouncement;
 use App\Models\TrainingModule;
@@ -16,7 +20,11 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\HeaderUtils;
@@ -45,6 +53,10 @@ class TraineeDashboardController extends Controller
 
         $application->load('batch');
 
+        $adminAnnouncements = AdminAnnouncement::visibleTo($request->user(), $application->training_batch_id)
+            ->latest('posted_at')
+            ->get();
+
         return view('trainee.stream', [
             'application' => $application,
             'announcements' => $this->visibleAnnouncementsFor($application)
@@ -52,6 +64,7 @@ class TraineeDashboardController extends Controller
                 ->orderByDesc('is_pinned')
                 ->orderByDesc('posted_at')
                 ->paginate(15),
+            'adminAnnouncements' => $adminAnnouncements,
             'upcomingModules' => $this->availableModulesFor($application)
                 ->limit(5)
                 ->get(),
@@ -82,6 +95,40 @@ class TraineeDashboardController extends Controller
         $month = isset($validated['month'])
             ? Carbon::createFromFormat('Y-m', $validated['month'])->startOfMonth()
             : $calendarService->suggestedMonth($application->batch);
+
+        if ($application->learning_status === EnrollmentApplication::LEARNING_GRADUATED) {
+            $careerSessions = CareerOpportunity::query()
+                ->visibleToAlumni()
+                ->whereBetween('estimated_start_date', [
+                    $month->copy()->startOfMonth()->toDateString(),
+                    $month->copy()->endOfMonth()->toDateString(),
+                ])
+                ->orderBy('estimated_start_date')
+                ->get()
+                ->map(function (CareerOpportunity $opportunity): array {
+                    $startsAt = $opportunity->estimated_start_date->copy()->startOfDay();
+
+                    return [
+                        'date_key' => $startsAt->toDateString(),
+                        'period' => 'CAREER',
+                        'calendar_title' => 'Caregiving opportunity',
+                        'title' => 'Caregiving opportunity',
+                        'time' => 'Start',
+                        'time_range' => 'Estimated start date',
+                        'starts_at' => $startsAt,
+                        'batch' => $opportunity->mobilityStatusLabel(),
+                        'room' => 'Open Career Hub for privacy-approved details',
+                    ];
+                });
+
+            return $this->portalView($request, 'trainee.schedule', [
+                'calendarMonth' => $month,
+                'calendarSessions' => $careerSessions,
+                'calendarSelectedDate' => $validated['date'] ?? null,
+                'isGraduate' => true,
+            ], $application);
+        }
+
         $sessions = $application->batch
             ? $calendarService->month($application->batch, $month, $application->schedule_preference)
             : collect();
@@ -95,7 +142,195 @@ class TraineeDashboardController extends Controller
 
     public function payments(Request $request): View|RedirectResponse
     {
-        return $this->portalView($request, 'trainee.payments');
+        $application = $this->approvedApplicationFor($request);
+
+        if (! $application) {
+            return redirect()
+                ->route('payment.show')
+                ->with('payment_notice', 'Your trainee dashboard opens after admin approval.');
+        }
+
+        $application->load(['paymentTransactions.recordedByAdmin', 'paymentTransactions.verifier']);
+        $remainingBalance = $application->remainingBalance();
+
+        return $this->portalView($request, 'trainee.payments', [
+            'transactions' => $application->paymentTransactions,
+            'totalFee' => (float) ($application->total_program_fee ?? 22000.00),
+            'downpayment' => (float) ($application->downpayment_amount ?? 2000.00),
+            'totalPaid' => (float) ($application->total_paid_amount ?? 0.00),
+            'balance' => $remainingBalance,
+            'activeOnsiteTicket' => $application->paymentTransactions->first(
+                fn (PaymentTransaction $transaction): bool => $transaction->isOnsiteTicket(),
+            ),
+            'ticketDefaultAmount' => min(
+                $remainingBalance,
+                $application->isDownpaymentSatisfied()
+                    ? 5000.00
+                    : (float) ($application->downpayment_amount ?? 2000.00),
+            ),
+        ], $application);
+    }
+
+    public function generateOnsiteTicket(Request $request): RedirectResponse
+    {
+        $application = $this->approvedApplicationFor($request);
+        abort_unless($application, 403);
+
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:1', 'max:100000'],
+            'transaction_type' => ['required', Rule::in(array_keys(PaymentTransaction::types()))],
+        ]);
+
+        $result = DB::transaction(function () use ($request, $validated, $application): array {
+            $lockedApplication = EnrollmentApplication::query()
+                ->whereKey($application->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            // Repeated clicks return the same active ticket instead of creating duplicate requests.
+            $existingTicket = PaymentTransaction::query()
+                ->where('enrollment_application_id', $lockedApplication->id)
+                ->where('payment_channel', PaymentTransaction::CHANNEL_ONSITE)
+                ->where('status', PaymentTransaction::STATUS_PENDING)
+                ->whereNotNull('ticket_number')
+                ->latest()
+                ->first();
+
+            if ($existingTicket) {
+                return ['ticket' => $existingTicket, 'created' => false];
+            }
+
+            if ($lockedApplication->payment_status === EnrollmentApplication::PAYMENT_PAID) {
+                throw ValidationException::withMessages([
+                    'payment' => 'Your tuition is already fully paid. No new on-site ticket is needed.',
+                ]);
+            }
+
+            $activeOnlineAttempt = PaymentAttempt::query()
+                ->where('enrollment_application_id', $lockedApplication->id)
+                ->where('provider', 'paymongo')
+                ->whereIn('status', [PaymentAttempt::STATUS_CREATING, PaymentAttempt::STATUS_PENDING])
+                ->exists();
+
+            if ($activeOnlineAttempt) {
+                throw ValidationException::withMessages([
+                    'payment' => 'An online PayMongo checkout is still active. Finish or cancel it before requesting an on-site ticket.',
+                ]);
+            }
+
+            $remainingBalance = $lockedApplication->remainingBalance();
+            $amount = round((float) $validated['amount'], 2);
+
+            if ($remainingBalance <= 0 || $amount > $remainingBalance) {
+                throw ValidationException::withMessages([
+                    'amount' => 'The ticket amount cannot be greater than your remaining balance of PHP '.number_format($remainingBalance, 2).'.',
+                ]);
+            }
+
+            $fixedAmount = match ($validated['transaction_type']) {
+                PaymentTransaction::TYPE_DOWNPAYMENT => min(
+                    (float) ($lockedApplication->downpayment_amount ?? 2000.00),
+                    $remainingBalance,
+                ),
+                PaymentTransaction::TYPE_FULL_PAYMENT,
+                PaymentTransaction::TYPE_BALANCE => $remainingBalance,
+                default => null,
+            };
+
+            if ($fixedAmount !== null && abs($amount - $fixedAmount) > 0.009) {
+                throw ValidationException::withMessages([
+                    'amount' => 'The selected payment purpose requires a ticket amount of PHP '.number_format($fixedAmount, 2).'.',
+                ]);
+            }
+
+            $ticketNumber = $this->uniqueOnsiteTicketNumber();
+            $ticket = PaymentTransaction::create([
+                'enrollment_application_id' => $lockedApplication->id,
+                'user_id' => $request->user()->id,
+                'ticket_number' => $ticketNumber,
+                'transaction_type' => $validated['transaction_type'],
+                'payment_channel' => PaymentTransaction::CHANNEL_ONSITE,
+                'amount' => $amount,
+                'status' => PaymentTransaction::STATUS_PENDING,
+                'notes' => 'On-site payment ticket generated by trainee; awaiting cashier verification.',
+            ]);
+
+            $paymentMeta = $lockedApplication->payment_meta ?? [];
+            $paymentMeta['active_onsite_ticket'] = $ticketNumber;
+
+            $lockedApplication->forceFill([
+                'payment_method' => 'onsite',
+                'payment_status' => $lockedApplication->payment_status === EnrollmentApplication::PAYMENT_NOT_SELECTED
+                    ? EnrollmentApplication::PAYMENT_ONSITE_PENDING
+                    : $lockedApplication->payment_status,
+                'payment_amount' => number_format($amount, 2, '.', ''),
+                'payment_currency' => 'PHP',
+                'payment_selected_at' => $lockedApplication->payment_selected_at ?: now(),
+                'payment_meta' => $paymentMeta,
+            ])->save();
+
+            AdminActivityLog::record($request->user(), 'payment.onsite_ticket.generated', $lockedApplication, [
+                'transaction_id' => $ticket->id,
+                'ticket_number' => $ticketNumber,
+                'amount' => $amount,
+                'transaction_type' => $validated['transaction_type'],
+            ]);
+
+            return ['ticket' => $ticket, 'created' => true];
+        }, 3);
+
+        $ticket = $result['ticket'];
+        $message = $result['created']
+            ? "On-site payment ticket {$ticket->ticket_number} generated. Present it to the MCARE cashier."
+            : "Your active on-site payment ticket is {$ticket->ticket_number}. Present the same ticket to the MCARE cashier.";
+
+        return redirect()
+            ->route('trainee.payments')
+            ->with('saved', $message);
+    }
+
+    public function uploadPaymentProof(Request $request): RedirectResponse
+    {
+        $application = $this->approvedApplicationFor($request);
+        abort_unless($application, 403);
+
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:1', 'max:100000'],
+            'or_number' => ['required', 'string', 'max:100'],
+            'transaction_type' => ['required', 'in:downpayment,installment,full_payment,balance_settlement'],
+            'paid_at' => ['required', 'date'],
+            'receipt_proof' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $proofPath = null;
+        if ($request->hasFile('receipt_proof')) {
+            $proofPath = $request->file('receipt_proof')->store("payment-receipts/{$application->id}", 'local');
+        }
+
+        $transaction = PaymentTransaction::create([
+            'enrollment_application_id' => $application->id,
+            'user_id' => $request->user()->id,
+            'transaction_type' => $validated['transaction_type'],
+            'payment_channel' => PaymentTransaction::CHANNEL_ONSITE,
+            'amount' => $validated['amount'],
+            'or_number' => $validated['or_number'],
+            'receipt_proof_path' => $proofPath,
+            'status' => PaymentTransaction::STATUS_PENDING,
+            'paid_at' => $validated['paid_at'],
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        $application->payment_receipt_number = $validated['or_number'];
+        $application->save();
+
+        AdminActivityLog::record($request->user(), 'trainee.payment_receipt.uploaded', $application, [
+            'transaction_id' => $transaction->id,
+            'amount' => $validated['amount'],
+            'or_number' => $validated['or_number'],
+        ]);
+
+        return back()->with('saved', 'Proof of on-site payment submitted. An administrator will verify your official receipt.');
     }
 
     public function documents(
@@ -145,6 +380,21 @@ class TraineeDashboardController extends Controller
         $progressPercent = $modules->isEmpty()
             ? 0
             : (int) round($modules->sum(fn ($module) => $progressByModule->get($module->id)?->progress_percent ?? 0) / $modules->count());
+        $isGraduate = $application->learning_status === EnrollmentApplication::LEARNING_GRADUATED;
+        if ($isGraduate && $view === 'trainee.dashboard') {
+            // Graduates keep the trainee shell and account, but receive the Career Hub home content.
+            $view = 'trainee.graduate-dashboard';
+        }
+        $graduateData = $isGraduate ? [
+            'alumniProfile' => $request->user()->alumniProfile()->firstOrCreate([], [
+                'is_available_for_duty' => false,
+            ]),
+            'careerJobs' => CareerOpportunity::query()
+                ->visibleToAlumni()
+                ->orderBy('estimated_start_date')
+                ->take(3)
+                ->get(),
+        ] : [];
 
         return view($view, array_merge([
             'application' => $application,
@@ -169,7 +419,8 @@ class TraineeDashboardController extends Controller
                 ])->filter()->count(),
                 'payment' => $application->paymentStatusLabel(),
             ],
-        ], $extraData));
+            'isGraduate' => $isGraduate,
+        ], $graduateData, $extraData));
     }
 
     public function viewModule(Request $request, TrainingModule $module): View
@@ -178,18 +429,7 @@ class TraineeDashboardController extends Controller
         $this->authorizeModule($application, $module);
 
         // Opening the protected viewer is a server-side progress event and does not depend on JavaScript.
-        $progress = ModuleProgress::query()->firstOrCreate([
-            'enrollment_application_id' => $application->id,
-            'training_module_id' => $module->id,
-        ]);
-        if ($progress->wasRecentlyCreated || $progress->status === ModuleProgress::STATUS_NOT_STARTED) {
-            $progress->forceFill([
-                'status' => ModuleProgress::STATUS_IN_PROGRESS,
-                'progress_percent' => 10,
-                'first_opened_at' => now(),
-            ])->save();
-        }
-        $progress->forceFill(['last_viewed_at' => now()])->save();
+        $progress = $this->touchModuleProgress($application, $module);
 
         AdminActivityLog::record($request->user(), 'trainee.module.viewer.opened', $module, [
             'trainee_email' => $application->email,
@@ -207,18 +447,7 @@ class TraineeDashboardController extends Controller
 
         // The protected content URL can be opened directly by the browser, so
         // it must create the same progress baseline as the viewer page.
-        $progress = ModuleProgress::query()->firstOrCreate([
-            'enrollment_application_id' => $application->id,
-            'training_module_id' => $module->id,
-        ]);
-        if ($progress->wasRecentlyCreated || $progress->status === ModuleProgress::STATUS_NOT_STARTED) {
-            $progress->forceFill([
-                'status' => ModuleProgress::STATUS_IN_PROGRESS,
-                'progress_percent' => 10,
-                'first_opened_at' => $progress->first_opened_at ?: now(),
-            ]);
-        }
-        $progress->forceFill(['last_viewed_at' => now()])->save();
+        $this->touchModuleProgress($application, $module);
 
         AdminActivityLog::record($request->user(), 'trainee.module.content.viewed', $module, [
             'trainee_email' => $application->email,
@@ -226,14 +455,22 @@ class TraineeDashboardController extends Controller
             'range_request' => $request->hasHeader('Range'),
         ]);
 
-        $filename = basename($module->original_file_name);
-        $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
+        return $this->moduleFileResponse($module, HeaderUtils::DISPOSITION_INLINE);
+    }
 
-        return response()->file(Storage::disk('local')->path($module->file_path), [
-            'Content-Type' => $module->mime_type ?: 'application/octet-stream',
-            'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_INLINE, $filename, $fallbackFilename),
-            'Accept-Ranges' => 'bytes',
+    public function moduleDownload(Request $request, TrainingModule $module): BinaryFileResponse
+    {
+        $application = $this->approvedApplicationFor($request);
+        $this->authorizeModule($application, $module);
+        abort_unless(Storage::disk('local')->exists($module->file_path), 404);
+        $this->touchModuleProgress($application, $module);
+
+        AdminActivityLog::record($request->user(), 'trainee.module.content.downloaded', $module, [
+            'trainee_email' => $application->email,
+            'mime_type' => $module->mime_type,
         ]);
+
+        return $this->moduleFileResponse($module, HeaderUtils::DISPOSITION_ATTACHMENT);
     }
 
     public function updateProgress(Request $request, TrainingModule $module): RedirectResponse
@@ -242,7 +479,7 @@ class TraineeDashboardController extends Controller
         $this->authorizeModule($application, $module);
         $validated = $request->validate(['action' => ['required', 'in:complete,reopen']]);
         $completed = $validated['action'] === 'complete';
-        $progress = ModuleProgress::query()->firstOrNew([
+        $progress = ModuleProgress::query()->firstOrCreate([
             'enrollment_application_id' => $application->id,
             'training_module_id' => $module->id,
         ]);
@@ -259,7 +496,9 @@ class TraineeDashboardController extends Controller
             'status' => $progress->status,
         ]);
 
-        return back()->with('saved', $completed ? 'Module marked complete.' : 'Module returned to in progress.');
+        return redirect()
+            ->route('trainee.modules.show', $module)
+            ->with('saved', $completed ? 'Module marked complete.' : 'Module returned to in progress.');
     }
 
     public function securityEvent(Request $request, TrainingModule $module): Response
@@ -307,25 +546,48 @@ class TraineeDashboardController extends Controller
 
     private function availableModulesFor(EnrollmentApplication $application)
     {
-        // Modules are scoped to the trainee's batch unless a trainer intentionally publishes globally.
         return TrainingModule::query()
             ->with(['trainer', 'batch'])
-            ->where('is_published', true)
-            ->where(fn ($query) => $query
-                ->whereNull('available_at')
-                ->orWhere('available_at', '<=', now()))
-            ->where(function ($query) use ($application) {
-                $query->where('target_enrollment_application_id', $application->id)
-                    ->orWhere(function ($batchQuery) use ($application) {
-                        $batchQuery->whereNull('target_enrollment_application_id')
-                            ->where(function ($scopeQuery) use ($application) {
-                                $scopeQuery->whereNull('training_batch_id')
-                                    ->orWhere('training_batch_id', $application->training_batch_id);
-                            });
-                    });
-            })
+            ->availableTo($application)
             ->orderBy('position')
             ->latest('published_at');
+    }
+
+    private function touchModuleProgress(
+        EnrollmentApplication $application,
+        TrainingModule $module,
+    ): ModuleProgress {
+        $progress = ModuleProgress::query()->firstOrCreate([
+            'enrollment_application_id' => $application->id,
+            'training_module_id' => $module->id,
+        ]);
+
+        if ($progress->wasRecentlyCreated || $progress->status === ModuleProgress::STATUS_NOT_STARTED) {
+            $progress->forceFill([
+                'status' => ModuleProgress::STATUS_IN_PROGRESS,
+                'progress_percent' => 10,
+                'first_opened_at' => $progress->first_opened_at ?: now(),
+            ]);
+        }
+
+        $progress->forceFill(['last_viewed_at' => now()])->save();
+
+        return $progress;
+    }
+
+    private function moduleFileResponse(
+        TrainingModule $module,
+        string $disposition,
+    ): BinaryFileResponse {
+        $filename = basename($module->original_file_name);
+        $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
+
+        return response()->file(Storage::disk('local')->path($module->file_path), [
+            'Content-Type' => $module->mime_type ?: 'application/octet-stream',
+            'Content-Disposition' => HeaderUtils::makeDisposition($disposition, $filename, $fallbackFilename),
+            'Accept-Ranges' => 'bytes',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     private function visibleAnnouncementsFor(EnrollmentApplication $application)
@@ -360,5 +622,14 @@ class TraineeDashboardController extends Controller
                             });
                     });
             });
+    }
+
+    private function uniqueOnsiteTicketNumber(): string
+    {
+        do {
+            $ticketNumber = 'MCARE-OT-'.now()->format('ymd').'-'.Str::upper(Str::random(6));
+        } while (PaymentTransaction::query()->where('ticket_number', $ticketNumber)->exists());
+
+        return $ticketNumber;
     }
 }

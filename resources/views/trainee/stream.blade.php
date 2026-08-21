@@ -26,6 +26,45 @@
 
     <div class="lms-stream-layout">
         <main class="lms-stream-feed">
+            @if(isset($adminAnnouncements) && $adminAnnouncements->isNotEmpty())
+                <section class="space-y-4 mb-6" aria-label="Administrative notices">
+                    @foreach($adminAnnouncements as $adminNotice)
+                        <article class="rounded-2xl border border-purple-200 bg-gradient-to-r from-purple-50 via-white to-sky-50 p-5 shadow-xs">
+                            <div class="flex items-start gap-3.5">
+                                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-700 text-white">
+                                    <x-dashboard-icon :name="$adminNotice->kind === 'reminder' ? 'credit-card' : 'bullhorn'" class="h-5 w-5" />
+                                </div>
+                                <div class="min-w-0 flex-1 space-y-1">
+                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                        <div class="flex items-center gap-2">
+                                            <span class="rounded-md bg-purple-100 px-2 py-0.5 text-[11px] font-bold uppercase text-purple-800">
+                                                {{ $adminNotice->kind === 'reminder' ? 'Payment / Due Date Reminder' : 'Administration Notice' }}
+                                            </span>
+                                            @if($adminNotice->due_date)
+                                                <span class="rounded-md bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-800">
+                                                    Due: {{ $adminNotice->due_date->format('M d, Y') }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                        <span class="text-xs text-slate-500">{{ $adminNotice->posted_at?->diffForHumans() ?? 'Recently' }}</span>
+                                    </div>
+                                    <h2 class="text-base font-bold text-slate-950">{{ $adminNotice->title }}</h2>
+                                    <p class="text-sm text-slate-700 leading-relaxed">{{ $adminNotice->message }}</p>
+                                    @if($adminNotice->kind === 'reminder')
+                                        <div class="pt-2">
+                                            <a href="{{ route('trainee.payments') }}" class="inline-flex items-center gap-1.5 text-xs font-bold text-purple-700 hover:text-purple-900 underline">
+                                                <span>Open Billing & Payment Dashboard</span>
+                                                <x-dashboard-icon name="arrow-right" class="h-3 w-3" />
+                                            </a>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        </article>
+                    @endforeach
+                </section>
+            @endif
+
             <section class="lms-post-list" aria-label="Class announcements">
                 @forelse($announcements as $announcement)
                     @php

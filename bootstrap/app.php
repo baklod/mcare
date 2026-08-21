@@ -1,9 +1,10 @@
 <?php
 
 use App\Console\Commands\PrepareDemoGraduate;
+use App\Http\Middleware\EnsureActiveTraining;
 use App\Http\Middleware\EnsureAdmin;
-use App\Http\Middleware\EnsureAlumni;
 use App\Http\Middleware\EnsureEnrollmentPaymentAccess;
+use App\Http\Middleware\EnsureGraduate;
 use App\Http\Middleware\EnsureTrainee;
 use App\Http\Middleware\EnsureTrainer;
 use App\Http\Middleware\EnsureTwoFactorVerified;
@@ -38,8 +39,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'admin' => EnsureAdmin::class,
-            'alumni' => EnsureAlumni::class,
+            'active.training' => EnsureActiveTraining::class,
             'enrollment.payment.access' => EnsureEnrollmentPaymentAccess::class,
+            'graduate' => EnsureGraduate::class,
             'private.response' => PrivateResponseHeaders::class,
             'permission' => PermissionMiddleware::class,
             'trainer' => EnsureTrainer::class,
@@ -51,7 +53,6 @@ return Application::configure(basePath: dirname(__DIR__))
             $request->is('admin') || $request->is('admin/*') => route('admin.login'),
             $request->is('trainer') || $request->is('trainer/*') => route('trainer.login'),
             $request->is('trainee') || $request->is('trainee/*') => route('trainee.login'),
-            $request->is('alumni') || $request->is('alumni/*') => route('login'),
             default => route('login'),
         });
     })

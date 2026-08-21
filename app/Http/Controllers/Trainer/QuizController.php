@@ -63,6 +63,7 @@ class QuizController extends Controller
     {
         $validated = $this->validatedPayload($request);
         [$batchId, $targetTrainee] = $this->resolveAudience($validated);
+        $this->assertTrainerBatch($request, $batchId, $targetTrainee);
         $questions = $this->normalizedQuestions($validated['questions']);
         $published = $request->boolean('is_published');
 
@@ -122,6 +123,7 @@ class QuizController extends Controller
 
         $validated = $this->validatedPayload($request);
         [$batchId, $targetTrainee] = $this->resolveAudience($validated);
+        $this->assertTrainerBatch($request, $batchId, $targetTrainee);
         $questions = $this->normalizedQuestions($validated['questions']);
 
         DB::transaction(function () use (
@@ -380,19 +382,39 @@ class QuizController extends Controller
      */
     private function formOptions(): array
     {
+        $assignedBatch = TrainingBatch::assignedTo(request()->user());
+
         return [
-            'batches' => TrainingBatch::query()
-                ->orderByDesc('is_active')
-                ->orderByDesc('year')
-                ->orderBy('name')
-                ->get(),
+            'batches' => $assignedBatch ? collect([$assignedBatch]) : collect(),
             'trainees' => EnrollmentApplication::query()
                 ->with('batch')
                 ->where('status', EnrollmentApplication::STATUS_APPROVED)
+                ->when($assignedBatch, fn ($query) => $query->where('training_batch_id', $assignedBatch->id))
+                ->when(! $assignedBatch, fn ($query) => $query->whereRaw('1 = 0'))
                 ->orderBy('last_name')
                 ->orderBy('first_name')
                 ->get(),
         ];
+    }
+
+    private function assertTrainerBatch(
+        Request $request,
+        int $batchId,
+        ?EnrollmentApplication $targetTrainee,
+    ): void {
+        $assignedBatch = TrainingBatch::assignedTo($request->user());
+
+        if (! $assignedBatch || $batchId !== (int) $assignedBatch->id) {
+            throw ValidationException::withMessages([
+                'training_batch_id' => 'Quizzes can only be assigned to the trainer\'s current batch.',
+            ]);
+        }
+
+        if ($targetTrainee && (int) $targetTrainee->training_batch_id !== $batchId) {
+            throw ValidationException::withMessages([
+                'target_enrollment_application_id' => 'The selected trainee is outside the trainer\'s assigned batch.',
+            ]);
+        }
     }
 
     /**

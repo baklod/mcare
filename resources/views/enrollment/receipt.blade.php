@@ -127,7 +127,12 @@
 </head>
 <body>
     @php
-        $fullName = trim($application->first_name.' '.$application->middle_name.' '.$application->last_name.' '.$application->extension_name);
+        $fullName = collect([
+            $application->first_name,
+            $application->middle_name,
+            $application->last_name,
+            $application->extension_name,
+        ])->filter(fn ($part) => filled($part))->join(' ');
         $amount = 'PHP '.number_format((float) $application->payment_amount, 2);
         $batch = $application->batch;
         $scheduleLabel = $batch?->scheduleLabelFor($application->schedule_preference) ?? 'Schedule to be confirmed by admin';
@@ -172,11 +177,11 @@
 
                 <div class="grid">
                     <div class="field">
-                        <span>Applicant name</span>
+                        <span>Trainee name</span>
                         <strong>{{ $fullName }}</strong>
                     </div>
                     <div class="field">
-                        <span>Gmail account</span>
+                        <span>Email account</span>
                         <strong>{{ $application->email }}</strong>
                     </div>
                     <div class="field">
@@ -188,35 +193,47 @@
                         <strong>{{ $application->program }}</strong>
                     </div>
                     <div class="field">
-                        <span>Preferred schedule</span>
-                        <strong>{{ $application->schedule_preference }} / {{ $scheduleLabel }}</strong>
-                    </div>
-                    <div class="field">
-                        <span>Room destination</span>
-                        <strong>{{ $roomLabel }}</strong>
-                    </div>
-                    <div class="field">
-                        <span>Batch</span>
+                        <span>Training Batch</span>
                         <strong>{{ $batch ? $batch->name.' '.$batch->year : 'Batch to be assigned' }}</strong>
                     </div>
                     <div class="field">
-                        <span>Status</span>
-                        <strong>{{ $application->paymentStatusLabel() }}</strong>
+                        <span>Schedule & Room</span>
+                        <strong>{{ $application->schedule_preference }} · {{ $roomLabel }}</strong>
+                    </div>
+                    <div class="field">
+                        <span>Total Program Tuition</span>
+                        <strong style="color: #581c87;">PHP {{ number_format((float) ($application->total_program_fee ?? 22000.00), 2) }}</strong>
+                    </div>
+                    <div class="field">
+                        <span>Remaining Balance</span>
+                        <strong style="color: #b45309;">PHP {{ number_format($application->remainingBalance(), 2) }}</strong>
                     </div>
                     <div class="field full">
-                        <span>Payment reference</span>
-                        <strong>{{ $application->payment_reference }}</strong>
+                        <span>Official Payment Reference</span>
+                        <strong style="font-family: monospace; font-size: 16px;">{{ $application->payment_reference ?: $application->payment_receipt_number }}</strong>
                     </div>
                 </div>
 
                 <div class="amount">
                     <div>
-                        <span>Amount for verification</span>
+                        <span>Amount for Cashier Verification</span>
                         <strong>{{ $amount }}</strong>
                     </div>
                     <div>
-                        <span>Expiration</span>
-                        <strong style="font-size: 18px;">{{ $deadline?->format('M d, Y') ?? 'TBA' }}</strong>
+                        <span>Payment Status</span>
+                        <strong style="font-size: 20px;">{{ $application->paymentStatusLabel() }}</strong>
+                    </div>
+                </div>
+
+                <div style="margin-top: 24px; border: 1px dashed #cbd5e1; border-radius: 18px; padding: 18px 24px; background: #fafafa; display: flex; justify-content: space-between; align-items: flex-end; gap: 20px;">
+                    <div>
+                        <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em;">Cashier / Finance Desk Use</span>
+                        <p style="margin: 4px 0 0; font-size: 12px; color: #475569;">Verified by: ________________________</p>
+                        <p style="margin: 4px 0 0; font-size: 12px; color: #475569;">Official Receipt (OR) #: ________________</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <p style="margin: 0; font-size: 12px; color: #475569;">Date: ______________</p>
+                        <p style="margin: 4px 0 0; font-size: 11px; color: #94a3b8;">Official MCARE Cashier Stamp</p>
                     </div>
                 </div>
             </div>

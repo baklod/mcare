@@ -7,6 +7,8 @@ use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
+use App\Rules\TrainingModuleFileType;
+use App\Support\TrainingModuleFiles;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -22,6 +24,7 @@ class TrainingModuleController extends Controller
     {
         $validated = $this->validatedPayload($request, true);
         [$batchId, $targetTrainee] = $this->resolveAudience($validated);
+        $this->assertTrainerBatch($request, $batchId, $targetTrainee);
         $trainer = $request->user();
         /** @var UploadedFile $file */
         $file = $request->file('module_file');
@@ -45,6 +48,7 @@ class TrainingModuleController extends Controller
                     'trainer_id' => $trainer->id,
                     'training_batch_id' => $batchId,
                     'target_enrollment_application_id' => $targetTrainee?->id,
+                    'module_code' => $validated['module_code'] ?? null,
                     'title' => $validated['title'],
                     'description' => $validated['description'],
                     'topic' => $validated['topic'] ?? null,
@@ -88,6 +92,7 @@ class TrainingModuleController extends Controller
 
         $validated = $this->validatedPayload($request, false);
         [$batchId, $targetTrainee] = $this->resolveAudience($validated);
+        $this->assertTrainerBatch($request, $batchId, $targetTrainee);
         $replacement = $request->file('module_file');
         $replacementPath = $replacement?->store("training-modules/{$request->user()->id}", 'local');
         $oldPath = $module->file_path;
@@ -108,6 +113,7 @@ class TrainingModuleController extends Controller
                 $attributes = [
                     'training_batch_id' => $batchId,
                     'target_enrollment_application_id' => $targetTrainee?->id,
+                    'module_code' => $validated['module_code'] ?? null,
                     'title' => $validated['title'],
                     'description' => $validated['description'],
                     'topic' => $validated['topic'] ?? null,
@@ -180,22 +186,22 @@ class TrainingModuleController extends Controller
      */
     private function validatedPayload(Request $request, bool $fileRequired): array
     {
-        $activeBatch = TrainingBatch::active();
+        $activeBatch = TrainingBatch::assignedTo($request->user());
         $request->merge([
             'audience_type' => $request->input('audience_type', 'batch'),
             'training_batch_id' => $request->input('training_batch_id', $activeBatch?->id),
         ]);
 
         $validated = $request->validate([
+            'module_code' => ['nullable', 'string', 'max:50'],
             'title' => ['required', 'string', 'max:160'],
             'description' => ['required', 'string', 'max:5000'],
             'topic' => ['nullable', 'string', 'max:120'],
             'module_file' => [
                 $fileRequired ? 'required' : 'nullable',
                 'file',
-                'mimes:pdf,jpg,jpeg,png,webp,mp4,webm',
-                'extensions:pdf,jpg,jpeg,png,webp,mp4,webm',
-                'max:102400',
+                'max:'.TrainingModuleFiles::MAX_UPLOAD_KB,
+                new TrainingModuleFileType,
             ],
             'audience_type' => ['required', Rule::in(['batch', 'trainee'])],
             'training_batch_id' => ['nullable', 'integer', 'exists:training_batches,id'],
@@ -211,8 +217,8 @@ class TrainingModuleController extends Controller
             'position' => ['nullable', 'integer', 'min:0', 'max:10000'],
             'is_published' => ['nullable', 'boolean'],
         ], [
-            'module_file.mimes' => 'Learning materials must be PDF, JPG, PNG, WEBP, MP4, or WEBM files.',
-            'module_file.max' => 'Learning materials must not exceed 100MB.',
+            'module_file.max' => 'Learning materials must not exceed 38MB on the current MCARE server.',
+            'module_file.uploaded' => 'The upload did not reach MCARE. Check the server upload limit and try a smaller file.',
         ]);
 
         if (
@@ -246,5 +252,25 @@ class TrainingModuleController extends Controller
         }
 
         return [(int) $batchId, $targetTrainee];
+    }
+
+    private function assertTrainerBatch(
+        Request $request,
+        int $batchId,
+        ?EnrollmentApplication $targetTrainee,
+    ): void {
+        $assignedBatch = TrainingBatch::assignedTo($request->user());
+
+        if (! $assignedBatch || $batchId !== (int) $assignedBatch->id) {
+            throw ValidationException::withMessages([
+                'training_batch_id' => 'Learning materials can only be published to the trainer\'s assigned batch.',
+            ]);
+        }
+
+        if ($targetTrainee && (int) $targetTrainee->training_batch_id !== $batchId) {
+            throw ValidationException::withMessages([
+                'target_enrollment_application_id' => 'The selected trainee is outside the trainer\'s assigned batch.',
+            ]);
+        }
     }
 }

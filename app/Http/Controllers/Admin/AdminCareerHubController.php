@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
 use App\Models\AlumniProfile;
 use App\Models\CareerOpportunity;
+use App\Models\EnrollmentApplication;
 use App\Models\User;
 use App\Notifications\CareerOpportunityPublished;
 use Illuminate\Http\RedirectResponse;
@@ -19,10 +20,10 @@ class AdminCareerHubController extends Controller
     public function index(): View
     {
         return view('admin.learning.alumni-jobs', [
-            'alumniAccounts' => User::query()->where('role', 'alumni')->count(),
+            'alumniAccounts' => $this->graduateQuery()->count(),
             'availableAlumni' => AlumniProfile::query()
                 ->where('is_available_for_duty', true)
-                ->whereHas('user', fn ($query) => $query->where('role', 'alumni'))
+                ->whereHas('user.enrollmentApplication', fn ($query) => $this->graduateScope($query))
                 ->count(),
             'publishedJobs' => CareerOpportunity::query()->visibleToAlumni()->count(),
             'draftJobs' => CareerOpportunity::query()->where('is_published', false)->count(),
@@ -30,8 +31,7 @@ class AdminCareerHubController extends Controller
                 ->with('creator')
                 ->latest('created_at')
                 ->paginate(12),
-            'alumniRoster' => User::query()
-                ->where('role', 'alumni')
+            'alumniRoster' => $this->graduateQuery()
                 ->with('alumniProfile')
                 ->orderBy('name')
                 ->simplePaginate(10, ['*'], 'alumni_page'),
@@ -44,7 +44,7 @@ class AdminCareerHubController extends Controller
     {
         AdminActivityLog::record($request->user(), 'career.portal.previewed');
 
-        return view('alumni.dashboard', [
+        return view('admin.learning.alumni-preview', [
             // Administrators see the exact published feed without impersonating an alumni account.
             'isAdminPreview' => true,
             'jobs' => CareerOpportunity::query()
@@ -175,11 +175,23 @@ class AdminCareerHubController extends Controller
 
     private function notifyAlumni(CareerOpportunity $opportunity): void
     {
-        // Career notifications only go to explicit alumni accounts, not trainees.
-        $alumni = User::query()->where('role', 'alumni')->get();
+        // Career notifications go to graduates, who still authenticate as trainees.
+        $alumni = $this->graduateQuery()->get();
 
         if ($alumni->isNotEmpty()) {
             Notification::send($alumni, new CareerOpportunityPublished($opportunity));
         }
+    }
+
+    private function graduateQuery()
+    {
+        return User::query()->whereHas('enrollmentApplication', fn ($query) => $this->graduateScope($query));
+    }
+
+    private function graduateScope($query)
+    {
+        return $query
+            ->where('status', EnrollmentApplication::STATUS_APPROVED)
+            ->where('learning_status', EnrollmentApplication::LEARNING_GRADUATED);
     }
 }

@@ -155,7 +155,7 @@ class TraineePortalTest extends TestCase
             ->assertOk()
             ->assertSee('Protected learning viewer')
             ->assertSee('data-protected-module-viewer', false)
-            ->assertSee('sandbox="allow-same-origin allow-scripts"', false)
+            ->assertSee('data-pdf-canvas-viewer', false)
             ->assertSee(route('trainee.modules.security-event', $module), false);
 
         $this->assertDatabaseHas('module_progress', [
@@ -173,7 +173,7 @@ class TraineePortalTest extends TestCase
 
         $this->actingAs($trainee)
             ->patch(route('trainee.modules.progress', $module), ['action' => 'complete'])
-            ->assertRedirect();
+            ->assertRedirect(route('trainee.modules.show', $module));
 
         $this->assertDatabaseHas('module_progress', [
             'enrollment_application_id' => $application->id,
