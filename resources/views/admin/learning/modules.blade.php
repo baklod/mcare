@@ -11,7 +11,7 @@
         <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Upload Caregiving NC II core modules on behalf of a trainer, assign them to specific batches, and manage learning codes and subtopics.</p>
     </header>
 
-    <details class="dashboard-panel" @if($errors->hasAny(['trainer_id', 'training_batch_id', 'module_code', 'title', 'description', 'module_file'])) open @endif>
+    <details class="dashboard-panel" @if($errors->hasAny(['trainer_id', 'training_batch_id', 'module_code', 'competency_category', 'estimated_hours', 'title', 'description', 'module_file', 'supplementary_files', 'supplementary_files.*'])) open @endif>
         <summary class="flex cursor-pointer list-none items-center gap-4 font-bold text-slate-900">
             <span>Add a learning module / Caregiving NC II Core Unit</span>
         </summary>
@@ -26,7 +26,7 @@
                     <optgroup label="11 Core Competencies (TESDA TOR)">
                         @foreach($catalogUnits as $unit)
                             @if(($unit['category'] ?? '') === 'core')
-                                <option value="{{ $unit['code'] }}" data-code="{{ $unit['code'] }}" data-title="{{ $unit['title'] }}" data-outcomes="{{ json_encode($unit['outcomes']) }}">
+                                <option value="{{ $unit['code'] }}" data-code="{{ $unit['code'] }}" data-title="{{ $unit['title'] }}" data-category="{{ $unit['category'] }}" data-hours="{{ $unit['nominal_hours'] ?? '' }}" data-outcomes="{{ json_encode($unit['outcomes']) }}">
                                     [{{ $unit['code'] }}] {{ $unit['title'] }}
                                 </option>
                             @endif
@@ -35,7 +35,7 @@
                     <optgroup label="Common Competencies">
                         @foreach($catalogUnits as $unit)
                             @if(($unit['category'] ?? '') === 'common')
-                                <option value="{{ $unit['code'] }}" data-code="{{ $unit['code'] }}" data-title="{{ $unit['title'] }}" data-outcomes="{{ json_encode($unit['outcomes']) }}">
+                                <option value="{{ $unit['code'] }}" data-code="{{ $unit['code'] }}" data-title="{{ $unit['title'] }}" data-category="{{ $unit['category'] }}" data-hours="{{ $unit['nominal_hours'] ?? '' }}" data-outcomes="{{ json_encode($unit['outcomes']) }}">
                                     [{{ $unit['code'] }}] {{ $unit['title'] }}
                                 </option>
                             @endif
@@ -44,7 +44,7 @@
                     <optgroup label="Basic Competencies">
                         @foreach($catalogUnits as $unit)
                             @if(($unit['category'] ?? '') === 'basic')
-                                <option value="{{ $unit['code'] }}" data-code="{{ $unit['code'] }}" data-title="{{ $unit['title'] }}" data-outcomes="{{ json_encode($unit['outcomes']) }}">
+                                <option value="{{ $unit['code'] }}" data-code="{{ $unit['code'] }}" data-title="{{ $unit['title'] }}" data-category="{{ $unit['category'] }}" data-hours="{{ $unit['nominal_hours'] ?? '' }}" data-outcomes="{{ json_encode($unit['outcomes']) }}">
                                     [{{ $unit['code'] }}] {{ $unit['title'] }}
                                 </option>
                             @endif
@@ -83,10 +83,27 @@
             </div>
 
             <div>
+                <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Competency Category</label>
+                <select id="admin-module-category" name="competency_category" class="form-field">
+                    <option value="custom" @selected(old('competency_category', 'custom') === 'custom')>Institutional / Custom</option>
+                    <option value="core" @selected(old('competency_category') === 'core')>Core Competency</option>
+                    <option value="common" @selected(old('competency_category') === 'common')>Common Competency</option>
+                    <option value="basic" @selected(old('competency_category') === 'basic')>Basic Competency</option>
+                </select>
+                @error('competency_category')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+            </div>
+
+            <div>
                 <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Sub-topic / Learning Outcome</label>
                 <input id="admin-module-topic" name="topic" list="admin-subtopics-list" value="{{ old('topic') }}" class="form-field" placeholder="e.g. Comfort infants and toddlers">
                 <datalist id="admin-subtopics-list"></datalist>
                 @error('topic')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+            </div>
+
+            <div>
+                <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Nominal Hours</label>
+                <input id="admin-module-hours" name="estimated_hours" type="number" min="1" max="500" value="{{ old('estimated_hours') }}" class="form-field" placeholder="e.g. 40">
+                @error('estimated_hours')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
             </div>
 
             <div class="md:col-span-2 xl:col-span-4">
@@ -105,6 +122,14 @@
                 <label class="mb-2 block text-xs font-bold uppercase text-slate-500">PDF, Office, image, video, or audio</label>
                 <input name="module_file" type="file" accept="{{ \App\Support\TrainingModuleFiles::acceptAttribute() }}" class="form-field" required>
                 @error('module_file')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+            </div>
+
+            <div class="md:col-span-2 xl:col-span-4">
+                <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Supplementary Handouts (Optional)</label>
+                <input name="supplementary_files[]" type="file" multiple accept="{{ \App\Support\TrainingModuleFiles::acceptAttribute() }}" class="form-field">
+                <p class="mt-1 text-xs text-slate-500">Up to {{ \App\Support\TrainingModuleFiles::MAX_SUPPLEMENTARY_FILES }} files, {{ number_format(\App\Support\TrainingModuleFiles::MAX_SUPPLEMENTARY_UPLOAD_KB / 1024) }} MB each.</p>
+                @error('supplementary_files')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+                @error('supplementary_files.*')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
             </div>
 
             <label class="flex items-center gap-3 text-sm font-semibold text-slate-700">
@@ -177,7 +202,12 @@
                         </td>
                         <td>{{ $module->trainer?->name ?? 'Unassigned' }}</td>
                         <td>{{ $module->batch ? $module->batch->name.' '.$module->batch->year : 'General' }}</td>
-                        <td><span class="break-all text-xs">{{ $module->original_file_name }}</span></td>
+                        <td>
+                            <span class="break-all text-xs">{{ $module->original_file_name }}</span>
+                            @if(count($module->supplementaryList()) > 0)
+                                <p class="mt-1 text-[11px] font-semibold text-purple-700">+ {{ count($module->supplementaryList()) }} supplementary</p>
+                            @endif
+                        </td>
                         <td>
                             <span class="dashboard-pill {{ $module->is_published ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-slate-100 text-slate-700 ring-slate-200' }}">
                                 {{ $module->is_published ? 'Published' : 'Draft' }}
@@ -207,6 +237,8 @@
         const codeInput = document.getElementById('admin-module-code');
         const titleInput = document.getElementById('admin-module-title');
         const topicInput = document.getElementById('admin-module-topic');
+        const categoryInput = document.getElementById('admin-module-category');
+        const hoursInput = document.getElementById('admin-module-hours');
         const datalist = document.getElementById('admin-subtopics-list');
 
         if (presetSelect) {
@@ -216,6 +248,8 @@
 
                 const code = selectedOption.dataset.code || '';
                 const title = selectedOption.dataset.title || '';
+                const category = selectedOption.dataset.category || '';
+                const hours = selectedOption.dataset.hours || '';
                 let outcomes = [];
 
                 try {
@@ -224,6 +258,8 @@
 
                 if (codeInput && code) codeInput.value = code;
                 if (titleInput && title) titleInput.value = title;
+                if (categoryInput && category) categoryInput.value = category;
+                if (hoursInput && hours) hoursInput.value = hours;
 
                 if (datalist) {
                     datalist.innerHTML = '';

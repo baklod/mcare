@@ -242,7 +242,7 @@ class PayMongoCheckoutTest extends TestCase
 
         $this->actingAs($user)->post(route('payment.select'), [
             'payment_method' => 'onsite',
-        ])->assertRedirect(route('payment.show'));
+        ])->assertRedirect(route('payment.complete'));
 
         Http::assertNothingSent();
         $this->assertSame(

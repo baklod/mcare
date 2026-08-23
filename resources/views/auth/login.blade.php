@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign In | MCARE Training Center</title>
+    <x-dashboard-theme-head />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-[#f7f7fb] font-sans text-slate-900 antialiased selection:bg-purple-600 selection:text-white">
@@ -27,18 +28,45 @@
                 @include('auth.partials.current-account', ['activeUser' => $activeUser])
 
                 <div class="mb-6">
-                    <h1 class="font-display text-2xl font-bold tracking-tight text-slate-900">Sign in to your account</h1>
-                    <p class="mt-1.5 text-sm text-slate-500">Welcome back. Enter your credentials to access your workspace.</p>
+                    <h1 class="font-display text-2xl font-bold tracking-tight text-slate-900">{{ $mfaPending ? 'Verify your sign-in' : 'Sign in to your account' }}</h1>
+                    <p class="mt-1.5 text-sm text-slate-500">
+                        {{ $mfaPending ? 'Enter the six-digit code sent to your staff email address.' : 'One sign-in page for applicants, trainees, trainers, alumni, and administrators.' }}
+                    </p>
                 </div>
+
+                @if (session('mfa_notice'))
+                    <div class="mb-5 rounded-xl border border-purple-200 bg-purple-50 p-3.5 text-sm font-medium text-purple-800" role="status">
+                        {{ session('mfa_notice') }}
+                    </div>
+                @endif
 
                 @if ($errors->any())
                     <div class="mb-5 rounded-xl border border-red-200 bg-red-50 p-3.5 text-sm font-medium text-red-700">
-                        Please check your email and password credentials.
+                        {{ $mfaPending ? 'Please check the verification code and try again.' : 'Please check your account credentials and try again.' }}
                     </div>
                 @endif
 
                 <div class="space-y-4">
-                    
+                    @if ($mfaPending)
+                        <form method="POST" action="{{ route('login.verify-2fa') }}" class="space-y-4">
+                            @csrf
+                            <div>
+                                <label for="code" class="mb-1 block text-xs font-semibold text-slate-700">Verification code</label>
+                                <input id="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required autofocus placeholder="000000" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-center text-2xl font-bold tracking-[0.4em] text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                                @error('code') <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p> @enderror
+                            </div>
+
+                            <button type="submit" class="w-full rounded-xl bg-purple-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-purple-800 active:bg-purple-900">
+                                Verify and continue
+                            </button>
+                        </form>
+
+                        <div class="pt-3 border-t border-slate-100 text-center">
+                            <a href="{{ route('login', ['cancel_mfa' => 1]) }}" class="text-xs font-semibold text-purple-700 hover:text-purple-800 hover:underline">
+                                Use a different account
+                            </a>
+                        </div>
+                    @else
                     <!-- Google OAuth Sign In Button -->
                     <a href="{{ route('auth.google.redirect') }}" class="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1">
                         <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
@@ -94,6 +122,7 @@
                             </a>
                         </p>
                     </div>
+                    @endif
                 </div>
             </div>
         </main>

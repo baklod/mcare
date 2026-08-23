@@ -12,16 +12,21 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Throwable;
 use Illuminate\View\View;
+use Throwable;
 
 class AccountSessionController extends Controller
 {
     public function create(Request $request): View
     {
+        if ($request->boolean('cancel_mfa')) {
+            $request->session()->forget('admin.mfa.pending');
+        }
+
         return view('auth.login', [
             // Shows the currently active browser session so role testing is not confusing.
             'activeUser' => $request->user(),
+            'mfaPending' => is_array($request->session()->get('admin.mfa.pending')),
         ]);
     }
 
@@ -45,6 +50,30 @@ class AccountSessionController extends Controller
                 ->onlyInput('email');
         }
 
+        if (! $user->hasVerifiedEmail()) {
+            try {
+                $user->sendEmailVerificationNotification();
+                $message = 'Verify your email before signing in. We sent a new verification link to your inbox.';
+            } catch (Throwable $exception) {
+                report($exception);
+                $message = 'Your email is not verified and MCARE could not send a new link. Please contact the administrator.';
+            }
+
+            return back()
+                ->withErrors(['email' => $message])
+                ->onlyInput('email');
+        }
+
+        $application = $user->enrollmentApplication()->latest()->first();
+
+        if ($user->role === 'applicant' && $application?->hasEnrollmentPaymentClearance()) {
+            return back()
+                ->withErrors([
+                    'email' => 'Your payment is verified. Please wait for the administrator to approve your MCARE account. We will email you as soon as you can log in.',
+                ])
+                ->onlyInput('email');
+        }
+
         // Keep administrator accounts on the dedicated staff challenge flow so
         // the public login form cannot become a second-factor bypass.
         $twoFactor = app(EmailTwoFactorService::class);
@@ -64,7 +93,7 @@ class AccountSessionController extends Controller
                 ]);
 
                 return redirect()
-                    ->route('admin.login')
+                    ->route('login')
                     ->with('mfa_notice', 'A verification code was sent to your staff email address.');
             } catch (Throwable $exception) {
                 report($exception);
@@ -78,6 +107,10 @@ class AccountSessionController extends Controller
         // Regenerate after any successful login or account switch to prevent session fixation.
         $request->session()->regenerate();
         Auth::login($user, $request->boolean('remember'));
+        $request->session()->forget([
+            'enrollment.payment_application_id',
+            'enrollment.awaiting_approval',
+        ]);
 
         AdminActivityLog::record($request->user(), 'account.login.success', $request->user(), [
             'role' => $request->user()?->role,

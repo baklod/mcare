@@ -4,6 +4,9 @@
 @php
     $answers = collect($attempt->answers ?? []);
     $answerReviewAvailable = $answerReviewAvailable ?? false;
+    $moduleReturnUrl = $quiz->training_module_id
+        ? route('trainee.modules.show', $quiz->training_module_id).'#assessments'
+        : route('trainee.modules.index');
 @endphp
 
 <div class="lms-page" data-quiz-result>
@@ -13,7 +16,7 @@
             <h1>{{ $quiz->title }}</h1>
             <p>Submitted {{ $attempt->submitted_at?->format('M d, Y g:i A') }}</p>
         </div>
-        <a href="{{ route('trainee.quizzes.index') }}" class="secondary-action">Back to quizzes</a>
+        <a href="{{ $moduleReturnUrl }}" class="secondary-action">Back to module</a>
     </header>
 
     <section class="lms-result-hero {{ $attempt->passed ? 'is-passed' : 'is-review' }}">

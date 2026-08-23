@@ -13,7 +13,7 @@ class TrainerDashboardTest extends TestCase
     public function test_guest_is_redirected_to_trainer_login(): void
     {
         $this->get(route('trainer.dashboard'))
-            ->assertRedirect(route('trainer.login'));
+            ->assertRedirect(route('login'));
     }
 
     public function test_non_trainer_cannot_open_trainer_dashboard(): void

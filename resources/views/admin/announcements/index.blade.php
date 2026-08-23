@@ -18,12 +18,6 @@
         </div>
     </header>
 
-    @if (session('saved'))
-        <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800" data-auto-dismiss="5000">
-            {{ session('saved') }}
-        </div>
-    @endif
-
     @if ($errors->any())
         <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-800">
             <ul class="list-disc pl-5 space-y-1">

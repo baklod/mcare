@@ -8,23 +8,32 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class TrainingModule extends Model
 {
     use HasFactory;
+
+    public const CATEGORY_CORE = 'core';
+    public const CATEGORY_COMMON = 'common';
+    public const CATEGORY_BASIC = 'basic';
+    public const CATEGORY_CUSTOM = 'custom';
 
     protected $fillable = [
         'trainer_id',
         'training_batch_id',
         'target_enrollment_application_id',
         'module_code',
+        'competency_category',
         'title',
         'description',
         'topic',
+        'estimated_hours',
         'file_path',
         'original_file_name',
         'mime_type',
         'file_size',
+        'supplementary_files',
         'is_published',
         'published_at',
         'available_at',
@@ -40,6 +49,8 @@ class TrainingModule extends Model
             'available_at' => 'datetime',
             'due_at' => 'datetime',
             'position' => 'integer',
+            'estimated_hours' => 'integer',
+            'supplementary_files' => 'array',
         ];
     }
 
@@ -61,6 +72,38 @@ class TrainingModule extends Model
     public function progressRecords(): HasMany
     {
         return $this->hasMany(ModuleProgress::class, 'training_module_id');
+    }
+
+    public function quizzes(): HasMany
+    {
+        return $this->hasMany(Quiz::class, 'training_module_id')->latest('id');
+    }
+
+    public function primaryQuiz(): HasOne
+    {
+        return $this->hasOne(Quiz::class, 'training_module_id')->latestOfMany();
+    }
+
+    public function categoryLabel(): string
+    {
+        return match ($this->competency_category) {
+            self::CATEGORY_CORE => 'Core Competency',
+            self::CATEGORY_COMMON => 'Common Competency',
+            self::CATEGORY_BASIC => 'Basic Competency',
+            default => 'Institutional Learning Module',
+        };
+    }
+
+    public function supplementaryList(): array
+    {
+        if (! is_array($this->supplementary_files)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $this->supplementary_files,
+            fn ($file): bool => is_array($file) && filled($file['file_path'] ?? null),
+        ));
     }
 
     public function scopeAvailableTo(Builder $query, EnrollmentApplication $application): Builder

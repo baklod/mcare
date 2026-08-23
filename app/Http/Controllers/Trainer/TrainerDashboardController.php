@@ -229,7 +229,50 @@ class TrainerDashboardController extends Controller
             'title' => $module->title,
         ]);
 
-        return view('trainer.modules.show', ['module' => $module->load(['batch', 'targetTrainee', 'progressRecords.application'])]);
+        $activeBatch = $module->batch ?? TrainingBatch::assignedTo($request->user());
+        $trainees = $activeBatch
+            ? $this->approvedTraineesFor($activeBatch)
+                ->when(
+                    $module->target_enrollment_application_id !== null,
+                    fn ($query) => $query->whereKey($module->target_enrollment_application_id),
+                )
+                ->get()
+            : collect();
+        $progressRecords = $module->progressRecords()->with(['application', 'evaluator'])->get();
+        $progressByApp = $progressRecords->keyBy('enrollment_application_id');
+        $quizzes = $module->quizzes()->with(['questions', 'attempts.application'])->get();
+
+        return view('trainer.modules.show', [
+            'module' => $module->load(['batch', 'targetTrainee']),
+            'trainees' => $trainees,
+            'progressByApp' => $progressByApp,
+            'quizzes' => $quizzes,
+        ]);
+    }
+
+    public function supplementaryDownload(Request $request, TrainingModule $module, int $index): BinaryFileResponse
+    {
+        abort_unless($module->trainer_id === $request->user()->id, 403);
+        $list = $module->supplementaryList();
+        abort_unless(isset($list[$index]), 404);
+
+        $attachment = $list[$index];
+        $path = $attachment['file_path'] ?? null;
+        abort_unless(is_string($path) && Storage::disk('local')->exists($path), 404);
+
+        AdminActivityLog::record($request->user(), 'trainer.module.supplementary.downloaded', $module, [
+            'filename' => $attachment['original_name'] ?? 'supplementary',
+        ]);
+
+        $filename = basename($attachment['original_name'] ?? 'attachment');
+        $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
+
+        return response()->file(Storage::disk('local')->path($path), [
+            'Content-Type' => ($attachment['mime_type'] ?? null) ?: 'application/octet-stream',
+            'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_ATTACHMENT, $filename, $fallbackFilename),
+            'Accept-Ranges' => 'bytes',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function moduleContent(Request $request, TrainingModule $module): BinaryFileResponse

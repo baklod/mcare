@@ -37,6 +37,14 @@ return Application::configure(basePath: dirname(__DIR__))
          */
         $middleware->append(SecurityHeaders::class);
 
+        // Preserve ngrok/reverse-proxy HTTPS and host information when the
+        // proxy is explicitly trusted (loopback-only by default).
+        $trustedProxies = array_values(array_filter(array_map(
+            static fn (string $proxy): string => trim($proxy),
+            explode(',', (string) env('TRUSTED_PROXIES', '127.0.0.1,::1'))
+        )));
+        $middleware->trustProxies(at: $trustedProxies);
+
         $middleware->alias([
             'admin' => EnsureAdmin::class,
             'active.training' => EnsureActiveTraining::class,
@@ -49,12 +57,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'two-factor' => EnsureTwoFactorVerified::class,
         ]);
 
-        $middleware->redirectGuestsTo(fn (Request $request) => match (true) {
-            $request->is('admin') || $request->is('admin/*') => route('admin.login'),
-            $request->is('trainer') || $request->is('trainer/*') => route('trainer.login'),
-            $request->is('trainee') || $request->is('trainee/*') => route('trainee.login'),
-            default => route('login'),
-        });
+        $middleware->redirectGuestsTo(fn (Request $request) => route('login'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (Throwable $e, Request $request) {

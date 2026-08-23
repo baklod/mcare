@@ -22,6 +22,9 @@
         ]];
     }
     $isPrivate = filled(old('target_enrollment_application_id', $quiz?->target_enrollment_application_id));
+    $moduleReturnUrl = $quiz?->training_module_id
+        ? route('trainer.modules.show', $quiz->training_module_id).'#assessments'
+        : route('trainer.resources');
 @endphp
 
 <div class="lms-page" data-quiz-builder>
@@ -31,7 +34,7 @@
             <h1>{{ $pageTitle }}</h1>
             <p>{{ $pageDescription }}</p>
         </div>
-        <a href="{{ route('trainer.assessments') }}" class="secondary-action">Back to quizzes</a>
+        <a href="{{ $moduleReturnUrl }}" class="secondary-action">Back to module</a>
     </header>
 
     @if($errors->any())
@@ -57,8 +60,17 @@
                     @error('title')<p class="lms-field-error">{{ $message }}</p>@enderror
                 </div>
                 <div class="lms-field lms-field-wide">
-                    <label for="quiz-instructions">Instructions</label>
-                    <textarea id="quiz-instructions" name="instructions" rows="4" maxlength="3000" placeholder="Explain the coverage, allowed materials, and submission expectations.">{{ old('instructions', $quiz?->instructions) }}</textarea>
+                    <label for="quiz-module">Learning Module</label>
+                    <select id="quiz-module" name="training_module_id" class="form-field" required>
+                        <option value="">Choose a learning module</option>
+                        @foreach(($modules ?? []) as $mod)
+                            <option value="{{ $mod->id }}" @selected((string) old('training_module_id', $quiz?->training_module_id) === (string) $mod->id)>
+                                {{ $mod->module_code ? '['.$mod->module_code.'] ' : '' }}{{ $mod->title }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <small class="text-xs text-slate-500">Every assessment belongs to one learning module.</small>
+                    @error('training_module_id')<p class="lms-field-error">{{ $message }}</p>@enderror
                 </div>
             </div>
         </section>
@@ -175,7 +187,7 @@
         </section>
 
         <div class="lms-sticky-submit">
-            <a href="{{ route('trainer.assessments') }}" class="secondary-action">Cancel</a>
+            <a href="{{ $moduleReturnUrl }}" class="secondary-action">Cancel</a>
             <button class="primary-action">{{ $submitLabel }}</button>
         </div>
     </form>

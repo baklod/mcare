@@ -337,6 +337,41 @@
         </aside>
     </div>
 
+    @php
+        $paymentCleared = $applicationProgress?->hasEnrollmentPaymentClearance() ?? false;
+        $accountApproved = $applicationProgress?->status === \App\Models\EnrollmentApplication::STATUS_APPROVED;
+    @endphp
+
+    @if (session('payment_error'))
+        <section class="relative z-20 border-b border-red-200 bg-red-50" role="alert">
+            <div class="mx-auto max-w-7xl px-4 py-4 text-sm font-semibold text-red-800 sm:px-6 lg:px-8">
+                {{ session('payment_error') }}
+            </div>
+        </section>
+    @endif
+
+    @if (session('account_approved') || $accountApproved)
+        <section id="applicant-review-status" data-account-approved="true" class="relative z-20 border-b border-emerald-200 bg-emerald-50" role="status" aria-live="polite">
+            <div class="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+                <div>
+                    <p class="font-black text-emerald-900">Your MCARE account is approved</p>
+                    <p class="mt-1 text-sm leading-6 text-emerald-800">Administration verified your account. You can now log in and open the trainee portal.</p>
+                </div>
+                <a href="{{ route('login') }}" class="inline-flex shrink-0 items-center justify-center rounded-full bg-emerald-700 px-6 py-3 text-sm font-bold text-white hover:bg-emerald-800">Log in to MCARE</a>
+            </div>
+        </section>
+    @elseif (session('payment_verified') || session('account_pending') || $paymentCleared)
+        <section id="applicant-review-status" data-account-approved="false" class="relative z-20 border-b border-purple-200 bg-purple-50" role="status" aria-live="polite">
+            <div class="mx-auto flex max-w-7xl items-start gap-3 px-4 py-5 sm:px-6 lg:px-8">
+                <span class="mt-0.5 inline-block h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-purple-200 border-t-purple-700" aria-hidden="true"></span>
+                <div>
+                    <p class="font-black text-purple-950">Payment verified successfully</p>
+                    <p class="mt-1 text-sm leading-6 text-purple-800">Please wait while the administrator completes your account verification. MCARE will email you when your account is approved and ready to log in.</p>
+                </div>
+            </div>
+        </section>
+    @endif
+
     <main class="relative z-10">
         <section class="relative overflow-hidden bg-white/45 backdrop-blur-[1px]">
             <div class="mx-auto grid max-w-7xl grid-cols-1 items-center gap-8 px-4 py-8 sm:gap-10 sm:px-6 sm:py-20 lg:grid-cols-2 lg:gap-16 lg:px-8 lg:py-28">
@@ -548,7 +583,7 @@
                 <div>
                     <p class="text-sm font-bold uppercase text-purple-600">Admissions</p>
                     <h2 class="mt-3 text-2xl font-bold leading-tight text-slate-900 sm:mt-4 sm:text-5xl">A simple enrollment flow before the admin review.</h2>
-                    <p class="mt-4 text-sm leading-6 text-slate-600 sm:mt-6 sm:text-lg sm:leading-8">Applicants now complete a direct TESDA-inspired learner profile for Caregiving NC II while Google OAuth is paused during development.</p>
+                    <p class="mt-4 text-sm leading-6 text-slate-600 sm:mt-6 sm:text-lg sm:leading-8">Applicants verify their identity with Google, then complete the TESDA-inspired Caregiving NC II learner profile with browser-assisted autofill.</p>
                     <div class="mt-6 sm:mt-10">
                         @auth
                             <a href="{{ $accountCtaUrl }}" class="inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:w-auto">{{ $accountCtaLabel }}</a>
@@ -573,7 +608,7 @@
                             <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-50 text-sm font-bold text-purple-600 sm:h-10 sm:w-10">2</span>
                             <div>
                                 <h3 class="text-base font-bold text-slate-900 sm:text-lg">Complete applicant details</h3>
-                                <p class="mt-1.5 text-sm leading-6 text-slate-600 sm:mt-2 sm:text-base sm:leading-7">Personal information, address, education, contact details, and preferred schedule are saved for review.</p>
+                                <p class="mt-1.5 text-sm leading-6 text-slate-600 sm:mt-2 sm:text-base sm:leading-7">Verified name and email are prefilled; personal information, address, education, contact details, and preferred schedule remain editable for confirmation.</p>
                             </div>
                         </div>
                     </div>
@@ -582,7 +617,7 @@
                             <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-50 text-sm font-bold text-purple-600 sm:h-10 sm:w-10">3</span>
                             <div>
                                 <h3 class="text-base font-bold text-slate-900 sm:text-lg">Admin approval next</h3>
-                                <p class="mt-1.5 text-sm leading-6 text-slate-600 sm:mt-2 sm:text-base sm:leading-7">Document verification, payment review, training access, and certificate records can be built after the flow is confirmed.</p>
+                                <p class="mt-1.5 text-sm leading-6 text-slate-600 sm:mt-2 sm:text-base sm:leading-7">MCARE emails enrollment updates while administrators review documents, payment readiness, and trainee access.</p>
                             </div>
                         </div>
                     </div>
@@ -732,6 +767,7 @@
         const mobileMenuOverlay = document.getElementById('mobile-menu-overlay');
         const mobileSidebarLinks = document.querySelectorAll('.mobile-sidebar-link');
         const discoverFadeItems = document.querySelectorAll('.discover-fade');
+        const applicantReviewStatus = document.getElementById('applicant-review-status');
 
         function updateHeaderScrollState() {
             siteHeader?.classList.toggle('is-scrolled', window.scrollY > 8);
@@ -778,8 +814,39 @@
             discoverFadeItems.forEach((item) => observer.observe(item));
         }
 
+        function attachApplicantReviewPolling() {
+            if (!applicantReviewStatus || applicantReviewStatus.dataset.accountApproved === 'true') return;
+
+            const statusUrl = @json(route('payment.status'));
+            const checkStatus = async () => {
+                if (document.hidden) return;
+
+                try {
+                    const response = await fetch(statusUrl, {
+                        credentials: 'same-origin',
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        cache: 'no-store',
+                    });
+                    if (!response.ok) return;
+
+                    const status = await response.json();
+                    if (status.account_approved === true) window.location.reload();
+                } catch (error) {
+                    // Email remains the authoritative fallback when a phone
+                    // briefly loses data connectivity.
+                }
+            };
+
+            window.setInterval(checkStatus, 15000);
+            document.addEventListener('visibilitychange', checkStatus);
+        }
+
         updateHeaderScrollState();
         attachDiscoverFadeObserver();
+        attachApplicantReviewPolling();
         window.addEventListener('scroll', updateHeaderScrollState, { passive: true });
         window.addEventListener('resize', syncResponsiveNavigation);
         mobileMenuOpen?.addEventListener('click', openMobileSidebar);

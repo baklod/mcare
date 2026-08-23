@@ -4,7 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\EnrollmentApplication;
 use App\Models\User;
+use App\Notifications\EnrollmentStatusUpdatedNotification;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -15,7 +18,7 @@ class AdminEnrollmentReviewTest extends TestCase
     public function test_guest_is_redirected_to_admin_login(): void
     {
         $this->get('/admin/enrollments')
-            ->assertRedirect(route('admin.login'));
+            ->assertRedirect(route('login'));
     }
 
     public function test_non_admin_cannot_open_admin_queue(): void
@@ -29,6 +32,7 @@ class AdminEnrollmentReviewTest extends TestCase
 
     public function test_admin_can_update_enrollment_review_status(): void
     {
+        Notification::fake();
         $admin = User::factory()->create(['role' => 'admin']);
         $applicant = User::factory()->create([
             'role' => 'applicant',
@@ -74,6 +78,16 @@ class AdminEnrollmentReviewTest extends TestCase
             'id' => $applicant->id,
             'applicant_status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
         ]);
+
+        Notification::assertSentTo(
+            $applicant,
+            EnrollmentStatusUpdatedNotification::class,
+            fn (EnrollmentStatusUpdatedNotification $notification, array $channels): bool => $notification instanceof ShouldQueue
+                && $notification->queue === 'mail'
+                && $notification->application->is($application)
+                && in_array('database', $channels, true)
+                && in_array('mail', $channels, true),
+        );
     }
 
     public function test_admin_can_preview_and_download_filled_tesda_registration_form(): void

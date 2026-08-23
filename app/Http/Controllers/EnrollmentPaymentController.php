@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Exceptions\PayMongoCheckoutException;
 use App\Models\EnrollmentApplication;
 use App\Models\PaymentAttempt;
+use App\Services\EnrollmentPaymentLifecycle;
 use App\Services\PayMongoCheckoutService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -25,7 +27,7 @@ class EnrollmentPaymentController extends Controller
         private readonly PayMongoCheckoutService $payMongo,
     ) {}
 
-    public function show(Request $request): View|RedirectResponse
+    public function show(Request $request, EnrollmentPaymentLifecycle $paymentLifecycle): View|RedirectResponse
     {
         $application = $this->applicationFor($request);
 
@@ -37,6 +39,10 @@ class EnrollmentPaymentController extends Controller
 
         $this->expireStaleReceipt($application);
         $application->refresh()->load('batch');
+
+        if ($paymentLifecycle->handleVerifiedPayment($application)) {
+            return redirect()->route('payment.complete');
+        }
         $activeAttempt = $application->paymentAttempts()
             ->where('provider', 'paymongo')
             ->where('status', PaymentAttempt::STATUS_PENDING)
@@ -67,7 +73,7 @@ class EnrollmentPaymentController extends Controller
         ]);
     }
 
-    public function select(Request $request): RedirectResponse
+    public function select(Request $request, EnrollmentPaymentLifecycle $paymentLifecycle): RedirectResponse
     {
         $validated = $request->validate([
             'payment_method' => ['required', 'in:onsite,online'],
@@ -81,6 +87,10 @@ class EnrollmentPaymentController extends Controller
 
         $this->expireStaleReceipt($application);
         $application->refresh();
+
+        if ($paymentLifecycle->handleVerifiedPayment($application)) {
+            return redirect()->route('payment.complete');
+        }
 
         // A confirmed payment is terminal; UI retries must never downgrade it.
         if ($application->payment_status === EnrollmentApplication::PAYMENT_PAID) {
@@ -145,7 +155,7 @@ class EnrollmentPaymentController extends Controller
         return redirect()->away($checkoutUrl);
     }
 
-    public function returned(Request $request): RedirectResponse
+    public function returned(Request $request, EnrollmentPaymentLifecycle $paymentLifecycle): RedirectResponse
     {
         $application = $this->applicationFor($request);
 
@@ -154,6 +164,10 @@ class EnrollmentPaymentController extends Controller
         }
 
         $application->refresh();
+
+        if ($paymentLifecycle->handleVerifiedPayment($application)) {
+            return redirect()->route('payment.complete');
+        }
         $notice = $application->payment_status === EnrollmentApplication::PAYMENT_PAID
             ? 'Payment confirmed. Your MCARE payment record is now updated.'
             : 'PayMongo returned you safely to MCARE. Confirmation is still pending and will update only after the signed gateway notification arrives.';
@@ -174,22 +188,61 @@ class EnrollmentPaymentController extends Controller
             ->with('payment_notice', 'Checkout was closed. No payment was confirmed, and you may continue the same secure checkout when ready.');
     }
 
-    public function status(Request $request): JsonResponse
+    public function status(Request $request, EnrollmentPaymentLifecycle $paymentLifecycle): JsonResponse
     {
         $application = $this->applicationFor($request);
 
         abort_unless($application, 404);
+        $paymentLifecycle->handleVerifiedPayment($application);
         $application->refresh();
 
         return response()->json([
             'status' => $application->payment_status,
             'label' => $application->paymentStatusLabel(),
             'paid' => $application->payment_status === EnrollmentApplication::PAYMENT_PAID,
+            'payment_verified' => $application->hasEnrollmentPaymentClearance(),
+            'account_approved' => $application->status === EnrollmentApplication::STATUS_APPROVED,
+            'completion_url' => route('payment.complete'),
             'verified_at' => $application->payment_verified_at?->toIso8601String(),
         ]);
     }
 
-    public function receipt(Request $request): View|RedirectResponse
+    public function completed(Request $request, EnrollmentPaymentLifecycle $paymentLifecycle): RedirectResponse
+    {
+        $application = $this->applicationFor($request);
+
+        if (! $application) {
+            return redirect()
+                ->route('landing')
+                ->with('payment_error', 'Your payment session expired. Check your email for verification and account-review updates.');
+        }
+
+        if (! $paymentLifecycle->handleVerifiedPayment($application)) {
+            return redirect()
+                ->route('payment.show')
+                ->withErrors(['payment' => 'Your required enrollment payment is still waiting for verification.']);
+        }
+
+        $application->refresh();
+        $request->session()->put('enrollment.awaiting_approval', true);
+
+        if ($request->user()?->role === 'applicant') {
+            Auth::logout();
+            $request->session()->regenerate();
+        }
+
+        if ($application->status === EnrollmentApplication::STATUS_APPROVED) {
+            return redirect()
+                ->route('landing')
+                ->with('account_approved', 'Your payment and MCARE account are approved. You can now log in.');
+        }
+
+        return redirect()
+            ->route('landing')
+            ->with('payment_verified', 'Payment verified successfully. Please wait while the administrator completes your account verification. We will email you when you can log in.');
+    }
+
+    public function receipt(Request $request, EnrollmentPaymentLifecycle $paymentLifecycle): View|RedirectResponse
     {
         $application = $this->applicationFor($request);
 
@@ -200,6 +253,10 @@ class EnrollmentPaymentController extends Controller
         }
 
         $this->expireStaleReceipt($application);
+
+        if ($paymentLifecycle->handleVerifiedPayment($application->refresh())) {
+            return redirect()->route('payment.complete');
+        }
 
         return view('enrollment.receipt', [
             'application' => $application->refresh()->load('batch'),

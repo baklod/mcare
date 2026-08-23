@@ -98,20 +98,6 @@ class TrainerPortalController extends Controller
         ]);
     }
 
-    public function assessments(): View
-    {
-        $assignedBatch = TrainingBatch::assignedTo(request()->user());
-
-        return view('trainer.assessments', [
-            'trainees' => $this->approvedTrainees($assignedBatch)->with(['batch', 'moduleProgress'])->get(),
-            'publishedModules' => TrainingModule::query()
-                ->where('is_published', true)
-                ->when($assignedBatch, fn ($query) => $query->where('training_batch_id', $assignedBatch->id))
-                ->when(! $assignedBatch, fn ($query) => $query->whereRaw('1 = 0'))
-                ->count(),
-        ]);
-    }
-
     public function resources(Request $request): View
     {
         $assignedBatch = TrainingBatch::assignedTo($request->user());

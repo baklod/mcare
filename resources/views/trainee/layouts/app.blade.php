@@ -18,16 +18,12 @@
         $traineeStreamHref = \Illuminate\Support\Facades\Route::has('trainee.stream')
             ? route('trainee.stream')
             : route('trainee.dashboard');
-        $traineeQuizHref = \Illuminate\Support\Facades\Route::has('trainee.quizzes.index')
-            ? route('trainee.quizzes.index')
-            : route('trainee.modules.index');
         $traineePrimaryNav = $isGraduate ? [
             ['label' => 'Career Hub', 'short' => 'Career Hub', 'icon' => 'fa-briefcase', 'href' => route('trainee.career-hub'), 'active' => request()->routeIs('trainee.career-hub')],
             ['label' => 'Calendar', 'short' => 'Calendar', 'icon' => 'fa-calendar-days', 'href' => route('trainee.schedule'), 'active' => request()->routeIs('trainee.schedule')],
         ] : [
             ['label' => 'Stream', 'short' => 'Stream', 'icon' => 'fa-bell', 'href' => $traineeStreamHref, 'active' => request()->routeIs('trainee.stream')],
-            ['label' => 'Classwork', 'short' => 'Classwork', 'icon' => 'fa-book-open', 'href' => route('trainee.modules.index'), 'active' => request()->routeIs('trainee.modules.*')],
-            ['label' => 'Quizzes', 'short' => 'Quizzes', 'icon' => 'fa-square-check', 'href' => $traineeQuizHref, 'active' => request()->routeIs('trainee.quizzes.*', 'trainee.quiz-attempts.*')],
+            ['label' => 'Classwork', 'short' => 'Classwork', 'icon' => 'fa-book-open', 'href' => route('trainee.modules.index'), 'active' => request()->routeIs('trainee.modules.*', 'trainee.quizzes.*', 'trainee.quiz-attempts.*')],
             ['label' => 'Calendar', 'short' => 'Calendar', 'icon' => 'fa-calendar-days', 'href' => route('trainee.schedule'), 'active' => request()->routeIs('trainee.schedule')],
         ];
         $traineeSecondaryNav = $isGraduate ? [
@@ -38,6 +34,19 @@
             ['label' => 'Payments', 'icon' => 'fa-credit-card', 'href' => route('trainee.payments'), 'active' => request()->routeIs('trainee.payments')],
             ['label' => 'Documents', 'icon' => 'fa-folder-open', 'href' => route('trainee.documents'), 'active' => request()->routeIs('trainee.documents')],
         ];
+        $traineeAllNav = collect(array_merge($traineePrimaryNav, $traineeSecondaryNav))->keyBy('label');
+        $traineeMobileLabels = $isGraduate
+            ? ['Home', 'Career Hub', 'Calendar', 'Documents']
+            : ['Home', 'Stream', 'Classwork'];
+        $traineeMobilePrimary = collect($traineeMobileLabels)
+            ->map(fn (string $label) => $traineeAllNav->get($label))
+            ->filter()
+            ->values()
+            ->all();
+        $traineeMobileMore = $traineeAllNav
+            ->reject(fn (array $item, string $label) => in_array($label, $traineeMobileLabels, true))
+            ->values()
+            ->all();
     @endphp
 
     <div class="dashboard-gradient"></div>
@@ -79,7 +88,7 @@
                 <x-dashboard-icon name="chevron-down" class="dashboard-chevron text-xs text-slate-400 transition" />
             </summary>
             <div class="dashboard-account-menu">
-                <x-dashboard-account-actions :logout-route="route('trainee.logout')" role-label="Trainee" />
+                <x-dashboard-account-actions :logout-route="route('logout')" role-label="Trainee" />
             </div>
         </details>
     </aside>
@@ -107,7 +116,7 @@
                         <x-dashboard-icon name="chevron-down" class="dashboard-chevron text-xs text-slate-400 transition" />
                         </summary>
                         <div class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
-                            <x-dashboard-account-actions :logout-route="route('trainee.logout')" role-label="Trainee" />
+                            <x-dashboard-account-actions :logout-route="route('logout')" role-label="Trainee" />
                         </div>
                     </details>
                 </div>
@@ -126,14 +135,13 @@
         </main>
     </div>
 
-    <nav class="dashboard-mobile-bar {{ $isGraduate ? 'grid-cols-2' : 'grid-cols-4' }}" aria-label="Mobile trainee navigation">
-        @foreach ($traineePrimaryNav as $item)
-            <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainee-{{ str($item['label'])->slug() }}" class="dashboard-mobile-link {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
-                <x-dashboard-icon :name="$item['icon']" />
-                <span class="truncate">{{ $item['short'] }}</span>
-            </a>
-        @endforeach
-    </nav>
+    <x-dashboard-mobile-navigation
+        :primary-items="$traineeMobilePrimary"
+        :more-items="$traineeMobileMore"
+        label="Mobile trainee navigation"
+        menu-title="Trainee destinations"
+        role="trainee"
+    />
 
     <dialog class="lms-confirm-dialog" data-lms-confirm-dialog aria-labelledby="lms-confirm-title">
         <form method="dialog" class="lms-confirm-card">

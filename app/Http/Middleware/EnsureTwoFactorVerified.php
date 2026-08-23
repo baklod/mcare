@@ -22,7 +22,7 @@ class EnsureTwoFactorVerified
             $request->session()->regenerateToken();
 
             return redirect()
-                ->route('admin.login')
+                ->route('login')
                 ->withErrors(['email' => 'Please complete email verification before entering the admin area.']);
         }
 

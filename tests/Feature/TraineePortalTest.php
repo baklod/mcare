@@ -17,7 +17,7 @@ class TraineePortalTest extends TestCase
     public function test_guest_is_redirected_to_trainee_login(): void
     {
         $this->get('/trainee')
-            ->assertRedirect(route('trainee.login'));
+            ->assertRedirect(route('login'));
     }
 
     public function test_non_trainee_cannot_open_trainee_dashboard(): void
@@ -47,6 +47,28 @@ class TraineePortalTest extends TestCase
             'role' => 'trainee',
             'applicant_status' => EnrollmentApplication::STATUS_APPROVED,
         ]);
+    }
+
+    public function test_admin_cannot_approve_applicant_before_required_payment_is_verified(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->create(['role' => 'applicant']);
+        $application = $this->approvedReadyApplication($applicant, EnrollmentApplication::STATUS_PRE_ENLISTMENT);
+        $application->forceFill([
+            'payment_status' => EnrollmentApplication::PAYMENT_ONSITE_PENDING,
+            'total_paid_amount' => 0,
+            'payment_verified_at' => null,
+        ])->save();
+
+        $this->actingAs($admin)
+            ->patch(route('admin.enrollments.update', $application), [
+                'status' => EnrollmentApplication::STATUS_APPROVED,
+                'admin_notes' => 'Attempted before payment verification.',
+            ])
+            ->assertSessionHasErrors('status');
+
+        $this->assertSame('applicant', $applicant->refresh()->role);
+        $this->assertSame(EnrollmentApplication::STATUS_PRE_ENLISTMENT, $application->refresh()->status);
     }
 
     public function test_approved_trainee_can_open_dashboard(): void
@@ -239,6 +261,12 @@ class TraineePortalTest extends TestCase
             'school_name' => 'MCARE High School',
             'year_graduated' => 2020,
             'status' => $status,
+            'total_program_fee' => 22000.00,
+            'downpayment_amount' => 2000.00,
+            'total_paid_amount' => 2000.00,
+            'payment_status' => EnrollmentApplication::PAYMENT_PARTIALLY_PAID,
+            'payment_method' => 'onsite',
+            'payment_verified_at' => now(),
         ]);
     }
 }

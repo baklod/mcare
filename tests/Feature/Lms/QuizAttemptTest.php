@@ -21,7 +21,11 @@ class QuizAttemptTest extends TestCase
         $trainer = $this->lmsUser('trainer');
         $batch = $this->lmsBatch();
         ['user' => $trainee, 'application' => $application] = $this->lmsTrainee($batch);
-        $quiz = $this->publishedQuiz($trainer, $batch, ['attempt_limit' => 2]);
+        $module = $this->lmsModule($trainer, $batch);
+        $quiz = $this->publishedQuiz($trainer, $batch, [
+            'training_module_id' => $module->id,
+            'attempt_limit' => 2,
+        ]);
         $first = $this->question($quiz, 'Which action comes first?', [
             'Perform hand hygiene',
             'Touch the patient',
@@ -33,10 +37,9 @@ class QuizAttemptTest extends TestCase
         ], 1, 1, 'true_false', 1);
 
         $this->actingAs($trainee)
-            ->get(route('trainee.quizzes.index'))
+            ->get(route('trainee.modules.show', $module))
             ->assertOk()
-            ->assertSee('data-quiz-library', false)
-            ->assertSee('data-lms-role="trainee"', false)
+            ->assertSee('id="assessments"', false)
             ->assertSee($quiz->title);
 
         $detail = $this->actingAs($trainee)
@@ -134,8 +137,7 @@ class QuizAttemptTest extends TestCase
 
         $this->actingAs($secondTrainee)
             ->get(route('trainee.quizzes.index'))
-            ->assertOk()
-            ->assertDontSee($quiz->title);
+            ->assertRedirect(route('trainee.modules.index'));
 
         $this->actingAs($secondTrainee)
             ->get(route('trainee.quizzes.show', $quiz))
@@ -171,8 +173,7 @@ class QuizAttemptTest extends TestCase
 
         $this->actingAs($trainee)
             ->get(route('trainee.quizzes.index'))
-            ->assertOk()
-            ->assertDontSee('Closed quiz');
+            ->assertRedirect(route('trainee.modules.index'));
 
         $this->actingAs($trainee)
             ->post(route('trainee.quizzes.start', $closedQuiz))

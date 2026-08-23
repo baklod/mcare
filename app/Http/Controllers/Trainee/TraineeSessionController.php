@@ -7,20 +7,16 @@ use App\Models\AdminActivityLog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\View\View;
 
 class TraineeSessionController extends Controller
 {
-    public function create(Request $request): View|RedirectResponse
+    public function create(Request $request): RedirectResponse
     {
         if ($request->user()?->hasRole('trainee')) {
             return redirect()->route('trainee.dashboard');
         }
 
-        return view('trainee.auth.login', [
-            // Makes role testing clear when another account is already active in this browser.
-            'activeUser' => $request->user(),
-        ]);
+        return redirect()->route('login');
     }
 
     public function store(Request $request): RedirectResponse
@@ -70,6 +66,8 @@ class TraineeSessionController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('trainee.login');
+        return redirect()
+            ->route('landing')
+            ->with('signed_out', 'You have signed out. You can now switch accounts safely.');
     }
 }

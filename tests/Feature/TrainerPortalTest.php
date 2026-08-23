@@ -17,7 +17,7 @@ class TrainerPortalTest extends TestCase
     public function test_guest_is_redirected_to_trainer_login(): void
     {
         $this->get('/trainer')
-            ->assertRedirect(route('trainer.login'));
+            ->assertRedirect(route('login'));
     }
 
     public function test_non_trainer_cannot_open_trainer_dashboard(): void
@@ -125,13 +125,16 @@ class TrainerPortalTest extends TestCase
             'trainer.trainings',
             'trainer.trainees',
             'trainer.sessions',
-            'trainer.assessments',
             'trainer.resources',
             'trainer.certificates',
             'trainer.reports',
         ] as $routeName) {
             $this->actingAs($trainer)->get(route($routeName))->assertOk();
         }
+
+        $this->actingAs($trainer)
+            ->get(route('trainer.assessments'))
+            ->assertRedirect(route('trainer.resources'));
     }
 
     public function test_admin_batch_schedule_is_reflected_in_trainer_month_calendar(): void

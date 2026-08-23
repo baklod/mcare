@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
+use App\Notifications\EnrollmentStatusUpdatedNotification;
 use App\Services\TesdaRegistrationPdfService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,6 +16,7 @@ use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class EnrollmentReviewController extends Controller
 {
@@ -148,6 +150,17 @@ class EnrollmentReviewController extends Controller
             'admin_notes.required' => 'Add a clear note before denying an application.',
         ]);
 
+        if ($validated['status'] === EnrollmentApplication::STATUS_APPROVED
+            && ! $enrollmentApplication->hasEnrollmentPaymentClearance()) {
+            return back()
+                ->withErrors([
+                    'status' => 'Verify the required enrollment payment before approving this account.',
+                ])
+                ->withInput();
+        }
+
+        $previousStatus = $enrollmentApplication->status;
+
         $enrollmentApplication->forceFill([
             'status' => $validated['status'],
             'admin_notes' => $validated['admin_notes'] ?? null,
@@ -168,6 +181,17 @@ class EnrollmentReviewController extends Controller
             'status' => $validated['status'],
             'applicant_email' => $enrollmentApplication->email,
         ]);
+
+        if ($previousStatus !== $validated['status'] && $enrollmentApplication->user) {
+            try {
+                $enrollmentApplication->user->notify(
+                    new EnrollmentStatusUpdatedNotification($enrollmentApplication),
+                );
+            } catch (Throwable $exception) {
+                // A mail outage must not undo an administrator's review decision.
+                report($exception);
+            }
+        }
 
         return redirect()
             ->route('admin.enrollments.show', $enrollmentApplication)

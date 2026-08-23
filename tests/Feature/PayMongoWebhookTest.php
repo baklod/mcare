@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\EnrollmentApplication;
 use App\Models\PaymentAttempt;
+use App\Models\PaymentTransaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -37,7 +38,9 @@ class PayMongoWebhookTest extends TestCase
         $application->refresh();
         $attempt->refresh();
 
-        $this->assertSame(EnrollmentApplication::PAYMENT_PAID, $application->payment_status);
+        $this->assertSame(EnrollmentApplication::PAYMENT_PARTIALLY_PAID, $application->payment_status);
+        $this->assertSame(2000.00, (float) $application->total_paid_amount);
+        $this->assertTrue($application->isDownpaymentSatisfied());
         $this->assertNotNull($application->payment_verified_at);
         $this->assertNull($application->payment_verified_by_id);
         $this->assertTrue((bool) data_get($application->payment_meta, 'gateway_verified'));
@@ -46,6 +49,14 @@ class PayMongoWebhookTest extends TestCase
         $this->assertSame('paid', $attempt->status);
         $this->assertSame('pay_test_paid_once', $attempt->provider_payment_id);
         $this->assertNotNull($attempt->paid_at);
+        $this->assertDatabaseHas('payment_transactions', [
+            'enrollment_application_id' => $application->id,
+            'payment_channel' => PaymentTransaction::CHANNEL_ONLINE,
+            'transaction_type' => PaymentTransaction::TYPE_DOWNPAYMENT,
+            'amount' => 2000.00,
+            'status' => PaymentTransaction::STATUS_VERIFIED,
+        ]);
+        $this->assertDatabaseCount('payment_transactions', 1);
 
         $this->assertDatabaseCount('paymongo_webhook_events', 1);
         $this->assertDatabaseHas('paymongo_webhook_events', [
@@ -72,7 +83,7 @@ class PayMongoWebhookTest extends TestCase
         $this->postSignedWebhook($payload)->assertOk();
 
         $this->assertSame(
-            EnrollmentApplication::PAYMENT_PAID,
+            EnrollmentApplication::PAYMENT_PARTIALLY_PAID,
             $application->refresh()->payment_status,
         );
         $this->assertSame(PaymentAttempt::STATUS_PAID, $attempt->refresh()->status);

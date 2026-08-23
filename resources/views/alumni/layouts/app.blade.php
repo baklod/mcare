@@ -17,6 +17,9 @@
             ['label' => 'Career Hub', 'icon' => 'fa-briefcase', 'href' => route('alumni.dashboard'), 'active' => request()->routeIs('alumni.dashboard')],
             ['label' => 'Notifications', 'icon' => 'fa-bell', 'href' => route('notifications.index'), 'active' => request()->routeIs('notifications.*')],
         ];
+        $alumniMobileNav = array_merge($alumniNav, [
+            ['label' => 'Public site', 'icon' => 'fa-arrow-up-right-from-square', 'href' => route('landing'), 'active' => false],
+        ]);
     @endphp
 
     <aside class="dashboard-sidebar" data-dashboard-sidebar>
@@ -81,10 +84,10 @@
         </main>
     </div>
 
-    <nav class="dashboard-mobile-bar grid-cols-2" aria-label="Mobile alumni navigation">
-        @foreach ($alumniNav as $item)
-            <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="alumni-{{ str($item['label'])->slug() }}" class="dashboard-mobile-link {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif><x-dashboard-icon :name="$item['icon']" /><span class="truncate">{{ $item['label'] }}</span></a>
-        @endforeach
-    </nav>
+    <x-dashboard-mobile-navigation
+        :primary-items="$alumniMobileNav"
+        label="Mobile alumni navigation"
+        role="alumni"
+    />
 </body>
 </html>

@@ -10,12 +10,6 @@
         </p>
     </header>
 
-    @if (session('saved'))
-        <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
-            {{ session('saved') }}
-        </div>
-    @endif
-
     @if (session('payment_notice'))
         <div class="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm font-semibold text-sky-800">
             {{ session('payment_notice') }}
@@ -193,8 +187,9 @@
                             </div>
                         </div>
                         <div>
-                            <label for="trainee-receipt-proof" class="mb-1.5 block text-xs font-bold uppercase text-slate-600">Receipt photo/document (optional)</label>
-                            <input id="trainee-receipt-proof" name="receipt_proof" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" class="form-field file:mr-4 file:rounded-lg file:border-0 file:bg-purple-50 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-purple-700 hover:file:bg-purple-100">
+                            <label for="trainee-receipt-proof" class="mb-1.5 block text-xs font-bold uppercase text-slate-600">Receipt photo/document</label>
+                            <input id="trainee-receipt-proof" name="receipt_proof" type="file" required accept=".pdf,.jpg,.jpeg,.png,.webp" class="form-field file:mr-4 file:rounded-lg file:border-0 file:bg-purple-50 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-purple-700 hover:file:bg-purple-100">
+                            <p class="mt-1 text-[11px] text-slate-500">PDF or clear JPG, PNG, or WebP; maximum 10 MB.</p>
                         </div>
                         <button type="submit" class="secondary-action">Submit receipt proof</button>
                     </form>

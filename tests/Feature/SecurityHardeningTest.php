@@ -26,7 +26,7 @@ class SecurityHardeningTest extends TestCase
 
     public function test_private_routes_are_marked_noindex_and_no_store(): void
     {
-        $response = $this->get('/admin/login');
+        $response = $this->get('/login');
 
         $response
             ->assertOk()
@@ -61,12 +61,12 @@ class SecurityHardeningTest extends TestCase
 
         // The strict limiter allows five attempts per minute for email + IP.
         for ($attempt = 1; $attempt <= 5; $attempt++) {
-            $this->post('/admin/login', $credentials)
+            $this->post('/login', $credentials)
                 ->assertSessionHasErrors('email');
         }
 
         // The sixth request should be stopped before another password check.
-        $this->post('/admin/login', $credentials)
+        $this->post('/login', $credentials)
             ->assertStatus(429);
     }
 
@@ -122,9 +122,9 @@ class SecurityHardeningTest extends TestCase
 
     public function test_theme_uses_light_as_default_and_shared_persistent_storage_key(): void
     {
-        $this->get('/admin/login')
+        $this->get('/login')
             ->assertOk()
             ->assertSee("window.localStorage.getItem('mcare-dashboard-theme') === 'dark' ? 'dark' : 'light'", false)
-            ->assertSee('admin-login-promo', false);
+            ->assertSee('One sign-in page for applicants, trainees, trainers, alumni, and administrators.');
     }
 }

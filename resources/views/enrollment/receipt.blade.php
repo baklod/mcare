@@ -138,6 +138,7 @@
         $scheduleLabel = $batch?->scheduleLabelFor($application->schedule_preference) ?? 'Schedule to be confirmed by admin';
         $roomLabel = $batch?->roomFor($application->schedule_preference) ?: 'Room to be announced';
         $deadline = $application->effectivePaymentDeadline() ?: $batch?->enrollment_ends_at;
+        $paymentCleared = $application->hasEnrollmentPaymentClearance();
         $logoPath = public_path('assets/official-logo.png');
         $logoSource = file_exists($logoPath)
             ? 'data:image/png;base64,'.base64_encode(file_get_contents($logoPath))
@@ -153,6 +154,12 @@
                     <button class="button button-primary" type="button" onclick="window.print()">Print / Save PDF</button>
                 </span>
             </div>
+
+            @unless ($paymentCleared)
+                <div id="payment-confirmation-status" class="notice" role="status" aria-live="polite" style="margin-bottom: 18px;">
+                    Waiting for cashier verification. Keep this page open and MCARE will return you to the landing page automatically after the required payment is verified.
+                </div>
+            @endunless
         @endunless
 
         <section class="receipt">
@@ -243,5 +250,47 @@
             </div>
         </section>
     </main>
+
+    @if (! $downloadMode && ! $paymentCleared)
+        <script>
+            const paymentStatusUrl = @json(route('payment.status'));
+            const paymentCompleteUrl = @json(route('payment.complete'));
+            const confirmationStatus = document.getElementById('payment-confirmation-status');
+            let paymentStatusChecks = 0;
+
+            window.setInterval(async () => {
+                if (document.hidden) return;
+                paymentStatusChecks += 1;
+
+                try {
+                    const response = await fetch(paymentStatusUrl, {
+                        credentials: 'same-origin',
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        cache: 'no-store',
+                    });
+                    if (!response.ok) return;
+
+                    const status = await response.json();
+                    if (status.payment_verified === true) {
+                        if (confirmationStatus) {
+                            confirmationStatus.textContent = 'Payment verified successfully. Returning you to MCARE while your account awaits approval...';
+                        }
+                        window.setTimeout(() => window.location.assign(status.completion_url || paymentCompleteUrl), 500);
+                        return;
+                    }
+                } catch (error) {
+                    // Keep waiting; email provides the fallback when the phone
+                    // temporarily loses its data connection.
+                }
+
+                if (paymentStatusChecks >= 15 && confirmationStatus) {
+                    confirmationStatus.textContent = 'Still waiting for cashier verification. Checking continues automatically; you may also close this page and wait for the MCARE email.';
+                }
+            }, 4000);
+        </script>
+    @endif
 </body>
 </html>

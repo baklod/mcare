@@ -7,6 +7,8 @@ use App\Models\PaymentTransaction;
 use App\Models\TrainingBatch;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class TraineeOnsiteTicketTest extends TestCase
@@ -42,6 +44,10 @@ class TraineeOnsiteTicketTest extends TestCase
         $this->assertNull($ticket->or_number);
         $this->assertNull($ticket->paid_at);
         $this->assertSame(EnrollmentApplication::PAYMENT_ONSITE_PENDING, $application->refresh()->payment_status);
+
+        $ticketNotice = "On-site payment ticket {$ticket->ticket_number} generated. Present it to the MCARE cashier.";
+        $paymentPage = $this->actingAs($trainee)->get(route('trainee.payments'))->assertOk();
+        $this->assertSame(1, substr_count($paymentPage->getContent(), $ticketNotice));
 
         // A second click returns the same pending ticket instead of adding another ledger row.
         $this->actingAs($trainee)
@@ -101,6 +107,46 @@ class TraineeOnsiteTicketTest extends TestCase
         $this->assertDatabaseCount('payment_transactions', 0);
     }
 
+    public function test_receipt_proof_completes_the_active_ticket_instead_of_duplicating_it(): void
+    {
+        Storage::fake('local');
+
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $batch = TrainingBatch::create([
+            'name' => 'Batch Receipt',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+        ]);
+        $application = $this->approvedApplication($trainee, $batch);
+
+        $this->actingAs($trainee)
+            ->post(route('trainee.payments.tickets.store'), [
+                'transaction_type' => 'downpayment',
+                'amount' => 2000.00,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $ticket = PaymentTransaction::query()->firstOrFail();
+
+        $this->actingAs($trainee)
+            ->post(route('trainee.payments.upload-proof'), [
+                'transaction_type' => 'downpayment',
+                'amount' => 2000.00,
+                'or_number' => 'OR-TICKET-2000',
+                'paid_at' => now()->toDateString(),
+                'receipt_proof' => UploadedFile::fake()->create('ticket-receipt.pdf', 100, 'application/pdf'),
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseCount('payment_transactions', 1);
+        $ticket->refresh();
+        $this->assertSame('OR-TICKET-2000', $ticket->or_number);
+        $this->assertNotNull($ticket->receipt_proof_path);
+        $this->assertSame(PaymentTransaction::STATUS_PENDING, $ticket->status);
+        $this->assertSame(EnrollmentApplication::PAYMENT_ONSITE_PENDING, $application->refresh()->payment_status);
+    }
+
     public function test_enrollment_onsite_downpayment_creates_ticket_and_admin_and_trainer_see_it(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
@@ -137,10 +183,17 @@ class TraineeOnsiteTicketTest extends TestCase
             'status' => 'pending_verification',
         ]);
 
-        // Admin verifies downpayment via quick toggle
+        $ticket = PaymentTransaction::query()
+            ->where('enrollment_application_id', $application->id)
+            ->where('status', PaymentTransaction::STATUS_PENDING)
+            ->firstOrFail();
+
+        // Cashier verification supplies the real OR instead of fabricating a ledger entry.
         $this->actingAs($admin)
-            ->patch(route('admin.payment-schedules.update', $application), [
-                'action' => 'verify_downpayment',
+            ->patch(route('admin.payment-schedules.transactions.verify', $ticket), [
+                'action' => 'verify',
+                'or_number' => 'OR-2026-BATCH3-01',
+                'paid_at' => now()->toDateString(),
             ])
             ->assertRedirect()
             ->assertSessionHas('saved');

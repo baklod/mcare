@@ -62,6 +62,24 @@ document.addEventListener('DOMContentLoaded', () => {
     let navigationUnlockTimer = null;
     let navigationSpamReported = false;
 
+    // Mobile dashboards keep the bottom bar compact while the More sheet
+    // exposes every destination that is available in the desktop sidebar.
+    document.querySelectorAll('[data-dashboard-mobile-menu-open]').forEach((button) => {
+        const dialog = document.getElementById(button.dataset.dashboardMobileMenuOpen);
+        if (!('HTMLDialogElement' in window) || !(dialog instanceof window.HTMLDialogElement)) return;
+
+        button.addEventListener('click', () => {
+            if (!dialog.open) dialog.showModal();
+        });
+    });
+
+    document.querySelectorAll('[data-dashboard-mobile-menu]').forEach((dialog) => {
+        dialog.querySelector('[data-dashboard-mobile-menu-close]')?.addEventListener('click', () => dialog.close());
+        dialog.addEventListener('click', (event) => {
+            if (event.target === dialog) dialog.close();
+        });
+    });
+
     // Successful action feedback stays long enough to read, pauses during
     // interaction, then leaves the interface without requiring another click.
     document.querySelectorAll('[data-auto-dismiss]').forEach((notice) => {

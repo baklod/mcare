@@ -19,13 +19,9 @@
         $trainerStreamHref = \Illuminate\Support\Facades\Route::has('trainer.stream')
             ? route('trainer.stream')
             : route('trainer.dashboard');
-        $trainerQuizCreateHref = \Illuminate\Support\Facades\Route::has('trainer.quizzes.create')
-            ? route('trainer.quizzes.create')
-            : route('trainer.assessments');
         $trainerPrimaryNav = [
             ['label' => 'Stream', 'short' => 'Stream', 'icon' => 'fa-bell', 'href' => $trainerStreamHref, 'active' => request()->routeIs('trainer.stream', 'trainer.announcements.*')],
-            ['label' => 'Classwork', 'short' => 'Classwork', 'icon' => 'fa-book-open', 'href' => route('trainer.resources'), 'active' => request()->routeIs('trainer.resources', 'trainer.modules.*')],
-            ['label' => 'Quizzes', 'short' => 'Quizzes', 'icon' => 'fa-square-check', 'href' => route('trainer.assessments'), 'active' => request()->routeIs('trainer.assessments', 'trainer.quizzes.*')],
+            ['label' => 'Classwork', 'short' => 'Classwork', 'icon' => 'fa-book-open', 'href' => route('trainer.resources'), 'active' => request()->routeIs('trainer.resources', 'trainer.modules.*', 'trainer.quizzes.*', 'trainer.assessments')],
             ['label' => 'Calendar', 'short' => 'Calendar', 'icon' => 'fa-calendar-days', 'href' => route('trainer.sessions'), 'active' => request()->routeIs('trainer.sessions')],
         ];
         $trainerSecondaryNav = [
@@ -36,6 +32,18 @@
             ['label' => 'Certificates', 'icon' => 'fa-award', 'href' => route('trainer.certificates'), 'active' => request()->routeIs('trainer.certificates')],
             ['label' => 'Reports', 'icon' => 'fa-chart-column', 'href' => route('trainer.reports'), 'active' => request()->routeIs('trainer.reports')],
         ];
+        $trainerAllNav = collect(array_merge($trainerPrimaryNav, $trainerSecondaryNav))->keyBy('label');
+        $trainerMobileLabels = ['Teaching Day', 'Stream', 'Classwork'];
+        $trainerMobilePrimary = collect($trainerMobileLabels)
+            ->map(fn (string $label) => $trainerAllNav->get($label))
+            ->filter()
+            ->values()
+            ->all();
+        $trainerMobileMore = $trainerAllNav
+            ->reject(fn (array $item, string $label) => in_array($label, $trainerMobileLabels, true))
+            ->values()
+            ->push(['label' => 'Public site', 'icon' => 'fa-arrow-up-right-from-square', 'href' => route('landing'), 'active' => false])
+            ->all();
     @endphp
 
     <aside class="dashboard-sidebar" data-dashboard-sidebar>
@@ -79,7 +87,7 @@
                 <x-dashboard-icon name="chevron-down" class="dashboard-chevron text-xs text-slate-500 transition" />
             </summary>
             <div class="dashboard-account-menu">
-                <x-dashboard-account-actions :logout-route="route('trainer.logout')" role-label="Trainer" />
+                <x-dashboard-account-actions :logout-route="route('logout')" role-label="Trainer" />
             </div>
         </details>
     </aside>
@@ -99,9 +107,8 @@
 
                 <div class="dashboard-classroom-actions">
                     <a href="{{ $trainerStreamHref }}" class="dashboard-context-link">Open stream</a>
-                    <a href="{{ $trainerQuizCreateHref }}" class="dashboard-context-link is-primary">
-                        <span aria-hidden="true">+</span>
-                        <span>Create quiz</span>
+                    <a href="{{ route('trainer.resources') }}" class="dashboard-context-link is-primary">
+                        <span>Open modules</span>
                     </a>
                 </div>
 
@@ -112,18 +119,17 @@
                         <x-dashboard-icon name="chevron-down" class="dashboard-chevron text-xs text-slate-500 transition" />
                     </summary>
                     <div class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
-                        <x-dashboard-account-actions :logout-route="route('trainer.logout')" role-label="Trainer" />
+                        <x-dashboard-account-actions :logout-route="route('logout')" role-label="Trainer" />
                     </div>
                 </details>
             </div>
-            <nav class="dashboard-mobile-bar grid-cols-4" aria-label="Mobile trainer navigation">
-                @foreach ($trainerPrimaryNav as $item)
-                    <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainer-{{ str($item['label'])->slug() }}" class="dashboard-mobile-link {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
-                        <x-dashboard-icon :name="$item['icon']" />
-                        <span class="truncate">{{ $item['short'] }}</span>
-                    </a>
-                @endforeach
-            </nav>
+            <x-dashboard-mobile-navigation
+                :primary-items="$trainerMobilePrimary"
+                :more-items="$trainerMobileMore"
+                label="Mobile trainer navigation"
+                menu-title="Trainer destinations"
+                role="trainer"
+            />
         </header>
 
         <main class="dashboard-main">

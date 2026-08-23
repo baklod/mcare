@@ -8,6 +8,7 @@ use App\Models\EnrollmentApplication;
 use App\Models\Quiz;
 use App\Models\QuizAttempt;
 use App\Models\TrainingBatch;
+use App\Models\TrainingModule;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,44 +20,16 @@ use Illuminate\View\View;
 
 class QuizController extends Controller
 {
-    public function index(Request $request): View
+    public function index(): RedirectResponse
     {
-        $trainer = $request->user();
-        $quizzes = Quiz::query()
-            ->with(['batch', 'targetTrainee'])
-            ->withCount(['questions', 'attempts'])
-            ->withAvg([
-                'attempts as average_score' => fn ($query) => $query->where('status', QuizAttempt::STATUS_GRADED),
-            ], 'score_percent')
-            ->where('trainer_id', $trainer->id)
-            ->latest('updated_at')
-            ->paginate(12);
-
-        return view('trainer.assessments', [
-            'quizzes' => $quizzes,
-            'quizStats' => [
-                'total' => Quiz::query()->where('trainer_id', $trainer->id)->count(),
-                'published' => Quiz::query()
-                    ->where('trainer_id', $trainer->id)
-                    ->where('is_published', true)
-                    ->count(),
-                'submissions' => $trainer->quizzes()
-                    ->withCount(['attempts' => fn ($query) => $query->where('status', QuizAttempt::STATUS_GRADED)])
-                    ->get()
-                    ->sum('attempts_count'),
-            ],
-        ]);
+        return redirect()->route('trainer.resources');
     }
 
-    public function create(Request $request): View
+    public function create(): RedirectResponse
     {
-        return view('trainer.quizzes.create', [
-            'quiz' => new Quiz([
-                'attempt_limit' => 1,
-                'passing_score_percent' => 75,
-            ]),
-            ...$this->formOptions(),
-        ]);
+        return redirect()
+            ->route('trainer.resources')
+            ->with('saved', 'Open a learning module to create its assessment.');
     }
 
     public function store(Request $request): RedirectResponse
@@ -64,6 +37,7 @@ class QuizController extends Controller
         $validated = $this->validatedPayload($request);
         [$batchId, $targetTrainee] = $this->resolveAudience($validated);
         $this->assertTrainerBatch($request, $batchId, $targetTrainee);
+        $parentModule = $this->resolveParentModule($request, $validated, $batchId, $targetTrainee);
         $questions = $this->normalizedQuestions($validated['questions']);
         $published = $request->boolean('is_published');
 
@@ -72,6 +46,7 @@ class QuizController extends Controller
             $validated,
             $batchId,
             $targetTrainee,
+            $parentModule,
             $questions,
             $published,
         ): Quiz {
@@ -79,6 +54,7 @@ class QuizController extends Controller
                 'trainer_id' => $request->user()->id,
                 'training_batch_id' => $batchId,
                 'target_enrollment_application_id' => $targetTrainee?->id,
+                'training_module_id' => $parentModule?->id,
                 'title' => $validated['title'],
                 'instructions' => $validated['instructions'] ?? null,
                 'available_at' => $validated['available_at'] ?? null,
@@ -102,8 +78,7 @@ class QuizController extends Controller
             'published' => $quiz->is_published,
         ]);
 
-        return redirect()
-            ->route('trainer.assessments')
+        return $this->moduleRedirect($quiz)
             ->with('saved', $quiz->is_published ? 'Quiz published.' : 'Quiz saved as a draft.');
     }
 
@@ -124,6 +99,7 @@ class QuizController extends Controller
         $validated = $this->validatedPayload($request);
         [$batchId, $targetTrainee] = $this->resolveAudience($validated);
         $this->assertTrainerBatch($request, $batchId, $targetTrainee);
+        $parentModule = $this->resolveParentModule($request, $validated, $batchId, $targetTrainee);
         $questions = $this->normalizedQuestions($validated['questions']);
 
         DB::transaction(function () use (
@@ -132,6 +108,7 @@ class QuizController extends Controller
             $validated,
             $batchId,
             $targetTrainee,
+            $parentModule,
             $questions,
         ): void {
             $lockedQuiz = Quiz::query()->lockForUpdate()->findOrFail($quiz->id);
@@ -143,6 +120,7 @@ class QuizController extends Controller
                     $validated,
                     $batchId,
                     $targetTrainee,
+                    $parentModule,
                     $questions,
                 );
             }
@@ -160,6 +138,7 @@ class QuizController extends Controller
             if (! $hasAttempts) {
                 $attributes = [
                     ...$attributes,
+                    'training_module_id' => $parentModule?->id,
                     'training_batch_id' => $batchId,
                     'target_enrollment_application_id' => $targetTrainee?->id,
                     'available_at' => $validated['available_at'] ?? null,
@@ -184,8 +163,7 @@ class QuizController extends Controller
             'published' => $quiz->is_published,
         ]);
 
-        return redirect()
-            ->route('trainer.assessments')
+        return $this->moduleRedirect($quiz)
             ->with('saved', 'Quiz updated.');
     }
 
@@ -211,8 +189,7 @@ class QuizController extends Controller
             'published' => $published,
         ]);
 
-        return redirect()
-            ->route('trainer.assessments')
+        return $this->moduleRedirect($quiz)
             ->with('saved', $published ? 'Quiz published.' : 'Quiz returned to draft.');
     }
 
@@ -234,7 +211,7 @@ class QuizController extends Controller
     {
         $this->authorize('delete', $quiz);
 
-        $title = DB::transaction(function () use ($request, $quiz): string {
+        [$title, $moduleId] = DB::transaction(function () use ($request, $quiz): array {
             $lockedQuiz = Quiz::query()->lockForUpdate()->findOrFail($quiz->id);
 
             if ($lockedQuiz->attempts()->exists()) {
@@ -244,17 +221,17 @@ class QuizController extends Controller
             }
 
             $title = $lockedQuiz->title;
+            $moduleId = $lockedQuiz->training_module_id;
             AdminActivityLog::record($request->user(), 'trainer.quiz.deleted', $lockedQuiz, [
                 'title' => $title,
                 'batch_id' => $lockedQuiz->training_batch_id,
             ]);
             $lockedQuiz->delete();
 
-            return $title;
+            return [$title, $moduleId];
         });
 
-        return redirect()
-            ->route('trainer.assessments')
+        return $this->moduleRedirect($quiz, $moduleId)
             ->with('saved', "Quiz {$title} was removed.");
     }
 
@@ -270,6 +247,13 @@ class QuizController extends Controller
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:160'],
             'instructions' => ['nullable', 'string', 'max:5000'],
+            'training_module_id' => [
+                'required',
+                'integer',
+                Rule::exists('training_modules', 'id')->where(
+                    fn ($query) => $query->where('trainer_id', $request->user()->id)
+                ),
+            ],
             'audience_type' => ['required', Rule::in(['batch', 'trainee'])],
             'training_batch_id' => ['nullable', 'integer', 'exists:training_batches,id'],
             'target_enrollment_application_id' => [
@@ -386,6 +370,10 @@ class QuizController extends Controller
 
         return [
             'batches' => $assignedBatch ? collect([$assignedBatch]) : collect(),
+            'modules' => \App\Models\TrainingModule::query()
+                ->where('trainer_id', request()->user()->id)
+                ->orderBy('title')
+                ->get(),
             'trainees' => EnrollmentApplication::query()
                 ->with('batch')
                 ->where('status', EnrollmentApplication::STATUS_APPROVED)
@@ -395,6 +383,50 @@ class QuizController extends Controller
                 ->orderBy('first_name')
                 ->get(),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function resolveParentModule(
+        Request $request,
+        array $validated,
+        int $batchId,
+        ?EnrollmentApplication $targetTrainee,
+    ): TrainingModule {
+        $moduleId = $validated['training_module_id'];
+        $module = TrainingModule::query()
+            ->whereKey($moduleId)
+            ->where('trainer_id', $request->user()->id)
+            ->first();
+
+        if (! $module) {
+            throw ValidationException::withMessages([
+                'training_module_id' => 'Choose one of your own learning modules.',
+            ]);
+        }
+
+        if (
+            (int) $module->training_batch_id !== $batchId
+            || $this->nullableInt($module->target_enrollment_application_id) !== $this->nullableInt($targetTrainee?->id)
+        ) {
+            throw ValidationException::withMessages([
+                'training_module_id' => 'The parent module and quiz must use the same class and trainee audience.',
+            ]);
+        }
+
+        return $module;
+    }
+
+    private function moduleRedirect(Quiz $quiz, ?int $moduleId = null): RedirectResponse
+    {
+        $moduleId ??= $quiz->training_module_id;
+
+        if (! $moduleId) {
+            return redirect()->route('trainer.resources');
+        }
+
+        return redirect()->to(route('trainer.modules.show', $moduleId).'#assessments');
     }
 
     private function assertTrainerBatch(
@@ -457,10 +489,15 @@ class QuizController extends Controller
         array $validated,
         int $batchId,
         ?EnrollmentApplication $targetTrainee,
+        ?TrainingModule $parentModule,
         array $questions,
     ): void {
         $message = 'This setting is locked because a trainee has already started the quiz.';
         $errors = [];
+
+        if ($this->nullableInt($quiz->training_module_id) !== $this->nullableInt($parentModule?->id)) {
+            $errors['training_module_id'] = $message;
+        }
 
         if ((int) $quiz->training_batch_id !== $batchId) {
             $errors['training_batch_id'] = $message;

@@ -18,20 +18,26 @@ class QuizAuthoringTest extends TestCase
     {
         $trainer = $this->lmsUser('trainer');
         $batch = $this->lmsBatch();
+        $module = $this->lmsModule($trainer, $batch);
 
         $this->actingAs($trainer)
             ->get(route('trainer.quizzes.create'))
-            ->assertOk()
-            ->assertSee('data-quiz-builder', false)
-            ->assertSee('data-quiz-question-list', false);
+            ->assertRedirect(route('trainer.resources'));
 
         $this->actingAs($trainer)
-            ->post(route('trainer.quizzes.store'), $this->quizPayload($batch->id))
-            ->assertRedirect(route('trainer.assessments'))
+            ->get(route('trainer.assessments'))
+            ->assertRedirect(route('trainer.resources'));
+
+        $this->actingAs($trainer)
+            ->post(route('trainer.quizzes.store'), $this->quizPayload($batch->id, [
+                'training_module_id' => $module->id,
+            ]))
+            ->assertRedirect(route('trainer.modules.show', $module).'#assessments')
             ->assertSessionHas('saved');
 
         $quiz = Quiz::query()->where('title', 'Infection control check')->firstOrFail();
         $this->assertSame($trainer->id, $quiz->trainer_id);
+        $this->assertSame($module->id, $quiz->training_module_id);
         $this->assertFalse($quiz->is_published);
         $this->assertCount(2, $quiz->questions);
 
@@ -43,14 +49,15 @@ class QuizAuthoringTest extends TestCase
 
         $this->actingAs($trainer)
             ->patch(route('trainer.quizzes.update', $quiz), $this->quizPayload($batch->id, [
+                'training_module_id' => $module->id,
                 'title' => 'Updated infection control check',
                 'passing_score_percent' => 80,
             ]))
-            ->assertRedirect(route('trainer.assessments'));
+            ->assertRedirect(route('trainer.modules.show', $module).'#assessments');
 
         $this->actingAs($trainer)
             ->patch(route('trainer.quizzes.publication', $quiz), ['is_published' => '1'])
-            ->assertRedirect(route('trainer.assessments'));
+            ->assertRedirect(route('trainer.modules.show', $module).'#assessments');
 
         $quiz->refresh();
         $this->assertTrue($quiz->is_published);
@@ -64,7 +71,7 @@ class QuizAuthoringTest extends TestCase
 
         $this->actingAs($trainer)
             ->delete(route('trainer.quizzes.destroy', $quiz))
-            ->assertRedirect(route('trainer.assessments'));
+            ->assertRedirect(route('trainer.modules.show', $module).'#assessments');
 
         $this->assertDatabaseMissing('quizzes', ['id' => $quiz->id]);
         $this->assertDatabaseMissing('quiz_questions', ['quiz_id' => $quiz->id]);
@@ -74,7 +81,8 @@ class QuizAuthoringTest extends TestCase
     {
         $trainer = $this->lmsUser('trainer');
         $batch = $this->lmsBatch();
-        $quiz = $this->quiz($trainer->id, $batch->id);
+        $module = $this->lmsModule($trainer, $batch);
+        $quiz = $this->quiz($trainer->id, $batch->id, ['training_module_id' => $module->id]);
 
         $this->actingAs($trainer)
             ->from(route('trainer.quizzes.edit', $quiz))
@@ -89,7 +97,8 @@ class QuizAuthoringTest extends TestCase
     {
         $trainer = $this->lmsUser('trainer');
         $batch = $this->lmsBatch();
-        $payload = $this->quizPayload($batch->id);
+        $module = $this->lmsModule($trainer, $batch);
+        $payload = $this->quizPayload($batch->id, ['training_module_id' => $module->id]);
         $payload['questions'][0]['correct_option'] = 99;
 
         $this->actingAs($trainer)
@@ -103,12 +112,32 @@ class QuizAuthoringTest extends TestCase
         ]);
     }
 
+    public function test_quiz_cannot_be_attached_to_another_trainers_module(): void
+    {
+        $trainer = $this->lmsUser('trainer');
+        $otherTrainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch();
+        $otherModule = $this->lmsModule($otherTrainer, $batch);
+        $payload = $this->quizPayload($batch->id, [
+            'training_module_id' => $otherModule->id,
+        ]);
+
+        $this->actingAs($trainer)
+            ->from(route('trainer.quizzes.create'))
+            ->post(route('trainer.quizzes.store'), $payload)
+            ->assertRedirect(route('trainer.quizzes.create'))
+            ->assertSessionHasErrors('training_module_id');
+
+        $this->assertDatabaseMissing('quizzes', ['title' => 'Infection control check']);
+    }
+
     public function test_trainer_cannot_manage_another_trainers_quiz(): void
     {
         $owner = $this->lmsUser('trainer');
         $otherTrainer = $this->lmsUser('trainer');
         $batch = $this->lmsBatch();
-        $quiz = $this->quiz($owner->id, $batch->id);
+        $module = $this->lmsModule($owner, $batch);
+        $quiz = $this->quiz($owner->id, $batch->id, ['training_module_id' => $module->id]);
         $this->question($quiz);
 
         $this->actingAs($otherTrainer)
@@ -137,7 +166,11 @@ class QuizAuthoringTest extends TestCase
         $trainer = $this->lmsUser('trainer');
         $batch = $this->lmsBatch();
         ['application' => $application] = $this->lmsTrainee($batch);
-        $quiz = $this->quiz($trainer->id, $batch->id, ['is_published' => true]);
+        $module = $this->lmsModule($trainer, $batch);
+        $quiz = $this->quiz($trainer->id, $batch->id, [
+            'training_module_id' => $module->id,
+            'is_published' => true,
+        ]);
         $question = $this->question($quiz);
         QuizAttempt::create([
             'quiz_id' => $quiz->id,
@@ -150,6 +183,7 @@ class QuizAuthoringTest extends TestCase
         $payload = [
             'audience_type' => 'batch',
             'training_batch_id' => $batch->id,
+            'training_module_id' => $module->id,
             'title' => 'Safe title update',
             'instructions' => 'Updated explanation only.',
             'available_at' => $quiz->available_at?->toDateTimeString(),
@@ -182,7 +216,7 @@ class QuizAuthoringTest extends TestCase
 
         $this->actingAs($trainer)
             ->patch(route('trainer.quizzes.update', $quiz), $payload)
-            ->assertRedirect(route('trainer.assessments'))
+            ->assertRedirect(route('trainer.modules.show', $module).'#assessments')
             ->assertSessionHas('saved');
 
         $quiz->refresh();
@@ -191,9 +225,9 @@ class QuizAuthoringTest extends TestCase
         $this->assertEquals(75.0, (float) $quiz->passing_score_percent);
 
         $this->actingAs($trainer)
-            ->from(route('trainer.assessments'))
+            ->from(route('trainer.modules.show', $module).'#assessments')
             ->delete(route('trainer.quizzes.destroy', $quiz))
-            ->assertRedirect(route('trainer.assessments'))
+            ->assertRedirect(route('trainer.modules.show', $module).'#assessments')
             ->assertSessionHasErrors('quiz');
 
         $this->assertDatabaseHas('quizzes', ['id' => $quiz->id]);

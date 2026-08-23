@@ -11,23 +11,18 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Illuminate\View\View;
 use Throwable;
 
 class AdminSessionController extends Controller
 {
-    public function create(Request $request): View|RedirectResponse
+    public function create(Request $request): RedirectResponse
     {
         // Already-authenticated admins should land on the operations dashboard.
         if ($request->user()?->hasRole('admin')) {
             return redirect()->route('admin.dashboard');
         }
 
-        return view('admin.auth.login', [
-            // Makes role testing clear when another account is already active in this browser.
-            'activeUser' => $request->user(),
-            'mfaPending' => is_array($request->session()->get('admin.mfa.pending')),
-        ]);
+        return redirect()->route('login');
     }
 
     public function store(Request $request): RedirectResponse
@@ -87,7 +82,7 @@ class AdminSessionController extends Controller
                 AdminActivityLog::record($user, 'admin.login.mfa.sent', $user);
 
                 return redirect()
-                    ->route('admin.login')
+                    ->route('login')
                     ->with('mfa_notice', 'A verification code was sent to your staff email address.');
             } catch (Throwable $exception) {
                 report($exception);
@@ -117,7 +112,7 @@ class AdminSessionController extends Controller
 
         if (! is_array($challenge) || ! isset($challenge['user_id'])) {
             return redirect()
-                ->route('admin.login')
+                ->route('login')
                 ->withErrors(['code' => 'Your verification session has expired. Please sign in again.']);
         }
 
@@ -131,7 +126,7 @@ class AdminSessionController extends Controller
             AdminActivityLog::record($pendingUser, 'admin.login.mfa.expired', $pendingUser);
 
             return redirect()
-                ->route('admin.login')
+                ->route('login')
                 ->with('mfa_notice', 'That verification code has expired. Please sign in again.')
                 ->withErrors(['email' => 'Enter your staff email and password to request a new code.']);
         }
@@ -143,7 +138,7 @@ class AdminSessionController extends Controller
             AdminActivityLog::record($pendingUser, 'admin.login.mfa.locked', $pendingUser);
 
             return redirect()
-                ->route('admin.login')
+                ->route('login')
                 ->with('mfa_notice', 'Too many incorrect codes. Please sign in again.')
                 ->withErrors(['email' => 'Enter your staff email and password to request a new code.']);
         }
@@ -160,7 +155,7 @@ class AdminSessionController extends Controller
             }
 
             return redirect()
-                ->route('admin.login')
+                ->route('login')
                 ->withErrors(['code' => 'The verification code is incorrect.']);
         }
 
@@ -170,7 +165,7 @@ class AdminSessionController extends Controller
             $request->session()->forget('admin.mfa.pending');
 
             return redirect()
-                ->route('admin.login')
+                ->route('login')
                 ->withErrors(['code' => 'This staff account is no longer allowed to access the admin area.']);
         }
 
@@ -193,6 +188,8 @@ class AdminSessionController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('admin.login');
+        return redirect()
+            ->route('landing')
+            ->with('signed_out', 'You have signed out. You can now switch accounts safely.');
     }
 }

@@ -15,7 +15,7 @@ use Illuminate\View\View;
 
 class QuizController extends Controller
 {
-    public function index(Request $request): View|RedirectResponse
+    public function index(Request $request): RedirectResponse
     {
         $application = $this->approvedApplicationFor($request);
 
@@ -23,26 +23,7 @@ class QuizController extends Controller
             return $this->approvalRedirect();
         }
 
-        $quizzes = $this->availableQuizQuery($application)
-            ->where(fn ($query) => $query->whereNull('due_at')->orWhere('due_at', '>=', now()))
-            ->with(['trainer', 'batch'])
-            ->withCount('questions')
-            ->orderByRaw('CASE WHEN due_at IS NULL THEN 1 ELSE 0 END')
-            ->orderBy('due_at')
-            ->latest('published_at')
-            ->get();
-        $attemptsByQuiz = QuizAttempt::query()
-            ->where('enrollment_application_id', $application->id)
-            ->whereIn('quiz_id', $quizzes->pluck('id'))
-            ->latest('attempt_number')
-            ->get()
-            ->groupBy('quiz_id');
-
-        return view('trainee.quizzes.index', [
-            'application' => $application->load('batch'),
-            'quizzes' => $quizzes,
-            'attemptsByQuiz' => $attemptsByQuiz,
-        ]);
+        return redirect()->route('trainee.modules.index');
     }
 
     public function show(Request $request, Quiz $quiz): View|RedirectResponse

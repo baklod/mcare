@@ -35,12 +35,6 @@
             </div>
         </header>
 
-        @if (session('saved'))
-            <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800" data-auto-dismiss="5000">
-                {{ session('saved') }}
-            </div>
-        @endif
-
         @if ($errors->any())
             <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-800">
                 <ul class="list-disc pl-5 space-y-1">
@@ -215,22 +209,16 @@
                                         <form method="POST" action="{{ route('admin.payment-schedules.update', $application) }}" class="flex flex-wrap items-center gap-1.5">
                                             @csrf
                                             @method('PATCH')
-                                            @if ($application->payment_method === 'onsite' && $application->payment_status !== 'paid')
-                                                @if (! $application->isDownpaymentSatisfied())
-                                                    <button name="action" value="verify_downpayment" title="Verify ₱2,000 downpayment for LMS activation" class="rounded-md bg-purple-100 px-2 py-1 text-[11px] font-bold text-purple-800 hover:bg-purple-200">
-                                                        Verify Downpayment (₱2,000)
-                                                    </button>
-                                                @endif
-                                                <button name="action" value="verify_paid" title="Mark full payment verified" class="rounded-md bg-emerald-100 px-2 py-1 text-[11px] font-bold text-emerald-800 hover:bg-emerald-200">
-                                                    Mark Paid
+                                            @if ($totalPaid <= 0)
+                                                <button name="action" value="return_pending" title="Return to pending verification" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50">
+                                                    Pending
                                                 </button>
+                                                <button name="action" value="mark_expired" title="Mark payment expired" class="rounded-md border border-rose-200 bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50">
+                                                    Expire
+                                                </button>
+                                            @else
+                                                <span class="text-[11px] font-semibold text-slate-500">Status follows the verified ledger.</span>
                                             @endif
-                                            <button name="action" value="return_pending" title="Return to pending verification" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50">
-                                                Pending
-                                            </button>
-                                            <button name="action" value="mark_expired" title="Mark payment expired" class="rounded-md border border-rose-200 bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50">
-                                                Expire
-                                            </button>
                                         </form>
                                     </div>
 
@@ -257,6 +245,11 @@
                                                                 OR #: <strong class="font-mono">{{ $tx->or_number ?: 'N/A' }}</strong> · {{ $tx->typeLabel() }} · {{ $tx->paid_at?->format('M d, Y') ?? 'N/A' }}
                                                             @endif
                                                         </p>
+                                                        @if ($tx->receipt_proof_path)
+                                                            <a href="{{ route('admin.payment-schedules.transactions.proof', $tx) }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 hover:text-purple-900">
+                                                                View uploaded receipt proof
+                                                            </a>
+                                                        @endif
                                                         @if ($tx->recordedByAdmin)
                                                             <p class="text-[10px] text-slate-400">Recorded by {{ $tx->recordedByAdmin->name }}</p>
                                                         @endif

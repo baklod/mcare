@@ -20,7 +20,6 @@
     <nav class="lms-context-tabs" aria-label="Trainee classroom sections">
         <a href="{{ route('trainee.stream') }}" class="is-active" aria-current="page">Stream</a>
         <a href="{{ route('trainee.modules.index') }}">Classwork</a>
-        <a href="{{ route('trainee.quizzes.index') }}">Quizzes</a>
         <a href="{{ route('trainee.schedule') }}">Calendar</a>
     </nav>
 
@@ -116,9 +115,9 @@
                 </div>
                 <div class="lms-upcoming-list">
                     @forelse($upcomingQuizzes as $quiz)
-                        <a href="{{ route('trainee.quizzes.show', $quiz) }}" class="lms-upcoming-item">
+                        <a href="{{ $quiz->training_module_id ? route('trainee.modules.show', $quiz->training_module_id).'#assessments' : route('trainee.quizzes.show', $quiz) }}" class="lms-upcoming-item">
                             <span class="lms-upcoming-icon is-quiz"><x-dashboard-icon name="square-check" /></span>
-                            <span><strong>{{ $quiz->title }}</strong><small>Quiz - {{ $quiz->due_at?->format('M d, g:i A') ?? 'No due date' }}</small></span>
+                            <span><strong>{{ $quiz->title }}</strong><small>Assessment - {{ $quiz->due_at?->format('M d, g:i A') ?? 'No due date' }}</small></span>
                         </a>
                     @empty
                     @endforelse
@@ -140,7 +139,6 @@
                 <h2>Quick links</h2>
                 <div class="lms-quick-links">
                     <a href="{{ route('trainee.modules.index') }}"><x-dashboard-icon name="book-open" /> Review classwork</a>
-                    <a href="{{ route('trainee.quizzes.index') }}"><x-dashboard-icon name="square-check" /> Open quizzes</a>
                 </div>
             </section>
         </aside>

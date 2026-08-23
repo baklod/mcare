@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
 use App\Models\User;
+use App\Notifications\EnrollmentSubmittedNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -15,6 +16,7 @@ use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Throwable;
 
 class EnrollmentController extends Controller
 {
@@ -41,6 +43,8 @@ class EnrollmentController extends Controller
             'application' => $application,
             'enrollmentBatch' => $enrollmentBatch,
             'user' => $request->user(),
+            'googleIdentity' => $this->googleIdentity($request),
+            'isGoogleApplicant' => filled($request->user()?->google_id),
             'documentLabels' => $documentLabels,
             'documentFeedback' => $documentFeedback,
             'draftUploads' => $request->session()->get('enrollment.draft_uploads', []),
@@ -77,10 +81,25 @@ class EnrollmentController extends Controller
         );
 
         $currentUser = $request->user();
+        if ($currentUser) {
+            // A signed-in identity owns its account email. Ignore a tampered
+            // form value instead of allowing enrollment to relink the account.
+            $request->merge(['email' => Str::lower($currentUser->email)]);
+        }
+
         $currentApplication = $currentUser
             ? EnrollmentApplication::where('user_id', $currentUser->id)->first()
             : null;
         $enrollmentBatch = $currentApplication?->batch ?: TrainingBatch::openForEnrollment();
+        $isGoogleApplicant = filled($currentUser?->google_id);
+        $passwordRules = $isGoogleApplicant
+            ? ['exclude']
+            : [
+                $currentUser ? 'nullable' : 'required',
+                'confirmed',
+                'max:255',
+                Password::min(10)->mixedCase()->letters()->numbers(),
+            ];
 
         // Existing applicants may update their record; only new entries require an open window.
         if (! $currentApplication && ! $enrollmentBatch) {
@@ -103,7 +122,7 @@ class EnrollmentController extends Controller
                 'ends_with:@gmail.com',
                 Rule::unique('users', 'email')->ignore($currentUser?->id),
             ],
-            'password' => ['required', 'confirmed', 'max:255', Password::min(10)->mixedCase()->letters()->numbers()],
+            'password' => $passwordRules,
             'first_name' => ['required', 'string', 'max:100', ...$safeText],
             'middle_name' => ['nullable', 'string', 'max:100', ...$safeText],
             'last_name' => ['required', 'string', 'max:100', ...$safeText],
@@ -168,15 +187,18 @@ class EnrollmentController extends Controller
         $validated = $validator->validated();
 
         $user = $currentUser ?? new User;
-        $user->forceFill(
-            [
-                'email' => $validated['email'],
-                'name' => trim($validated['first_name'].' '.$validated['last_name']),
-                'role' => 'applicant',
-                'applicant_status' => 'profile_submitted',
-                'password' => $validated['password'],
-            ],
-        )->save();
+        $userData = [
+            'email' => $validated['email'],
+            'name' => trim($validated['first_name'].' '.$validated['last_name']),
+            'role' => 'applicant',
+            'applicant_status' => 'profile_submitted',
+        ];
+
+        if (filled($validated['password'] ?? null)) {
+            $userData['password'] = $validated['password'];
+        }
+
+        $user->forceFill($userData)->save();
 
         $documentPaths = [
             'birth_certificate_path' => $this->storeUploadedDocument($request, 'birth_certificate', $user, $currentApplication?->birth_certificate_path),
@@ -215,6 +237,7 @@ class EnrollmentController extends Controller
         );
 
         $this->clearDraftUploads($request);
+        $request->session()->forget('enrollment.google_identity');
 
         if ($currentApplication) {
             $review = $application->document_review ?? [];
@@ -246,9 +269,67 @@ class EnrollmentController extends Controller
             $request->session()->put('enrollment.payment_application_id', $application->id);
         }
 
+        if (! $currentUser && ! $user->hasVerifiedEmail()) {
+            try {
+                $user->sendEmailVerificationNotification();
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        }
+
+        try {
+            $user->notify(new EnrollmentSubmittedNotification($application));
+        } catch (Throwable $exception) {
+            // SMTP delivery must not roll back a valid enrollment submission.
+            report($exception);
+        }
+
         return redirect()
             ->route('payment.show')
             ->with('payment_notice', 'Caregiving NC II enrollment registration saved. Choose your payment method to continue.');
+    }
+
+    /** @return array{email: string, first_name: string, middle_name: string, last_name: string, full_name: string, avatar_url: ?string} */
+    private function googleIdentity(Request $request): array
+    {
+        $user = $request->user();
+
+        if (! $user || blank($user->google_id)) {
+            return [
+                'email' => '',
+                'first_name' => '',
+                'middle_name' => '',
+                'last_name' => '',
+                'full_name' => '',
+                'avatar_url' => null,
+            ];
+        }
+
+        $identity = $request->session()->get('enrollment.google_identity', []);
+
+        if (is_array($identity) && Str::lower((string) ($identity['email'] ?? '')) === Str::lower($user->email)) {
+            return [
+                'email' => $user->email,
+                'first_name' => trim((string) ($identity['first_name'] ?? '')),
+                'middle_name' => trim((string) ($identity['middle_name'] ?? '')),
+                'last_name' => trim((string) ($identity['last_name'] ?? '')),
+                'full_name' => trim((string) ($identity['full_name'] ?? $user->name)),
+                'avatar_url' => $identity['avatar_url'] ?? $user->avatar_url,
+            ];
+        }
+
+        $parts = preg_split('/\s+/u', trim((string) $user->name), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $firstName = (string) array_shift($parts);
+        $lastName = count($parts) > 0 ? (string) array_pop($parts) : '';
+
+        return [
+            'email' => $user->email,
+            'first_name' => $firstName,
+            'middle_name' => implode(' ', $parts),
+            'last_name' => $lastName,
+            'full_name' => (string) $user->name,
+            'avatar_url' => $user->avatar_url,
+        ];
     }
 
     private function storeUploadedDocument(Request $request, string $field, User $user, ?string $existingPath): ?string

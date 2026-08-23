@@ -208,13 +208,26 @@ class AdminLearningSystemController extends Controller
             ],
             'training_batch_id' => ['required', 'integer', 'exists:training_batches,id'],
             'module_code' => ['nullable', 'string', 'max:50'],
+            'competency_category' => ['nullable', 'string', Rule::in(['core', 'common', 'basic', 'custom'])],
             'title' => ['required', 'string', 'max:160'],
             'topic' => ['nullable', 'string', 'max:120'],
-            'description' => ['required', 'string', 'max:1200'],
+            'estimated_hours' => ['nullable', 'integer', 'min:1', 'max:500'],
+            'description' => ['required', 'string', 'max:5000'],
             'module_file' => [
                 'required',
                 'file',
                 'max:'.TrainingModuleFiles::MAX_UPLOAD_KB,
+                new TrainingModuleFileType,
+            ],
+            'supplementary_files' => [
+                'nullable',
+                'array',
+                'max:'.TrainingModuleFiles::MAX_SUPPLEMENTARY_FILES,
+            ],
+            'supplementary_files.*' => [
+                'nullable',
+                'file',
+                'max:'.TrainingModuleFiles::MAX_SUPPLEMENTARY_UPLOAD_KB,
                 new TrainingModuleFileType,
             ],
             'is_published' => ['nullable', 'boolean'],
@@ -225,17 +238,40 @@ class AdminLearningSystemController extends Controller
 
         /** @var UploadedFile $file */
         $file = $request->file('module_file');
-        $path = $file->store("training-modules/admin/{$request->user()->id}", 'local');
+        $path = null;
+        $supplementaryList = [];
 
-        $module = TrainingModule::create([
-            ...collect($validated)->except(['module_file'])->all(),
-            'file_path' => $path,
-            'original_file_name' => $file->getClientOriginalName(),
-            'mime_type' => $file->getMimeType(),
-            'file_size' => $file->getSize() ?: 0,
-            'is_published' => $request->boolean('is_published'),
-            'published_at' => $request->boolean('is_published') ? now() : null,
-        ]);
+        try {
+            $path = $file->store("training-modules/admin/{$request->user()->id}", 'local');
+            if ($path === false) {
+                throw new \RuntimeException('The primary learning material could not be stored.');
+            }
+
+            if ($request->hasFile('supplementary_files')) {
+                $supplementaryList = TrainingModuleFiles::storeSupplementaryFiles(
+                    $request->file('supplementary_files'),
+                    $request->user()->id
+                );
+            }
+
+            $module = DB::transaction(fn (): TrainingModule => TrainingModule::create([
+                ...collect($validated)->except(['module_file', 'supplementary_files'])->all(),
+                'file_path' => $path,
+                'original_file_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getMimeType(),
+                'file_size' => $file->getSize() ?: 0,
+                'supplementary_files' => $supplementaryList,
+                'is_published' => $request->boolean('is_published'),
+                'published_at' => $request->boolean('is_published') ? now() : null,
+            ]));
+        } catch (\Throwable $exception) {
+            if ($path) {
+                Storage::disk('local')->delete($path);
+            }
+            TrainingModuleFiles::deleteSupplementaryFiles($supplementaryList);
+
+            throw $exception;
+        }
 
         AdminActivityLog::record($request->user(), 'admin.module.created', $module, [
             'trainer_id' => $module->trainer_id,
@@ -249,13 +285,16 @@ class AdminLearningSystemController extends Controller
     public function destroyModule(Request $request, TrainingModule $module): RedirectResponse
     {
         $title = $module->title;
+        $path = $module->file_path;
+        $supplementary = $module->supplementaryList();
         AdminActivityLog::record($request->user(), 'admin.module.removed', $module, [
             'title' => $title,
             'trainer_id' => $module->trainer_id,
         ]);
 
-        Storage::disk('local')->delete($module->file_path);
         $module->delete();
+        Storage::disk('local')->delete($path);
+        TrainingModuleFiles::deleteSupplementaryFiles($supplementary);
 
         return back()->with('saved', "Module {$title} was removed.");
     }

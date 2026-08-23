@@ -295,34 +295,125 @@ class TraineeDashboardController extends Controller
         abort_unless($application, 403);
 
         $validated = $request->validate([
-            'amount' => ['required', 'numeric', 'min:1', 'max:100000'],
-            'or_number' => ['required', 'string', 'max:100'],
-            'transaction_type' => ['required', 'in:downpayment,installment,full_payment,balance_settlement'],
-            'paid_at' => ['required', 'date'],
-            'receipt_proof' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
+            'amount' => ['required', 'numeric', 'decimal:0,2', 'min:1', 'max:100000'],
+            'or_number' => [
+                'required',
+                'string',
+                'max:100',
+                'regex:/^[A-Za-z0-9][A-Za-z0-9._-]*$/',
+            ],
+            'transaction_type' => ['required', Rule::in(array_keys(PaymentTransaction::types()))],
+            'paid_at' => ['required', 'date', 'before_or_equal:today'],
+            'receipt_proof' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $proofPath = null;
-        if ($request->hasFile('receipt_proof')) {
-            $proofPath = $request->file('receipt_proof')->store("payment-receipts/{$application->id}", 'local');
+        $proofPath = $request->file('receipt_proof')->store("payment-receipts/{$application->id}", 'local');
+        if ($proofPath === false) {
+            throw ValidationException::withMessages([
+                'receipt_proof' => 'The receipt proof could not be stored. Please try again.',
+            ]);
         }
 
-        $transaction = PaymentTransaction::create([
-            'enrollment_application_id' => $application->id,
-            'user_id' => $request->user()->id,
-            'transaction_type' => $validated['transaction_type'],
-            'payment_channel' => PaymentTransaction::CHANNEL_ONSITE,
-            'amount' => $validated['amount'],
-            'or_number' => $validated['or_number'],
-            'receipt_proof_path' => $proofPath,
-            'status' => PaymentTransaction::STATUS_PENDING,
-            'paid_at' => $validated['paid_at'],
-            'notes' => $validated['notes'] ?? null,
-        ]);
+        try {
+            $transaction = DB::transaction(function () use ($request, $validated, $application, $proofPath): PaymentTransaction {
+                $lockedApplication = EnrollmentApplication::query()
+                    ->whereKey($application->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-        $application->payment_receipt_number = $validated['or_number'];
-        $application->save();
+                if ($lockedApplication->payment_status === EnrollmentApplication::PAYMENT_PAID) {
+                    throw ValidationException::withMessages([
+                        'amount' => 'Your tuition is already fully paid.',
+                    ]);
+                }
+
+                $activeOnlineAttempt = PaymentAttempt::query()
+                    ->where('enrollment_application_id', $lockedApplication->id)
+                    ->where('provider', 'paymongo')
+                    ->whereIn('status', [PaymentAttempt::STATUS_CREATING, PaymentAttempt::STATUS_PENDING])
+                    ->exists();
+
+                if ($activeOnlineAttempt) {
+                    throw ValidationException::withMessages([
+                        'payment' => 'An online PayMongo checkout is still active. Finish or cancel it before submitting an on-site receipt.',
+                    ]);
+                }
+
+                $amount = round((float) $validated['amount'], 2);
+                $remainingBalance = $lockedApplication->remainingBalance();
+                if ($amount > $remainingBalance) {
+                    throw ValidationException::withMessages([
+                        'amount' => 'The receipt amount cannot exceed your remaining balance of PHP '.number_format($remainingBalance, 2).'.',
+                    ]);
+                }
+
+                $activeTicket = PaymentTransaction::query()
+                    ->where('enrollment_application_id', $lockedApplication->id)
+                    ->where('payment_channel', PaymentTransaction::CHANNEL_ONSITE)
+                    ->where('status', PaymentTransaction::STATUS_PENDING)
+                    ->whereNotNull('ticket_number')
+                    ->lockForUpdate()
+                    ->first();
+
+                $duplicateOr = PaymentTransaction::query()
+                    ->where('or_number', $validated['or_number'])
+                    ->when($activeTicket, fn ($query) => $query->where('id', '!=', $activeTicket->id))
+                    ->exists();
+                if ($duplicateOr) {
+                    throw ValidationException::withMessages([
+                        'or_number' => 'This official receipt number has already been submitted.',
+                    ]);
+                }
+
+                if ($activeTicket) {
+                    if (
+                        abs((float) $activeTicket->amount - $amount) > 0.009
+                        || $activeTicket->transaction_type !== $validated['transaction_type']
+                    ) {
+                        throw ValidationException::withMessages([
+                            'amount' => 'The receipt amount and purpose must match your active on-site ticket.',
+                        ]);
+                    }
+
+                    $activeTicket->update([
+                        'or_number' => $validated['or_number'],
+                        'receipt_proof_path' => $proofPath,
+                        'paid_at' => $validated['paid_at'],
+                        'notes' => $validated['notes'] ?? $activeTicket->notes,
+                    ]);
+                    $transaction = $activeTicket;
+                } else {
+                    $transaction = PaymentTransaction::create([
+                        'enrollment_application_id' => $lockedApplication->id,
+                        'user_id' => $request->user()->id,
+                        'transaction_type' => $validated['transaction_type'],
+                        'payment_channel' => PaymentTransaction::CHANNEL_ONSITE,
+                        'amount' => $amount,
+                        'or_number' => $validated['or_number'],
+                        'receipt_proof_path' => $proofPath,
+                        'status' => PaymentTransaction::STATUS_PENDING,
+                        'paid_at' => $validated['paid_at'],
+                        'notes' => $validated['notes'] ?? null,
+                    ]);
+                }
+
+                $lockedApplication->forceFill([
+                    'payment_method' => 'onsite',
+                    'payment_status' => $lockedApplication->payment_status === EnrollmentApplication::PAYMENT_PARTIALLY_PAID
+                        ? EnrollmentApplication::PAYMENT_PARTIALLY_PAID
+                        : EnrollmentApplication::PAYMENT_ONSITE_PENDING,
+                    'payment_receipt_number' => $validated['or_number'],
+                    'payment_selected_at' => $lockedApplication->payment_selected_at ?: now(),
+                ])->save();
+
+                return $transaction;
+            }, 3);
+        } catch (\Throwable $exception) {
+            Storage::disk('local')->delete($proofPath);
+
+            throw $exception;
+        }
 
         AdminActivityLog::record($request->user(), 'trainee.payment_receipt.uploaded', $application, [
             'transaction_id' => $transaction->id,
@@ -430,13 +521,51 @@ class TraineeDashboardController extends Controller
 
         // Opening the protected viewer is a server-side progress event and does not depend on JavaScript.
         $progress = $this->touchModuleProgress($application, $module);
+        $progress->load('evaluator');
+
+        $quizzes = $module->quizzes()->released()->get();
+        $quizAttempts = \App\Models\QuizAttempt::query()
+            ->where('enrollment_application_id', $application->id)
+            ->whereIn('quiz_id', $quizzes->pluck('id'))
+            ->latest()
+            ->get()
+            ->groupBy('quiz_id');
 
         AdminActivityLog::record($request->user(), 'trainee.module.viewer.opened', $module, [
             'trainee_email' => $application->email,
             'progress_status' => $progress->status,
         ]);
 
-        return view('trainee.modules.show', compact('application', 'module', 'progress'));
+        return view('trainee.modules.show', compact('application', 'module', 'progress', 'quizzes', 'quizAttempts'));
+    }
+
+    public function supplementaryDownload(Request $request, TrainingModule $module, int $index): BinaryFileResponse
+    {
+        $application = $this->approvedApplicationFor($request);
+        $this->authorizeModule($application, $module);
+        $list = $module->supplementaryList();
+        abort_unless(isset($list[$index]), 404);
+
+        $attachment = $list[$index];
+        $path = $attachment['file_path'] ?? null;
+        abort_unless(is_string($path) && Storage::disk('local')->exists($path), 404);
+
+        $this->touchModuleProgress($application, $module);
+
+        AdminActivityLog::record($request->user(), 'trainee.module.supplementary.downloaded', $module, [
+            'trainee_email' => $application->email,
+            'filename' => $attachment['original_name'] ?? 'supplementary',
+        ]);
+
+        $filename = basename($attachment['original_name'] ?? 'attachment');
+        $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
+
+        return response()->file(Storage::disk('local')->path($path), [
+            'Content-Type' => ($attachment['mime_type'] ?? null) ?: 'application/octet-stream',
+            'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_ATTACHMENT, $filename, $fallbackFilename),
+            'Accept-Ranges' => 'bytes',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function moduleContent(Request $request, TrainingModule $module): BinaryFileResponse

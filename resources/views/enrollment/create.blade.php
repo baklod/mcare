@@ -161,7 +161,7 @@
                     Caregiving NC II Enrollment Registration
                 </h1>
                 <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600 sm:mt-5 sm:text-lg sm:leading-8">
-                    Complete the learner profile for MCARE's NC II enrollment. This version uses direct applicant registration while Google OAuth is paused during development.
+                    Complete the learner profile for MCARE's NC II enrollment. Google applicants start with a verified identity, while the remaining TESDA details stay under the applicant's control.
                 </p>
             </div>
 
@@ -185,7 +185,7 @@
                     @endif
                 </div>
                 <p class="mt-4 text-sm leading-6 text-slate-500 sm:mt-5">
-                    Documents, payment review, and admin verification will follow after this base registration is stable.
+                    After submission, continue to payment. MCARE will email you as documents and application status are reviewed.
                 </p>
             </aside>
         </section>
@@ -267,13 +267,19 @@
                     <div class="enrollment-section-heading border-b border-slate-100 pb-5">
                         <p class="text-sm font-bold uppercase text-purple-600">Account</p>
                         <h2 class="mt-2 text-2xl font-bold text-slate-900">Applicant account</h2>
-                        <p class="mt-2 text-sm leading-6 text-slate-500">This replaces Google OAuth for now. The email becomes the applicant account used for enrollment tracking.</p>
+                        <p class="mt-2 text-sm leading-6 text-slate-500">Google sign-in verifies the applicant identity. Browser autofill and saved MCARE details reduce repeat typing without requesting private Google profile data.</p>
                     </div>
                     <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-3">
                         <div class="md:col-span-2">
                             <label for="email" class="mb-2 block text-sm font-semibold text-slate-800">Email address</label>
-                            <input id="email" name="email" type="email" inputmode="email" autocomplete="section-applicant email" pattern="^[A-Za-z0-9._%+\-]+@gmail\.com$" value="{{ old('email', $application->email ?? $user?->email ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
-                            <p class="mt-2 text-xs leading-5 text-slate-500">Use a Gmail address only, for example name@gmail.com.</p>
+                            <input id="email" name="email" type="email" inputmode="email" autocomplete="section-applicant email" pattern="^[A-Za-z0-9._%+\-]+@gmail\.com$" value="{{ old('email', $application->email ?? $user?->email ?? '') }}" required @readonly($user) class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100 read-only:cursor-not-allowed read-only:bg-slate-100 read-only:text-slate-600">
+                            @if ($isGoogleApplicant)
+                                <p class="mt-2 text-xs font-semibold leading-5 text-emerald-700">Verified by Google and locked to this signed-in account.</p>
+                            @elseif ($user)
+                                <p class="mt-2 text-xs leading-5 text-slate-500">This email is locked to your signed-in MCARE account.</p>
+                            @else
+                                <p class="mt-2 text-xs leading-5 text-slate-500">Use a Gmail address only. MCARE will email a verification link before account sign-in is allowed.</p>
+                            @endif
                             @error('email') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
@@ -286,22 +292,29 @@
                             </select>
                             @error('schedule_preference') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
-                        <div>
-                            <label for="password" class="mb-2 block text-sm font-semibold text-slate-800">Password</label>
-                            <input id="password" name="password" type="password" autocomplete="new-password" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
-                            <div class="mt-3 space-y-1.5 text-xs font-semibold">
-                                <p id="pw-length-check" class="flex items-center gap-2 text-slate-500"><span class="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[10px]"> </span> At least 10 characters</p>
-                                <p id="pw-letter-number-check" class="flex items-center gap-2 text-slate-500"><span class="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[10px]"> </span> Contains a number</p>
-                                <p id="pw-case-check" class="flex items-center gap-2 text-slate-500"><span class="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[10px]"> </span> Contains upper and lowercase letters</p>
+                        @if ($isGoogleApplicant)
+                            <div class="md:col-span-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                                <p class="text-sm font-bold text-emerald-900">Google account connected</p>
+                                <p class="mt-1 text-xs leading-5 text-emerald-800">No separate MCARE password is required. Use Continue with Google whenever you return.</p>
                             </div>
-                            <p class="mt-2 text-xs leading-5 text-slate-500">Use a unique passphrase you do not reuse on another website.</p>
-                            @error('password') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
-                        </div>
-                        <div>
-                            <label for="password_confirmation" class="mb-2 block text-sm font-semibold text-slate-800">Confirm password</label>
-                            <input id="password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
-                            <p id="pw-match-check" class="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-500"><span class="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[10px]"> </span> Passwords match</p>
-                        </div>
+                        @else
+                            <div>
+                                <label for="password" class="mb-2 block text-sm font-semibold text-slate-800">{{ $user ? 'New password (optional)' : 'Password' }}</label>
+                                <input id="password" name="password" type="password" autocomplete="new-password" @required(! $user) class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                                <div class="mt-3 space-y-1.5 text-xs font-semibold">
+                                    <p id="pw-length-check" class="flex items-center gap-2 text-slate-500"><span class="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[10px]"> </span> At least 10 characters</p>
+                                    <p id="pw-letter-number-check" class="flex items-center gap-2 text-slate-500"><span class="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[10px]"> </span> Contains a number</p>
+                                    <p id="pw-case-check" class="flex items-center gap-2 text-slate-500"><span class="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[10px]"> </span> Contains upper and lowercase letters</p>
+                                </div>
+                                <p class="mt-2 text-xs leading-5 text-slate-500">{{ $user ? 'Leave blank to keep your current password.' : 'Use a unique passphrase you do not reuse on another website.' }}</p>
+                                @error('password') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label for="password_confirmation" class="mb-2 block text-sm font-semibold text-slate-800">Confirm password</label>
+                                <input id="password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" @required(! $user) class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                                <p id="pw-match-check" class="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-500"><span class="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[10px]"> </span> Passwords match</p>
+                            </div>
+                        @endif
                     </div>
                 </div>
 
@@ -313,17 +326,17 @@
                     <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-4">
                         <div>
                             <label for="last_name" class="mb-2 block text-sm font-semibold text-slate-800">Last name</label>
-                            <input id="last_name" name="last_name" type="text" autocomplete="section-applicant family-name" value="{{ old('last_name', $application->last_name ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="last_name" name="last_name" type="text" autocomplete="section-applicant family-name" value="{{ old('last_name', $application->last_name ?? $googleIdentity['last_name']) }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('last_name') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label for="first_name" class="mb-2 block text-sm font-semibold text-slate-800">First name</label>
-                            <input id="first_name" name="first_name" type="text" autocomplete="section-applicant given-name" value="{{ old('first_name', $application->first_name ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="first_name" name="first_name" type="text" autocomplete="section-applicant given-name" value="{{ old('first_name', $application->first_name ?? $googleIdentity['first_name']) }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('first_name') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label for="middle_name" class="mb-2 block text-sm font-semibold text-slate-800">Middle name</label>
-                            <input id="middle_name" name="middle_name" type="text" autocomplete="section-applicant additional-name" value="{{ old('middle_name', $application->middle_name ?? '') }}" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="middle_name" name="middle_name" type="text" autocomplete="section-applicant additional-name" value="{{ old('middle_name', $application->middle_name ?? $googleIdentity['middle_name']) }}" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('middle_name') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
@@ -392,7 +405,7 @@
                     <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-4">
                         <div>
                             <label for="gender" class="mb-2 block text-sm font-semibold text-slate-800">Sex</label>
-                            <select id="gender" name="gender" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <select id="gender" name="gender" autocomplete="section-applicant sex" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                                 <option value="">Select</option>
                                 @foreach (['Female', 'Male'] as $option)
                                     <option value="{{ $option }}" @selected(old('gender', $application->gender ?? '') === $option)>{{ $option }}</option>
@@ -641,7 +654,7 @@
                         </div>
                         <div>
                             <label for="signature_name" class="mb-2 block text-sm font-semibold text-slate-800">Applicant signature over printed name</label>
-                            <input id="signature_name" name="signature_name" type="text" value="{{ old('signature_name', $application->signature_name ?? '') }}" required class="w-full rounded-2xl border border-purple-200 bg-white px-4 py-3 text-sm outline-none focus:border-purple-300 focus:ring-4 focus:ring-purple-100">
+                            <input id="signature_name" name="signature_name" type="text" autocomplete="section-applicant name" value="{{ old('signature_name', $application->signature_name ?? $googleIdentity['full_name']) }}" required class="w-full rounded-2xl border border-purple-200 bg-white px-4 py-3 text-sm outline-none focus:border-purple-300 focus:ring-4 focus:ring-purple-100">
                             @error('signature_name') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                             <p class="mt-3 text-xs leading-5 text-slate-500">Use the same name shown in your drawn or uploaded signature.</p>
                         </div>
@@ -711,11 +724,23 @@
                     </div>
                 </div>
 
-                <div id="enrollment-submit" class="enrollment-submit-row enrollment-jump-target flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
-                    <p class="text-sm leading-6 text-slate-500">Date accomplished will be recorded automatically when the form is submitted.</p>
-                    <button type="submit" @disabled(! $application && ! $enrollmentBatch) class="inline-flex h-12 items-center justify-center rounded-full bg-purple-600 px-8 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:h-auto sm:py-4">
-                        Submit NC II enrollment
-                    </button>
+                <div id="enrollment-submit" class="enrollment-submit-row enrollment-jump-target border-t border-slate-100 pt-6">
+                    <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p class="text-sm leading-6 text-slate-500">Date accomplished will be recorded automatically when the form is submitted.</p>
+                        <button type="submit" data-default-label="Submit NC II enrollment" @disabled(! $application && ! $enrollmentBatch) class="inline-flex h-12 items-center justify-center rounded-full bg-purple-600 px-8 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:h-auto sm:py-4">
+                            Submit NC II enrollment
+                        </button>
+                    </div>
+
+                    <div id="enrollment-submit-progress" class="mt-4 hidden rounded-2xl border border-purple-200 bg-purple-50 p-4" role="status" aria-live="polite">
+                        <div class="flex items-start gap-3">
+                            <span class="mt-0.5 inline-block h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-purple-200 border-t-purple-700" aria-hidden="true"></span>
+                            <div>
+                                <p id="enrollment-submit-title" class="text-sm font-black text-purple-900">Uploading your enrollment securely...</p>
+                                <p id="enrollment-submit-detail" class="mt-1 text-xs font-semibold leading-5 text-purple-700">Keep this page open while the documents upload.</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </form>
         </section>
@@ -729,9 +754,15 @@
         const enrollmentForm = document.querySelector('form[action="{{ route('enrollment.store') }}"]');
         const actionToast = document.getElementById('action-toast');
         const enrollmentJumpDetails = document.getElementById('enrollment-jump-details');
+        const enrollmentSubmitButton = enrollmentForm?.querySelector('button[type="submit"]');
+        const enrollmentSubmitProgress = document.getElementById('enrollment-submit-progress');
+        const enrollmentSubmitTitle = document.getElementById('enrollment-submit-title');
+        const enrollmentSubmitDetail = document.getElementById('enrollment-submit-detail');
         const existingSignatureSaved = @json((bool) ($application->signature_path ?? false));
         const serverErrorFields = @json($errors->keys());
         let signatureDrawn = false;
+        let enrollmentSubmitStartedAt = null;
+        let enrollmentSubmitTimer = null;
 
         function showActionToast(message) {
             if (!actionToast) return;
@@ -739,6 +770,12 @@
             actionToast.classList.remove('hidden');
             window.clearTimeout(window.mcareEnrollmentToastTimer);
             window.mcareEnrollmentToastTimer = window.setTimeout(() => actionToast.classList.add('hidden'), 2800);
+        }
+
+        function formatFileSize(bytes) {
+            if (!bytes) return '0 MB';
+
+            return `${(bytes / (1024 * 1024)).toFixed(bytes >= 1024 * 1024 ? 1 : 2)} MB`;
         }
 
         function setCheckState(elementId, isValid) {
@@ -920,7 +957,7 @@
                     }
 
                     input.setCustomValidity('');
-                    if (name) name.textContent = `Selected: ${file.name}`;
+                    if (name) name.textContent = `Selected: ${file.name} (${formatFileSize(file.size)})`;
                     zone?.classList.add('border-emerald-300', 'bg-emerald-50');
                     draftPreview?.classList.add('hidden');
                     showPreview(file);
@@ -1043,6 +1080,25 @@
         }
 
         function attachSubmitValidation() {
+            enrollmentForm?.addEventListener('invalid', (event) => {
+                const invalidField = event.target;
+                if (!(invalidField instanceof HTMLElement)) return;
+
+                window.clearTimeout(window.mcareEnrollmentInvalidTimer);
+                window.mcareEnrollmentInvalidTimer = window.setTimeout(() => {
+                    const firstInvalid = enrollmentForm.querySelector(':invalid');
+                    if (!(firstInvalid instanceof HTMLElement)) return;
+
+                    const label = firstInvalid.labels?.[0]?.textContent?.trim()
+                        || firstInvalid.getAttribute('aria-label')
+                        || 'the highlighted field';
+
+                    showActionToast(`Please check ${label} before submitting.`);
+                    firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    firstInvalid.focus({ preventScroll: true });
+                }, 0);
+            }, true);
+
             enrollmentForm?.addEventListener('submit', (event) => {
                 if (enrollmentForm.dataset.submitted === 'true') {
                     event.preventDefault();
@@ -1076,12 +1132,61 @@
 
                 if (!event.defaultPrevented) {
                     enrollmentForm.dataset.submitted = 'true';
-                    const submitButton = enrollmentForm.querySelector('button[type="submit"]');
-                    if (submitButton) {
-                        submitButton.disabled = true;
-                        submitButton.classList.add('cursor-not-allowed', 'opacity-70');
-                        submitButton.textContent = 'Submitting securely...';
+                    const uploadBytes = [...enrollmentForm.querySelectorAll('input[type="file"]')]
+                        .reduce((total, input) => total + (input.files?.[0]?.size || 0), 0);
+
+                    if (enrollmentSubmitButton) {
+                        enrollmentSubmitButton.disabled = true;
+                        enrollmentSubmitButton.classList.add('cursor-not-allowed', 'opacity-70');
+                        enrollmentSubmitButton.textContent = uploadBytes
+                            ? `Uploading ${formatFileSize(uploadBytes)}...`
+                            : 'Submitting securely...';
                     }
+
+                    enrollmentSubmitStartedAt = Date.now();
+                    enrollmentSubmitProgress?.classList.remove('hidden');
+                    if (enrollmentSubmitTitle) {
+                        enrollmentSubmitTitle.textContent = uploadBytes
+                            ? `Uploading ${formatFileSize(uploadBytes)} securely...`
+                            : 'Submitting your enrollment securely...';
+                    }
+                    if (enrollmentSubmitDetail) {
+                        enrollmentSubmitDetail.textContent = 'Keep this page open. You will continue to payment automatically when the upload finishes.';
+                    }
+
+                    window.clearInterval(enrollmentSubmitTimer);
+                    enrollmentSubmitTimer = window.setInterval(() => {
+                        if (!enrollmentSubmitStartedAt || !enrollmentSubmitDetail) return;
+
+                        const elapsedSeconds = Math.max(1, Math.round((Date.now() - enrollmentSubmitStartedAt) / 1000));
+                        enrollmentSubmitDetail.textContent = elapsedSeconds >= 30
+                            ? `Still working (${elapsedSeconds}s). Phone photo uploads can take a minute; please keep this page open.`
+                            : `Upload in progress (${elapsedSeconds}s). You will continue to payment automatically.`;
+                    }, 1000);
+                }
+            });
+
+            window.addEventListener('offline', () => {
+                if (enrollmentForm?.dataset.submitted !== 'true') return;
+
+                if (enrollmentSubmitTitle) enrollmentSubmitTitle.textContent = 'Connection lost during upload';
+                if (enrollmentSubmitDetail) enrollmentSubmitDetail.textContent = 'Reconnect to the internet and keep this page open. If the page does not continue, go back and submit once more.';
+                showActionToast('Your internet connection was interrupted during the upload.');
+            });
+
+            window.addEventListener('pageshow', () => {
+                if (!enrollmentForm) return;
+
+                enrollmentForm.dataset.submitted = 'false';
+                enrollmentSubmitStartedAt = null;
+                window.clearInterval(enrollmentSubmitTimer);
+                enrollmentSubmitTimer = null;
+                enrollmentSubmitProgress?.classList.add('hidden');
+
+                if (enrollmentSubmitButton) {
+                    enrollmentSubmitButton.disabled = @json(! $application && ! $enrollmentBatch);
+                    enrollmentSubmitButton.classList.remove('cursor-not-allowed', 'opacity-70');
+                    enrollmentSubmitButton.textContent = enrollmentSubmitButton.dataset.defaultLabel || 'Submit NC II enrollment';
                 }
             });
         }

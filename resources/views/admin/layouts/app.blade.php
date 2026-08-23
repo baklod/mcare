@@ -32,6 +32,15 @@
             ['label' => 'Reports', 'icon' => 'fa-chart-column', 'href' => route('admin.learning.reports'), 'active' => request()->routeIs('admin.learning.reports')],
             ['label' => 'Accounts', 'icon' => 'fa-users', 'href' => route('admin.accounts.index'), 'active' => request()->routeIs('admin.accounts.*')],
         ];
+        $adminMobilePrimary = array_slice($primaryNav, 0, 3);
+        $adminMobileMore = array_merge(
+            array_slice($primaryNav, 3),
+            $capstoneNav,
+            [
+                ['label' => 'Admin logs', 'icon' => 'fa-shield-halved', 'href' => route('admin.logs.index'), 'active' => request()->routeIs('admin.logs.*')],
+                ['label' => 'Public site', 'icon' => 'fa-arrow-up-right-from-square', 'href' => route('landing'), 'active' => false],
+            ],
+        );
     @endphp
 
     <aside class="dashboard-sidebar" data-dashboard-sidebar>
@@ -91,7 +100,7 @@
                 <x-dashboard-icon name="chevron-up" class="dashboard-chevron text-xs text-slate-400 transition" />
             </summary>
             <div class="dashboard-account-menu">
-                <x-dashboard-account-actions :logout-route="route('admin.logout')" role-label="Administrator" :show-admin-logs="true" />
+                <x-dashboard-account-actions :logout-route="route('logout')" role-label="Administrator" :show-admin-logs="true" />
             </div>
         </details>
     </aside>
@@ -119,19 +128,18 @@
                             <x-dashboard-icon name="chevron-down" class="dashboard-chevron text-xs text-slate-400 transition" />
                         </summary>
                         <div class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
-                            <x-dashboard-account-actions :logout-route="route('admin.logout')" role-label="Administrator" :show-admin-logs="true" :career-hub-route="route('admin.learning.alumni-jobs')" />
+                            <x-dashboard-account-actions :logout-route="route('logout')" role-label="Administrator" :show-admin-logs="true" :career-hub-route="route('admin.learning.alumni-jobs')" />
                         </div>
                 </details>
             </div>
 
-            <nav class="dashboard-mobile-bar grid-cols-4" aria-label="Mobile admin navigation">
-                @foreach ($primaryNav as $item)
-                    <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="admin-{{ str($item['label'])->slug() }}" class="dashboard-mobile-link {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
-                        <x-dashboard-icon :name="$item['icon']" />
-                        <span class="truncate">{{ $item['label'] }}</span>
-                    </a>
-                @endforeach
-            </nav>
+            <x-dashboard-mobile-navigation
+                :primary-items="$adminMobilePrimary"
+                :more-items="$adminMobileMore"
+                label="Mobile admin navigation"
+                menu-title="Admin destinations"
+                role="admin"
+            />
         </header>
 
         <main class="dashboard-main">

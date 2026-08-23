@@ -4,7 +4,11 @@ namespace App\Http\Controllers\Trainer;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
+use App\Models\CompetencyUnit;
 use App\Models\EnrollmentApplication;
+use App\Models\ModuleProgress;
+use App\Models\Quiz;
+use App\Models\TraineeCompetencyRecord;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
 use App\Rules\TrainingModuleFileType;
@@ -26,11 +30,25 @@ class TrainingModuleController extends Controller
         [$batchId, $targetTrainee] = $this->resolveAudience($validated);
         $this->assertTrainerBatch($request, $batchId, $targetTrainee);
         $trainer = $request->user();
+
         /** @var UploadedFile $file */
         $file = $request->file('module_file');
-        $path = $file->store("training-modules/{$trainer->id}", 'local');
+        $path = null;
+        $supplementaryList = [];
 
         try {
+            $path = $file->store("training-modules/{$trainer->id}", 'local');
+            if ($path === false) {
+                throw new \RuntimeException('The primary learning material could not be stored.');
+            }
+
+            if ($request->hasFile('supplementary_files')) {
+                $supplementaryList = TrainingModuleFiles::storeSupplementaryFiles(
+                    $request->file('supplementary_files'),
+                    $trainer->id
+                );
+            }
+
             $module = DB::transaction(function () use (
                 $validated,
                 $trainer,
@@ -38,6 +56,7 @@ class TrainingModuleController extends Controller
                 $path,
                 $batchId,
                 $targetTrainee,
+                $supplementaryList,
                 $request,
             ): TrainingModule {
                 $published = $request->has('is_published')
@@ -49,9 +68,11 @@ class TrainingModuleController extends Controller
                     'training_batch_id' => $batchId,
                     'target_enrollment_application_id' => $targetTrainee?->id,
                     'module_code' => $validated['module_code'] ?? null,
+                    'competency_category' => $validated['competency_category'] ?? null,
                     'title' => $validated['title'],
                     'description' => $validated['description'],
                     'topic' => $validated['topic'] ?? null,
+                    'estimated_hours' => $validated['estimated_hours'] ?? null,
                     'available_at' => $validated['available_at'] ?? null,
                     'due_at' => $validated['due_at'] ?? null,
                     'position' => $validated['position'] ?? 0,
@@ -59,12 +80,16 @@ class TrainingModuleController extends Controller
                     'original_file_name' => $file->getClientOriginalName(),
                     'mime_type' => $file->getMimeType(),
                     'file_size' => $file->getSize() ?: 0,
+                    'supplementary_files' => $supplementaryList,
                     'is_published' => $published,
                     'published_at' => $published ? now() : null,
                 ]);
             });
         } catch (\Throwable $exception) {
-            Storage::disk('local')->delete($path);
+            if ($path) {
+                Storage::disk('local')->delete($path);
+            }
+            TrainingModuleFiles::deleteSupplementaryFiles($supplementaryList);
 
             throw $exception;
         }
@@ -90,14 +115,31 @@ class TrainingModuleController extends Controller
     ): RedirectResponse {
         $this->authorize('update', $module);
 
-        $validated = $this->validatedPayload($request, false);
+        $validated = $this->validatedPayload($request, false, count($module->supplementaryList()));
         [$batchId, $targetTrainee] = $this->resolveAudience($validated);
         $this->assertTrainerBatch($request, $batchId, $targetTrainee);
         $replacement = $request->file('module_file');
-        $replacementPath = $replacement?->store("training-modules/{$request->user()->id}", 'local');
+        $replacementPath = null;
         $oldPath = $module->file_path;
+        $currentSupplementary = $module->supplementaryList();
+        $newSupplementary = [];
 
         try {
+            if ($replacement) {
+                $replacementPath = $replacement->store("training-modules/{$request->user()->id}", 'local');
+                if ($replacementPath === false) {
+                    throw new \RuntimeException('The replacement learning material could not be stored.');
+                }
+            }
+
+            if ($request->hasFile('supplementary_files')) {
+                $newSupplementary = TrainingModuleFiles::storeSupplementaryFiles(
+                    $request->file('supplementary_files'),
+                    $request->user()->id
+                );
+                $currentSupplementary = array_merge($currentSupplementary, $newSupplementary);
+            }
+
             DB::transaction(function () use (
                 $validated,
                 $request,
@@ -106,6 +148,7 @@ class TrainingModuleController extends Controller
                 $targetTrainee,
                 $replacement,
                 $replacementPath,
+                $currentSupplementary,
             ): void {
                 $published = $request->has('is_published')
                     ? $request->boolean('is_published')
@@ -114,12 +157,15 @@ class TrainingModuleController extends Controller
                     'training_batch_id' => $batchId,
                     'target_enrollment_application_id' => $targetTrainee?->id,
                     'module_code' => $validated['module_code'] ?? null,
+                    'competency_category' => $validated['competency_category'] ?? null,
                     'title' => $validated['title'],
                     'description' => $validated['description'],
                     'topic' => $validated['topic'] ?? null,
+                    'estimated_hours' => $validated['estimated_hours'] ?? null,
                     'available_at' => $validated['available_at'] ?? null,
                     'due_at' => $validated['due_at'] ?? null,
                     'position' => $validated['position'] ?? 0,
+                    'supplementary_files' => $currentSupplementary,
                     'is_published' => $published,
                     'published_at' => $published ? ($module->published_at ?? now()) : null,
                 ];
@@ -140,6 +186,7 @@ class TrainingModuleController extends Controller
             if ($replacementPath) {
                 Storage::disk('local')->delete($replacementPath);
             }
+            TrainingModuleFiles::deleteSupplementaryFiles($newSupplementary);
 
             throw $exception;
         }
@@ -155,6 +202,12 @@ class TrainingModuleController extends Controller
             'file_replaced' => (bool) $replacementPath,
         ]);
 
+        if ($request->boolean('_return_to_module')) {
+            return redirect()
+                ->route('trainer.modules.show', $module)
+                ->with('saved', 'Learning material updated.');
+        }
+
         return redirect()
             ->route('trainer.resources')
             ->with('saved', 'Learning material updated.');
@@ -168,23 +221,184 @@ class TrainingModuleController extends Controller
 
         $title = $module->title;
         $path = $module->file_path;
+        $supplementary = $module->supplementaryList();
 
         AdminActivityLog::record($request->user(), 'trainer.module.deleted', $module, [
             'title' => $title,
             'batch_id' => $module->training_batch_id,
         ]);
+
         $module->delete();
         Storage::disk('local')->delete($path);
+        TrainingModuleFiles::deleteSupplementaryFiles($supplementary);
 
         return redirect()
             ->route('trainer.resources')
             ->with('saved', "Learning material {$title} was removed.");
     }
 
+    public function destroySupplementary(
+        Request $request,
+        TrainingModule $module,
+        int $index,
+    ): RedirectResponse {
+        $this->authorize('update', $module);
+
+        $removed = DB::transaction(function () use ($module, $index): array {
+            $lockedModule = TrainingModule::query()->lockForUpdate()->findOrFail($module->id);
+            $files = $lockedModule->supplementaryList();
+            abort_unless(isset($files[$index]), 404);
+
+            $removedFile = $files[$index];
+            array_splice($files, $index, 1);
+            $lockedModule->update(['supplementary_files' => $files]);
+
+            return $removedFile;
+        }, 3);
+
+        TrainingModuleFiles::deleteSupplementaryFiles([$removed]);
+
+        AdminActivityLog::record($request->user(), 'trainer.module.supplementary.deleted', $module, [
+            'filename' => $removed['original_name'] ?? 'supplementary',
+        ]);
+
+        return redirect()
+            ->route('trainer.modules.show', $module)
+            ->with('saved', 'Supplementary attachment removed.');
+    }
+
+    public function evaluate(Request $request, TrainingModule $module): RedirectResponse
+    {
+        $this->authorize('update', $module);
+
+        $validated = $request->validate([
+            'enrollment_application_id' => [
+                'required',
+                'integer',
+                Rule::exists('enrollment_applications', 'id')->where(
+                    fn ($query) => $query->where('training_batch_id', $module->training_batch_id)
+                ),
+            ],
+            'quiz_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'practical_rating' => ['nullable', Rule::in(['competent', 'not_yet_competent', 'pending'])],
+            'competency_outcome' => ['required', Rule::in(['competent', 'not_yet_competent', 'in_progress'])],
+            'evaluation_remarks' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $application = EnrollmentApplication::findOrFail($validated['enrollment_application_id']);
+        if (
+            $module->target_enrollment_application_id !== null
+            && (int) $module->target_enrollment_application_id !== (int) $application->id
+        ) {
+            throw ValidationException::withMessages([
+                'enrollment_application_id' => 'This private module can only evaluate its assigned trainee.',
+            ]);
+        }
+
+        $progress = DB::transaction(function () use ($request, $validated, $application, $module): ModuleProgress {
+            $progress = ModuleProgress::query()->firstOrNew([
+                'enrollment_application_id' => $application->id,
+                'training_module_id' => $module->id,
+            ]);
+
+            $isCompetent = $validated['competency_outcome'] === ModuleProgress::OUTCOME_COMPETENT;
+            $currentProgress = (int) ($progress->progress_percent ?: 50);
+            $progress->fill([
+                'quiz_score' => $validated['quiz_score'] ?? $progress->quiz_score,
+                'practical_rating' => $validated['practical_rating'] ?? $progress->practical_rating,
+                'competency_outcome' => $validated['competency_outcome'],
+                'evaluation_remarks' => $validated['evaluation_remarks'] ?? null,
+                'evaluated_by_id' => $request->user()->id,
+                'evaluated_at' => now(),
+                'status' => $isCompetent ? ModuleProgress::STATUS_COMPLETED : ModuleProgress::STATUS_IN_PROGRESS,
+                'progress_percent' => $isCompetent ? 100 : min($currentProgress, 99),
+                'completed_at' => $isCompetent ? ($progress->completed_at ?: now()) : null,
+            ])->save();
+
+            // Keep the module evaluation and the official competency record atomic.
+            if (filled($module->module_code)) {
+                $unit = CompetencyUnit::query()->where('code', $module->module_code)->first();
+                if ($unit) {
+                    $compRecord = TraineeCompetencyRecord::query()->firstOrNew([
+                        'enrollment_application_id' => $application->id,
+                        'competency_unit_id' => $unit->id,
+                    ]);
+
+                    $compStatus = match ($validated['competency_outcome']) {
+                        ModuleProgress::OUTCOME_COMPETENT => TraineeCompetencyRecord::STATUS_COMPETENT,
+                        ModuleProgress::OUTCOME_NOT_YET_COMPETENT => TraineeCompetencyRecord::STATUS_NOT_YET_COMPETENT,
+                        default => TraineeCompetencyRecord::STATUS_IN_PROGRESS,
+                    };
+
+                    $compRecord->fill([
+                        'status' => $compStatus,
+                        'percentage_score' => $validated['quiz_score'] ?? ($isCompetent ? 85.00 : null),
+                        'notes' => $validated['evaluation_remarks'] ?? $compRecord->notes,
+                        'assessed_by_id' => $request->user()->id,
+                        'assessed_at' => now(),
+                    ])->save();
+                }
+            }
+
+            return $progress;
+        }, 3);
+
+        AdminActivityLog::record($request->user(), 'trainer.module.evaluated', $progress, [
+            'module_id' => $module->id,
+            'application_id' => $application->id,
+            'trainee_name' => trim($application->first_name.' '.$application->last_name),
+            'outcome' => $validated['competency_outcome'],
+        ]);
+
+        return redirect()
+            ->route('trainer.modules.show', $module)
+            ->with('saved', "Evaluation recorded for {$application->first_name} {$application->last_name}.");
+    }
+
+    public function storeQuiz(Request $request, TrainingModule $module): RedirectResponse
+    {
+        $this->authorize('update', $module);
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:160'],
+            'instructions' => ['nullable', 'string', 'max:2000'],
+            'time_limit_minutes' => ['nullable', 'integer', 'min:1', 'max:180'],
+            'passing_score_percent' => ['nullable', 'numeric', 'min:50', 'max:100'],
+            'is_published' => ['nullable', 'boolean'],
+        ]);
+
+        $quiz = Quiz::create([
+            'trainer_id' => $request->user()->id,
+            'training_batch_id' => $module->training_batch_id,
+            'target_enrollment_application_id' => $module->target_enrollment_application_id,
+            'training_module_id' => $module->id,
+            'title' => $validated['title'],
+            'instructions' => $validated['instructions'] ?? null,
+            'time_limit_minutes' => $validated['time_limit_minutes'] ?? 20,
+            'passing_score_percent' => $validated['passing_score_percent'] ?? 75.00,
+            // A quiz cannot be released until the trainer adds at least one question.
+            'is_published' => false,
+            'published_at' => null,
+        ]);
+
+        AdminActivityLog::record($request->user(), 'trainer.quiz.created', $quiz, [
+            'title' => $quiz->title,
+            'module_id' => $module->id,
+        ]);
+
+        return redirect()
+            ->route('trainer.quizzes.edit', $quiz)
+            ->with('saved', 'Module assessment created. Add your questions and choices below.');
+    }
+
     /**
      * @return array<string, mixed>
      */
-    private function validatedPayload(Request $request, bool $fileRequired): array
+    private function validatedPayload(
+        Request $request,
+        bool $fileRequired,
+        int $existingSupplementaryCount = 0,
+    ): array
     {
         $activeBatch = TrainingBatch::assignedTo($request->user());
         $request->merge([
@@ -194,13 +408,26 @@ class TrainingModuleController extends Controller
 
         $validated = $request->validate([
             'module_code' => ['nullable', 'string', 'max:50'],
+            'competency_category' => ['nullable', 'string', Rule::in(['core', 'common', 'basic', 'custom'])],
             'title' => ['required', 'string', 'max:160'],
             'description' => ['required', 'string', 'max:5000'],
             'topic' => ['nullable', 'string', 'max:120'],
+            'estimated_hours' => ['nullable', 'integer', 'min:1', 'max:500'],
             'module_file' => [
                 $fileRequired ? 'required' : 'nullable',
                 'file',
                 'max:'.TrainingModuleFiles::MAX_UPLOAD_KB,
+                new TrainingModuleFileType,
+            ],
+            'supplementary_files' => [
+                'nullable',
+                'array',
+                'max:'.TrainingModuleFiles::MAX_SUPPLEMENTARY_FILES,
+            ],
+            'supplementary_files.*' => [
+                'nullable',
+                'file',
+                'max:'.TrainingModuleFiles::MAX_SUPPLEMENTARY_UPLOAD_KB,
                 new TrainingModuleFileType,
             ],
             'audience_type' => ['required', Rule::in(['batch', 'trainee'])],
@@ -216,10 +443,18 @@ class TrainingModuleController extends Controller
             'due_at' => ['nullable', 'date'],
             'position' => ['nullable', 'integer', 'min:0', 'max:10000'],
             'is_published' => ['nullable', 'boolean'],
+            '_return_to_module' => ['nullable', 'boolean'],
         ], [
             'module_file.max' => 'Learning materials must not exceed 38MB on the current MCARE server.',
             'module_file.uploaded' => 'The upload did not reach MCARE. Check the server upload limit and try a smaller file.',
         ]);
+
+        $newSupplementaryCount = count($request->file('supplementary_files', []));
+        if ($existingSupplementaryCount + $newSupplementaryCount > TrainingModuleFiles::MAX_SUPPLEMENTARY_FILES) {
+            throw ValidationException::withMessages([
+                'supplementary_files' => 'A module can have at most '.TrainingModuleFiles::MAX_SUPPLEMENTARY_FILES.' supplementary files.',
+            ]);
+        }
 
         if (
             filled($validated['available_at'] ?? null)

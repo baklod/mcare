@@ -4,11 +4,16 @@ namespace App\Support;
 
 use App\Models\TrainingModule;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use ZipArchive;
 
 class TrainingModuleFiles
 {
     public const MAX_UPLOAD_KB = 38912;
+
+    public const MAX_SUPPLEMENTARY_FILES = 10;
+
+    public const MAX_SUPPLEMENTARY_UPLOAD_KB = 25600;
 
     /** @return list<string> */
     public static function extensions(): array
@@ -126,5 +131,74 @@ class TrainingModuleFiles
         } finally {
             $archive->close();
         }
+    }
+
+    /**
+     * Store supplementary learning attachments and return structured metadata.
+     *
+     * @param  list<UploadedFile>  $uploadedFiles
+     * @return list<array{file_path: string, original_name: string, mime_type: string, file_size: int, human_size: string}>
+     */
+    public static function storeSupplementaryFiles(array $uploadedFiles, int $userId): array
+    {
+        $stored = [];
+
+        try {
+            foreach ($uploadedFiles as $file) {
+                if (! $file instanceof UploadedFile || ! $file->isValid()) {
+                    continue;
+                }
+
+                $path = $file->store("training-modules/{$userId}/supplementary", 'local');
+                if ($path === false) {
+                    throw new \RuntimeException('A supplementary learning file could not be stored.');
+                }
+
+                $size = (int) ($file->getSize() ?: 0);
+                $stored[] = [
+                    'file_path' => $path,
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime_type' => (string) $file->getMimeType(),
+                    'file_size' => $size,
+                    'human_size' => self::formatBytes($size),
+                ];
+            }
+        } catch (\Throwable $exception) {
+            self::deleteSupplementaryFiles($stored);
+
+            throw $exception;
+        }
+
+        return $stored;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $storedFiles
+     */
+    public static function deleteSupplementaryFiles(array $storedFiles): void
+    {
+        $paths = collect($storedFiles)
+            ->pluck('file_path')
+            ->filter(fn ($path) => is_string($path) && $path !== '')
+            ->values()
+            ->all();
+
+        if ($paths !== []) {
+            Storage::disk('local')->delete($paths);
+        }
+    }
+
+    public static function formatBytes(int $bytes, int $precision = 1): string
+    {
+        if ($bytes <= 0) {
+            return '0 B';
+        }
+
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $power = min((int) floor(log($bytes, 1024)), count($units) - 1);
+        $power = max(0, $power);
+        $value = $bytes / (1024 ** $power);
+
+        return round($value, $precision).' '.$units[$power];
     }
 }

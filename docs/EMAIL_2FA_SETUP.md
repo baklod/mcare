@@ -23,7 +23,7 @@ Set these values in the deployment environment (not in Git):
 
 \`\`\`dotenv
 MAIL_MAILER=smtp
-MAIL_SCHEME=tls
+MAIL_SCHEME=smtp
 MAIL_HOST=smtp.gmail.com
 MAIL_PORT=587
 MAIL_USERNAME=staff@example.com
@@ -40,6 +40,10 @@ TWO_FACTOR_MAX_ATTEMPTS=5
 For Gmail, use an app password, not the normal account password. Mailgun, SES,
 Postmark, and another SMTP provider can be used by replacing the host,
 credentials, and sender values.
+
+With this Laravel/Symfony Mailer version, port 587 uses the `smtp` scheme and
+automatically negotiates STARTTLS. The supported scheme names are `smtp` and
+`smtps`; do not set `MAIL_SCHEME=tls`.
 
 After changing environment variables on a cached deployment, run:
 

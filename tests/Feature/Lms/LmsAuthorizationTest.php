@@ -14,13 +14,13 @@ class LmsAuthorizationTest extends TestCase
     public function test_guests_are_sent_to_the_correct_portal_login(): void
     {
         $this->get(route('trainer.stream'))
-            ->assertRedirect(route('trainer.login'));
+            ->assertRedirect(route('login'));
 
         $this->get(route('trainee.stream'))
-            ->assertRedirect(route('trainee.login'));
+            ->assertRedirect(route('login'));
 
         $this->get(route('trainee.quizzes.index'))
-            ->assertRedirect(route('trainee.login'));
+            ->assertRedirect(route('login'));
     }
 
     public function test_trainer_and_trainee_lms_surfaces_are_role_isolated(): void

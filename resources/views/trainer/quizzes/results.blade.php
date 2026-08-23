@@ -19,7 +19,7 @@
         </div>
         <div class="lms-header-actions">
             <a href="{{ route('trainer.quizzes.edit', $quiz) }}" class="secondary-action">Edit quiz</a>
-            <a href="{{ route('trainer.assessments') }}" class="secondary-action">Back to quizzes</a>
+            <a href="{{ $quiz->training_module_id ? route('trainer.modules.show', $quiz->training_module_id).'#assessments' : route('trainer.resources') }}" class="secondary-action">Back to module</a>
         </div>
     </header>
 

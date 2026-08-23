@@ -363,6 +363,56 @@
         @apply bg-purple-50 text-purple-800;
     }
 
+    .universal-dashboard .dashboard-mobile-menu {
+        width: 100%;
+        max-width: none;
+        margin: auto 0 0;
+        padding: 12px;
+        border: 0;
+        background: transparent;
+        overflow: visible;
+    }
+
+    .universal-dashboard .dashboard-mobile-menu::backdrop {
+        background: rgba(15, 23, 42, 0.48);
+    }
+
+    .universal-dashboard .dashboard-mobile-menu-card {
+        @apply mx-auto max-h-[76vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl;
+    }
+
+    .universal-dashboard .dashboard-mobile-menu-header {
+        @apply sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-slate-100 bg-white pb-3;
+    }
+
+    .universal-dashboard .dashboard-mobile-menu-title {
+        @apply mt-1 text-xl font-extrabold text-slate-950;
+    }
+
+    .universal-dashboard .dashboard-mobile-menu-close {
+        @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-purple-500;
+    }
+
+    .universal-dashboard .dashboard-mobile-menu-list {
+        @apply mt-3 grid gap-2;
+    }
+
+    .universal-dashboard .dashboard-mobile-menu-link {
+        @apply flex min-h-12 items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm font-bold text-slate-700 outline-none hover:border-purple-100 hover:bg-purple-50 hover:text-purple-800 focus-visible:ring-2 focus-visible:ring-purple-500;
+    }
+
+    .universal-dashboard .dashboard-mobile-menu-link.is-active {
+        @apply border-purple-200 bg-purple-50 text-purple-800;
+    }
+
+    .universal-dashboard .dashboard-mobile-menu-icon {
+        @apply flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600;
+    }
+
+    .universal-dashboard .dashboard-mobile-menu-link.is-active .dashboard-mobile-menu-icon {
+        @apply bg-purple-100 text-purple-800;
+    }
+
     .universal-dashboard .primary-action,
     .universal-dashboard .secondary-action {
         @apply min-h-11 rounded-xl px-5 py-2.5 shadow-none outline-none transition duration-150 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2;
@@ -1101,6 +1151,26 @@ html[data-dashboard-theme="dark"] .account-card {
     border-color: #1e293b !important;
     color: #f1f5f9 !important;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.4) !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-mobile-menu-card,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-mobile-menu-header,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-mobile-menu-close {
+    background-color: #111827 !important;
+    border-color: #334155 !important;
+    color: #f1f5f9 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-mobile-menu-title,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-mobile-menu-link {
+    color: #f1f5f9 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-mobile-menu-link:hover,
+html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-mobile-menu-link.is-active {
+    background-color: #2e1065 !important;
+    border-color: #581c87 !important;
+    color: #e9d5ff !important;
 }
 
 html[data-dashboard-theme="dark"] .universal-dashboard :is(.dashboard-table, .dashboard-table tbody, .dashboard-table tbody tr, .dashboard-table td) {

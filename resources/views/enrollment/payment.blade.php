@@ -18,6 +18,7 @@
             'not_selected' => 'bg-slate-50 text-slate-700 ring-slate-100',
             'onsite_pending' => 'bg-amber-50 text-amber-700 ring-amber-100',
             'online_pending' => 'bg-purple-50 text-purple-700 ring-purple-100',
+            'partially_paid' => 'bg-sky-50 text-sky-700 ring-sky-100',
             'paid' => 'bg-emerald-50 text-emerald-700 ring-emerald-100',
             'expired' => 'bg-red-50 text-red-700 ring-red-100',
         ];
@@ -30,6 +31,7 @@
             'maya' => 'Maya',
         ];
         $paymentConfirmed = $application->payment_status === 'paid';
+        $paymentCleared = $application->hasEnrollmentPaymentClearance();
         $onlineCheckoutActive = $application->payment_status === 'online_pending' && filled($activeCheckoutUrl);
     @endphp
 
@@ -129,6 +131,12 @@
             </aside>
         </section>
 
+        @if ($application->payment_method && ! $paymentCleared)
+            <section id="payment-confirmation-status" class="mt-8 rounded-3xl border border-purple-200 bg-purple-50 p-5 font-semibold leading-6 text-purple-900 shadow-sm" aria-live="polite">
+                Waiting for secure payment verification. This page checks MCARE automatically and will return you to the landing page after the required enrollment payment is verified.
+            </section>
+        @endif
+
         <section class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
             <form method="POST" action="{{ route('payment.select') }}" data-single-action class="rounded-3xl border border-purple-100 bg-white p-6 shadow-xl shadow-purple-100/40 sm:p-8">
                 @csrf
@@ -181,17 +189,12 @@
                             Test mode is active. Use PayMongo test payment details only; no real funds will be collected.
                         </p>
                     @endif
-                    @if ($application->payment_status === 'online_pending')
-                        <p id="payment-confirmation-status" class="rounded-2xl border border-purple-200 bg-purple-50 px-4 py-3 font-semibold text-purple-800" aria-live="polite">
-                            Waiting for PayMongo’s signed confirmation. This page checks securely in the background.
-                        </p>
-                    @endif
                 </div>
 
                 <button
                     type="submit"
                     data-action-button
-                    @disabled(! $paymongoReady || $paymentConfirmed || $paymongoModeConflict)
+                    @disabled(! $paymongoReady || $paymentCleared || $paymongoModeConflict)
                     class="mt-7 inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-6 py-4 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
                 >
                     @if ($paymentConfirmed)
@@ -242,7 +245,7 @@
                     <button
                         type="submit"
                         data-action-button
-                        @disabled($paymentConfirmed || $application->payment_status === 'online_pending')
+                        @disabled($paymentCleared || $application->payment_status === 'online_pending')
                         class="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-4 text-sm font-bold text-white shadow-lg shadow-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
                     >
                         Choose Pay on Site
@@ -285,7 +288,7 @@
             });
         });
 
-        @if ($application->payment_status === 'online_pending')
+        @if ($application->payment_method && ! $paymentCleared)
             // The status endpoint reads only MCARE's server-side record; no
             // browser query parameter can turn a pending payment into paid.
             const paymentStatusUrl = @json(route('payment.status'));
@@ -307,12 +310,14 @@
                     if (response.ok) {
                         const status = await response.json();
 
-                        if (status.paid === true) {
+                        if (status.payment_verified === true) {
                             window.clearInterval(paymentStatusTimer);
                             if (confirmationStatus) {
-                                confirmationStatus.textContent = 'Payment confirmed securely. Updating your record...';
+                                confirmationStatus.textContent = 'Payment verified successfully. Returning you to MCARE while your account awaits approval...';
                             }
-                            window.setTimeout(() => window.location.reload(), 500);
+                            window.setTimeout(() => {
+                                window.location.assign(status.completion_url || @json(route('payment.complete')));
+                            }, 500);
                             return;
                         }
                     }
@@ -322,12 +327,11 @@
                 }
 
                 if (paymentStatusChecks >= 20) {
-                    window.clearInterval(paymentStatusTimer);
                     if (confirmationStatus) {
-                        confirmationStatus.textContent = 'Confirmation is still pending. You can safely refresh this page later.';
+                        confirmationStatus.textContent = 'Still waiting for the administrator or payment provider. You may keep this page open; checking will continue automatically.';
                     }
                 }
-            }, 3000);
+            }, 4000);
         @endif
     </script>
 </body>

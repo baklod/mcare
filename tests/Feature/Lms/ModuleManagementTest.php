@@ -171,4 +171,225 @@ class ModuleManagementTest extends TestCase
         $this->assertNotNull($progress->first_opened_at);
         $this->assertNotNull($progress->last_viewed_at);
     }
+
+    public function test_trainer_can_create_module_with_supplementary_attachments_and_nominal_hours(): void
+    {
+        Storage::fake('local');
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch();
+
+        $response = $this->actingAs($trainer)
+            ->post(route('trainer.modules.store'), [
+                'audience_type' => 'batch',
+                'training_batch_id' => $batch->id,
+                'module_code' => 'HCS323301',
+                'competency_category' => 'core',
+                'title' => 'Provide Care and Support to Infants and Toddlers',
+                'topic' => 'Comfort infants and toddlers',
+                'estimated_hours' => 40,
+                'description' => 'Comprehensive infant care module with worksheets.',
+                'position' => 1,
+                'is_published' => '1',
+                'module_file' => UploadedFile::fake()->create('core1-infant-care.pdf', 100, 'application/pdf'),
+                'supplementary_files' => [
+                    UploadedFile::fake()->create('infant-feeding-rubric.pdf', 50, 'application/pdf'),
+                    UploadedFile::fake()->create('bathing-worksheet.docx', 30, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+                ],
+            ]);
+
+        $response->assertRedirect(route('trainer.resources'));
+        $this->assertDatabaseHas('training_modules', [
+            'module_code' => 'HCS323301',
+            'competency_category' => 'core',
+            'estimated_hours' => 40,
+            'title' => 'Provide Care and Support to Infants and Toddlers',
+        ]);
+
+        $module = \App\Models\TrainingModule::where('module_code', 'HCS323301')->firstOrFail();
+        $this->assertCount(2, $module->supplementaryList());
+    }
+
+    public function test_trainer_can_create_quiz_inside_module_hub(): void
+    {
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch();
+        $module = $this->lmsModule($trainer, $batch, ['module_code' => 'HCS323301']);
+
+        $response = $this->actingAs($trainer)
+            ->post(route('trainer.modules.quizzes.store', $module), [
+                'title' => 'Infant Care Mastery Assessment',
+                'instructions' => 'Complete all 10 questions.',
+                'time_limit_minutes' => 25,
+                'passing_score_percent' => 75,
+                'is_published' => 1,
+            ]);
+
+        $quiz = \App\Models\Quiz::where('title', 'Infant Care Mastery Assessment')->firstOrFail();
+        $this->assertSame($module->id, $quiz->training_module_id);
+        $this->assertFalse($quiz->is_published);
+        $this->assertNull($quiz->published_at);
+        $response->assertRedirect(route('trainer.quizzes.edit', $quiz));
+    }
+
+    public function test_trainer_can_evaluate_trainee_competency_inside_module_hub_and_syncs_tor(): void
+    {
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch();
+        ['user' => $trainee, 'application' => $application] = $this->lmsTrainee($batch);
+
+        // Ensure competency unit exists for TOR sync
+        \App\Models\CompetencyUnit::firstOrCreate(
+            ['code' => 'HCS323301'],
+            ['title' => 'Provide care and support to infants/toddlers', 'category' => 'core', 'nominal_hours' => 40, 'position' => 1]
+        );
+
+        $module = $this->lmsModule($trainer, $batch, ['module_code' => 'HCS323301']);
+
+        $response = $this->actingAs($trainer)
+            ->post(route('trainer.modules.evaluate', $module), [
+                'enrollment_application_id' => $application->id,
+                'quiz_score' => 92.5,
+                'practical_rating' => 'competent',
+                'competency_outcome' => 'competent',
+                'evaluation_remarks' => 'Excellent demonstration of sterile diaper changing and infant feeding.',
+            ]);
+
+        $response->assertRedirect(route('trainer.modules.show', $module));
+
+        $progress = ModuleProgress::where('enrollment_application_id', $application->id)
+            ->where('training_module_id', $module->id)
+            ->firstOrFail();
+
+        $this->assertEquals(92.5, (float) $progress->quiz_score);
+        $this->assertSame('competent', $progress->practical_rating);
+        $this->assertSame('competent', $progress->competency_outcome);
+        $this->assertSame(100, $progress->progress_percent);
+        $this->assertSame(ModuleProgress::STATUS_COMPLETED, $progress->status);
+
+        // Check TOR record auto-synced
+        $this->assertDatabaseHas('trainee_competency_records', [
+            'enrollment_application_id' => $application->id,
+            'status' => \App\Models\TraineeCompetencyRecord::STATUS_COMPETENT,
+        ]);
+    }
+
+    public function test_trainee_can_download_supplementary_attachments(): void
+    {
+        Storage::fake('local');
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch();
+        ['user' => $trainee] = $this->lmsTrainee($batch);
+
+        $filePath = "training-modules/{$trainer->id}/supplementary/worksheet.pdf";
+        Storage::disk('local')->put($filePath, '%PDF supplementary');
+
+        $module = $this->lmsModule($trainer, $batch, [
+            'supplementary_files' => [
+                [
+                    'file_path' => $filePath,
+                    'original_name' => 'infant-care-worksheet.pdf',
+                    'mime_type' => 'application/pdf',
+                    'file_size' => 1024,
+                    'human_size' => '1 KB',
+                ],
+            ],
+        ]);
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.modules.supplementary.download', [$module, 0]))
+            ->assertOk()
+            ->assertHeader('Content-Disposition', 'attachment; filename=infant-care-worksheet.pdf');
+    }
+
+    public function test_trainer_can_remove_a_supplementary_attachment_without_deleting_the_module(): void
+    {
+        Storage::fake('local');
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch();
+        $firstPath = "training-modules/{$trainer->id}/supplementary/first.pdf";
+        $secondPath = "training-modules/{$trainer->id}/supplementary/second.pdf";
+        Storage::disk('local')->put($firstPath, '%PDF first');
+        Storage::disk('local')->put($secondPath, '%PDF second');
+
+        $module = $this->lmsModule($trainer, $batch, [
+            'supplementary_files' => [
+                ['file_path' => $firstPath, 'original_name' => 'first.pdf'],
+                ['file_path' => $secondPath, 'original_name' => 'second.pdf'],
+            ],
+        ]);
+
+        $this->actingAs($trainer)
+            ->delete(route('trainer.modules.supplementary.destroy', [$module, 0]))
+            ->assertRedirect(route('trainer.modules.show', $module))
+            ->assertSessionHas('saved');
+
+        $module->refresh();
+        $this->assertSame('second.pdf', $module->supplementaryList()[0]['original_name']);
+        Storage::disk('local')->assertMissing($firstPath);
+        Storage::disk('local')->assertExists($secondPath);
+    }
+
+    public function test_module_rejects_more_than_ten_supplementary_files_before_storing_anything(): void
+    {
+        Storage::fake('local');
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch();
+        $files = collect(range(1, 11))
+            ->map(fn (int $index) => UploadedFile::fake()->create("handout-{$index}.pdf", 10, 'application/pdf'))
+            ->all();
+
+        $this->actingAs($trainer)
+            ->post(route('trainer.modules.store'), [
+                'audience_type' => 'batch',
+                'training_batch_id' => $batch->id,
+                'title' => 'Too many handouts',
+                'description' => 'This request must fail before storage.',
+                'module_file' => UploadedFile::fake()->create('primary.pdf', 10, 'application/pdf'),
+                'supplementary_files' => $files,
+            ])
+            ->assertSessionHasErrors('supplementary_files');
+
+        $this->assertDatabaseMissing('training_modules', ['title' => 'Too many handouts']);
+        $this->assertSame([], Storage::disk('local')->allFiles());
+    }
+
+    public function test_private_module_cannot_evaluate_another_trainee_and_downgrade_clears_completion(): void
+    {
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch();
+        ['application' => $assigned] = $this->lmsTrainee($batch);
+        ['application' => $other] = $this->lmsTrainee($batch);
+        $module = $this->lmsModule($trainer, $batch, [
+            'target_enrollment_application_id' => $assigned->id,
+        ]);
+
+        $this->actingAs($trainer)
+            ->post(route('trainer.modules.evaluate', $module), [
+                'enrollment_application_id' => $other->id,
+                'competency_outcome' => ModuleProgress::OUTCOME_COMPETENT,
+            ])
+            ->assertSessionHasErrors('enrollment_application_id');
+
+        $this->actingAs($trainer)
+            ->post(route('trainer.modules.evaluate', $module), [
+                'enrollment_application_id' => $assigned->id,
+                'competency_outcome' => ModuleProgress::OUTCOME_COMPETENT,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($trainer)
+            ->post(route('trainer.modules.evaluate', $module), [
+                'enrollment_application_id' => $assigned->id,
+                'competency_outcome' => ModuleProgress::OUTCOME_NOT_YET_COMPETENT,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $progress = ModuleProgress::query()
+            ->where('enrollment_application_id', $assigned->id)
+            ->where('training_module_id', $module->id)
+            ->firstOrFail();
+        $this->assertSame(ModuleProgress::STATUS_IN_PROGRESS, $progress->status);
+        $this->assertSame(99, $progress->progress_percent);
+        $this->assertNull($progress->completed_at);
+    }
 }

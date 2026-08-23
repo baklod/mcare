@@ -17,6 +17,7 @@ class Quiz extends Model
         'trainer_id',
         'training_batch_id',
         'target_enrollment_application_id',
+        'training_module_id',
         'title',
         'instructions',
         'is_published',
@@ -49,6 +50,11 @@ class Quiz extends Model
     public function batch(): BelongsTo
     {
         return $this->belongsTo(TrainingBatch::class, 'training_batch_id');
+    }
+
+    public function trainingModule(): BelongsTo
+    {
+        return $this->belongsTo(TrainingModule::class, 'training_module_id');
     }
 
     public function targetTrainee(): BelongsTo

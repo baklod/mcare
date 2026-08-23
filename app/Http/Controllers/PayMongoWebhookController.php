@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\PaymentAttempt;
+use App\Models\PaymentTransaction;
 use App\Models\PaymongoWebhookEvent;
+use App\Services\EnrollmentPaymentLifecycle;
 use App\Support\PayMongoWebhookSignature;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,7 +16,11 @@ use JsonException;
 
 class PayMongoWebhookController extends Controller
 {
-    public function __invoke(Request $request, PayMongoWebhookSignature $signature): JsonResponse
+    public function __invoke(
+        Request $request,
+        PayMongoWebhookSignature $signature,
+        EnrollmentPaymentLifecycle $paymentLifecycle,
+    ): JsonResponse
     {
         if (! $signature->configured()) {
             return response()->json([
@@ -92,6 +98,14 @@ class PayMongoWebhookController extends Controller
             return $this->processPaidCheckout($event, $envelope);
         }, 3);
 
+        if (isset($result['payment_verified_application_id'])) {
+            $application = EnrollmentApplication::query()->find($result['payment_verified_application_id']);
+
+            if ($application) {
+                $paymentLifecycle->handleVerifiedPayment($application);
+            }
+        }
+
         return response()->json([
             'received' => true,
             'status' => $result['status'],
@@ -154,7 +168,7 @@ class PayMongoWebhookController extends Controller
      *     livemode: bool,
      *     resource: array<string, mixed>
      * }  $envelope
-     * @return array{status: string, http_status: int}
+     * @return array{status: string, http_status: int, payment_verified_application_id?: int}
      */
     private function processPaidCheckout(PaymongoWebhookEvent $event, array $envelope): array
     {
@@ -259,9 +273,7 @@ class PayMongoWebhookController extends Controller
                 return $this->finishEvent($event, 'rejected', 'conflicting_paid_payment', 202);
             }
 
-            if ($application->payment_status === EnrollmentApplication::PAYMENT_PAID) {
-                return $this->finishEvent($event, 'processed', null, 200);
-            }
+            return $this->finishEvent($event, 'processed', null, 200);
         }
 
         $paidAt = now();
@@ -277,8 +289,27 @@ class PayMongoWebhookController extends Controller
             ]),
         ])->save();
 
+        $amount = round($attempt->amount_minor / 100, 2);
+        $transactionType = $amount >= (float) ($application->total_program_fee ?? 22000.00)
+            ? PaymentTransaction::TYPE_FULL_PAYMENT
+            : PaymentTransaction::TYPE_DOWNPAYMENT;
+
+        PaymentTransaction::query()->updateOrCreate([
+            'enrollment_application_id' => $application->id,
+            'payment_channel' => PaymentTransaction::CHANNEL_ONLINE,
+            'or_number' => $paymentId,
+        ], [
+            'user_id' => $application->user_id,
+            'transaction_type' => $transactionType,
+            'amount' => $amount,
+            'status' => PaymentTransaction::STATUS_VERIFIED,
+            'paid_at' => $paidAt,
+            'verified_at' => $paidAt,
+            'notes' => 'Verified automatically from a signed PayMongo webhook.',
+        ]);
+
         $application->forceFill([
-            'payment_status' => EnrollmentApplication::PAYMENT_PAID,
+            'payment_receipt_number' => $paymentId,
             'payment_verified_by_id' => null,
             'payment_verified_at' => $paidAt,
             'payment_verification_notes' => 'Verified automatically from a signed PayMongo webhook.',
@@ -291,6 +322,7 @@ class PayMongoWebhookController extends Controller
                 'gateway_verified_at' => $paidAt->toIso8601String(),
             ]),
         ])->save();
+        $application->recalculatePaymentStatus();
 
         AdminActivityLog::record(null, 'payment.paymongo.verified', $application, [
             'event_id' => $envelope['event_id'],
@@ -301,7 +333,10 @@ class PayMongoWebhookController extends Controller
             'livemode' => $attempt->livemode,
         ]);
 
-        return $this->finishEvent($event, 'processed', null, 200);
+        return [
+            ...$this->finishEvent($event, 'processed', null, 200),
+            'payment_verified_application_id' => $application->getKey(),
+        ];
     }
 
     /**

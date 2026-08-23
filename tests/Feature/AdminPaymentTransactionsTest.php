@@ -6,8 +6,13 @@ use App\Models\EnrollmentApplication;
 use App\Models\PaymentTransaction;
 use App\Models\TrainingBatch;
 use App\Models\User;
+use App\Notifications\EnrollmentStatusUpdatedNotification;
+use App\Notifications\PaymentVerifiedNotification;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -47,6 +52,10 @@ class AdminPaymentTransactionsTest extends TestCase
         $this->assertEquals(20000.00, $application->remainingBalance());
         $this->assertEquals('partially_paid', $application->payment_status);
         $this->assertTrue($application->isDownpaymentSatisfied());
+
+        $adminNotice = 'On-site payment of ₱2,000.00 recorded for Juan Dela Cruz (OR #OR-2026-001).';
+        $paymentPage = $this->actingAs($admin)->get(route('admin.payment-schedules.index'))->assertOk();
+        $this->assertSame(1, substr_count($paymentPage->getContent(), $adminNotice));
     }
 
     public function test_admin_recording_full_tuition_sets_status_to_paid(): void
@@ -83,6 +92,105 @@ class AdminPaymentTransactionsTest extends TestCase
         $this->assertEquals('paid', $application->payment_status);
     }
 
+    public function test_verified_downpayment_moves_applicant_to_account_review_then_approval_unlocks_login(): void
+    {
+        Notification::fake();
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->create([
+            'role' => 'applicant',
+            'applicant_status' => EnrollmentApplication::STATUS_PROFILE_SUBMITTED,
+            'email' => 'payment.lifecycle@gmail.com',
+            'email_verified_at' => now(),
+            'password' => 'Password123',
+        ]);
+        $application = $this->createApprovedApplication($applicant, $this->batch());
+        $application->forceFill([
+            'status' => EnrollmentApplication::STATUS_PROFILE_SUBMITTED,
+        ])->save();
+
+        $this->actingAs($admin)
+            ->post(route('admin.payment-schedules.transactions.store', $application), [
+                'amount' => 2000.00,
+                'or_number' => 'OR-LIFECYCLE-001',
+                'transaction_type' => 'downpayment',
+                'paid_at' => now()->toDateString(),
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('saved');
+
+        $application->refresh();
+        $this->assertSame(EnrollmentApplication::PAYMENT_PARTIALLY_PAID, $application->payment_status);
+        $this->assertSame(EnrollmentApplication::STATUS_PRE_ENLISTMENT, $application->status);
+        $this->assertTrue($application->hasEnrollmentPaymentClearance());
+        $this->assertNotNull(data_get($application->payment_meta, 'enrollment_clearance_notified_at'));
+        $this->assertSame(
+            EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+            $applicant->refresh()->applicant_status,
+        );
+
+        Notification::assertSentTo(
+            $applicant,
+            PaymentVerifiedNotification::class,
+            fn (PaymentVerifiedNotification $notification, array $channels): bool => $notification instanceof ShouldQueue
+                && $notification->queue === 'mail'
+                && $notification->toMail($applicant)->subject === 'MCARE payment verified successfully'
+                && in_array('database', $channels, true)
+                && in_array('mail', $channels, true),
+        );
+
+        Auth::logout();
+        $session = ['enrollment.payment_application_id' => $application->id];
+        $this->withSession($session)
+            ->getJson(route('payment.status'))
+            ->assertOk()
+            ->assertJson([
+                'payment_verified' => true,
+                'account_approved' => false,
+                'completion_url' => route('payment.complete'),
+            ]);
+
+        $this->actingAs($applicant)
+            ->withSession($session)
+            ->get(route('payment.complete'))
+            ->assertRedirect(route('landing'))
+            ->assertSessionHas('payment_verified');
+        $this->assertGuest();
+
+        $this->get(route('landing'))
+            ->assertOk()
+            ->assertSee('Payment verified successfully')
+            ->assertSee('Please wait while the administrator completes your account verification');
+
+        $this->post(route('login.store'), [
+            'email' => $applicant->email,
+            'password' => 'Password123',
+        ])->assertSessionHasErrors('email');
+        $this->assertGuest();
+
+        $this->actingAs($admin)
+            ->patch(route('admin.enrollments.update', $application), [
+                'status' => EnrollmentApplication::STATUS_APPROVED,
+                'admin_notes' => 'Payment and documents verified.',
+            ])
+            ->assertRedirect(route('admin.enrollments.show', $application));
+
+        $this->assertSame('trainee', $applicant->refresh()->role);
+        Notification::assertSentTo(
+            $applicant,
+            EnrollmentStatusUpdatedNotification::class,
+            fn (EnrollmentStatusUpdatedNotification $notification): bool => $notification->application->status === EnrollmentApplication::STATUS_APPROVED
+                && $notification->queue === 'mail'
+                && $notification->toMail($applicant)->subject === 'Your MCARE account is approved - you can now log in',
+        );
+
+        Auth::logout();
+        $this->post(route('login.store'), [
+            'email' => $applicant->email,
+            'password' => 'Password123',
+        ])->assertRedirect(route('trainee.dashboard'));
+        $this->assertAuthenticatedAs($applicant);
+    }
+
     public function test_trainee_can_upload_payment_proof_and_admin_can_verify(): void
     {
         Storage::fake('local');
@@ -114,6 +222,12 @@ class AdminPaymentTransactionsTest extends TestCase
         $this->assertEquals('OR-ONLINE-999', $transaction->or_number);
         $this->assertNotNull($transaction->receipt_proof_path);
 
+        $this->actingAs($admin)
+            ->get(route('admin.payment-schedules.transactions.proof', $transaction))
+            ->assertOk()
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('Content-Type', 'application/pdf');
+
         // Admin verifies the transaction
         $this->actingAs($admin)
             ->patch(route('admin.payment-schedules.transactions.verify', $transaction), [
@@ -129,6 +243,76 @@ class AdminPaymentTransactionsTest extends TestCase
         $application->refresh();
         $this->assertEquals(5000.00, (float) $application->total_paid_amount);
         $this->assertEquals(17000.00, $application->remainingBalance());
+    }
+
+    public function test_admin_and_trainee_cannot_submit_more_than_the_remaining_balance(): void
+    {
+        Storage::fake('local');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $application = $this->createApprovedApplication($trainee, $this->batch());
+
+        $this->actingAs($admin)
+            ->from(route('admin.payment-schedules.index'))
+            ->post(route('admin.payment-schedules.transactions.store', $application), [
+                'amount' => 22000.01,
+                'or_number' => 'OR-OVERPAY-ADMIN',
+                'transaction_type' => 'full_payment',
+                'paid_at' => now()->toDateString(),
+            ])
+            ->assertRedirect(route('admin.payment-schedules.index'))
+            ->assertSessionHasErrors('amount');
+
+        $this->actingAs($trainee)
+            ->from(route('trainee.payments'))
+            ->post(route('trainee.payments.upload-proof'), [
+                'amount' => 22000.01,
+                'or_number' => 'OR-OVERPAY-TRAINEE',
+                'transaction_type' => 'full_payment',
+                'paid_at' => now()->toDateString(),
+                'receipt_proof' => UploadedFile::fake()->create('overpay.pdf', 100, 'application/pdf'),
+            ])
+            ->assertRedirect(route('trainee.payments'))
+            ->assertSessionHasErrors('amount');
+
+        $this->assertDatabaseCount('payment_transactions', 0);
+        $this->assertSame([], Storage::disk('local')->allFiles("payment-receipts/{$application->id}"));
+    }
+
+    public function test_receipt_proof_is_required_and_or_number_cannot_be_reused(): void
+    {
+        Storage::fake('local');
+
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $application = $this->createApprovedApplication($trainee, $this->batch());
+
+        $payload = [
+            'amount' => 2000,
+            'or_number' => 'OR-UNIQUE-001',
+            'transaction_type' => 'downpayment',
+            'paid_at' => now()->toDateString(),
+        ];
+
+        $this->actingAs($trainee)
+            ->post(route('trainee.payments.upload-proof'), $payload)
+            ->assertSessionHasErrors('receipt_proof');
+
+        $this->actingAs($trainee)
+            ->post(route('trainee.payments.upload-proof'), [
+                ...$payload,
+                'receipt_proof' => UploadedFile::fake()->create('receipt-one.pdf', 100, 'application/pdf'),
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($trainee)
+            ->post(route('trainee.payments.upload-proof'), [
+                ...$payload,
+                'receipt_proof' => UploadedFile::fake()->create('receipt-two.pdf', 100, 'application/pdf'),
+            ])
+            ->assertSessionHasErrors('or_number');
+
+        $this->assertDatabaseCount('payment_transactions', 1);
     }
 
     private function batch(): TrainingBatch

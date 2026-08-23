@@ -212,6 +212,11 @@ class EnrollmentApplication extends Model
         return $paid >= $downpayment;
     }
 
+    public function hasEnrollmentPaymentClearance(): bool
+    {
+        return $this->isDownpaymentSatisfied() && $this->payment_verified_at !== null;
+    }
+
     public function recalculatePaymentStatus(): void
     {
         $totalPaid = (float) $this->paymentTransactions()

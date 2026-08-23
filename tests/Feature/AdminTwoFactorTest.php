@@ -31,12 +31,12 @@ class AdminTwoFactorTest extends TestCase
             'role' => 'admin',
         ]);
 
-        $this->from(route('admin.login'))
-            ->post(route('admin.login.store'), [
+        $this->from(route('login'))
+            ->post(route('login.store'), [
                 'email' => $admin->email,
                 'password' => 'Password123',
             ])
-            ->assertRedirect(route('admin.login'))
+            ->assertRedirect(route('login'))
             ->assertSessionHas('admin.mfa.pending');
 
         $this->assertGuest();
@@ -48,12 +48,12 @@ class AdminTwoFactorTest extends TestCase
             return $mail->hasTo($admin->email) && strlen($mail->code) === 6;
         });
 
-        $this->get(route('admin.login'))
+        $this->get(route('login'))
             ->assertOk()
             ->assertSee('Verify your sign-in');
 
         $this->withSession(['url.intended' => route('admin.enrollments.index')])
-            ->post(route('admin.login.verify-2fa'), ['code' => $code])
+            ->post(route('login.verify-2fa'), ['code' => $code])
             ->assertRedirect(route('admin.dashboard'));
 
         $this->assertAuthenticatedAs($admin);
@@ -73,7 +73,7 @@ class AdminTwoFactorTest extends TestCase
             'email' => $admin->email,
             'password' => 'Password123',
         ])
-            ->assertRedirect(route('admin.login'))
+            ->assertRedirect(route('login'))
             ->assertSessionHas('admin.mfa.pending');
 
         $this->assertGuest();

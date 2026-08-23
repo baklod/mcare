@@ -7,6 +7,9 @@
     $attemptsRemaining = max(0, (int) $quiz->attempt_limit - $attemptCollection->count());
     $isUpcoming = $quiz->available_at && $quiz->available_at->isFuture();
     $isClosed = $quiz->due_at && $quiz->due_at->isPast();
+    $moduleReturnUrl = $quiz->training_module_id
+        ? route('trainee.modules.show', $quiz->training_module_id).'#assessments'
+        : route('trainee.modules.index');
 @endphp
 
 <div class="lms-page" data-quiz-detail>
@@ -16,7 +19,7 @@
             <h1>{{ $quiz->title }}</h1>
             <p>{{ $quiz->batch?->name ?? 'Assigned class' }} - Posted by {{ $quiz->trainer?->name ?? 'MCARE Trainer' }}</p>
         </div>
-        <a href="{{ route('trainee.quizzes.index') }}" class="secondary-action">Back to quizzes</a>
+        <a href="{{ $moduleReturnUrl }}" class="secondary-action">Back to module</a>
     </header>
 
     <div class="lms-detail-layout">
