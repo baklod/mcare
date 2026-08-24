@@ -111,6 +111,40 @@ class TrainerNotificationAndQuizVisibilityTest extends TestCase
         });
     }
 
+    public function test_repeating_an_already_published_quiz_request_does_not_notify_twice(): void
+    {
+        Notification::fake();
+
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch(['trainer_id' => $trainer->id]);
+        ['user' => $student] = $this->lmsTrainee($batch);
+        $module = $this->lmsModule($trainer, $batch);
+        $quiz = Quiz::create([
+            'trainer_id' => $trainer->id,
+            'training_batch_id' => $batch->id,
+            'training_module_id' => $module->id,
+            'title' => 'Already Published Quiz',
+            'passing_score_percent' => 75,
+            'attempt_limit' => 1,
+            'is_published' => true,
+            'published_at' => now(),
+        ]);
+        $quiz->questions()->create([
+            'type' => 'multiple_choice',
+            'prompt' => 'Existing question?',
+            'options' => ['Yes', 'No'],
+            'correct_option' => 0,
+            'points' => 1,
+            'position' => 0,
+        ]);
+
+        $this->actingAs($trainer)
+            ->patch(route('trainer.quizzes.publication', $quiz), ['is_published' => '1'])
+            ->assertRedirect();
+
+        Notification::assertNotSentTo($student, LmsQuizPublished::class);
+    }
+
     public function test_quizzes_are_visible_on_classwork_and_dashboard(): void
     {
         $trainer = $this->lmsUser('trainer');
@@ -142,6 +176,7 @@ class TrainerNotificationAndQuizVisibilityTest extends TestCase
         $response->assertSee('First Aid Mastery Quiz');
         $response->assertSee('Quizzes & Assessments', false);
         $response->assertSee('80%');
+        $response->assertDontSee('Attached Assessments');
 
         $dashboardResponse = $this->actingAs($trainer)->get(route('trainer.dashboard'));
         $dashboardResponse->assertOk();

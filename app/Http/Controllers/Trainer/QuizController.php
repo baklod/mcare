@@ -11,6 +11,7 @@ use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
 use App\Models\User;
 use App\Notifications\LmsQuizPublished;
+use App\Services\ClassroomComments;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -89,12 +90,18 @@ class QuizController extends Controller
             ->with('saved', $quiz->is_published ? 'Quiz published.' : 'Quiz saved as a draft.');
     }
 
-    public function edit(Request $request, Quiz $quiz): View
+    public function edit(
+        Request $request,
+        Quiz $quiz,
+        ClassroomComments $comments,
+    ): View
     {
         $this->authorize('update', $quiz);
 
         return view('trainer.quizzes.edit', [
             'quiz' => $quiz->load(['questions', 'batch', 'targetTrainee']),
+            'classroomComments' => $comments->visibleFor($request->user(), $quiz),
+            'privateCommentRecipients' => $comments->privateRecipients($request->user(), $quiz),
             ...$this->formOptions(),
         ]);
     }
@@ -184,6 +191,7 @@ class QuizController extends Controller
         $this->authorize('update', $quiz);
         $validated = $request->validate(['is_published' => ['required', 'boolean']]);
         $published = (bool) $validated['is_published'];
+        $wasPublished = $quiz->is_published;
 
         if ($published && ! $quiz->questions()->exists()) {
             throw ValidationException::withMessages([
@@ -201,7 +209,7 @@ class QuizController extends Controller
             'published' => $published,
         ]);
 
-        if ($published) {
+        if (! $wasPublished && $published) {
             $this->notifyTrainees($quiz);
         }
 

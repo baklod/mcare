@@ -7,6 +7,7 @@ use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\Quiz;
 use App\Models\QuizAttempt;
+use App\Services\ClassroomComments;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +27,11 @@ class QuizController extends Controller
         return redirect()->route('trainee.modules.index');
     }
 
-    public function show(Request $request, Quiz $quiz): View|RedirectResponse
+    public function show(
+        Request $request,
+        Quiz $quiz,
+        ClassroomComments $comments,
+    ): View|RedirectResponse
     {
         $application = $this->approvedApplicationFor($request);
 
@@ -46,6 +51,8 @@ class QuizController extends Controller
             'quiz' => $quiz,
             'attempts' => $attempts,
             'canStart' => $quiz->isOpenAt() && $quiz->attemptsRemainingFor($application) > 0,
+            'classroomComments' => $comments->visibleFor($request->user(), $quiz),
+            'privateCommentRecipients' => $comments->privateRecipients($request->user(), $quiz),
         ]);
     }
 

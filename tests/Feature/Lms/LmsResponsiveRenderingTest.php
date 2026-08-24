@@ -32,7 +32,11 @@ class LmsResponsiveRenderingTest extends TestCase
             ->get(route('trainer.resources'))
             ->assertOk()
             ->assertSee('data-lms-classwork', false)
-            ->assertSee('data-module-composer', false);
+            ->assertSee('id="module-creator-dialog"', false)
+            ->assertSee('id="quiz-creator-dialog"', false)
+            ->assertSee('data-dashboard-dialog', false)
+            ->assertDontSee('data-classwork-tab="all"', false)
+            ->assertDontSee('Attached Assessments');
 
         $this->actingAs($trainer)
             ->get(route('trainer.assessments'))

@@ -16,6 +16,7 @@ use App\Http\Controllers\Alumni\AlumniCareerHubController;
 use App\Http\Controllers\Auth\AccountSessionController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\GoogleAuthController;
+use App\Http\Controllers\ClassroomCommentController;
 use App\Http\Controllers\CompetencyWorkbookController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\EnrollmentPaymentController;
@@ -105,6 +106,25 @@ Route::middleware('throttle:global-web')->group(function () {
             Route::post('/read-all', [NotificationController::class, 'markAllRead'])
                 ->middleware('throttle:sensitive-mutation')
                 ->name('read-all');
+        });
+
+    Route::prefix('classroom-comments')
+        ->name('classroom-comments.')
+        ->middleware(['auth', 'private.response'])
+        ->group(function () {
+            Route::get('/{type}/{id}', [ClassroomCommentController::class, 'index'])
+                ->whereIn('type', ['module', 'quiz'])
+                ->whereNumber('id')
+                ->name('index');
+            Route::post('/', [ClassroomCommentController::class, 'store'])
+                ->middleware('throttle:sensitive-mutation')
+                ->name('store');
+            Route::patch('/{comment}', [ClassroomCommentController::class, 'update'])
+                ->middleware('throttle:sensitive-mutation')
+                ->name('update');
+            Route::delete('/{comment}', [ClassroomCommentController::class, 'destroy'])
+                ->middleware('throttle:sensitive-mutation')
+                ->name('destroy');
         });
 
     /*

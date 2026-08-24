@@ -8,4 +8,8 @@
         'pageDescription' => 'Revise the instructions, availability, questions, and publication state.',
         'submitLabel' => 'Save changes',
     ])
+
+    <div class="mx-auto mt-6 max-w-7xl">
+        <x-classroom-comments :commentable="$quiz" :comments="$classroomComments" :private-recipients="$privateCommentRecipients" />
+    </div>
 @endsection

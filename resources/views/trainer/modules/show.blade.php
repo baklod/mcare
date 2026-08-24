@@ -210,6 +210,7 @@
                     <h2 class="text-lg font-bold text-stone-950">Module Assessments</h2>
                     <p class="text-xs text-stone-500">Quizzes attached directly to this module for knowledge evaluation.</p>
                 </div>
+                <button type="button" class="primary-action text-xs" data-dashboard-dialog-open="module-quiz-dialog">Create quiz</button>
             </div>
 
             <div class="space-y-3">
@@ -241,13 +242,14 @@
                 @endforelse
             </div>
 
-            <!-- Create In-Module Quiz Form -->
-            <details class="rounded-xl border border-purple-200 bg-purple-50/40 p-4 text-xs">
-                <summary class="cursor-pointer font-bold text-purple-800 hover:text-purple-950 select-none">
-                    + Create a New Quiz for this Module
-                </summary>
-                <form method="POST" action="{{ route('trainer.modules.quizzes.store', $module) }}" class="mt-4 grid gap-3 sm:grid-cols-2">
+            <dialog id="module-quiz-dialog" data-dashboard-dialog data-auto-open="{{ old('_composer') === 'module-quiz' && $errors->any() ? 'true' : 'false' }}" class="lms-workflow-dialog is-compact" aria-labelledby="module-quiz-title">
+                <div class="lms-dialog-header">
+                    <div><p class="lms-eyebrow">{{ $module->title }}</p><h2 id="module-quiz-title">Create module quiz</h2><p>Create the draft, then add the answer key and questions.</p></div>
+                    <button type="button" data-dashboard-dialog-close class="lms-dialog-close" aria-label="Close quiz creator"><x-dashboard-icon name="xmark" /></button>
+                </div>
+                <form method="POST" action="{{ route('trainer.modules.quizzes.store', $module) }}" class="grid gap-3 p-6 sm:grid-cols-2" data-dashboard-dialog-form data-submit-label="Creating quiz...">
                     @csrf
+                    <input type="hidden" name="_composer" value="module-quiz">
                     <div class="sm:col-span-2">
                         <label class="block text-xs font-bold text-purple-900 mb-1">Assessment / Quiz Title</label>
                         <input name="title" required maxlength="160" placeholder="e.g. {{ $module->title }} - Mastery Assessment" class="form-field">
@@ -265,11 +267,12 @@
                         <input type="number" name="passing_score_percent" value="75" min="50" max="100" class="form-field">
                     </div>
                     <p class="sm:col-span-2 text-xs text-stone-600">The assessment starts as a draft. Add the answer key and questions before publishing it to trainees.</p>
-                    <div class="sm:col-span-2">
-                        <button type="submit" class="primary-action text-xs">Create & Add Questions</button>
+                    <div class="flex flex-col-reverse gap-2 border-t border-stone-200 pt-4 sm:col-span-2 sm:flex-row sm:justify-end">
+                        <button type="button" data-dashboard-dialog-close class="secondary-action text-xs">Cancel</button>
+                        <button type="submit" data-action-button class="primary-action text-xs">Create & Add Questions</button>
                     </div>
                 </form>
-            </details>
+            </dialog>
         </div>
     </section>
 
@@ -392,5 +395,7 @@
             </div>
         </div>
     </section>
+
+    <x-classroom-comments :commentable="$module" :comments="$classroomComments" :private-recipients="$privateCommentRecipients" />
 </div>
 @endsection

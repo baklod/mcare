@@ -5,17 +5,21 @@
     $catalogUnits = $catalogUnits ?? \App\Support\CaregivingNcIiCatalog::units();
 @endphp
 <section class="space-y-6">
-    <header class="border-b border-slate-200 pb-6">
-        <p class="dashboard-section-kicker">Learning system - LMS Modules</p>
-        <h1 class="dashboard-section-title mt-2 text-3xl">Module management</h1>
-        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Upload Caregiving NC II core modules on behalf of a trainer, assign them to specific batches, and manage learning codes and subtopics.</p>
+    <header class="flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+            <p class="dashboard-section-kicker">Learning system - LMS Modules</p>
+            <h1 class="dashboard-section-title mt-2 text-3xl">Module management</h1>
+            <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Upload Caregiving NC II core modules on behalf of a trainer, assign them to specific batches, and manage learning codes and subtopics.</p>
+        </div>
+        <button type="button" class="primary-action" data-dashboard-dialog-open="admin-module-dialog"><x-dashboard-icon name="plus" class="h-4 w-4" />Add module</button>
     </header>
 
-    <details class="dashboard-panel" @if($errors->hasAny(['trainer_id', 'training_batch_id', 'module_code', 'competency_category', 'estimated_hours', 'title', 'description', 'module_file', 'supplementary_files', 'supplementary_files.*'])) open @endif>
-        <summary class="flex cursor-pointer list-none items-center gap-4 font-bold text-slate-900">
-            <span>Add a learning module / Caregiving NC II Core Unit</span>
-        </summary>
-        <form method="POST" action="{{ route('admin.learning.modules.store') }}" enctype="multipart/form-data" class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <dialog id="admin-module-dialog" data-dashboard-dialog data-auto-open="{{ $errors->hasAny(['trainer_id', 'training_batch_id', 'module_code', 'competency_category', 'estimated_hours', 'title', 'description', 'module_file', 'supplementary_files', 'supplementary_files.*']) ? 'true' : 'false' }}" class="lms-workflow-dialog" aria-labelledby="admin-module-dialog-title">
+        <div class="lms-dialog-header">
+            <div><p class="lms-eyebrow">Admin LMS</p><h2 id="admin-module-dialog-title">Add a learning module</h2><p>Upload a protected module and assign its trainer and batch.</p></div>
+            <button type="button" data-dashboard-dialog-close class="lms-dialog-close" aria-label="Close module creator"><x-dashboard-icon name="xmark" /></button>
+        </div>
+        <form method="POST" action="{{ route('admin.learning.modules.store') }}" enctype="multipart/form-data" class="grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-4" data-dashboard-dialog-form data-submit-label="Adding module...">
             @csrf
 
             <!-- Preset Dropdown -->
@@ -137,11 +141,12 @@
                 <input name="is_published" type="checkbox" value="1" @checked(old('is_published', true))> Publish immediately
             </label>
 
-            <div class="md:col-span-2 xl:col-span-3">
-                <button class="primary-action">Add module</button>
+            <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 md:col-span-2 md:flex-row md:justify-end xl:col-span-3">
+                <button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button>
+                <button class="primary-action" data-action-button>Add module</button>
             </div>
         </form>
-    </details>
+    </dialog>
 
     <form method="GET" data-auto-filter class="dashboard-panel grid gap-4 md:grid-cols-4">
         <div class="md:col-span-2">
@@ -215,11 +220,14 @@
                             <p class="mt-2 text-xs text-slate-500">{{ $module->published_at?->format('M d, Y g:i A') ?? 'Not published' }}</p>
                         </td>
                         <td>
-                            <form method="POST" action="{{ route('admin.learning.modules.destroy', $module) }}" onsubmit="return confirm('Remove this module and its recorded progress?')">
-                                @csrf
-                                @method('DELETE')
-                                <button class="min-h-10 rounded-lg border border-red-200 bg-white px-3 text-xs font-bold text-red-700 hover:bg-red-50">Remove</button>
-                            </form>
+                            <div class="flex flex-wrap gap-2">
+                                <a href="{{ route('classroom-comments.index', ['type' => 'module', 'id' => $module->id]) }}" class="secondary-action text-xs">Comments</a>
+                                <form method="POST" action="{{ route('admin.learning.modules.destroy', $module) }}" data-confirm="Remove this module and its recorded progress?">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button class="min-h-10 rounded-lg border border-red-200 bg-white px-3 text-xs font-bold text-red-700 hover:bg-red-50">Remove</button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                 @empty

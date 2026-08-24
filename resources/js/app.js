@@ -119,9 +119,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Shared native dialogs keep large creation forms outside the normal page flow.
     const dashboardDialogs = document.querySelectorAll('dialog[data-dashboard-dialog]');
-    const openDashboardDialog = (dialog) => {
+    const dashboardDialogTriggers = new WeakMap();
+    const openDashboardDialog = (dialog, trigger = document.activeElement) => {
         if (!dialog?.showModal || dialog.open) return;
 
+        if (trigger instanceof HTMLElement) {
+            dashboardDialogTriggers.set(dialog, trigger);
+        }
         dialog.showModal();
         window.requestAnimationFrame(() => {
             dialog.querySelector('[autofocus], input:not([type="hidden"]), select, textarea, button')?.focus();
@@ -130,7 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelectorAll('[data-dashboard-dialog-open]').forEach((button) => {
         button.addEventListener('click', () => {
-            openDashboardDialog(document.getElementById(button.dataset.dashboardDialogOpen));
+            openDashboardDialog(document.getElementById(button.dataset.dashboardDialogOpen), button);
         });
     });
 
@@ -150,6 +154,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dialog.dataset.autoOpen === 'true') {
             openDashboardDialog(dialog);
         }
+
+        dialog.addEventListener('close', () => {
+            const trigger = dashboardDialogTriggers.get(dialog);
+            if (trigger?.isConnected) {
+                window.requestAnimationFrame(() => trigger.focus());
+            }
+            dashboardDialogTriggers.delete(dialog);
+        });
     });
 
     document.querySelectorAll('[data-dashboard-dialog-form]').forEach((form) => {

@@ -122,6 +122,16 @@ class User extends Authenticatable implements MustVerifyEmailContract
         return $this->hasMany(AdminAnnouncement::class, 'author_id');
     }
 
+    public function classroomComments(): HasMany
+    {
+        return $this->hasMany(ClassroomComment::class, 'author_id');
+    }
+
+    public function privateClassroomComments(): HasMany
+    {
+        return $this->hasMany(ClassroomComment::class, 'recipient_user_id');
+    }
+
     public function isGraduate(): bool
     {
         $application = $this->relationLoaded('enrollmentApplication')

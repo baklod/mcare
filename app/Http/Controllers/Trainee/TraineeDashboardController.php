@@ -14,6 +14,7 @@ use App\Models\PaymentTransaction;
 use App\Models\Quiz;
 use App\Models\TrainerAnnouncement;
 use App\Models\TrainingModule;
+use App\Services\ClassroomComments;
 use App\Services\CompletionEligibilityService;
 use App\Services\TrainingCalendarService;
 use Illuminate\Http\RedirectResponse;
@@ -514,7 +515,11 @@ class TraineeDashboardController extends Controller
         ], $graduateData, $extraData));
     }
 
-    public function viewModule(Request $request, TrainingModule $module): View
+    public function viewModule(
+        Request $request,
+        TrainingModule $module,
+        ClassroomComments $comments,
+    ): View
     {
         $application = $this->approvedApplicationFor($request);
         $this->authorizeModule($application, $module);
@@ -536,7 +541,15 @@ class TraineeDashboardController extends Controller
             'progress_status' => $progress->status,
         ]);
 
-        return view('trainee.modules.show', compact('application', 'module', 'progress', 'quizzes', 'quizAttempts'));
+        return view('trainee.modules.show', [
+            'application' => $application,
+            'module' => $module,
+            'progress' => $progress,
+            'quizzes' => $quizzes,
+            'quizAttempts' => $quizAttempts,
+            'classroomComments' => $comments->visibleFor($request->user(), $module),
+            'privateCommentRecipients' => $comments->privateRecipients($request->user(), $module),
+        ]);
     }
 
     public function supplementaryDownload(Request $request, TrainingModule $module, int $index): BinaryFileResponse

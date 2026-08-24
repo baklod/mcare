@@ -92,5 +92,7 @@
             </section>
         </aside>
     </div>
+
+    <x-classroom-comments :commentable="$quiz" :comments="$classroomComments" :private-recipients="$privateCommentRecipients" />
 </div>
 @endsection

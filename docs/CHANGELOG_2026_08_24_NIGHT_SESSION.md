@@ -13,6 +13,7 @@ This document records all modifications, new files, architectural enhancements, 
 6. [Notification Deduplication & Recipient Integrity](#5-notification-deduplication--recipient-integrity)
 7. [Comprehensive File-by-File Modification Ledger](#6-comprehensive-file-by-file-modification-ledger)
 8. [Testing & Verification Results](#7-testing--verification-results)
+9. [August 25 Follow-Up Fixes](#8-august-25-follow-up-fixes)
 
 ---
 
@@ -174,4 +175,17 @@ Eliminated potential duplicate notifications on the admin side.
    - **Failures / Errors**: `0 failures, 0 errors`
 
 ---
-*Report generated on August 24, 2026 for `mcare-hub-dev`.*
+
+## 8. August 25 Follow-Up Fixes
+
+The `bug-fix-quiz-something` follow-up keeps the August 24 work but corrects the parts that made Classwork too dense.
+
+- **Responsive Classwork**: Removed the combined **All Classwork** view and the duplicated assessment list inside module cards. Modules and assessments now have separate tabs, auto-fit to the available width, and do not create horizontal page overflow at desktop or mobile widths.
+- **Simplified Module Cards**: Hid module codes, file metadata, handout counts, quiz badges, and embedded quiz controls from the trainer's Classwork card. Detailed files and assessments remain available inside the Module Hub.
+- **Creation Windows**: Replaced the large inline module and quiz composers with accessible native dialog windows for trainer Classwork, the trainer Module Hub, and admin module management. Dialogs focus the first control, return focus to their trigger, and become full-height mobile sheets.
+- **Exactly-Once Notices**: Removed the duplicate account success banner from the Admin Accounts page and kept the shared admin layout as the single flash renderer. Repeated publication requests for an already-published quiz no longer send a second learner notification.
+- **Class and Private Comments**: Added permission-scoped comments for modules and quizzes. Class comments are visible to authorized participants; private comments are visible only to their participants, the owning trainer, and administrators. Trainee private comments are always routed to the assigned trainer, and private notification previews do not expose the message body.
+- **Verification**: Production assets build successfully. The full Laravel suite passes with **185 tests and 1,372 assertions**, and local browser checks at **1280 px** and **390 px** confirmed the revised Classwork, dialogs, and comments workspace have no horizontal overflow.
+
+---
+*Original report generated on August 24, 2026 and reviewed with follow-up verification on August 25, 2026 for `mcare-hub-dev`.*

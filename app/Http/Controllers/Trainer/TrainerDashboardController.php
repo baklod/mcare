@@ -11,6 +11,7 @@ use App\Models\TrainingModule;
 use App\Models\User;
 use App\Notifications\LmsModulePublished;
 use App\Rules\TrainingModuleFileType;
+use App\Services\ClassroomComments;
 use App\Support\TrainingModuleFiles;
 use App\Services\TrainingCalendarService;
 use Illuminate\Http\RedirectResponse;
@@ -260,7 +261,11 @@ class TrainerDashboardController extends Controller
                 : 'Training module published for the selected batch.');
     }
 
-    public function viewModule(Request $request, TrainingModule $module): View
+    public function viewModule(
+        Request $request,
+        TrainingModule $module,
+        ClassroomComments $comments,
+    ): View
     {
         abort_unless($module->trainer_id === $request->user()->id, 403);
 
@@ -286,6 +291,8 @@ class TrainerDashboardController extends Controller
             'trainees' => $trainees,
             'progressByApp' => $progressByApp,
             'quizzes' => $quizzes,
+            'classroomComments' => $comments->visibleFor($request->user(), $module),
+            'privateCommentRecipients' => $comments->privateRecipients($request->user(), $module),
         ]);
     }
 

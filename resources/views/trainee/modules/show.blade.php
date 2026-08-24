@@ -242,5 +242,7 @@
             </div>
         @endif
     </section>
+
+    <x-classroom-comments :commentable="$module" :comments="$classroomComments" :private-recipients="$privateCommentRecipients" />
 </div>
 @endsection

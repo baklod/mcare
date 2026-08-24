@@ -32,11 +32,6 @@
             {{ $errors->first('account') }}
         </div>
     @endif
-    @if(session('saved'))
-        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-900" role="status" data-auto-dismiss="7000">
-            {{ session('saved') }}
-        </div>
-    @endif
     @if(session('verification_notice'))
         <div class="rounded-xl border border-purple-200 bg-purple-50 px-5 py-4 text-sm font-semibold text-purple-900" role="status" data-auto-dismiss="7000">
             {{ session('verification_notice') }}

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class TrainingModule extends Model
 {
@@ -82,6 +83,11 @@ class TrainingModule extends Model
     public function primaryQuiz(): HasOne
     {
         return $this->hasOne(Quiz::class, 'training_module_id')->latestOfMany();
+    }
+
+    public function comments(): MorphMany
+    {
+        return $this->morphMany(ClassroomComment::class, 'commentable');
     }
 
     public function categoryLabel(): string

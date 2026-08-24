@@ -35,6 +35,8 @@ class RolePermissionMatrix
                 'reports.export',
                 'logs.view',
                 'alumni.jobs.manage',
+                'comments.create',
+                'comments.moderate',
             ],
             'trainer' => [
                 'trainer.access',
@@ -47,6 +49,8 @@ class RolePermissionMatrix
                 'grades.view',
                 'competencies.assess',
                 'sessions.view',
+                'comments.create',
+                'comments.moderate',
             ],
             'trainee' => [
                 'trainee.access',
@@ -59,6 +63,7 @@ class RolePermissionMatrix
                 'cotc.download',
                 'payments.view',
                 'alumni.jobs.view',
+                'comments.create',
             ],
             'applicant' => [
                 'enrollment.submit',

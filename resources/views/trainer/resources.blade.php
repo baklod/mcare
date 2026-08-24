@@ -8,7 +8,6 @@
     $publishedModuleCount = $moduleList->where('is_published', true)->count();
     $activeQuizCount = $quizList->where('is_published', true)->count();
     $catalogUnits = $catalogUnits ?? \App\Support\CaregivingNcIiCatalog::units();
-    $initialTab = request()->query('tab', 'all');
 @endphp
 
 <div class="lms-page" data-lms-classwork>
@@ -18,15 +17,15 @@
             <h1>Classwork library</h1>
             <p>Manage Caregiving NC II learning modules, attached lesson materials, in-module quizzes, and learner competency evaluations.</p>
         </div>
-        <div class="flex flex-wrap items-center gap-3 text-xs">
-            <div class="rounded-xl border border-stone-200 bg-white px-3.5 py-2 shadow-sm">
-                <span class="text-stone-500 font-medium">Modules:</span>
-                <strong class="text-stone-900 ml-1">{{ $publishedModuleCount }} / {{ $moduleList->count() }} published</strong>
-            </div>
-            <div class="rounded-xl border border-stone-200 bg-white px-3.5 py-2 shadow-sm">
-                <span class="text-stone-500 font-medium">Assessments:</span>
-                <strong class="text-stone-900 ml-1">{{ $activeQuizCount }} / {{ $quizList->count() }} active</strong>
-            </div>
+        <div class="lms-header-actions">
+            <button type="button" class="secondary-action" data-dashboard-dialog-open="quiz-creator-dialog">
+                <x-dashboard-icon name="list-check" class="h-4 w-4" />
+                Create quiz
+            </button>
+            <button type="button" class="primary-action" data-dashboard-dialog-open="module-creator-dialog">
+                <x-dashboard-icon name="plus" class="h-4 w-4" />
+                Create module
+            </button>
         </div>
     </header>
 
@@ -48,14 +47,11 @@
     <!-- Content Type View Switcher Filter -->
     <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm">
         <div class="flex flex-wrap gap-1.5" role="tablist" aria-label="Classwork view filter">
-            <button type="button" class="rounded-xl px-4 py-2 text-xs font-bold transition lms-filter-btn" data-classwork-tab="all">
-                📚 All Classwork ({{ $moduleList->count() + $quizList->count() }})
-            </button>
             <button type="button" class="rounded-xl px-4 py-2 text-xs font-bold transition lms-filter-btn" data-classwork-tab="modules">
-                📖 Learning Modules ({{ $moduleList->count() }})
+                Learning Modules ({{ $moduleList->count() }})
             </button>
             <button type="button" class="rounded-xl px-4 py-2 text-xs font-bold transition lms-filter-btn" data-classwork-tab="assessments">
-                📝 Quizzes & Assessments ({{ $quizList->count() }})
+                Quizzes & Assessments ({{ $quizList->count() }})
             </button>
         </div>
         <div class="text-xs text-stone-500 font-medium">
@@ -63,19 +59,19 @@
         </div>
     </div>
 
-    <!-- 1. COMPOSER: CREATE LEARNING MODULE -->
-    <details class="lms-composer" data-module-composer @if($errors->has('module_file') || $errors->has('title') && old('topic')) open @endif>
-        <summary class="lms-disclosure-summary">
-            <span class="lms-disclosure-icon" aria-hidden="true">+</span>
-            <span>
-                <strong>Create Learning Module / Caregiving Core Unit</strong>
-                <small>Caregiving NC II core units, sub-topics, PDF/video lessons, supplementary worksheets, and in-module assessments</small>
-            </span>
-            <span class="lms-summary-action">Open module composer</span>
-        </summary>
+    <dialog id="module-creator-dialog" data-dashboard-dialog data-auto-open="{{ old('_composer') === 'module' && $errors->any() ? 'true' : 'false' }}" class="lms-workflow-dialog" aria-labelledby="module-creator-title">
+        <div class="lms-dialog-header">
+            <div>
+                <p class="lms-eyebrow">New classwork</p>
+                <h2 id="module-creator-title">Create learning module</h2>
+                <p>Set the lesson, audience, schedule, and protected learning files.</p>
+            </div>
+            <button type="button" data-dashboard-dialog-close class="lms-dialog-close" aria-label="Close module creator"><x-dashboard-icon name="xmark" /></button>
+        </div>
 
-        <form method="POST" action="{{ route('trainer.modules.store') }}" enctype="multipart/form-data" class="lms-form-grid lms-composer-form">
+        <form method="POST" action="{{ route('trainer.modules.store') }}" enctype="multipart/form-data" class="lms-form-grid lms-composer-form" data-dashboard-dialog-form data-submit-label="Creating module...">
             @csrf
+            <input type="hidden" name="_composer" value="module">
 
             <!-- Caregiving NC II Core Preset Selector -->
             <div class="lms-field lms-field-wide">
@@ -228,24 +224,25 @@
                 </label>
             </div>
             <div class="lms-form-actions lms-field-wide">
-                <button class="primary-action">Create & Open Module Hub</button>
+                <button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button>
+                <button class="primary-action" data-action-button>Create & Open Module Hub</button>
             </div>
         </form>
-    </details>
+    </dialog>
 
-    <!-- 2. COMPOSER: CREATE IN-MODULE QUIZ / ASSESSMENT DIRECTLY -->
-    <details class="lms-composer rounded-2xl border border-amber-200 bg-amber-50/40 p-4" data-quiz-quick-composer>
-        <summary class="lms-disclosure-summary">
-            <span class="lms-disclosure-icon bg-amber-100 text-amber-900 ring-1 ring-amber-300" aria-hidden="true">+</span>
-            <span>
-                <strong>Create Module Assessment / Quiz</strong>
-                <small>Create an in-module knowledge assessment, assign to class or individual trainee, and configure questions</small>
-            </span>
-            <span class="lms-summary-action text-amber-800">Open quiz composer</span>
-        </summary>
+    <dialog id="quiz-creator-dialog" data-dashboard-dialog data-auto-open="{{ old('_composer') === 'quiz' && $errors->any() ? 'true' : 'false' }}" class="lms-workflow-dialog is-compact" aria-labelledby="quiz-creator-title">
+        <div class="lms-dialog-header">
+            <div>
+                <p class="lms-eyebrow">New assessment</p>
+                <h2 id="quiz-creator-title">Create quiz</h2>
+                <p>Create the draft here, then continue in the full question builder.</p>
+            </div>
+            <button type="button" data-dashboard-dialog-close class="lms-dialog-close" aria-label="Close quiz creator"><x-dashboard-icon name="xmark" /></button>
+        </div>
 
-        <form method="POST" action="{{ route('trainer.quizzes.store') }}" class="lms-form-grid lms-composer-form mt-4">
+        <form method="POST" action="{{ route('trainer.quizzes.store') }}" class="lms-form-grid lms-composer-form" data-dashboard-dialog-form data-submit-label="Creating quiz...">
             @csrf
+            <input type="hidden" name="_composer" value="quiz">
 
             <div class="lms-field lms-field-wide">
                 <label for="quick-quiz-title" class="font-bold text-amber-950">Quiz Title</label>
@@ -329,10 +326,11 @@
             <input type="hidden" name="is_published" value="0">
 
             <div class="lms-form-actions lms-field-wide">
-                <button class="primary-action bg-amber-700 hover:bg-amber-800">Create Assessment & Build Questions</button>
+                <button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button>
+                <button class="primary-action" data-action-button>Create Assessment & Build Questions</button>
             </div>
         </form>
-    </details>
+    </dialog>
 
     <!-- SECTION: LEARNING MATERIALS & MODULES -->
     <section aria-labelledby="classwork-list-title" class="lms-content-section" data-section-kind="modules">
@@ -351,11 +349,6 @@
             @forelse($modules as $module)
                 @php
                     $isPrivate = filled($module->target_enrollment_application_id);
-                    $isAvailable = ! $module->available_at || $module->available_at->isPast();
-                    $fileType = $module->fileTypeLabel();
-                    $suppCount = count($module->supplementaryList());
-                    $modQuizzes = $module->quizzes ?? collect();
-                    $quizCount = $modQuizzes->count();
                     $completedCount = $module->progressRecords->where('status', 'completed')->count();
                     $competentCount = $module->progressRecords->where('competency_outcome', 'competent')->count();
                 @endphp
@@ -369,72 +362,17 @@
                         </div>
                     </header>
                     <div class="lms-module-content">
-                        <div class="flex flex-wrap items-center gap-1.5 mb-1.5">
-                            @if($module->module_code)
-                                <span class="rounded bg-purple-100 px-2 py-0.5 text-[11px] font-mono font-bold text-purple-900 ring-1 ring-purple-300">
-                                    {{ $module->module_code }}
-                                </span>
-                            @endif
-                            <span class="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
-                                {{ $module->categoryLabel() }}
-                            </span>
-                            @if($module->topic)
-                                <p class="lms-module-topic text-xs text-slate-500">· {{ $module->topic }}</p>
-                            @endif
-                        </div>
+                        @if($module->topic)<p class="lms-module-topic">{{ $module->topic }}</p>@endif
                         <h3 class="font-bold text-slate-950 text-base">
                             <a href="{{ route('trainer.modules.show', $module) }}" class="hover:text-purple-700 transition">
                                 {{ $module->title }}
                             </a>
                         </h3>
-                        <p>{{ str($module->description)->limit(140) }}</p>
-
-                        <div class="mt-2 flex flex-wrap gap-2 text-xs">
-                            @if($suppCount > 0)
-                                <span class="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 font-semibold text-indigo-700 ring-1 ring-indigo-200">
-                                    <x-dashboard-icon name="paperclip" class="h-3 w-3" /> {{ $suppCount }} {{ str('attachment')->plural($suppCount) }}
-                                </span>
-                            @endif
-                            @if($quizCount > 0)
-                                <span class="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 font-semibold text-amber-700 ring-1 ring-amber-200">
-                                    <x-dashboard-icon name="list-check" class="h-3 w-3" /> {{ $quizCount }} {{ str('Assessment')->plural($quizCount) }}
-                                </span>
-                            @endif
-                        </div>
-
-                        <!-- Embedded Quiz List for Module -->
-                        @if($quizCount > 0)
-                            <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50/50 p-2.5 text-xs space-y-1.5">
-                                <p class="font-bold text-amber-950 flex items-center gap-1">
-                                    <span>📝 Attached Assessments ({{ $quizCount }}):</span>
-                                </p>
-                                @foreach($modQuizzes as $modQuiz)
-                                    <div class="flex items-center justify-between gap-2 rounded-lg bg-white p-2 border border-amber-100 text-[11px]">
-                                        <div class="min-w-0">
-                                            <p class="font-bold text-stone-900 truncate">{{ $modQuiz->title }}</p>
-                                            <p class="text-stone-500">{{ $modQuiz->questions->count() }} Questions · {{ number_format((float)$modQuiz->passing_score_percent, 0) }}% Passing</p>
-                                        </div>
-                                        <div class="flex shrink-0 items-center gap-1">
-                                            <span class="rounded px-1.5 py-0.5 text-[9px] font-bold {{ $modQuiz->is_published ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-200 text-stone-700' }}">
-                                                {{ $modQuiz->is_published ? 'Active' : 'Draft' }}
-                                            </span>
-                                            <a href="{{ route('trainer.quizzes.edit', $modQuiz) }}" class="rounded bg-stone-100 hover:bg-stone-200 px-2 py-0.5 font-bold text-stone-700">
-                                                Edit
-                                            </a>
-                                            <a href="{{ route('trainer.quizzes.results', $modQuiz) }}" class="rounded bg-purple-100 hover:bg-purple-200 px-2 py-0.5 font-bold text-purple-900">
-                                                Results
-                                            </a>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                        @endif
+                        <p class="line-clamp-2">{{ str($module->description)->limit(150) }}</p>
                     </div>
 
                     <dl class="lms-module-meta">
-                        <div><dt>Class</dt><dd>{{ $module->batch ? $module->batch->name.' '.$module->batch->year : 'General' }}</dd></div>
                         <div><dt>Audience</dt><dd>{{ $isPrivate ? ($module->targetTrainee?->first_name.' '.$module->targetTrainee?->last_name) : 'Entire class' }}</dd></div>
-                        <div><dt>File</dt><dd>{{ $fileType }} · {{ number_format(($module->file_size ?? 0) / 1048576, 1) }} MB</dd></div>
                         <div><dt>Due</dt><dd>{{ $module->due_at?->format('M d, Y g:i A') ?? 'No due date' }}</dd></div>
                     </dl>
                     <div class="lms-progress-summary flex justify-between items-center text-xs">
@@ -442,38 +380,37 @@
                         <span class="font-bold text-emerald-700">{{ $competentCount }} Competent (Passed)</span>
                     </div>
                     <footer class="lms-card-footer">
-                        <div class="flex items-center gap-2">
-                            <a href="{{ route('trainer.modules.show', $module) }}" class="primary-action text-xs py-1.5 px-3">
-                                <span>Open Module Hub</span>
-                            </a>
-                            <a href="{{ route('trainer.modules.show', $module) }}#assessments" class="secondary-action text-xs py-1.5 px-2.5" title="Manage Assessments">
-                                + Add Quiz
-                            </a>
-                        </div>
+                        <a href="{{ route('trainer.modules.show', $module) }}" class="primary-action text-xs">Open Module Hub</a>
                         <div class="lms-card-actions">
-                            <form method="POST" action="{{ route('trainer.modules.update', $module) }}">
-                                @csrf
-                                @method('PATCH')
-                                <input type="hidden" name="module_code" value="{{ $module->module_code }}">
-                                <input type="hidden" name="competency_category" value="{{ $module->competency_category }}">
-                                <input type="hidden" name="title" value="{{ $module->title }}">
-                                <input type="hidden" name="description" value="{{ $module->description }}">
-                                <input type="hidden" name="topic" value="{{ $module->topic }}">
-                                <input type="hidden" name="estimated_hours" value="{{ $module->estimated_hours }}">
-                                <input type="hidden" name="position" value="{{ $module->position ?? 0 }}">
-                                <input type="hidden" name="audience_type" value="{{ $isPrivate ? 'trainee' : 'batch' }}">
-                                <input type="hidden" name="training_batch_id" value="{{ $module->training_batch_id }}">
-                                <input type="hidden" name="target_enrollment_application_id" value="{{ $module->target_enrollment_application_id }}">
-                                <input type="hidden" name="available_at" value="{{ $module->available_at?->format('Y-m-d\TH:i') }}">
-                                <input type="hidden" name="due_at" value="{{ $module->due_at?->format('Y-m-d\TH:i') }}">
-                                <input type="hidden" name="is_published" value="{{ $module->is_published ? 0 : 1 }}">
-                                <button class="lms-text-action">{{ $module->is_published ? 'Unpublish' : 'Publish' }}</button>
-                            </form>
-                            <form method="POST" action="{{ route('trainer.modules.destroy', $module) }}" data-confirm="Delete '{{ $module->title }}' and its recorded learner progress?">
-                                @csrf
-                                @method('DELETE')
-                                <button class="lms-text-action is-danger">Delete</button>
-                            </form>
+                            <button type="button" class="secondary-action text-xs" data-dashboard-dialog-open="quiz-creator-dialog" data-quiz-module-id="{{ $module->id }}">Add quiz</button>
+                            <details class="lms-action-menu">
+                                <summary class="secondary-action text-xs">More</summary>
+                                <div class="lms-action-menu-popover">
+                                    <form method="POST" action="{{ route('trainer.modules.update', $module) }}">
+                                        @csrf
+                                        @method('PATCH')
+                                        <input type="hidden" name="module_code" value="{{ $module->module_code }}">
+                                        <input type="hidden" name="competency_category" value="{{ $module->competency_category }}">
+                                        <input type="hidden" name="title" value="{{ $module->title }}">
+                                        <input type="hidden" name="description" value="{{ $module->description }}">
+                                        <input type="hidden" name="topic" value="{{ $module->topic }}">
+                                        <input type="hidden" name="estimated_hours" value="{{ $module->estimated_hours }}">
+                                        <input type="hidden" name="position" value="{{ $module->position ?? 0 }}">
+                                        <input type="hidden" name="audience_type" value="{{ $isPrivate ? 'trainee' : 'batch' }}">
+                                        <input type="hidden" name="training_batch_id" value="{{ $module->training_batch_id }}">
+                                        <input type="hidden" name="target_enrollment_application_id" value="{{ $module->target_enrollment_application_id }}">
+                                        <input type="hidden" name="available_at" value="{{ $module->available_at?->format('Y-m-d\TH:i') }}">
+                                        <input type="hidden" name="due_at" value="{{ $module->due_at?->format('Y-m-d\TH:i') }}">
+                                        <input type="hidden" name="is_published" value="{{ $module->is_published ? 0 : 1 }}">
+                                        <button>{{ $module->is_published ? 'Unpublish' : 'Publish' }}</button>
+                                    </form>
+                                    <form method="POST" action="{{ route('trainer.modules.destroy', $module) }}" data-confirm="Delete '{{ $module->title }}' and its recorded learner progress?">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button class="is-danger">Delete</button>
+                                    </form>
+                                </div>
+                            </details>
                         </div>
                     </footer>
                 </article>
@@ -504,7 +441,7 @@
             </div>
         </div>
 
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="lms-quiz-grid">
             @forelse($quizzes as $quiz)
                 @php
                     $isQuizPrivate = filled($quiz->target_enrollment_application_id);
@@ -524,11 +461,6 @@
 
                         @if($quiz->trainingModule)
                             <div class="flex items-center gap-1.5 mb-2">
-                                @if($quiz->trainingModule->module_code)
-                                    <span class="rounded bg-purple-100 px-2 py-0.5 text-[10px] font-mono font-bold text-purple-900">
-                                        {{ $quiz->trainingModule->module_code }}
-                                    </span>
-                                @endif
                                 <a href="{{ route('trainer.modules.show', $quiz->trainingModule) }}" class="text-xs text-purple-800 hover:underline font-semibold truncate">
                                     {{ $quiz->trainingModule->title }}
                                 </a>
@@ -587,19 +519,22 @@
                                     Results ({{ $attemptCount }})
                                 </a>
                             </div>
-                            <div class="flex items-center gap-1">
-                                <form method="POST" action="{{ route('trainer.quizzes.publication', $quiz) }}">
-                                    @csrf
-                                    @method('PATCH')
-                                    <input type="hidden" name="is_published" value="{{ $quiz->is_published ? 0 : 1 }}">
-                                    <button class="lms-text-action text-xs">{{ $quiz->is_published ? 'Unpublish' : 'Publish' }}</button>
-                                </form>
-                                <form method="POST" action="{{ route('trainer.quizzes.destroy', $quiz) }}" data-confirm="Delete '{{ $quiz->title }}'?">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button class="lms-text-action is-danger text-xs">Delete</button>
-                                </form>
-                            </div>
+                            <details class="lms-action-menu">
+                                <summary class="secondary-action text-xs">More</summary>
+                                <div class="lms-action-menu-popover">
+                                    <form method="POST" action="{{ route('trainer.quizzes.publication', $quiz) }}">
+                                        @csrf
+                                        @method('PATCH')
+                                        <input type="hidden" name="is_published" value="{{ $quiz->is_published ? 0 : 1 }}">
+                                        <button>{{ $quiz->is_published ? 'Unpublish' : 'Publish' }}</button>
+                                    </form>
+                                    <form method="POST" action="{{ route('trainer.quizzes.destroy', $quiz) }}" data-confirm="Delete '{{ $quiz->title }}'?">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button class="is-danger">Delete</button>
+                                    </form>
+                                </div>
+                            </details>
                         </div>
                     </div>
                 </article>
@@ -666,22 +601,21 @@
         const assessmentSection = document.querySelector('[data-section-kind="assessments"]');
 
         function setActiveTab(tab) {
+            const activeTab = tab === 'assessments' ? 'assessments' : 'modules';
             filterButtons.forEach(btn => {
-                const isCurrent = btn.dataset.classworkTab === tab;
+                const isCurrent = btn.dataset.classworkTab === activeTab;
                 btn.className = isCurrent
                     ? 'rounded-xl px-4 py-2 text-xs font-bold transition bg-purple-700 text-white shadow-sm'
                     : 'rounded-xl px-4 py-2 text-xs font-bold transition bg-stone-100 text-stone-700 hover:bg-stone-200';
+                btn.setAttribute('aria-selected', isCurrent ? 'true' : 'false');
             });
 
             if (moduleSection && assessmentSection) {
-                if (tab === 'modules') {
+                if (activeTab === 'modules') {
                     moduleSection.style.display = 'block';
                     assessmentSection.style.display = 'none';
-                } else if (tab === 'assessments') {
-                    moduleSection.style.display = 'none';
-                    assessmentSection.style.display = 'block';
                 } else {
-                    moduleSection.style.display = 'block';
+                    moduleSection.style.display = 'none';
                     assessmentSection.style.display = 'block';
                 }
             }
@@ -702,9 +636,14 @@
             setActiveTab('assessments');
         } else if (tabParam === 'modules') {
             setActiveTab('modules');
-        } else {
-            setActiveTab('all');
-        }
+        } else setActiveTab('modules');
+
+        const quizModuleSelect = document.getElementById('quick-quiz-module');
+        document.querySelectorAll('[data-quiz-module-id]').forEach(button => {
+            button.addEventListener('click', () => {
+                if (quizModuleSelect) quizModuleSelect.value = button.dataset.quizModuleId || '';
+            });
+        });
     });
 </script>
 @endsection
