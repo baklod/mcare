@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\EnrollmentApplication;
 use App\Models\User;
 use App\Support\AccountPortal;
 use Illuminate\Http\RedirectResponse;
@@ -94,6 +95,17 @@ class GoogleAuthController extends Controller
         }
 
         $application = $user->enrollmentApplication()->latest()->first();
+
+        if ($user->role === 'applicant' && $application?->status === EnrollmentApplication::STATUS_DENIED) {
+            Auth::login($user, true);
+            $request->session()->forget('enrollment.payment_application_id');
+            $request->session()->forget('enrollment.awaiting_approval');
+            $request->session()->regenerate();
+
+            return redirect()
+                ->route('enrollment.create')
+                ->with('reapply_notice', 'Your previous application was not approved. Correct the highlighted information or documents below, then resubmit using this same Google account.');
+        }
 
         if ($user->role === 'applicant' && $application?->hasEnrollmentPaymentClearance()) {
             Auth::logout();

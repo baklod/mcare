@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
 use App\Models\User;
@@ -90,6 +91,8 @@ class EnrollmentController extends Controller
         $currentApplication = $currentUser
             ? EnrollmentApplication::where('user_id', $currentUser->id)->first()
             : null;
+        $isDeniedResubmission = $currentApplication?->status === EnrollmentApplication::STATUS_DENIED;
+        $previousDenialNote = $isDeniedResubmission ? $currentApplication->admin_notes : null;
         $enrollmentBatch = $currentApplication?->batch ?: TrainingBatch::openForEnrollment();
         $isGoogleApplicant = filled($currentUser?->google_id);
         $passwordRules = $isGoogleApplicant
@@ -164,7 +167,7 @@ class EnrollmentController extends Controller
             'signature_upload' => ['exclude_unless:signature_type,upload', $hasDocument('signature_upload', $currentApplication?->signature_path) ? 'nullable' : 'required', 'file', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:5120'],
         ], [
             'email.ends_with' => 'Please use a Gmail address ending in @gmail.com.',
-            'email.unique' => 'This Gmail account already has an applicant account. Please sign in or use a different Gmail address.',
+            'email.unique' => 'This Gmail account already has an MCARE account. Sign in with the same Gmail to continue or resubmit a denied enrollment.',
             'not_regex' => 'This field contains characters that are not allowed for security reasons.',
             'password.confirmed' => 'Password and confirmation must match.',
             'birth_certificate.required' => 'Upload a clear birth certificate copy.',
@@ -191,7 +194,7 @@ class EnrollmentController extends Controller
             'email' => $validated['email'],
             'name' => trim($validated['first_name'].' '.$validated['last_name']),
             'role' => 'applicant',
-            'applicant_status' => 'profile_submitted',
+            'applicant_status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
         ];
 
         if (filled($validated['password'] ?? null)) {
@@ -226,8 +229,13 @@ class EnrollmentController extends Controller
                 'training_batch_id' => $currentApplication?->training_batch_id ?: $enrollmentBatch?->id,
                 'privacy_consent' => true,
                 'date_accomplished' => now()->toDateString(),
-                'status' => 'profile_submitted',
+                'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
             ])
+            ->when($isDeniedResubmission, fn ($data) => $data->merge([
+                'admin_notes' => null,
+                'reviewed_at' => null,
+                'reviewed_by_id' => null,
+            ]))
             ->merge($documentPaths)
             ->all();
 
@@ -262,6 +270,14 @@ class EnrollmentController extends Controller
             $application->forceFill(['document_review' => $review])->save();
         }
 
+        if ($isDeniedResubmission) {
+            AdminActivityLog::record($currentUser, 'enrollment.denied.resubmitted', $application, [
+                'previous_status' => EnrollmentApplication::STATUS_DENIED,
+                'previous_admin_notes' => $previousDenialNote,
+                'payment_clearance_preserved' => $application->hasEnrollmentPaymentClearance(),
+            ]);
+        }
+
         // Keep payment continuation private to this browser session. Creating
         // an applicant record must not silently sign the person into the
         // public account bar; explicit login remains the account boundary.
@@ -286,7 +302,9 @@ class EnrollmentController extends Controller
 
         return redirect()
             ->route('payment.show')
-            ->with('payment_notice', 'Caregiving NC II enrollment registration saved. Choose your payment method to continue.');
+            ->with('payment_notice', $isDeniedResubmission
+                ? 'Your corrected enrollment was resubmitted for admin review. Your existing verified payment remains recorded.'
+                : 'Caregiving NC II enrollment registration saved. Choose your payment method to continue.');
     }
 
     /** @return array{email: string, first_name: string, middle_name: string, last_name: string, full_name: string, avatar_url: ?string} */

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
+use App\Models\EnrollmentApplication;
 use App\Models\User;
 use App\Services\EmailTwoFactorService;
 use App\Support\AccountPortal;
@@ -66,7 +67,9 @@ class AccountSessionController extends Controller
 
         $application = $user->enrollmentApplication()->latest()->first();
 
-        if ($user->role === 'applicant' && $application?->hasEnrollmentPaymentClearance()) {
+        if ($user->role === 'applicant'
+            && $application?->status !== EnrollmentApplication::STATUS_DENIED
+            && $application?->hasEnrollmentPaymentClearance()) {
             return back()
                 ->withErrors([
                     'email' => 'Your payment is verified. Please wait for the administrator to approve your MCARE account. We will email you as soon as you can log in.',
@@ -120,6 +123,13 @@ class AccountSessionController extends Controller
         // intended URL must not send a newly signed-in admin into a submodule.
         if ($request->user()?->hasRole('admin')) {
             return redirect()->route('admin.dashboard');
+        }
+
+        if ($request->user()?->role === 'applicant'
+            && $application?->status === EnrollmentApplication::STATUS_DENIED) {
+            return redirect()
+                ->route('enrollment.create')
+                ->with('reapply_notice', 'Your previous application was not approved. Correct the highlighted information or documents below, then resubmit using this same account.');
         }
 
         return redirect()->intended(route(AccountPortal::routeNameFor($request->user())));

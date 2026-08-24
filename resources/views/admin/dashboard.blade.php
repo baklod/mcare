@@ -42,10 +42,10 @@
 
         $overviewCards = [
             [
-                'label' => 'Pending Applications',
+                'label' => 'Pre-enlisted Applications',
                 'abbr' => 'PA',
                 'value' => $stats['pending_applications'],
-                'hint' => $stats['pre_enlistment'].' in pre-enlistment',
+                'hint' => 'Awaiting document and payment review',
                 'tone' => 'bg-purple-50 text-purple-700 ring-purple-100',
             ],
             [

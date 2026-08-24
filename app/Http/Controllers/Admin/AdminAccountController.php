@@ -4,13 +4,19 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
+use App\Models\AlumniProfile;
 use App\Models\EnrollmentApplication;
+use App\Models\Quiz;
+use App\Models\TrainerAnnouncement;
 use App\Models\TrainingBatch;
+use App\Models\TrainingModule;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\SendQueuedNotifications;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -19,15 +25,45 @@ use Throwable;
 
 class AdminAccountController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $roleFilter = $request->query('role', 'all');
+        $search = trim((string) $request->query('search', ''));
+
+        $query = User::query()
+            ->whereIn('role', ['trainer', 'trainee', 'applicant'])
+            ->with(['enrollmentApplication.batch', 'roles'])
+            ->when($roleFilter !== 'all' && in_array($roleFilter, ['trainer', 'trainee', 'applicant'], true), function ($q) use ($roleFilter) {
+                $q->where('role', $roleFilter);
+            })
+            ->when(filled($search), function ($q) use ($search) {
+                $q->where(function ($sq) use ($search) {
+                    $sq->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhereHas('enrollmentApplication', function ($appQ) use ($search) {
+                            $appQ->where('first_name', 'like', "%{$search}%")
+                                ->orWhere('last_name', 'like', "%{$search}%")
+                                ->orWhere('contact_number', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->latest();
+
+        $accounts = $query->paginate(20)->withQueryString();
+
+        $counts = [
+            'all' => User::query()->whereIn('role', ['trainer', 'trainee', 'applicant'])->count(),
+            'trainer' => User::query()->where('role', 'trainer')->count(),
+            'trainee' => User::query()->where('role', 'trainee')->count(),
+            'applicant' => User::query()->where('role', 'applicant')->count(),
+        ];
+
         return view('admin.accounts', [
             'batches' => TrainingBatch::query()->orderByDesc('year')->orderBy('name')->get(),
-            'accounts' => User::query()
-                ->whereIn('role', ['trainer', 'trainee'])
-                ->with('enrollmentApplication')
-                ->latest()
-                ->paginate(20),
+            'accounts' => $accounts,
+            'roleFilter' => $roleFilter,
+            'search' => $search,
+            'counts' => $counts,
         ]);
     }
 
@@ -137,43 +173,102 @@ class AdminAccountController extends Controller
 
     public function destroy(Request $request, User $user): RedirectResponse
     {
-        abort_unless(in_array($user->role, ['trainer', 'trainee'], true), 404);
+        abort_unless(in_array($user->role, ['trainer', 'trainee', 'applicant'], true), 404);
 
-        if (! $this->wasCreatedByAdmin($user)) {
+        if ($user->id === $request->user()->id || $user->hasRole('admin') || $user->role === 'admin') {
             return back()->withErrors([
-                'account' => 'Only Trainer or Trainee accounts created by an administrator can be removed here.',
+                'account' => 'Administrator accounts cannot be deleted here.',
             ]);
         }
 
-        $blockers = $this->deletionBlockers($user);
-        if ($blockers !== []) {
-            return back()->withErrors([
-                'account' => 'This account is protected because it already has related records: '.implode(', ', $blockers).'.',
-            ]);
+        $accountLabel = $user->name ?: 'Applicant';
+        $accountEmail = $user->email;
+        $accountRole = $user->role;
+
+        // 1. Gather all file paths from storage before DB deletion
+        $application = $user->enrollmentApplication()->first();
+        $storageFiles = collect();
+
+        if ($application) {
+            $storageFiles = $storageFiles->merge([
+                $application->birth_certificate_path,
+                $application->education_document_path,
+                $application->good_moral_certificate_path,
+                $application->id_photo_path,
+                $application->signature_path,
+            ])->filter();
+
+            $storageFiles = $storageFiles->merge(
+                $application->paymentTransactions()->pluck('receipt_proof_path')->filter()
+            );
         }
 
-        $accountLabel = $user->name;
-        AdminActivityLog::record($request->user(), 'admin.account.deleted', $user, [
-            'deleted_role' => $user->role,
-            'deleted_email' => $user->email,
-        ]);
+        $officialFiles = $application
+            ? $application->officialDocuments()
+                ->whereNotNull('file_path')
+                ->get(['storage_disk', 'file_path'])
+            : collect();
 
-        DB::transaction(function () use ($user): void {
-            // Clean non-FK session/notification rows before the user cascade.
+        $queuedJobIds = $this->queuedNotificationJobIds($user);
+
+        // 2. Perform transactional deletion of all related database records
+        DB::transaction(function () use ($user, $application, $request, $accountRole, $accountEmail, $queuedJobIds): void {
+            if ($queuedJobIds !== []) {
+                DB::table('jobs')->whereIn('id', $queuedJobIds)->delete();
+            }
+
             if (Schema::hasTable('sessions')) {
                 DB::table('sessions')->where('user_id', $user->id)->delete();
             }
+
             if (Schema::hasTable('notifications')) {
                 DB::table('notifications')
                     ->where('notifiable_type', User::class)
                     ->where('notifiable_id', $user->id)
                     ->delete();
             }
+
+            if ($application) {
+                // Clean up related child rows
+                $application->officialDocuments()->delete();
+                $application->competencyRecords()->delete();
+                $application->quizAttempts()->delete();
+                $application->moduleProgress()->delete();
+                $application->paymentTransactions()->delete();
+                $application->paymentAttempts()->delete();
+                $application->targetedQuizzes()->update(['target_enrollment_application_id' => null]);
+                TrainingModule::where('target_enrollment_application_id', $application->id)->update(['target_enrollment_application_id' => null]);
+
+                $application->delete();
+            }
+
+            if ($accountRole === 'trainer') {
+                TrainingBatch::where('trainer_id', $user->id)->update(['trainer_id' => null]);
+                TrainerAnnouncement::where('trainer_id', $user->id)->delete();
+                Quiz::where('trainer_id', $user->id)->delete();
+                TrainingModule::where('trainer_id', $user->id)->delete();
+            }
+
+            AlumniProfile::where('user_id', $user->id)->delete();
+
+            AdminActivityLog::record($request->user(), 'admin.account.deleted', $user, [
+                'deleted_role' => $accountRole,
+                'deleted_email' => $accountEmail,
+            ]);
+
             $user->syncRoles([]);
             $user->delete();
         });
 
-        return back()->with('saved', "Account for {$accountLabel} was safely removed.");
+        // 3. Delete physical files from storage
+        foreach ($storageFiles->unique() as $path) {
+            Storage::disk('local')->delete($path);
+        }
+        foreach ($officialFiles as $doc) {
+            Storage::disk($doc->storage_disk ?: 'local')->delete($doc->file_path);
+        }
+
+        return back()->with('saved', "Account for {$accountLabel} ({$accountEmail}) and related records were permanently removed. The applicant can now submit a fresh enrollment if needed.");
     }
 
     private function accountCreatedResponse(Request $request, User $user, string $message): RedirectResponse
@@ -197,50 +292,35 @@ class AdminAccountController extends Controller
                 : 'The account was created, but the verification email could not be sent. Check the mail configuration and resend later.');
     }
 
-    private function wasCreatedByAdmin(User $user): bool
+    /** @return list<int> */
+    private function queuedNotificationJobIds(User $user): array
     {
-        if ($user->applicant_status === 'staff_created') {
-            return true;
+        if (! Schema::hasTable('jobs')) {
+            return [];
         }
 
-        return $user->role === 'trainee'
-            && $user->enrollmentApplication()
-                ->whereNotNull('reviewed_by_id')
-                ->where('admin_notes', 'Trainee account created by an administrator.')
-                ->exists();
-    }
+        return DB::table('jobs')
+            ->get(['id', 'payload'])
+            ->filter(function (object $job) use ($user): bool {
+                $payload = json_decode($job->payload, true);
+                if (data_get($payload, 'data.commandName') !== SendQueuedNotifications::class) {
+                    return false;
+                }
 
-    /** @return list<string> */
-    private function deletionBlockers(User $user): array
-    {
-        $blockers = [];
+                try {
+                    $command = unserialize((string) data_get($payload, 'data.command'));
+                } catch (Throwable) {
+                    return false;
+                }
 
-        if ($user->role === 'trainer') {
-            if ($user->trainingModules()->exists()) $blockers[] = 'learning modules';
-            if ($user->trainerAnnouncements()->exists()) $blockers[] = 'announcements';
-            if ($user->quizzes()->exists()) $blockers[] = 'quizzes';
-
-            return $blockers;
-        }
-
-        $application = $user->enrollmentApplication()->first();
-        if (! $application) return $blockers;
-
-        if ($application->moduleProgress()->exists()) $blockers[] = 'module progress';
-        if ($application->quizAttempts()->exists()) $blockers[] = 'quiz attempts';
-        if ($application->competencyRecords()->exists()) $blockers[] = 'competency records';
-        if ($application->officialDocuments()->exists()) $blockers[] = 'official documents';
-        if ($application->paymentAttempts()->exists()) $blockers[] = 'payment attempts';
-        if ($application->payment_status !== EnrollmentApplication::PAYMENT_NOT_SELECTED) $blockers[] = 'payment history';
-        if ($application->learning_status === EnrollmentApplication::LEARNING_GRADUATED) $blockers[] = 'graduation records';
-
-        foreach (['birth_certificate_path', 'education_document_path', 'good_moral_certificate_path', 'id_photo_path', 'signature_path'] as $path) {
-            if (filled($application->{$path})) {
-                $blockers[] = 'uploaded enrollment files';
-                break;
-            }
-        }
-
-        return $blockers;
+                return $command instanceof SendQueuedNotifications
+                    && collect($command->notifiables)->contains(
+                        fn ($notifiable): bool => $notifiable instanceof User && $notifiable->is($user),
+                    );
+            })
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
     }
 }

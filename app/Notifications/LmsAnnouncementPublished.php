@@ -3,19 +3,31 @@
 namespace App\Notifications;
 
 use App\Models\TrainerAnnouncement;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class LmsAnnouncementPublished extends Notification
+class LmsAnnouncementPublished extends Notification implements ShouldQueue
 {
+    use Queueable;
+
+    public int $tries = 3;
+
+    public int $timeout = 60;
+
     public function __construct(
         public TrainerAnnouncement $announcement,
-    ) {}
+    ) {
+        $this->onQueue('mail');
+    }
 
     /** @return list<string> */
     public function via(object $notifiable): array
     {
-        return ['database'];
+        return filled($notifiable->email)
+            ? ['database', 'mail']
+            : ['database'];
     }
 
     /** @return array<string, mixed> */
@@ -32,9 +44,16 @@ class LmsAnnouncementPublished extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $trainerName = $this->announcement->trainer?->name ?? 'Your Trainer';
+
         return (new MailMessage)
-            ->subject('New MCARE classroom announcement')
-            ->line($this->announcement->title)
-            ->action('Open classroom stream', route('trainee.stream'));
+            ->subject('MCARE Class Announcement: '.$this->announcement->title)
+            ->greeting('Hello '.$notifiable->name.',')
+            ->line($trainerName.' posted a new classroom update:')
+            ->line('**'.$this->announcement->title.'**')
+            ->line($this->announcement->message)
+            ->action('Open Classroom Stream', route('trainee.stream'))
+            ->line('Stay up to date with your class schedule and learning announcements.')
+            ->salutation('MCARE Training Center');
     }
 }

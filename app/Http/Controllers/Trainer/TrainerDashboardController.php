@@ -5,13 +5,17 @@ namespace App\Http\Controllers\Trainer;
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
+use App\Models\Quiz;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
+use App\Models\User;
+use App\Notifications\LmsModulePublished;
 use App\Rules\TrainingModuleFileType;
 use App\Support\TrainingModuleFiles;
 use App\Services\TrainingCalendarService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -56,6 +60,19 @@ class TrainerDashboardController extends Controller
         // Resources. Avoid loading file metadata and batch relations here.
         $moduleCount = TrainingModule::query()
             ->where('trainer_id', $trainer->id)
+            ->when($activeBatch, fn ($query) => $query->where('training_batch_id', $activeBatch->id))
+            ->when(! $activeBatch, fn ($query) => $query->whereRaw('1 = 0'))
+            ->count();
+
+        $quizCount = Quiz::query()
+            ->where('trainer_id', $trainer->id)
+            ->when($activeBatch, fn ($query) => $query->where('training_batch_id', $activeBatch->id))
+            ->when(! $activeBatch, fn ($query) => $query->whereRaw('1 = 0'))
+            ->count();
+
+        $activeQuizCount = Quiz::query()
+            ->where('trainer_id', $trainer->id)
+            ->where('is_published', true)
             ->when($activeBatch, fn ($query) => $query->where('training_batch_id', $activeBatch->id))
             ->when(! $activeBatch, fn ($query) => $query->whereRaw('1 = 0'))
             ->count();
@@ -125,12 +142,16 @@ class TrainerDashboardController extends Controller
             'activeBatch' => $activeBatch,
             'learnerFollowUps' => $learnerFollowUps,
             'moduleCount' => $moduleCount,
+            'quizCount' => $quizCount,
+            'activeQuizCount' => $activeQuizCount,
             'progressRows' => $progressRows,
             'search' => $search,
             'stats' => [
                 'total_trainings' => $moduleCount,
                 'total_trainees' => $assignedTrainees->count(),
                 'sessions_today' => $todaySessions->count(),
+                'total_quizzes' => $quizCount,
+                'active_quizzes' => $activeQuizCount,
             ],
             'teachingTimeline' => $teachingTimeline,
             'todaySessions' => $todaySessions,
@@ -213,6 +234,24 @@ class TrainerDashboardController extends Controller
             'audience' => $targetTrainee ? 'trainee' : 'batch',
             'target_trainee_id' => $targetTrainee?->id,
         ]);
+
+        $traineeIds = $targetTrainee
+            ? collect([$targetTrainee->user_id])->filter()
+            : EnrollmentApplication::query()
+                ->where('status', EnrollmentApplication::STATUS_APPROVED)
+                ->where('training_batch_id', $batchId)
+                ->whereNotNull('user_id')
+                ->pluck('user_id')
+                ->unique();
+
+        $trainees = User::query()
+            ->where('role', 'trainee')
+            ->whereIn('id', $traineeIds)
+            ->get();
+
+        if ($trainees->isNotEmpty()) {
+            Notification::send($trainees, new LmsModulePublished($module));
+        }
 
         return redirect()
             ->route('trainer.resources')

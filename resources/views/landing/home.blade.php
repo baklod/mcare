@@ -340,6 +340,7 @@
     @php
         $paymentCleared = $applicationProgress?->hasEnrollmentPaymentClearance() ?? false;
         $accountApproved = $applicationProgress?->status === \App\Models\EnrollmentApplication::STATUS_APPROVED;
+        $accountDenied = $applicationProgress?->status === \App\Models\EnrollmentApplication::STATUS_DENIED;
     @endphp
 
     @if (session('payment_error'))
@@ -350,8 +351,21 @@
         </section>
     @endif
 
-    @if (session('account_approved') || $accountApproved)
-        <section id="applicant-review-status" data-account-approved="true" class="relative z-20 border-b border-emerald-200 bg-emerald-50" role="status" aria-live="polite">
+    @if (session('account_denied') || $accountDenied)
+        <section id="applicant-review-status" data-account-terminal="true" class="relative z-20 border-b border-red-200 bg-red-50" role="alert" aria-live="assertive">
+            <div class="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-5 sm:px-6 lg:px-8">
+                <div>
+                    <p class="font-black text-red-950">Enrollment application not approved</p>
+                    <p class="mt-1 text-sm leading-6 text-red-800">Your verified payment remains recorded, but administration did not approve your MCARE account. Please review the reason below and contact MCARE regarding correction, resubmission, or other next steps.</p>
+                    @if (filled($applicationProgress?->admin_notes))
+                        <p class="mt-3 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm font-semibold leading-6 text-red-900"><span class="font-black">Administrator note:</span> {{ $applicationProgress->admin_notes }}</p>
+                    @endif
+                    <a href="{{ route('login') }}" class="mt-4 inline-flex items-center justify-center rounded-full bg-red-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-800">Sign in to correct and resubmit</a>
+                </div>
+            </div>
+        </section>
+    @elseif (session('account_approved') || $accountApproved)
+        <section id="applicant-review-status" data-account-terminal="true" class="relative z-20 border-b border-emerald-200 bg-emerald-50" role="status" aria-live="polite">
             <div class="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
                 <div>
                     <p class="font-black text-emerald-900">Your MCARE account is approved</p>
@@ -361,7 +375,7 @@
             </div>
         </section>
     @elseif (session('payment_verified') || session('account_pending') || $paymentCleared)
-        <section id="applicant-review-status" data-account-approved="false" class="relative z-20 border-b border-purple-200 bg-purple-50" role="status" aria-live="polite">
+        <section id="applicant-review-status" data-account-terminal="false" class="relative z-20 border-b border-purple-200 bg-purple-50" role="status" aria-live="polite">
             <div class="mx-auto flex max-w-7xl items-start gap-3 px-4 py-5 sm:px-6 lg:px-8">
                 <span class="mt-0.5 inline-block h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-purple-200 border-t-purple-700" aria-hidden="true"></span>
                 <div>
@@ -815,7 +829,7 @@
         }
 
         function attachApplicantReviewPolling() {
-            if (!applicantReviewStatus || applicantReviewStatus.dataset.accountApproved === 'true') return;
+            if (!applicantReviewStatus || applicantReviewStatus.dataset.accountTerminal === 'true') return;
 
             const statusUrl = @json(route('payment.status'));
             const checkStatus = async () => {
@@ -833,7 +847,7 @@
                     if (!response.ok) return;
 
                     const status = await response.json();
-                    if (status.account_approved === true) window.location.reload();
+                    if (status.account_approved === true || status.account_denied === true) window.location.reload();
                 } catch (error) {
                     // Email remains the authoritative fallback when a phone
                     // briefly loses data connectivity.

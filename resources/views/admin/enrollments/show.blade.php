@@ -21,6 +21,9 @@
             ? $application->status
             : 'pre_enlistment';
 
+        $documentsReadyForApproval = $pendingDocumentApprovals === [];
+        $paymentReadyForApproval = $application->hasEnrollmentPaymentClearance();
+
         $personalFields = [
             'Full name' => trim($application->first_name.' '.$application->middle_name.' '.$application->last_name.' '.$application->extension_name),
             'Email' => $application->email,
@@ -281,6 +284,24 @@
                 <p class="text-sm font-bold uppercase text-purple-600">Review decision</p>
                 <h2 class="mt-2 text-2xl font-bold text-slate-900">Update application</h2>
 
+                <div class="mt-5 space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                    <div class="flex items-start justify-between gap-3">
+                        <span class="font-semibold text-slate-700">Required documents</span>
+                        <span class="text-right font-bold {{ $documentsReadyForApproval ? 'text-emerald-700' : 'text-amber-700' }}">
+                            {{ $documentsReadyForApproval ? 'All accepted' : count($pendingDocumentApprovals).' pending' }}
+                        </span>
+                    </div>
+                    <div class="flex items-start justify-between gap-3">
+                        <span class="font-semibold text-slate-700">Enrollment payment</span>
+                        <span class="text-right font-bold {{ $paymentReadyForApproval ? 'text-emerald-700' : 'text-amber-700' }}">
+                            {{ $paymentReadyForApproval ? 'Verified' : 'Not verified' }}
+                        </span>
+                    </div>
+                    @if (! $documentsReadyForApproval)
+                        <p class="pt-1 text-xs leading-5 text-slate-500">Pending: {{ implode(', ', $pendingDocumentApprovals) }}. Save document feedback separately before approving.</p>
+                    @endif
+                </div>
+
                 @if ($errors->any())
                     <div class="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold leading-6 text-red-700">
                         Please correct the review form before saving.
@@ -304,7 +325,7 @@
                     <div>
                         <label for="admin_notes" class="mb-2 block text-sm font-semibold text-slate-800">Admin notes</label>
                         <textarea id="admin_notes" name="admin_notes" rows="6" maxlength="2000" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100" placeholder="Add document requirements, pre-enlistment instructions, or denial reason.">{{ old('admin_notes', $application->admin_notes) }}</textarea>
-                        <p class="mt-2 text-xs leading-5 text-slate-500">A note is required when denying an application.</p>
+                        <p class="mt-2 text-xs leading-5 text-slate-500">A note is required when denying an application. Approval requires verified payment and all five required documents accepted.</p>
                         @error('admin_notes') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                     </div>
 

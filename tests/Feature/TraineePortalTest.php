@@ -71,6 +71,26 @@ class TraineePortalTest extends TestCase
         $this->assertSame(EnrollmentApplication::STATUS_PRE_ENLISTMENT, $application->refresh()->status);
     }
 
+    public function test_admin_cannot_approve_applicant_until_every_required_document_is_accepted(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->create(['role' => 'applicant']);
+        $application = $this->approvedReadyApplication($applicant, EnrollmentApplication::STATUS_PRE_ENLISTMENT);
+        $review = $application->document_review;
+        $review['education-document']['status'] = 'replace';
+        $application->forceFill(['document_review' => $review])->save();
+
+        $this->actingAs($admin)
+            ->patch(route('admin.enrollments.update', $application), [
+                'status' => EnrollmentApplication::STATUS_APPROVED,
+                'admin_notes' => 'Attempted before all documents were accepted.',
+            ])
+            ->assertSessionHasErrors('status');
+
+        $this->assertSame('applicant', $applicant->refresh()->role);
+        $this->assertSame(EnrollmentApplication::STATUS_PRE_ENLISTMENT, $application->refresh()->status);
+    }
+
     public function test_approved_trainee_can_open_dashboard(): void
     {
         $trainee = User::factory()->create(['role' => 'trainee']);
@@ -260,6 +280,19 @@ class TraineePortalTest extends TestCase
             'educational_attainment' => 'High School Graduate',
             'school_name' => 'MCARE High School',
             'year_graduated' => 2020,
+            'birth_certificate_path' => 'enrollment-documents/test/birth-certificate.pdf',
+            'education_document_path' => 'enrollment-documents/test/education-document.pdf',
+            'good_moral_certificate_path' => 'enrollment-documents/test/good-moral-certificate.pdf',
+            'id_photo_path' => 'enrollment-documents/test/id-photo.jpg',
+            'signature_path' => 'enrollment-documents/test/signature.png',
+            'document_review' => [
+                'birth-certificate' => ['status' => 'accepted', 'note' => null],
+                'education-document' => ['status' => 'accepted', 'note' => null],
+                'good-moral-certificate' => ['status' => 'accepted', 'note' => null],
+                'id-photo' => ['status' => 'accepted', 'note' => null],
+                'signature' => ['status' => 'accepted', 'note' => null],
+            ],
+            'documents_reviewed_at' => now(),
             'status' => $status,
             'total_program_fee' => 22000.00,
             'downpayment_amount' => 2000.00,

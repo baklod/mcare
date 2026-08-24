@@ -73,8 +73,8 @@ class AdminDashboardController extends Controller
                 ->limit(5)
                 ->get(),
             'stats' => [
-                'pending_applications' => $statusCounts[EnrollmentApplication::STATUS_PROFILE_SUBMITTED] ?? 0,
-                'pre_enlistment' => $statusCounts[EnrollmentApplication::STATUS_PRE_ENLISTMENT] ?? 0,
+                'pending_applications' => ($statusCounts[EnrollmentApplication::STATUS_PROFILE_SUBMITTED] ?? 0)
+                    + ($statusCounts[EnrollmentApplication::STATUS_PRE_ENLISTMENT] ?? 0),
                 'approved' => $statusCounts[EnrollmentApplication::STATUS_APPROVED] ?? 0,
                 'paid' => $paymentCounts[EnrollmentApplication::PAYMENT_PAID] ?? 0,
                 'total_applications' => $totalApplications,

@@ -180,5 +180,17 @@
             });
         })();
     </script>
+
+    <dialog class="lms-confirm-dialog" data-lms-confirm-dialog aria-labelledby="lms-confirm-title">
+        <form method="dialog" class="lms-confirm-card">
+            <span class="lms-confirm-icon" aria-hidden="true">!</span>
+            <h2 id="lms-confirm-title">Confirm action</h2>
+            <p data-lms-confirm-message>This action cannot be undone.</p>
+            <div class="lms-confirm-actions">
+                <button value="cancel" class="secondary-action">Cancel</button>
+                <button value="confirm" class="lms-danger-action">Continue</button>
+            </div>
+        </form>
+    </dialog>
 </body>
 </html>

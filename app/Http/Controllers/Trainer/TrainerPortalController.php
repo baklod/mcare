@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Trainer;
 use App\Http\Controllers\Controller;
 use App\Models\EnrollmentApplication;
 use App\Models\ModuleProgress;
+use App\Models\Quiz;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
 use App\Services\TraineeRosterCsv;
@@ -102,15 +103,32 @@ class TrainerPortalController extends Controller
     {
         $assignedBatch = TrainingBatch::assignedTo($request->user());
 
+        $modules = TrainingModule::query()
+            ->with([
+                'batch',
+                'targetTrainee',
+                'progressRecords.application',
+                'quizzes.questions',
+                'quizzes.attempts.application',
+            ])
+            ->where('trainer_id', $request->user()->id)
+            ->when($assignedBatch, fn ($query) => $query->where('training_batch_id', $assignedBatch->id))
+            ->when(! $assignedBatch, fn ($query) => $query->whereRaw('1 = 0'))
+            ->latest('published_at')
+            ->get();
+
+        $quizzes = Quiz::query()
+            ->with(['trainingModule', 'batch', 'targetTrainee', 'questions', 'attempts.application'])
+            ->where('trainer_id', $request->user()->id)
+            ->when($assignedBatch, fn ($query) => $query->where('training_batch_id', $assignedBatch->id))
+            ->when(! $assignedBatch, fn ($query) => $query->whereRaw('1 = 0'))
+            ->latest('id')
+            ->get();
+
         return view('trainer.resources', [
             'batches' => $assignedBatch ? collect([$assignedBatch]) : collect(),
-            'modules' => TrainingModule::query()
-                ->with(['batch', 'targetTrainee', 'progressRecords.application'])
-                ->where('trainer_id', $request->user()->id)
-                ->when($assignedBatch, fn ($query) => $query->where('training_batch_id', $assignedBatch->id))
-                ->when(! $assignedBatch, fn ($query) => $query->whereRaw('1 = 0'))
-                ->latest('published_at')
-                ->get(),
+            'modules' => $modules,
+            'quizzes' => $quizzes,
             'trainees' => $this->approvedTrainees($assignedBatch)->with('batch')->get(),
             'assignedBatch' => $assignedBatch,
             'catalogUnits' => \App\Support\CaregivingNcIiCatalog::units(),

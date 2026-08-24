@@ -35,12 +35,17 @@ class EnrollmentStatusUpdatedNotification extends Notification implements Should
     public function toDatabase(object $notifiable): array
     {
         $approved = $this->application->status === EnrollmentApplication::STATUS_APPROVED;
+        $denied = $this->application->status === EnrollmentApplication::STATUS_DENIED;
 
         return [
-            'title' => $approved ? 'MCARE account approved' : 'Enrollment status updated',
+            'title' => $approved
+                ? 'MCARE account approved'
+                : ($denied ? 'Enrollment application not approved' : 'Enrollment status updated'),
             'message' => $approved
                 ? 'Your account was verified and approved. You can now log in to the MCARE trainee portal.'
-                : 'Your Caregiving NC II application is now '.$this->application->statusLabel().'.',
+                : ($denied
+                    ? 'Your Caregiving NC II enrollment application was not approved. Review the administrator note for the reason and next steps.'
+                    : 'Your Caregiving NC II application is now '.$this->application->statusLabel().'.'),
             'url' => AccountPortal::urlFor($notifiable),
             'icon' => $this->application->status === EnrollmentApplication::STATUS_APPROVED ? 'badge-check' : 'clipboard-check',
             'enrollment_application_id' => $this->application->id,
@@ -58,6 +63,22 @@ class EnrollmentStatusUpdatedNotification extends Notification implements Should
                 ->line('Your account is now active. You may log in and open the trainee portal.')
                 ->action('Log in to MCARE', route('login'))
                 ->line('Use the same verified Gmail account or MCARE credentials from your enrollment.')
+                ->salutation('MCARE Training Center Administration');
+        }
+
+        if ($this->application->status === EnrollmentApplication::STATUS_DENIED) {
+            $mail = (new MailMessage)
+                ->subject('Important: Your MCARE enrollment application was not approved')
+                ->greeting('Hello '.$notifiable->name.',')
+                ->line('MCARE administration completed the review of your Caregiving NC II enrollment application and did not approve the account.');
+
+            if (filled($this->application->admin_notes)) {
+                $mail->line('Administrator note: '.$this->application->admin_notes);
+            }
+
+            return $mail
+                ->line('If your enrollment payment was already verified, it remains recorded. Please contact MCARE administration regarding correction, resubmission, or other next steps.')
+                ->action('Open MCARE', route('landing'))
                 ->salutation('MCARE Training Center Administration');
         }
 

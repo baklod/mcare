@@ -201,7 +201,9 @@ class EnrollmentPaymentController extends Controller
             'label' => $application->paymentStatusLabel(),
             'paid' => $application->payment_status === EnrollmentApplication::PAYMENT_PAID,
             'payment_verified' => $application->hasEnrollmentPaymentClearance(),
+            'application_status' => $application->status,
             'account_approved' => $application->status === EnrollmentApplication::STATUS_APPROVED,
+            'account_denied' => $application->status === EnrollmentApplication::STATUS_DENIED,
             'completion_url' => route('payment.complete'),
             'verified_at' => $application->payment_verified_at?->toIso8601String(),
         ]);
@@ -224,18 +226,28 @@ class EnrollmentPaymentController extends Controller
         }
 
         $application->refresh();
-        $request->session()->put('enrollment.awaiting_approval', true);
-
         if ($request->user()?->role === 'applicant') {
             Auth::logout();
             $request->session()->regenerate();
         }
 
+        if ($application->status === EnrollmentApplication::STATUS_DENIED) {
+            $request->session()->forget('enrollment.awaiting_approval');
+
+            return redirect()
+                ->route('landing')
+                ->with('account_denied', 'Your enrollment application was not approved. Your verified payment remains recorded; contact MCARE administration regarding the next steps.');
+        }
+
         if ($application->status === EnrollmentApplication::STATUS_APPROVED) {
+            $request->session()->forget('enrollment.awaiting_approval');
+
             return redirect()
                 ->route('landing')
                 ->with('account_approved', 'Your payment and MCARE account are approved. You can now log in.');
         }
+
+        $request->session()->put('enrollment.awaiting_approval', true);
 
         return redirect()
             ->route('landing')

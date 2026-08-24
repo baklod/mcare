@@ -27,7 +27,7 @@ return new class extends Migration
             $table->string('educational_attainment', 150);
             $table->string('school_name', 180);
             $table->unsignedSmallInteger('year_graduated');
-            $table->string('status')->default('profile_submitted');
+            $table->string('status')->default('pre_enlistment');
             $table->timestamps();
 
             $table->unique('user_id');

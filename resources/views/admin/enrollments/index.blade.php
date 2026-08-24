@@ -35,7 +35,7 @@
         </header>
 
         <!-- Status Summary Horizontal Cards Grid -->
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-4">
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
             @foreach ($statuses as $status => $label)
                 <a href="{{ route('admin.enrollments.index', ['status' => $status]) }}" class="group flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 transition hover:border-purple-300 hover:shadow-sm @if($selectedStatus === $status) ring-2 ring-purple-500 border-purple-300 bg-purple-50/20 @endif">
                     <span class="text-xs font-bold uppercase tracking-wider text-slate-500 group-hover:text-purple-700">{{ $label }}</span>

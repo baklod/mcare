@@ -4,26 +4,180 @@
 @php
     $trainerErrors = $errors->getBag('trainer');
     $traineeErrors = $errors->getBag('trainee');
+    $currentRole = $roleFilter ?? 'all';
+    $searchQuery = $search ?? '';
 @endphp
 
 <section class="space-y-6">
     <header class="flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
             <p class="dashboard-section-kicker">Administration - Accounts</p>
-            <h1 class="dashboard-section-title mt-2 text-3xl">Trainer and trainee accounts</h1>
-            <p class="mt-2 text-sm leading-6 text-slate-600">Create role-specific sign-in accounts. Admin-created trainees are immediately approved and assigned to the selected batch.</p>
+            <h1 class="dashboard-section-title mt-2 text-3xl">User account management</h1>
+            <p class="mt-2 text-sm leading-6 text-slate-600">
+                Manage trainer, trainee, and applicant accounts. Deleting an account safely purges its enrollment data, files, and payment attempts, allowing the applicant to re-register cleanly.
+            </p>
         </div>
         <div class="flex flex-wrap gap-2">
-            <button type="button" data-dashboard-dialog-open="trainer-account-dialog" class="secondary-action inline-flex items-center justify-center gap-2"><x-dashboard-icon name="plus" class="h-4 w-4" />Add trainer</button>
-            <button type="button" data-dashboard-dialog-open="trainee-account-dialog" class="primary-action inline-flex items-center justify-center gap-2"><x-dashboard-icon name="plus" class="h-4 w-4" />Add trainee</button>
+            <button type="button" data-dashboard-dialog-open="trainer-account-dialog" class="secondary-action inline-flex items-center justify-center gap-2">
+                <x-dashboard-icon name="plus" class="h-4 w-4" />Add trainer
+            </button>
+            <button type="button" data-dashboard-dialog-open="trainee-account-dialog" class="primary-action inline-flex items-center justify-center gap-2">
+                <x-dashboard-icon name="plus" class="h-4 w-4" />Add trainee
+            </button>
         </div>
     </header>
 
-    @if($errors->has('account'))<div class="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-800" role="alert">{{ $errors->first('account') }}</div>@endif
-    @if(session('verification_notice'))<div class="rounded-xl border border-purple-200 bg-purple-50 px-5 py-4 text-sm font-semibold text-purple-900" role="status" data-auto-dismiss="7000">{{ session('verification_notice') }}</div>@endif
+    @if($errors->has('account'))
+        <div class="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-800" role="alert">
+            {{ $errors->first('account') }}
+        </div>
+    @endif
+    @if(session('saved'))
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-900" role="status" data-auto-dismiss="7000">
+            {{ session('saved') }}
+        </div>
+    @endif
+    @if(session('verification_notice'))
+        <div class="rounded-xl border border-purple-200 bg-purple-50 px-5 py-4 text-sm font-semibold text-purple-900" role="status" data-auto-dismiss="7000">
+            {{ session('verification_notice') }}
+        </div>
+    @endif
 
-    <div class="dashboard-table-wrap overflow-x-auto"><table class="dashboard-table min-w-[62rem]"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Verification</th><th>Created</th><th class="text-right">Action</th></tr></thead><tbody>@forelse($accounts as $account)@php($adminCreated = $account->applicant_status === 'staff_created' || ($account->role === 'trainee' && $account->enrollmentApplication?->admin_notes === 'Trainee account created by an administrator.'))<tr><td class="font-bold text-slate-900">{{ $account->name }}</td><td>{{ $account->email }}</td><td><span class="dashboard-pill bg-purple-50 text-purple-700 ring-purple-100">{{ str($account->role)->headline() }}</span></td><td><span class="dashboard-pill {{ $account->hasVerifiedEmail() ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-amber-50 text-amber-700 ring-amber-100' }}">{{ $account->hasVerifiedEmail() ? 'Verified' : 'Pending' }}</span></td><td>{{ $account->created_at?->format('M d, Y g:i A') }}</td><td class="text-right">@if($adminCreated)<form method="POST" action="{{ route('admin.accounts.destroy', $account) }}" data-confirm="Remove this admin-created {{ $account->role }} account? Related learning or payment records will protect it from deletion.">@csrf @method('DELETE')<button type="submit" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-red-50" aria-label="Delete {{ $account->name }}" title="Delete account"><x-dashboard-icon name="trash-2" class="h-4 w-4" /></button></form>@else<span class="text-xs font-semibold text-slate-400">Protected</span>@endif</td></tr>@empty<tr><td colspan="6" class="py-12 text-center">No trainer or trainee accounts yet.</td></tr>@endforelse</tbody></table>@if($accounts->hasPages())<div class="border-t border-slate-200 px-5 py-4">{{ $accounts->links() }}</div>@endif</div>
+    <!-- Role Filter Tabs & Search Bar -->
+    <div class="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex flex-wrap gap-1.5" role="tablist" aria-label="Filter accounts by role">
+            <a href="{{ route('admin.accounts.index', ['role' => 'all', 'search' => $searchQuery]) }}"
+               class="rounded-xl px-4 py-2 text-xs font-bold transition {{ $currentRole === 'all' ? 'bg-purple-700 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
+                All Accounts ({{ $counts['all'] ?? 0 }})
+            </a>
+            <a href="{{ route('admin.accounts.index', ['role' => 'trainer', 'search' => $searchQuery]) }}"
+               class="rounded-xl px-4 py-2 text-xs font-bold transition {{ $currentRole === 'trainer' ? 'bg-indigo-700 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
+                Trainers ({{ $counts['trainer'] ?? 0 }})
+            </a>
+            <a href="{{ route('admin.accounts.index', ['role' => 'trainee', 'search' => $searchQuery]) }}"
+               class="rounded-xl px-4 py-2 text-xs font-bold transition {{ $currentRole === 'trainee' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
+                Trainees ({{ $counts['trainee'] ?? 0 }})
+            </a>
+            <a href="{{ route('admin.accounts.index', ['role' => 'applicant', 'search' => $searchQuery]) }}"
+               class="rounded-xl px-4 py-2 text-xs font-bold transition {{ $currentRole === 'applicant' ? 'bg-amber-700 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
+                Applicants ({{ $counts['applicant'] ?? 0 }})
+            </a>
+        </div>
 
+        <form method="GET" action="{{ route('admin.accounts.index') }}" class="flex items-center gap-2">
+            <input type="hidden" name="role" value="{{ $currentRole }}">
+            <div class="relative">
+                <input type="text" name="search" value="{{ $searchQuery }}" placeholder="Search name, email..."
+                       class="form-field w-56 text-xs pl-8 pr-3 py-1.5">
+                <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400">
+                    <x-dashboard-icon name="search" class="h-3.5 w-3.5" />
+                </span>
+            </div>
+            <button type="submit" class="secondary-action text-xs py-1.5 px-3">Search</button>
+            @if(filled($searchQuery))
+                <a href="{{ route('admin.accounts.index', ['role' => $currentRole]) }}" class="text-xs text-slate-500 hover:text-slate-900 underline">Clear</a>
+            @endif
+        </form>
+    </div>
+
+    <!-- Accounts Table -->
+    <div class="dashboard-table-wrap overflow-x-auto">
+        <table class="dashboard-table min-w-[66rem]">
+            <thead>
+                <tr>
+                    <th>Account / Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Batch / Progress Status</th>
+                    <th>Verification</th>
+                    <th>Created</th>
+                    <th class="text-right">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($accounts as $account)
+                    @php
+                        $app = $account->enrollmentApplication;
+                        $roleBadge = match($account->role) {
+                            'trainer' => 'bg-indigo-50 text-indigo-700 ring-indigo-100',
+                            'trainee' => 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+                            'applicant' => 'bg-amber-50 text-amber-800 ring-amber-100',
+                            default => 'bg-purple-50 text-purple-700 ring-purple-100',
+                        };
+                    @endphp
+                    <tr>
+                        <td>
+                            <div class="font-bold text-slate-900">{{ $account->name ?: ($app ? $app->first_name.' '.$app->last_name : 'No name set') }}</div>
+                            @if(filled($account->google_id))
+                                <span class="inline-flex items-center gap-1 text-[10px] text-slate-500 font-medium">
+                                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-blue-500"></span> Google Sign-in
+                                </span>
+                            @endif
+                        </td>
+                        <td>
+                            <div class="font-mono text-xs text-slate-700">{{ $account->email }}</div>
+                            @if($app?->contact_number)
+                                <div class="text-[11px] text-slate-500">{{ $app->contact_number }}</div>
+                            @endif
+                        </td>
+                        <td>
+                            <span class="dashboard-pill {{ $roleBadge }}">
+                                {{ str($account->role)->headline() }}
+                            </span>
+                        </td>
+                        <td>
+                            @if($app)
+                                <div class="text-xs font-semibold text-slate-900">
+                                    {{ $app->batch ? $app->batch->name.' '.$app->batch->year : 'No batch assigned' }}
+                                </div>
+                                <div class="flex items-center gap-1 mt-0.5">
+                                    <span class="rounded px-1.5 py-0.5 text-[10px] font-bold {{ $app->status === 'approved' ? 'bg-emerald-100 text-emerald-800' : ($app->status === 'denied' ? 'bg-red-100 text-red-800' : 'bg-stone-100 text-stone-700') }}">
+                                        {{ $app->statusLabel() }}
+                                    </span>
+                                    <span class="text-[10px] text-slate-500">· {{ $app->paymentStatusLabel() }}</span>
+                                </div>
+                            @else
+                                <span class="text-xs text-slate-400">Direct staff account</span>
+                            @endif
+                        </td>
+                        <td>
+                            <span class="dashboard-pill {{ $account->hasVerifiedEmail() ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-amber-50 text-amber-700 ring-amber-100' }}">
+                                {{ $account->hasVerifiedEmail() ? 'Verified' : 'Pending' }}
+                            </span>
+                        </td>
+                        <td class="text-xs text-slate-600">
+                            {{ $account->created_at?->format('M d, Y g:i A') }}
+                        </td>
+                        <td class="text-right">
+                            <form method="POST" action="{{ route('admin.accounts.destroy', $account) }}"
+                                  data-confirm="Permanently delete account for '{{ $account->name ?: $account->email }}' ({{ str($account->role)->headline() }})? All related enrollment applications, payment records, uploaded documents, and learning history will be permanently deleted, allowing them to re-enroll if needed.">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300 transition"
+                                        aria-label="Delete {{ $account->name ?: $account->email }}" title="Delete account">
+                                    <x-dashboard-icon name="trash-2" class="h-4 w-4" />
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="7" class="py-12 text-center text-slate-500">
+                            No accounts found matching the selected filter.
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+
+        @if($accounts->hasPages())
+            <div class="border-t border-slate-200 px-5 py-4">
+                {{ $accounts->links() }}
+            </div>
+        @endif
+    </div>
+
+    <!-- DIALOG: ADD TRAINER -->
     <dialog id="trainer-account-dialog" data-dashboard-dialog data-auto-open="{{ $trainerErrors->any() ? 'true' : 'false' }}" class="m-auto max-h-[90vh] w-[min(94vw,42rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/45" aria-labelledby="trainer-account-dialog-title">
         <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4">
             <div><h2 id="trainer-account-dialog-title" class="font-display text-xl font-bold text-slate-900">Add trainer</h2><p class="mt-1 text-xs text-slate-500">Create a trainer account with temporary sign-in credentials.</p></div>
@@ -41,6 +195,7 @@
         </form>
     </dialog>
 
+    <!-- DIALOG: ADD TRAINEE -->
     <dialog id="trainee-account-dialog" data-dashboard-dialog data-auto-open="{{ $traineeErrors->any() ? 'true' : 'false' }}" class="m-auto max-h-[90vh] w-[min(96vw,64rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/45" aria-labelledby="trainee-account-dialog-title">
         <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4">
             <div><h2 id="trainee-account-dialog-title" class="font-display text-xl font-bold text-slate-900">Add trainee</h2><p class="mt-1 text-xs text-slate-500">Create an approved trainee and assign their class batch.</p></div>

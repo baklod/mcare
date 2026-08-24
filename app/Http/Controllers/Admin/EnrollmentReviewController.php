@@ -128,9 +128,12 @@ class EnrollmentReviewController extends Controller
 
     public function show(EnrollmentApplication $enrollmentApplication): View
     {
+        $enrollmentApplication->load(['user', 'reviewer', 'batch', 'documentReviewer']);
+
         return view('admin.enrollments.show', [
-            'application' => $enrollmentApplication->load(['user', 'reviewer', 'batch', 'documentReviewer']),
+            'application' => $enrollmentApplication,
             'documentDefinitions' => $this->documentFields(),
+            'pendingDocumentApprovals' => $this->pendingDocumentApprovals($enrollmentApplication),
             'reviewableStatuses' => EnrollmentApplication::reviewableStatuses(),
             'statuses' => EnrollmentApplication::statuses(),
         ]);
@@ -150,13 +153,23 @@ class EnrollmentReviewController extends Controller
             'admin_notes.required' => 'Add a clear note before denying an application.',
         ]);
 
-        if ($validated['status'] === EnrollmentApplication::STATUS_APPROVED
-            && ! $enrollmentApplication->hasEnrollmentPaymentClearance()) {
-            return back()
-                ->withErrors([
-                    'status' => 'Verify the required enrollment payment before approving this account.',
-                ])
-                ->withInput();
+        if ($validated['status'] === EnrollmentApplication::STATUS_APPROVED) {
+            $approvalIssues = [];
+            $pendingDocuments = $this->pendingDocumentApprovals($enrollmentApplication);
+
+            if ($pendingDocuments !== []) {
+                $approvalIssues[] = 'Review and accept every required document first. Pending: '.implode(', ', $pendingDocuments).'.';
+            }
+
+            if (! $enrollmentApplication->hasEnrollmentPaymentClearance()) {
+                $approvalIssues[] = 'Verify the required enrollment payment before approving this account.';
+            }
+
+            if ($approvalIssues !== []) {
+                return back()
+                    ->withErrors(['status' => implode(' ', $approvalIssues)])
+                    ->withInput();
+            }
         }
 
         $previousStatus = $enrollmentApplication->status;
@@ -303,6 +316,24 @@ class EnrollmentReviewController extends Controller
         abort_unless(array_key_exists($document, $fields), 404);
 
         return $fields[$document];
+    }
+
+    /** @return list<string> */
+    private function pendingDocumentApprovals(EnrollmentApplication $enrollmentApplication): array
+    {
+        $pending = [];
+        $review = $enrollmentApplication->document_review ?? [];
+
+        foreach ($this->documentFields() as $key => $definition) {
+            $hasDocument = filled($enrollmentApplication->{$definition['field']});
+            $isAccepted = data_get($review, $key.'.status') === 'accepted';
+
+            if (! $hasDocument || ! $isAccepted) {
+                $pending[] = $definition['label'];
+            }
+        }
+
+        return $pending;
     }
 
     private function documentFields(): array

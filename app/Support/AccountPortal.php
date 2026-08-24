@@ -25,7 +25,9 @@ class AccountPortal
             'trainer' => 'Open Trainer Portal',
             'trainee' => 'Open Trainee Portal',
             'alumni' => 'Open Alumni Portal',
-            default => self::applicantHasApplication($user) ? 'Continue Application' : 'Start Enrollment',
+            default => self::applicantWasDenied($user)
+                ? 'Correct & Resubmit'
+                : (self::applicantHasApplication($user) ? 'Continue Application' : 'Start Enrollment'),
         };
     }
 
@@ -41,7 +43,9 @@ class AccountPortal
             'trainer' => 'trainer.dashboard',
             'trainee' => 'trainee.dashboard',
             'alumni' => 'alumni.dashboard',
-            default => self::applicantHasApplication($user) ? 'payment.show' : 'enrollment.create',
+            default => self::applicantWasDenied($user)
+                ? 'enrollment.create'
+                : (self::applicantHasApplication($user) ? 'payment.show' : 'enrollment.create'),
         };
     }
 
@@ -54,6 +58,18 @@ class AccountPortal
         // This keeps returning applicants on payment/review instead of sending them back to a blank form.
         return EnrollmentApplication::query()
             ->where('user_id', $user->id)
+            ->exists();
+    }
+
+    public static function applicantWasDenied(?User $user): bool
+    {
+        if (! $user || $user->role !== 'applicant') {
+            return false;
+        }
+
+        return EnrollmentApplication::query()
+            ->where('user_id', $user->id)
+            ->where('status', EnrollmentApplication::STATUS_DENIED)
             ->exists();
     }
 }

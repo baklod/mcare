@@ -9,11 +9,14 @@ use App\Models\Quiz;
 use App\Models\QuizAttempt;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
+use App\Models\User;
+use App\Notifications\LmsQuizPublished;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -78,6 +81,10 @@ class QuizController extends Controller
             'published' => $quiz->is_published,
         ]);
 
+        if ($quiz->is_published) {
+            $this->notifyTrainees($quiz);
+        }
+
         return $this->moduleRedirect($quiz)
             ->with('saved', $quiz->is_published ? 'Quiz published.' : 'Quiz saved as a draft.');
     }
@@ -96,6 +103,7 @@ class QuizController extends Controller
     {
         $this->authorize('update', $quiz);
 
+        $wasPublished = $quiz->is_published;
         $validated = $this->validatedPayload($request);
         [$batchId, $targetTrainee] = $this->resolveAudience($validated);
         $this->assertTrainerBatch($request, $batchId, $targetTrainee);
@@ -163,6 +171,10 @@ class QuizController extends Controller
             'published' => $quiz->is_published,
         ]);
 
+        if (! $wasPublished && $quiz->is_published) {
+            $this->notifyTrainees($quiz);
+        }
+
         return $this->moduleRedirect($quiz)
             ->with('saved', 'Quiz updated.');
     }
@@ -188,6 +200,10 @@ class QuizController extends Controller
             'title' => $quiz->title,
             'published' => $published,
         ]);
+
+        if ($published) {
+            $this->notifyTrainees($quiz);
+        }
 
         return $this->moduleRedirect($quiz)
             ->with('saved', $published ? 'Quiz published.' : 'Quiz returned to draft.');
@@ -562,5 +578,33 @@ class QuizController extends Controller
     private function nullableInt(mixed $value): ?int
     {
         return filled($value) ? (int) $value : null;
+    }
+
+    private function notifyTrainees(Quiz $quiz): void
+    {
+        if (! $quiz->is_published || ($quiz->available_at && $quiz->available_at->isFuture())) {
+            return;
+        }
+
+        $query = EnrollmentApplication::query()
+            ->where('status', EnrollmentApplication::STATUS_APPROVED)
+            ->whereNotNull('user_id');
+
+        if ($quiz->target_enrollment_application_id !== null) {
+            $query->whereKey($quiz->target_enrollment_application_id);
+        } elseif ($quiz->training_batch_id) {
+            $query->where('training_batch_id', $quiz->training_batch_id);
+        }
+
+        $traineeIds = $query->pluck('user_id')->unique();
+
+        $trainees = User::query()
+            ->where('role', 'trainee')
+            ->whereIn('id', $traineeIds)
+            ->get();
+
+        if ($trainees->isNotEmpty()) {
+            Notification::send($trainees, new LmsQuizPublished($quiz));
+        }
     }
 }

@@ -11,6 +11,8 @@ use App\Models\Quiz;
 use App\Models\TraineeCompetencyRecord;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
+use App\Models\User;
+use App\Notifications\LmsModulePublished;
 use App\Rules\TrainingModuleFileType;
 use App\Support\TrainingModuleFiles;
 use Illuminate\Http\RedirectResponse;
@@ -18,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -102,6 +105,10 @@ class TrainingModuleController extends Controller
             'published' => $module->is_published,
         ]);
 
+        if ($module->is_published) {
+            $this->notifyTrainees($module);
+        }
+
         return redirect()
             ->route('trainer.resources')
             ->with('saved', $module->is_published
@@ -115,6 +122,7 @@ class TrainingModuleController extends Controller
     ): RedirectResponse {
         $this->authorize('update', $module);
 
+        $wasPublished = $module->is_published;
         $validated = $this->validatedPayload($request, false, count($module->supplementaryList()));
         [$batchId, $targetTrainee] = $this->resolveAudience($validated);
         $this->assertTrainerBatch($request, $batchId, $targetTrainee);
@@ -201,6 +209,10 @@ class TrainingModuleController extends Controller
             'published' => $module->is_published,
             'file_replaced' => (bool) $replacementPath,
         ]);
+
+        if (! $wasPublished && $module->is_published) {
+            $this->notifyTrainees($module);
+        }
 
         if ($request->boolean('_return_to_module')) {
             return redirect()
@@ -506,6 +518,34 @@ class TrainingModuleController extends Controller
             throw ValidationException::withMessages([
                 'target_enrollment_application_id' => 'The selected trainee is outside the trainer\'s assigned batch.',
             ]);
+        }
+    }
+
+    private function notifyTrainees(TrainingModule $module): void
+    {
+        if (! $module->is_published || ($module->available_at && $module->available_at->isFuture())) {
+            return;
+        }
+
+        $query = EnrollmentApplication::query()
+            ->where('status', EnrollmentApplication::STATUS_APPROVED)
+            ->whereNotNull('user_id');
+
+        if ($module->target_enrollment_application_id !== null) {
+            $query->whereKey($module->target_enrollment_application_id);
+        } elseif ($module->training_batch_id) {
+            $query->where('training_batch_id', $module->training_batch_id);
+        }
+
+        $traineeIds = $query->pluck('user_id')->unique();
+
+        $trainees = User::query()
+            ->where('role', 'trainee')
+            ->whereIn('id', $traineeIds)
+            ->get();
+
+        if ($trainees->isNotEmpty()) {
+            Notification::send($trainees, new LmsModulePublished($module));
         }
     }
 }

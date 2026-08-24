@@ -133,10 +133,27 @@
                 <a href="{{ route('trainer.trainees') }}" class="secondary-action inline-flex items-center justify-center text-sm font-bold">View trainees</a>
             </div>
         </div>
-        <div class="mt-5 grid gap-3 sm:grid-cols-3">
-            <div class="rounded-lg border border-stone-200 bg-stone-50 p-4"><p class="text-xs font-bold uppercase tracking-wide text-stone-500">Published modules</p><p class="mt-2 text-2xl font-bold text-stone-950">{{ $moduleCount }}</p></div>
-            <div class="rounded-lg border border-stone-200 bg-stone-50 p-4"><p class="text-xs font-bold uppercase tracking-wide text-stone-500">Assigned learners</p><p class="mt-2 text-2xl font-bold text-stone-950">{{ $stats['total_trainees'] ?? 0 }}</p></div>
-            <div class="rounded-lg border border-stone-200 bg-stone-50 p-4"><p class="text-xs font-bold uppercase tracking-wide text-stone-500">Sessions today</p><p class="mt-2 text-2xl font-bold text-stone-950">{{ $stats['sessions_today'] ?? 0 }}</p></div>
+        <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="rounded-lg border border-stone-200 bg-stone-50 p-4">
+                <p class="text-xs font-bold uppercase tracking-wide text-stone-500">Published modules</p>
+                <p class="mt-2 text-2xl font-bold text-stone-950">{{ $moduleCount }}</p>
+                <a href="{{ route('trainer.resources') }}" class="mt-2 block text-xs font-bold text-purple-700 hover:text-purple-900">View modules →</a>
+            </div>
+            <div class="rounded-lg border border-stone-200 bg-stone-50 p-4">
+                <p class="text-xs font-bold uppercase tracking-wide text-stone-500">Quizzes & Assessments</p>
+                <p class="mt-2 text-2xl font-bold text-amber-700">{{ $quizCount ?? 0 }}</p>
+                <a href="{{ route('trainer.resources') }}#assessments-hub" class="mt-2 block text-xs font-bold text-amber-800 hover:text-amber-950">View quizzes →</a>
+            </div>
+            <div class="rounded-lg border border-stone-200 bg-stone-50 p-4">
+                <p class="text-xs font-bold uppercase tracking-wide text-stone-500">Assigned learners</p>
+                <p class="mt-2 text-2xl font-bold text-stone-950">{{ $stats['total_trainees'] ?? 0 }}</p>
+                <a href="{{ route('trainer.trainees') }}" class="mt-2 block text-xs font-bold text-stone-700 hover:text-stone-900">View roster →</a>
+            </div>
+            <div class="rounded-lg border border-stone-200 bg-stone-50 p-4">
+                <p class="text-xs font-bold uppercase tracking-wide text-stone-500">Sessions today</p>
+                <p class="mt-2 text-2xl font-bold text-stone-950">{{ $stats['sessions_today'] ?? 0 }}</p>
+                <a href="{{ route('trainer.sessions') }}" class="mt-2 block text-xs font-bold text-stone-700 hover:text-stone-900">Open calendar →</a>
+            </div>
         </div>
     </section>
 </div>

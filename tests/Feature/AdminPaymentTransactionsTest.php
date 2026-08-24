@@ -191,6 +191,76 @@ class AdminPaymentTransactionsTest extends TestCase
         $this->assertAuthenticatedAs($applicant);
     }
 
+    public function test_paid_applicant_denial_is_terminal_and_explains_the_next_steps(): void
+    {
+        Notification::fake();
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->create([
+            'role' => 'applicant',
+            'applicant_status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+            'email_verified_at' => now(),
+            'password' => 'Password123',
+        ]);
+        $application = $this->createApprovedApplication($applicant, $this->batch());
+        $application->forceFill([
+            'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+            'total_paid_amount' => 2000.00,
+            'payment_status' => EnrollmentApplication::PAYMENT_PARTIALLY_PAID,
+            'payment_verified_at' => now(),
+        ])->save();
+
+        $this->actingAs($admin)
+            ->patch(route('admin.enrollments.update', $application), [
+                'status' => EnrollmentApplication::STATUS_DENIED,
+                'admin_notes' => 'Please contact MCARE regarding the submitted requirement.',
+            ])
+            ->assertRedirect(route('admin.enrollments.show', $application));
+
+        $session = ['enrollment.payment_application_id' => $application->id];
+        Auth::logout();
+
+        $this->withSession($session)
+            ->getJson(route('payment.status'))
+            ->assertOk()
+            ->assertJson([
+                'payment_verified' => true,
+                'application_status' => EnrollmentApplication::STATUS_DENIED,
+                'account_approved' => false,
+                'account_denied' => true,
+            ]);
+
+        $this->withSession($session)
+            ->get(route('payment.complete'))
+            ->assertRedirect(route('landing'))
+            ->assertSessionHas('account_denied');
+
+        $this->get(route('landing'))
+            ->assertOk()
+            ->assertSee('Enrollment application not approved')
+            ->assertSee('Your verified payment remains recorded')
+            ->assertSee('Please contact MCARE regarding the submitted requirement.')
+            ->assertDontSee('Please wait while the administrator completes your account verification');
+
+        $this->post(route('login.store'), [
+            'email' => $applicant->email,
+            'password' => 'Password123',
+        ])->assertRedirect(route('enrollment.create'))
+            ->assertSessionHas('reapply_notice');
+        $this->assertAuthenticatedAs($applicant);
+
+        $this->get(route('enrollment.create'))
+            ->assertOk()
+            ->assertSee('Resubmit corrected enrollment')
+            ->assertSee('Please contact MCARE regarding the submitted requirement.');
+
+        Notification::assertSentTo(
+            $applicant,
+            EnrollmentStatusUpdatedNotification::class,
+            fn (EnrollmentStatusUpdatedNotification $notification): bool => $notification->application->status === EnrollmentApplication::STATUS_DENIED
+                && $notification->toMail($applicant)->subject === 'Important: Your MCARE enrollment application was not approved',
+        );
+    }
+
     public function test_trainee_can_upload_payment_proof_and_admin_can_verify(): void
     {
         Storage::fake('local');
@@ -346,6 +416,19 @@ class AdminPaymentTransactionsTest extends TestCase
             'educational_attainment' => 'College Graduate',
             'school_name' => 'University of Nueva Caceres',
             'year_graduated' => 2022,
+            'birth_certificate_path' => 'enrollment-documents/test/birth-certificate.pdf',
+            'education_document_path' => 'enrollment-documents/test/education-document.pdf',
+            'good_moral_certificate_path' => 'enrollment-documents/test/good-moral-certificate.pdf',
+            'id_photo_path' => 'enrollment-documents/test/id-photo.jpg',
+            'signature_path' => 'enrollment-documents/test/signature.png',
+            'document_review' => [
+                'birth-certificate' => ['status' => 'accepted', 'note' => null],
+                'education-document' => ['status' => 'accepted', 'note' => null],
+                'good-moral-certificate' => ['status' => 'accepted', 'note' => null],
+                'id-photo' => ['status' => 'accepted', 'note' => null],
+                'signature' => ['status' => 'accepted', 'note' => null],
+            ],
+            'documents_reviewed_at' => now(),
             'status' => EnrollmentApplication::STATUS_APPROVED,
             'total_program_fee' => 22000.00,
             'downpayment_amount' => 2000.00,

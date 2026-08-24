@@ -235,6 +235,12 @@
                 </div>
             @endif
 
+            @if (session('reapply_notice'))
+                <div class="mb-6 rounded-2xl border border-purple-200 bg-purple-50 px-5 py-4 text-sm font-semibold leading-6 text-purple-900" role="status" aria-live="polite">
+                    {{ session('reapply_notice') }}
+                </div>
+            @endif
+
             @if ($errors->any())
                 <div class="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold leading-6 text-red-700">
                     Please review the highlighted fields and complete the required information.
@@ -727,8 +733,8 @@
                 <div id="enrollment-submit" class="enrollment-submit-row enrollment-jump-target border-t border-slate-100 pt-6">
                     <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <p class="text-sm leading-6 text-slate-500">Date accomplished will be recorded automatically when the form is submitted.</p>
-                        <button type="submit" data-default-label="Submit NC II enrollment" @disabled(! $application && ! $enrollmentBatch) class="inline-flex h-12 items-center justify-center rounded-full bg-purple-600 px-8 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:h-auto sm:py-4">
-                            Submit NC II enrollment
+                        <button type="submit" data-default-label="{{ $application?->status === \App\Models\EnrollmentApplication::STATUS_DENIED ? 'Resubmit corrected enrollment' : 'Submit NC II enrollment' }}" @disabled(! $application && ! $enrollmentBatch) class="inline-flex h-12 items-center justify-center rounded-full bg-purple-600 px-8 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:h-auto sm:py-4">
+                            {{ $application?->status === \App\Models\EnrollmentApplication::STATUS_DENIED ? 'Resubmit corrected enrollment' : 'Submit NC II enrollment' }}
                         </button>
                     </div>
 

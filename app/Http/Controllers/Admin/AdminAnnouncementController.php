@@ -79,9 +79,11 @@ class AdminAnnouncementController extends Controller
                 ->whereHas('enrollmentApplication', fn ($q) => $q
                     ->where('status', EnrollmentApplication::STATUS_APPROVED)
                     ->where('training_batch_id', $announcement->training_batch_id))
+                ->distinct()
                 ->get(),
             default => User::query()
                 ->whereHas('enrollmentApplication', fn ($q) => $q->where('status', EnrollmentApplication::STATUS_APPROVED))
+                ->distinct()
                 ->get(),
         };
 

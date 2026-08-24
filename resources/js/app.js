@@ -719,8 +719,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelectorAll('form[data-confirm]').forEach((form) => {
         form.addEventListener('submit', (event) => {
-            if (form.dataset.confirmed === 'true' || !confirmDialog?.showModal) {
+            if (form.dataset.confirmed === 'true') {
                 delete form.dataset.confirmed;
+                return;
+            }
+
+            if (!confirmDialog || typeof confirmDialog.showModal !== 'function') {
+                const message = form.dataset.confirm || 'Continue with this action?';
+                if (!window.confirm(message)) {
+                    event.preventDefault();
+                    return;
+                }
                 return;
             }
 

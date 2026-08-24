@@ -138,7 +138,6 @@ class EnrollmentApplication extends Model
     public static function statuses(): array
     {
         return [
-            self::STATUS_PROFILE_SUBMITTED => 'Submitted',
             self::STATUS_PRE_ENLISTMENT => 'Pre-enlistment',
             self::STATUS_APPROVED => 'Approved',
             self::STATUS_DENIED => 'Denied',
@@ -156,6 +155,10 @@ class EnrollmentApplication extends Model
 
     public function statusLabel(): string
     {
+        if ($this->status === self::STATUS_PROFILE_SUBMITTED) {
+            return self::statuses()[self::STATUS_PRE_ENLISTMENT];
+        }
+
         return self::statuses()[$this->status] ?? str($this->status)->headline()->toString();
     }
 

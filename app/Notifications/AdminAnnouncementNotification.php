@@ -4,16 +4,19 @@ namespace App\Notifications;
 
 use App\Models\AdminAnnouncement;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class AdminAnnouncementNotification extends Notification
+class AdminAnnouncementNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
     public function __construct(
         public AdminAnnouncement $announcement,
-    ) {}
+    ) {
+        $this->onQueue('mail');
+    }
 
     /** @return list<string> */
     public function via(object $notifiable): array

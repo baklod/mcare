@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
 use App\Models\User;
@@ -86,7 +87,7 @@ class EnrollmentSubmissionTest extends TestCase
         $this->assertDatabaseHas('enrollment_applications', [
             'email' => 'applicant@gmail.com',
             'signature_type' => 'draw',
-            'status' => 'profile_submitted',
+            'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
         ]);
 
         $application = EnrollmentApplication::firstOrFail();
@@ -146,7 +147,7 @@ class EnrollmentSubmissionTest extends TestCase
         $this->assertDatabaseHas('enrollment_applications', [
             'user_id' => $user->id,
             'email' => 'verified.applicant@gmail.com',
-            'status' => EnrollmentApplication::STATUS_PROFILE_SUBMITTED,
+            'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
         ]);
 
         Notification::assertSentTo(
@@ -206,6 +207,82 @@ class EnrollmentSubmissionTest extends TestCase
         $this->assertNotNull($application->payment_reference);
         $this->assertNotNull($application->payment_receipt_number);
         $this->assertTrue($application->payment_receipt_expires_at->isFuture());
+    }
+
+    public function test_denied_applicant_can_correct_and_resubmit_without_losing_verified_payment(): void
+    {
+        Notification::fake();
+        Storage::fake('local');
+        $batch = TrainingBatch::create([
+            'name' => 'Reapplication Batch',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_starts_at' => now()->subDay(),
+            'enrollment_ends_at' => now()->addWeek(),
+        ]);
+        $user = User::factory()->create([
+            'email' => 'reapply@gmail.com',
+            'role' => 'applicant',
+            'applicant_status' => EnrollmentApplication::STATUS_DENIED,
+            'email_verified_at' => now(),
+        ]);
+        $application = EnrollmentApplication::create([
+            'user_id' => $user->id,
+            'training_batch_id' => $batch->id,
+            'email' => $user->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => 'Maria',
+            'last_name' => 'Santos',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'street' => 'Training Street',
+            'barangay' => 'Central',
+            'city' => 'Pili',
+            'province' => 'Camarines Sur',
+            'zip_code' => '4418',
+            'educational_attainment' => 'High School Graduate',
+            'school_name' => 'MCARE High School',
+            'year_graduated' => 2020,
+            'status' => EnrollmentApplication::STATUS_DENIED,
+            'admin_notes' => 'Replace the unclear documents and submit again.',
+            'reviewed_at' => now(),
+            'reviewed_by_id' => User::factory()->create(['role' => 'admin'])->id,
+            'total_paid_amount' => 2000,
+            'downpayment_amount' => 2000,
+            'payment_status' => EnrollmentApplication::PAYMENT_PARTIALLY_PAID,
+            'payment_verified_at' => now(),
+            'document_review' => [
+                'birth-certificate' => ['status' => 'replace', 'note' => 'Upload a clear copy.'],
+            ],
+        ]);
+        $payload = $this->validEnrollmentPayload(['email' => 'tampered@gmail.com']);
+        unset($payload['password'], $payload['password_confirmation']);
+
+        $this->actingAs($user)
+            ->post(route('enrollment.store'), $payload)
+            ->assertRedirect(route('payment.show'))
+            ->assertSessionHas('payment_notice', 'Your corrected enrollment was resubmitted for admin review. Your existing verified payment remains recorded.');
+
+        $application->refresh();
+        $this->assertSame(EnrollmentApplication::STATUS_PRE_ENLISTMENT, $application->status);
+        $this->assertSame(EnrollmentApplication::STATUS_PRE_ENLISTMENT, $user->refresh()->applicant_status);
+        $this->assertNull($application->admin_notes);
+        $this->assertNull($application->reviewed_at);
+        $this->assertNull($application->reviewed_by_id);
+        $this->assertTrue($application->hasEnrollmentPaymentClearance());
+        $this->assertSame('unreviewed', $application->document_review['birth-certificate']['status']);
+
+        $log = AdminActivityLog::query()->where('action', 'enrollment.denied.resubmitted')->firstOrFail();
+        $this->assertSame('Replace the unclear documents and submit again.', $log->meta['previous_admin_notes']);
+        $this->assertTrue($log->meta['payment_clearance_preserved']);
+
+        Notification::assertSentTo(
+            $user,
+            EnrollmentSubmittedNotification::class,
+            fn (EnrollmentSubmittedNotification $notification): bool => $notification->application->is($application),
+        );
     }
 
     /** @return array<string, mixed> */
