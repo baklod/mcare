@@ -106,13 +106,16 @@
 
                 <details class="trainee-accordion-card overflow-hidden rounded-xl border border-slate-200 bg-white" data-trainee-card>
                     <summary class="grid cursor-pointer list-none gap-4 p-5 outline-none transition hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple-500 lg:grid-cols-[minmax(16rem,1.2fr)_minmax(25rem,1fr)_auto] lg:items-center">
-                        <div class="min-w-0">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <p class="truncate text-lg font-bold text-slate-950">{{ $trainee->last_name }}, {{ $trainee->first_name }}</p>
-                                <span class="dashboard-pill {{ $statusStyles[$trainee->learning_status] ?? $statusStyles[\App\Models\EnrollmentApplication::LEARNING_ACTIVE] }}">{{ $trainee->learningStatusLabel() }}</span>
+                        <div class="flex min-w-0 items-center gap-3">
+                            <x-user-avatar :user="$trainee->user" :application="$trainee" :use-enrollment-photo="true" class="grid h-12 w-12 place-items-center rounded-full bg-purple-100 text-sm font-black text-purple-800" />
+                            <div class="min-w-0">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <p class="truncate text-lg font-bold text-slate-950">{{ $trainee->last_name }}, {{ $trainee->first_name }}</p>
+                                    <span class="dashboard-pill {{ $statusStyles[$trainee->learning_status] ?? $statusStyles[\App\Models\EnrollmentApplication::LEARNING_ACTIVE] }}">{{ $trainee->learningStatusLabel() }}</span>
+                                </div>
+                                <p class="mt-1 truncate text-sm text-slate-500">{{ $trainee->email }}</p>
+                                <p class="mt-2 text-xs font-semibold text-slate-600">{{ $trainee->batch ? $trainee->batch->name.' '.$trainee->batch->year : 'Unassigned batch' }} · {{ $trainee->schedule_preference ?: 'Schedule pending' }}</p>
                             </div>
-                            <p class="mt-1 truncate text-sm text-slate-500">{{ $trainee->email }}</p>
-                            <p class="mt-2 text-xs font-semibold text-slate-600">{{ $trainee->batch ? $trainee->batch->name.' '.$trainee->batch->year : 'Unassigned batch' }} · {{ $trainee->schedule_preference ?: 'Schedule pending' }}</p>
                         </div>
 
                         <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">

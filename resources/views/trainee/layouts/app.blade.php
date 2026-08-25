@@ -13,7 +13,6 @@
     @php
         $navItem = 'dashboard-nav-link';
         $traineeName = auth()->user()?->name ?? 'Trainee';
-        $traineeInitial = strtoupper(substr($traineeName, 0, 1));
         $isGraduate = auth()->user()?->isGraduate() ?? false;
         $traineeStreamHref = \Illuminate\Support\Facades\Route::has('trainee.stream')
             ? route('trainee.stream')
@@ -80,7 +79,7 @@
 
         <details class="dashboard-sidebar-footer" data-dashboard-account>
             <summary class="dashboard-account-summary">
-                <span class="dashboard-account-avatar">{{ $traineeInitial }}</span>
+                <x-user-avatar :user="auth()->user()" :name="$traineeName" class="dashboard-account-avatar" />
                 <span class="min-w-0 flex-1">
                     <span class="block truncate text-sm font-bold text-slate-950">{{ $traineeName }}</span>
                     <span class="block text-xs text-slate-500">{{ \App\Support\AccountPortal::roleLabelFor(auth()->user()) }}</span>
@@ -108,7 +107,7 @@
                 <div class="flex items-center gap-2">
                     <details class="relative shrink-0 justify-self-end" data-dashboard-account>
                         <summary class="dashboard-account-summary">
-                        <span class="dashboard-account-avatar h-9 w-9">{{ $traineeInitial }}</span>
+                        <x-user-avatar :user="auth()->user()" :name="$traineeName" class="dashboard-account-avatar h-9 w-9" />
                         <span class="hidden text-left sm:block">
                             <span class="block text-sm font-bold">{{ $traineeName }}</span>
                             <span class="block text-xs font-semibold text-slate-400">{{ \App\Support\AccountPortal::roleLabelFor(auth()->user()) }}</span>

@@ -52,6 +52,7 @@ class GoogleOauthEnrollmentTest extends TestCase
         $user = User::query()->where('email', 'maria.santos@gmail.com')->firstOrFail();
         $this->assertAuthenticatedAs($user);
         $this->assertSame('google-123', $user->google_id);
+        $this->assertSame('https://example.test/maria.jpg', $user->avatar_url);
         $this->assertNotNull($user->email_verified_at);
 
         $this->get(route('enrollment.create'))
@@ -60,6 +61,7 @@ class GoogleOauthEnrollmentTest extends TestCase
             ->assertSee('value="maria.santos@gmail.com"', false)
             ->assertSee('value="Maria"', false)
             ->assertSee('value="Santos"', false)
+            ->assertSee('https://example.test/maria.jpg', false)
             ->assertSee('autocomplete="section-applicant sex"', false)
             ->assertDontSee('name="password"', false)
             ->assertDontSee('Google OAuth is paused');

@@ -335,6 +335,10 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/accounts', [AdminAccountController::class, 'index'])
                     ->middleware('permission:accounts.manage')
                     ->name('accounts.index');
+                Route::get('/accounts/{user}/photo', [AdminAccountController::class, 'photo'])
+                    ->middleware('permission:accounts.manage')
+                    ->whereNumber('user')
+                    ->name('accounts.photo');
                 Route::post('/accounts/trainers', [AdminAccountController::class, 'storeTrainer'])
                     ->middleware(['permission:accounts.manage', 'throttle:sensitive-mutation'])
                     ->name('accounts.trainers.store');

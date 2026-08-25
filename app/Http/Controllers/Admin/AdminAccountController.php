@@ -21,6 +21,8 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Throwable;
 
 class AdminAccountController extends Controller
@@ -64,6 +66,27 @@ class AdminAccountController extends Controller
             'roleFilter' => $roleFilter,
             'search' => $search,
             'counts' => $counts,
+        ]);
+    }
+
+    public function photo(User $user): BinaryFileResponse
+    {
+        abort_unless(in_array($user->role, ['trainer', 'trainee', 'applicant'], true), 404);
+
+        $path = $user->enrollmentApplication?->id_photo_path;
+        abort_unless($path && Storage::disk('local')->exists($path), 404);
+
+        $mime = Storage::disk('local')->mimeType($path) ?: 'application/octet-stream';
+        abort_unless(str_starts_with($mime, 'image/'), 404);
+
+        $filename = basename($path);
+        $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
+
+        return response()->file(Storage::disk('local')->path($path), [
+            'Content-Type' => $mime,
+            'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_INLINE, $filename, $fallbackFilename),
+            'Cache-Control' => 'private, max-age=300',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 

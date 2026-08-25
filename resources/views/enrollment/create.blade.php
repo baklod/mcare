@@ -274,6 +274,15 @@
                         <p class="text-sm font-bold uppercase text-purple-600">Account</p>
                         <h2 class="mt-2 text-2xl font-bold text-slate-900">Applicant account</h2>
                         <p class="mt-2 text-sm leading-6 text-slate-500">Google sign-in verifies the applicant identity. Browser autofill and saved MCARE details reduce repeat typing without requesting private Google profile data.</p>
+                        @if ($isGoogleApplicant)
+                            <div class="mt-4 inline-flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2.5">
+                                <x-user-avatar :user="$user" class="grid h-10 w-10 place-items-center rounded-full bg-emerald-100 font-black text-emerald-800" />
+                                <span class="text-left">
+                                    <strong class="block text-sm text-emerald-900">{{ $user->name }}</strong>
+                                    <span class="block text-xs font-semibold text-emerald-700">Google profile connected</span>
+                                </span>
+                            </div>
+                        @endif
                     </div>
                     <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-3">
                         <div class="md:col-span-2">

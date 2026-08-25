@@ -32,8 +32,13 @@
             <div class="space-y-6">
                 <section class="account-card rounded-2xl border border-slate-200 bg-white p-6">
                     <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Signed-in account</p>
-                    <h2 class="mt-3 text-xl font-black">{{ $user->name }}</h2>
-                    <p class="mt-1 text-sm text-slate-600">{{ $user->email }}</p>
+                    <div class="mt-3 flex items-center gap-4">
+                        <x-user-avatar :user="$user" class="grid h-14 w-14 place-items-center rounded-full bg-purple-100 text-lg font-black text-purple-800" />
+                        <div class="min-w-0">
+                            <h2 class="truncate text-xl font-black">{{ $user->name }}</h2>
+                            <p class="mt-1 truncate text-sm text-slate-600">{{ $user->email }}</p>
+                        </div>
+                    </div>
                     <span class="mt-4 inline-flex rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-800">{{ $roleLabel }}</span>
                 </section>
                 <section id="preferences" class="account-card rounded-2xl border border-slate-200 bg-white p-6">

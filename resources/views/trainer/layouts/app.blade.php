@@ -12,7 +12,6 @@
     <div class="dashboard-navigation-progress" aria-hidden="true"></div>
     @php
         $trainerName = auth()->user()?->name ?? 'Trainer User';
-        $trainerInitial = strtoupper(substr($trainerName, 0, 1));
         $navClass = 'dashboard-nav-link';
         $navIdle = '';
         $navActive = 'is-active';
@@ -79,7 +78,7 @@
 
         <details class="dashboard-sidebar-footer" data-dashboard-account>
             <summary class="dashboard-account-summary">
-                <span class="dashboard-account-avatar">{{ $trainerInitial }}</span>
+                <x-user-avatar :user="auth()->user()" :name="$trainerName" class="dashboard-account-avatar" />
                 <span class="min-w-0 flex-1">
                     <span class="block truncate text-sm font-bold text-slate-950">{{ $trainerName }}</span>
                     <span class="block text-xs text-slate-500">Caregiving NC II Trainer</span>
@@ -114,7 +113,7 @@
 
                 <details class="relative shrink-0 justify-self-end" data-dashboard-account>
                     <summary class="dashboard-account-summary">
-                        <span class="dashboard-account-avatar h-9 w-9">{{ $trainerInitial }}</span>
+                        <x-user-avatar :user="auth()->user()" :name="$trainerName" class="dashboard-account-avatar h-9 w-9" />
                         <span class="hidden max-w-32 truncate sm:block">{{ $trainerName }}</span>
                         <x-dashboard-icon name="chevron-down" class="dashboard-chevron text-xs text-slate-500 transition" />
                     </summary>

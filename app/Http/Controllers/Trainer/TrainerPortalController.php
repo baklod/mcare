@@ -142,7 +142,7 @@ class TrainerPortalController extends Controller
 
         return view('trainer.certificates', [
             'trainees' => $this->approvedTrainees($assignedBatch)
-                ->with('batch')
+                ->with(['batch', 'user'])
                 ->orderBy('last_name')
                 ->get(),
         ]);

@@ -11,7 +11,6 @@
     <div class="dashboard-navigation-progress" aria-hidden="true"></div>
     @php
         $adminName = auth()->user()?->name ?? 'Admin User';
-        $adminInitial = strtoupper(substr($adminName, 0, 1));
         $navClass = 'dashboard-nav-link';
         $navIdle = '';
         $navActive = 'is-active';
@@ -92,7 +91,7 @@
 
         <details class="dashboard-sidebar-footer" data-dashboard-account>
             <summary class="dashboard-account-summary">
-                <span class="dashboard-account-avatar">{{ $adminInitial }}</span>
+                <x-user-avatar :user="auth()->user()" :name="$adminName" class="dashboard-account-avatar" />
                 <span class="min-w-0 flex-1">
                     <span class="block truncate text-sm font-bold text-slate-950">{{ $adminName }}</span>
                     <span class="block text-xs text-slate-500">Administrator</span>
@@ -123,7 +122,7 @@
 
                 <details class="relative shrink-0 justify-self-end" data-dashboard-account>
                         <summary class="dashboard-account-summary">
-                            <span class="dashboard-account-avatar h-9 w-9">{{ $adminInitial }}</span>
+                            <x-user-avatar :user="auth()->user()" :name="$adminName" class="dashboard-account-avatar h-9 w-9" />
                             <span class="hidden max-w-36 truncate sm:block">{{ $adminName }}</span>
                             <x-dashboard-icon name="chevron-down" class="dashboard-chevron text-xs text-slate-400 transition" />
                         </summary>

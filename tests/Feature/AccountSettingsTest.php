@@ -38,13 +38,18 @@ class AccountSettingsTest extends TestCase
     public function test_admin_trainer_and_trainee_can_open_role_aware_settings_and_help(): void
     {
         foreach (['admin', 'trainer', 'trainee'] as $role) {
-            $user = User::factory()->create(['role' => $role]);
+            $avatarUrl = "https://example.test/{$role}-avatar.jpg";
+            $user = User::factory()->create([
+                'role' => $role,
+                'avatar_url' => $avatarUrl,
+            ]);
 
             $this->actingAs($user)
                 ->get(route('account.settings'))
                 ->assertOk()
                 ->assertSee('Night mode')
-                ->assertSee('Change password');
+                ->assertSee('Change password')
+                ->assertSee($avatarUrl, false);
 
             $this->actingAs($user)
                 ->get(route('account.help'))

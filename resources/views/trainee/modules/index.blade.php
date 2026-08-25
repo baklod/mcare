@@ -80,7 +80,10 @@
                                 <p>{{ str($module->description)->limit(180) }}</p>
 
                                 <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                                    <span>👤 {{ $module->trainer?->name ?? 'MCARE Trainer' }}</span>
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <x-user-avatar :user="$module->trainer" :name="$module->trainer?->name ?? 'MCARE Trainer'" class="grid h-6 w-6 place-items-center rounded-full bg-purple-100 text-[9px] font-black text-purple-800" />
+                                        {{ $module->trainer?->name ?? 'MCARE Trainer' }}
+                                    </span>
                                     <span>📅 Available {{ $module->available_at?->format('M d, Y') ?? 'now' }}</span>
                                     @if($module->due_at)<span>⏰ Due {{ $module->due_at->format('M d, g:i A') }}</span>@endif
                                     @if($suppCount > 0)

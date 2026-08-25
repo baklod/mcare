@@ -182,8 +182,10 @@
                             @forelse ($actionQueue as $application)
                                 <tr class="hover:bg-purple-50/40">
                                     <td class="px-6 py-5">
-                                        <p class="font-black text-slate-950">{{ $application->last_name }}, {{ $application->first_name }}</p>
-                                        <p class="mt-1 text-sm text-slate-500">{{ $application->email }}</p>
+                                        <div class="flex items-center gap-3">
+                                            <x-user-avatar :user="$application->user" :application="$application" :use-enrollment-photo="true" class="grid h-10 w-10 place-items-center rounded-full bg-purple-100 text-xs font-black text-purple-800" />
+                                            <div class="min-w-0"><p class="font-black text-slate-950">{{ $application->last_name }}, {{ $application->first_name }}</p><p class="mt-1 text-sm text-slate-500">{{ $application->email }}</p></div>
+                                        </div>
                                     </td>
                                     <td class="px-6 py-5">
                                         <span class="inline-flex rounded-full px-3 py-1 text-xs font-black ring-1 {{ $statusBadgeClasses[$application->status] ?? 'bg-slate-50 text-slate-700 ring-slate-100' }}">
@@ -242,9 +244,9 @@
                     @forelse ($paymentQueue as $application)
                         <article class="py-4 first:pt-0 last:pb-0">
                             <div class="flex items-start justify-between gap-3">
-                                <div>
-                                    <p class="font-black text-slate-950">{{ $application->last_name }}, {{ $application->first_name }}</p>
-                                    <p class="mt-1 text-xs text-slate-500">{{ $application->payment_method === 'online' ? 'PayMongo checkout' : 'Pay on-site receipt' }}</p>
+                                <div class="flex min-w-0 items-center gap-3">
+                                    <x-user-avatar :user="$application->user" :application="$application" :use-enrollment-photo="true" class="grid h-9 w-9 place-items-center rounded-full bg-purple-100 text-xs font-black text-purple-800" />
+                                    <div class="min-w-0"><p class="font-black text-slate-950">{{ $application->last_name }}, {{ $application->first_name }}</p><p class="mt-1 text-xs text-slate-500">{{ $application->payment_method === 'online' ? 'PayMongo checkout' : 'Pay on-site receipt' }}</p></div>
                                 </div>
                                 <span class="shrink-0 rounded-full px-3 py-1 text-xs font-black ring-1 {{ $paymentBadgeClasses[$application->payment_status] ?? 'bg-slate-50 text-slate-700 ring-slate-100' }}">
                                     {{ $application->paymentStatusLabel() }}

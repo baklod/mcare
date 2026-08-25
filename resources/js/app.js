@@ -763,6 +763,12 @@ document.addEventListener('DOMContentLoaded', () => {
         form.requestSubmit();
     });
 
+    // Keep the initials fallback visible when a remote Google image can no
+    // longer be loaded or was removed by its provider.
+    document.querySelectorAll('[data-user-avatar-image]').forEach((image) => {
+        image.addEventListener('error', () => image.remove(), { once: true });
+    });
+
     // Batch and single-trainee assignment share the same form component.
     // Disable the inactive selector so only the chosen audience reaches Laravel.
     document.querySelectorAll('[data-audience-scope]').forEach((scope) => {

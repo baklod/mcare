@@ -41,7 +41,7 @@
 
             <section class="lms-composer" data-announcement-composer aria-labelledby="announcement-composer-title">
                 <div class="lms-composer-heading">
-                    <span class="lms-avatar" aria-hidden="true">{{ strtoupper(substr(auth()->user()?->name ?? 'T', 0, 1)) }}</span>
+                    <x-user-avatar :user="auth()->user()" :name="auth()->user()?->name ?? 'MCARE Trainer'" class="lms-avatar" />
                     <div>
                         <p class="lms-eyebrow">New post</p>
                         <h2 id="announcement-composer-title">Share with your class</h2>
@@ -112,7 +112,7 @@
                     @endphp
                     <article class="lms-post-card {{ $announcement->is_pinned ? 'is-pinned' : '' }}" data-announcement-card>
                         <header class="lms-post-header">
-                            <span class="lms-avatar" aria-hidden="true">{{ strtoupper(substr($announcement->trainer?->name ?? auth()->user()?->name ?? 'T', 0, 1)) }}</span>
+                            <x-user-avatar :user="$announcement->trainer ?: auth()->user()" :name="$announcement->trainer?->name ?? auth()->user()?->name ?? 'MCARE Trainer'" class="lms-avatar" />
                             <div class="min-w-0 flex-1">
                                 <div class="lms-post-author-line">
                                     <strong>{{ $announcement->trainer?->name ?? auth()->user()?->name ?? 'MCARE Trainer' }}</strong>

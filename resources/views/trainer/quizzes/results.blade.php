@@ -71,8 +71,14 @@
                         @endphp
                         <tr>
                             <td data-label="Learner">
-                                <strong>{{ $learnerName }}</strong>
-                                <small>{{ $learner?->email ?? $learner?->user?->email }}</small>
+                                <span class="flex items-center gap-3">
+                                    <x-user-avatar
+                                        :user="$learner?->user"
+                                        :name="$learnerName"
+                                        class="grid h-9 w-9 place-items-center rounded-full bg-purple-100 text-xs font-black text-purple-800"
+                                    />
+                                    <span class="min-w-0"><strong class="block truncate">{{ $learnerName }}</strong><small class="block truncate">{{ $learner?->email ?? $learner?->user?->email }}</small></span>
+                                </span>
                             </td>
                             <td data-label="Attempt">#{{ $attempt->attempt_number }}</td>
                             <td data-label="Submitted">{{ $attempt->submitted_at?->format('M d, Y g:i A') ?? '-' }}</td>

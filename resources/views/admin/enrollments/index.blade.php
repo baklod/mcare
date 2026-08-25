@@ -119,9 +119,14 @@
                     @forelse ($applications as $application)
                         <tr class="hover:bg-slate-50/80 transition-colors">
                             <td class="px-5 py-4">
-                                <p class="font-bold text-slate-900">{{ $application->last_name }}, {{ $application->first_name }}</p>
-                                <p class="text-xs text-slate-500">{{ $application->email }}</p>
-                                <p class="text-xs text-slate-400">{{ $application->contact_number }}</p>
+                                <div class="flex items-center gap-3">
+                                    <x-user-avatar :user="$application->user" :application="$application" :use-enrollment-photo="true" class="grid h-11 w-11 place-items-center rounded-full bg-purple-100 text-sm font-black text-purple-800" />
+                                    <div class="min-w-0">
+                                        <p class="font-bold text-slate-900">{{ $application->last_name }}, {{ $application->first_name }}</p>
+                                        <p class="text-xs text-slate-500">{{ $application->email }}</p>
+                                        <p class="text-xs text-slate-400">{{ $application->contact_number }}</p>
+                                    </div>
+                                </div>
                             </td>
                             <td class="px-5 py-4 font-semibold text-slate-700">{{ $application->program }}</td>
                             <td class="px-5 py-4 text-slate-600">{{ $application->batch ? $application->batch->name.' '.$application->batch->year : 'Unassigned' }}</td>

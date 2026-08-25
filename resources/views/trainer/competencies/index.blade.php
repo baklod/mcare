@@ -62,7 +62,16 @@
                 @forelse($trainees as $trainee)
                     <tr>
                         <td class="competency-select-column"><input type="checkbox" name="trainee_ids[]" value="{{ $trainee->id }}" form="bulk-competency-form" data-trainee-selector @checked($selectedTraineeIds->contains($trainee->id)) aria-label="Select {{ $trainee->first_name }} {{ $trainee->last_name }}"></td>
-                        <th scope="row" class="competency-trainee-column"><span>{{ $trainee->last_name }}, {{ $trainee->first_name }}</span><small>{{ $trainee->schedule_preference }} | {{ $trainee->email }}</small></th>
+                        <th scope="row" class="competency-trainee-column">
+                            <span class="flex items-center gap-2">
+                                <x-user-avatar
+                                    :user="$trainee->user"
+                                    :name="trim($trainee->first_name.' '.$trainee->last_name)"
+                                    class="grid h-8 w-8 place-items-center rounded-full bg-purple-100 text-[10px] font-black text-purple-800"
+                                />
+                                <span class="min-w-0"><span class="block truncate">{{ $trainee->last_name }}, {{ $trainee->first_name }}</span><small>{{ $trainee->schedule_preference }} | {{ $trainee->email }}</small></span>
+                            </span>
+                        </th>
                         @foreach($unitsByCategory as $category => $units)
                             @foreach($units as $unit)
                                 @php

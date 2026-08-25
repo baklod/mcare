@@ -19,6 +19,7 @@ class ClassroomCommentTest extends TestCase
     {
         Notification::fake();
         $trainer = $this->lmsUser('trainer');
+        $trainer->forceFill(['avatar_url' => 'https://example.test/comment-author.jpg'])->save();
         $batch = $this->lmsBatch(['trainer_id' => $trainer->id]);
         ['user' => $traineeOne] = $this->lmsTrainee($batch);
         ['user' => $traineeTwo] = $this->lmsTrainee($batch, ['email' => 'second@example.test']);
@@ -43,7 +44,8 @@ class ClassroomCommentTest extends TestCase
         $this->actingAs($traineeOne)
             ->get(route('trainee.modules.show', $module))
             ->assertOk()
-            ->assertSee('Please bring your skills checklist tomorrow.');
+            ->assertSee('Please bring your skills checklist tomorrow.')
+            ->assertSee('https://example.test/comment-author.jpg', false);
     }
 
     public function test_trainee_private_comment_is_only_visible_to_participants_and_authorized_staff(): void
@@ -53,6 +55,7 @@ class ClassroomCommentTest extends TestCase
         $admin = $this->lmsUser('admin');
         $batch = $this->lmsBatch(['trainer_id' => $trainer->id]);
         ['user' => $traineeOne] = $this->lmsTrainee($batch);
+        $traineeOne->forceFill(['avatar_url' => 'https://example.test/trainee-comment-author.jpg'])->save();
         ['user' => $traineeTwo] = $this->lmsTrainee($batch, ['email' => 'peer@example.test']);
         $module = $this->lmsModule($trainer, $batch);
 
@@ -80,7 +83,8 @@ class ClassroomCommentTest extends TestCase
         $this->actingAs($trainer)
             ->get(route('trainer.modules.show', $module))
             ->assertOk()
-            ->assertSee('I need help with the transfer procedure.');
+            ->assertSee('I need help with the transfer procedure.')
+            ->assertSee('https://example.test/trainee-comment-author.jpg', false);
 
         $this->actingAs($admin)
             ->get(route('classroom-comments.index', ['type' => 'module', 'id' => $module->id]))

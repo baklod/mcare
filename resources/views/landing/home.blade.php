@@ -213,7 +213,6 @@
         $accountCtaUrl = $currentUser ? \App\Support\AccountPortal::urlFor($currentUser) : route('enrollment.create');
         $accountCtaLabel = $currentUser ? \App\Support\AccountPortal::ctaLabelFor($currentUser) : 'Start Enrollment';
         $accountRoleLabel = \App\Support\AccountPortal::roleLabelFor($currentUser);
-        $accountInitial = $currentUser ? \Illuminate\Support\Str::of($currentUser->name ?: $currentUser->email)->substr(0, 1)->upper() : null;
     @endphp
 
     <!-- Path: resources/views/landing/home.blade.php | Label: Main landing background layer -->
@@ -243,7 +242,7 @@
                     <!-- Path: resources/views/landing/home.blade.php | Label: Compact active account menu -->
                     <details class="relative hidden md:block">
                         <summary class="flex cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-left hover:bg-slate-50">
-                            <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-purple-100 text-sm font-bold text-purple-700">{{ $accountInitial }}</span>
+                            <x-user-avatar :user="$currentUser" class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-purple-100 text-sm font-bold text-purple-700" />
                             <span class="hidden min-w-0 max-w-32 lg:block">
                                 <span class="block truncate text-sm font-bold text-slate-900">{{ $currentUser->name }}</span>
                                 <span class="block truncate text-xs text-slate-500">{{ $accountRoleLabel }}</span>
@@ -301,9 +300,7 @@
                     <!-- Path: resources/views/landing/home.blade.php | Label: Mobile active account identity -->
                     <div class="mb-3 rounded-2xl border border-purple-100 bg-purple-50/80 p-4">
                         <div class="flex items-start gap-3">
-                            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-purple-600 text-sm font-black text-white">
-                                {{ $accountInitial }}
-                            </span>
+                            <x-user-avatar :user="$currentUser" class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-purple-600 text-sm font-black text-white" />
                             <div class="min-w-0">
                                 <p class="text-[10px] font-black uppercase tracking-wide text-purple-700">Active account</p>
                                 <p class="truncate text-sm font-bold text-slate-900" title="{{ $currentUser->name }}">{{ $currentUser->name }}</p>

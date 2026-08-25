@@ -72,7 +72,7 @@
                     @endphp
                     <article class="lms-post-card {{ $announcement->is_pinned ? 'is-pinned' : '' }}" data-announcement-card>
                         <header class="lms-post-header">
-                            <span class="lms-avatar" aria-hidden="true">{{ strtoupper(substr($announcement->trainer?->name ?? 'M', 0, 1)) }}</span>
+                            <x-user-avatar :user="$announcement->trainer" :name="$announcement->trainer?->name ?? 'MCARE Trainer'" class="lms-avatar" />
                             <div class="min-w-0 flex-1">
                                 <div class="lms-post-author-line">
                                     <strong>{{ $announcement->trainer?->name ?? 'MCARE Trainer' }}</strong>

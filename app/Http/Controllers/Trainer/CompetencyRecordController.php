@@ -43,7 +43,7 @@ class CompetencyRecordController extends Controller
 
         if ($selectedBatchId) {
             $trainees = EnrollmentApplication::query()
-                ->with(['batch', 'competencyRecords.outcomeResults'])
+                ->with(['batch', 'user', 'competencyRecords.outcomeResults'])
                 ->where('status', EnrollmentApplication::STATUS_APPROVED)
                 ->where('training_batch_id', $selectedBatchId)
                 ->when($validated['schedule'] ?? null, fn ($query, $schedule) => $query
@@ -95,7 +95,7 @@ class CompetencyRecordController extends Controller
     {
         $this->assertApproved($enrollmentApplication);
         $this->assertBatchAccess($request, (int) $enrollmentApplication->training_batch_id);
-        $enrollmentApplication->load(['batch', 'competencyRecords.outcomeResults']);
+        $enrollmentApplication->load(['batch', 'user', 'competencyRecords.outcomeResults']);
 
         return view('trainer.competencies.edit', [
             'trainee' => $enrollmentApplication,
@@ -128,7 +128,7 @@ class CompetencyRecordController extends Controller
             ->where('status', EnrollmentApplication::STATUS_APPROVED)
             ->when($validated['schedule'] ?? null, fn ($query, $schedule) => $query
                 ->where('schedule_preference', $schedule))
-            ->with(['competencyRecords.outcomeResults'])
+            ->with(['user', 'competencyRecords.outcomeResults'])
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->get();

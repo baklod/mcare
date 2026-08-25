@@ -102,12 +102,17 @@
                     @endphp
                     <tr>
                         <td>
-                            <div class="font-bold text-slate-900">{{ $account->name ?: ($app ? $app->first_name.' '.$app->last_name : 'No name set') }}</div>
-                            @if(filled($account->google_id))
-                                <span class="inline-flex items-center gap-1 text-[10px] text-slate-500 font-medium">
-                                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-blue-500"></span> Google Sign-in
-                                </span>
-                            @endif
+                            <div class="flex items-center gap-3">
+                                <x-user-avatar :user="$account" :application="$app" :use-enrollment-photo="true" class="grid h-10 w-10 place-items-center rounded-full bg-purple-100 text-sm font-black text-purple-800" />
+                                <div class="min-w-0">
+                                    <div class="font-bold text-slate-900">{{ $account->name ?: ($app ? $app->first_name.' '.$app->last_name : 'No name set') }}</div>
+                                    @if(filled($account->google_id))
+                                        <span class="inline-flex items-center gap-1 text-[10px] text-slate-500 font-medium">
+                                            <span class="inline-block h-1.5 w-1.5 rounded-full bg-blue-500"></span> Google Sign-in
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
                         </td>
                         <td>
                             <div class="font-mono text-xs text-slate-700">{{ $account->email }}</div>

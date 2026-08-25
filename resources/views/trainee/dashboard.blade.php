@@ -88,7 +88,10 @@
                         <span class="dashboard-pill {{ $moduleProgress?->status === 'completed' ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : ($moduleProgress ? 'bg-amber-50 text-amber-700 ring-amber-100' : 'bg-slate-50 text-slate-600 ring-slate-100') }}">{{ $moduleProgress ? str($moduleProgress->status)->headline() : 'Not started' }}</span>
                     </div>
                     <p class="mt-3 line-clamp-3 text-sm leading-6 text-slate-500">{{ $module->description }}</p>
-                    <p class="mt-3 text-xs font-semibold text-slate-400">Trainer: {{ $module->trainer?->name ?? 'MCARE Trainer' }}</p>
+                    <div class="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-500">
+                        <x-user-avatar :user="$module->trainer" :name="$module->trainer?->name ?? 'MCARE Trainer'" class="grid h-7 w-7 place-items-center rounded-full bg-purple-100 text-[10px] font-black text-purple-800" />
+                        <span class="truncate">Trainer: {{ $module->trainer?->name ?? 'MCARE Trainer' }}</span>
+                    </div>
                     <div class="mt-4 h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full bg-purple-600" style="width: {{ $moduleProgress?->progress_percent ?? 0 }}%"></div></div>
                     <p class="mt-2 text-xs font-bold text-slate-500">{{ $moduleProgress?->progress_percent ?? 0 }}% recorded</p>
                     <a href="{{ route('trainee.modules.show', $module) }}" class="secondary-action mt-5 w-full">

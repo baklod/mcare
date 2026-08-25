@@ -25,6 +25,29 @@
 }
 
 @layer components {
+    .user-avatar {
+        position: relative;
+        isolation: isolate;
+        overflow: hidden;
+        flex: 0 0 auto;
+    }
+
+    .user-avatar-fallback {
+        display: grid;
+        width: 100%;
+        height: 100%;
+        place-items: center;
+    }
+
+    .user-avatar-image {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
     .competency-board-toolbar {
         @apply flex flex-col gap-4 border border-slate-200 bg-white p-4 lg:flex-row lg:items-center lg:justify-between;
     }

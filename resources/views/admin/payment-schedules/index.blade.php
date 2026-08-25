@@ -146,8 +146,10 @@
                             @endphp
                             <tr class="align-top">
                                 <td>
-                                    <p class="font-bold text-slate-950">{{ $application->last_name }}, {{ $application->first_name }}</p>
-                                    <p class="mt-0.5 text-xs text-slate-500">{{ $application->email }}</p>
+                                    <div class="flex items-center gap-3">
+                                        <x-user-avatar :user="$application->user" :application="$application" :use-enrollment-photo="true" class="grid h-10 w-10 place-items-center rounded-full bg-purple-100 text-xs font-black text-purple-800" />
+                                        <div class="min-w-0"><p class="font-bold text-slate-950">{{ $application->last_name }}, {{ $application->first_name }}</p><p class="mt-0.5 text-xs text-slate-500">{{ $application->email }}</p></div>
+                                    </div>
                                     <div class="mt-2 flex items-center gap-3">
                                         <a href="{{ route('admin.enrollments.show', $application) }}" class="text-xs font-semibold text-purple-700 hover:text-purple-900">View profile</a>
                                     </div>

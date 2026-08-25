@@ -48,7 +48,24 @@ class AdminLearningSystemTest extends TestCase
 
     public function test_large_admin_creation_forms_are_hidden_in_native_dialogs(): void
     {
+        Storage::fake('local');
         $admin = User::factory()->create(['role' => 'admin']);
+        User::factory()->create([
+            'role' => 'trainee',
+            'avatar_url' => 'https://example.test/managed-trainee.jpg',
+        ]);
+        $photoTrainee = User::factory()->create(['role' => 'trainee']);
+        $batch = TrainingBatch::create([
+            'name' => 'Photo Batch',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+        ]);
+        $photoApplication = $this->approvedApplication($photoTrainee, $batch);
+        $photoPath = "enrollment-documents/{$photoTrainee->id}/id-photo.png";
+        Storage::disk('local')->put($photoPath, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZkN0AAAAASUVORK5CYII='));
+        $photoApplication->update(['id_photo_path' => $photoPath]);
+        $photoUrl = route('admin.accounts.photo', $photoTrainee, absolute: false);
 
         $this->actingAs($admin)
             ->get(route('admin.accounts.index'))
@@ -56,7 +73,18 @@ class AdminLearningSystemTest extends TestCase
             ->assertSee('data-dashboard-dialog-open="trainer-account-dialog"', false)
             ->assertSee('<dialog id="trainer-account-dialog"', false)
             ->assertSee('data-dashboard-dialog-open="trainee-account-dialog"', false)
-            ->assertSee('<dialog id="trainee-account-dialog"', false);
+            ->assertSee('<dialog id="trainee-account-dialog"', false)
+            ->assertSee('https://example.test/managed-trainee.jpg', false)
+            ->assertSee($photoUrl, false);
+
+        $this->actingAs($admin)
+            ->get(route('admin.accounts.photo', $photoTrainee))
+            ->assertOk()
+            ->assertHeader('content-type', 'image/png');
+
+        $this->actingAs($photoTrainee)
+            ->get(route('admin.accounts.photo', $photoTrainee))
+            ->assertForbidden();
 
         $this->actingAs($admin)
             ->get(route('admin.learning.alumni-jobs'))

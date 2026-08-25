@@ -32,7 +32,7 @@
             <div class="lms-comment-feed" aria-live="polite">
                 @forelse($classComments as $comment)
                     <article class="lms-comment" id="comment-{{ $comment->id }}">
-                        <div class="lms-comment-avatar" aria-hidden="true">{{ strtoupper(substr($comment->author?->name ?? 'M', 0, 1)) }}</div>
+                        <x-user-avatar :user="$comment->author" :name="$comment->author?->name ?? 'MCARE user'" class="lms-comment-avatar" />
                         <div class="lms-comment-content">
                             <div class="lms-comment-meta">
                                 <strong>{{ $comment->author?->name ?? 'MCARE user' }}</strong>
@@ -73,7 +73,10 @@
                 <input type="hidden" name="commentable_type" value="{{ $commentableType }}">
                 <input type="hidden" name="commentable_id" value="{{ $commentable->id }}">
                 <input type="hidden" name="visibility" value="class">
-                <label for="class-comment-{{ $commentableType }}-{{ $commentable->id }}">Add a class comment</label>
+                <label for="class-comment-{{ $commentableType }}-{{ $commentable->id }}" class="flex items-center gap-2">
+                    <x-user-avatar :user="$viewer" :name="$viewer?->name ?? 'MCARE user'" class="lms-comment-avatar" />
+                    <span>Comment as {{ $viewer?->name ?? 'MCARE user' }}</span>
+                </label>
                 <textarea id="class-comment-{{ $commentableType }}-{{ $commentable->id }}" name="body" required maxlength="2000" rows="3" placeholder="Write a helpful question, answer, or update..."></textarea>
                 <div><span>Plain text · 2,000 characters maximum</span><button class="primary-action text-xs" data-action-button>Post comment</button></div>
             </form>
@@ -92,7 +95,7 @@
                             : ($comment->recipient_user_id === $viewer?->id ? $comment->author : $comment->recipient);
                     @endphp
                     <article class="lms-comment is-private" id="comment-{{ $comment->id }}">
-                        <div class="lms-comment-avatar" aria-hidden="true">{{ strtoupper(substr($comment->author?->name ?? 'M', 0, 1)) }}</div>
+                        <x-user-avatar :user="$comment->author" :name="$comment->author?->name ?? 'MCARE user'" class="lms-comment-avatar" />
                         <div class="lms-comment-content">
                             <div class="lms-comment-meta">
                                 <strong>{{ $comment->author?->name ?? 'MCARE user' }}</strong>
@@ -147,7 +150,10 @@
                             @endforeach
                         </select>
                     @endif
-                    <label for="private-comment-{{ $commentableType }}-{{ $commentable->id }}">Add a private comment</label>
+                    <label for="private-comment-{{ $commentableType }}-{{ $commentable->id }}" class="flex items-center gap-2">
+                        <x-user-avatar :user="$viewer" :name="$viewer?->name ?? 'MCARE user'" class="lms-comment-avatar" />
+                        <span>Send as {{ $viewer?->name ?? 'MCARE user' }}</span>
+                    </label>
                     <textarea id="private-comment-{{ $commentableType }}-{{ $commentable->id }}" name="body" required maxlength="2000" rows="3" placeholder="Write feedback that only the selected participant and classroom staff can read..."></textarea>
                     <div><span>Private · Plain text</span><button class="primary-action text-xs" data-action-button>Send privately</button></div>
                 </form>

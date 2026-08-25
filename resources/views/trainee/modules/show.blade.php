@@ -45,10 +45,11 @@
                     <p class="text-sm font-semibold text-purple-800">Learning Outcome / Topic: {{ $module->topic }}</p>
                 @endif
 
-                <p class="text-xs text-slate-500">
-                    Trainer: <strong class="text-slate-700">{{ $module->trainer?->name ?? 'MCARE Trainer' }}</strong>
-                    @if($module->due_at) · Due: <strong class="text-amber-700">{{ $module->due_at->format('M d, Y g:i A') }}</strong> @endif
-                </p>
+                <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    <x-user-avatar :user="$module->trainer" :name="$module->trainer?->name ?? 'MCARE Trainer'" class="grid h-8 w-8 place-items-center rounded-full bg-purple-100 text-[10px] font-black text-purple-800" />
+                    <span>Trainer: <strong class="text-slate-700">{{ $module->trainer?->name ?? 'MCARE Trainer' }}</strong></span>
+                    @if($module->due_at)<span>· Due: <strong class="text-amber-700">{{ $module->due_at->format('M d, Y g:i A') }}</strong></span>@endif
+                </div>
             </div>
 
             <div class="flex items-center gap-2">

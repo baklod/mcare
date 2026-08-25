@@ -59,9 +59,18 @@
                     @endphp
                     <tr class="align-top">
                         <td>
-                            <p class="font-bold text-stone-950">{{ $trainee->last_name }}, {{ $trainee->first_name }}</p>
-                            <p class="text-xs text-stone-500">{{ $trainee->email }}</p>
-                            <p class="mt-1 text-[11px] text-stone-400">Tel: {{ $trainee->contact_number }}</p>
+                            <div class="flex items-center gap-3">
+                                <x-user-avatar
+                                    :user="$trainee->user"
+                                    :name="trim($trainee->first_name.' '.$trainee->last_name)"
+                                    class="grid h-10 w-10 place-items-center rounded-full bg-purple-100 text-xs font-black text-purple-800"
+                                />
+                                <div class="min-w-0">
+                                    <p class="font-bold text-stone-950">{{ $trainee->last_name }}, {{ $trainee->first_name }}</p>
+                                    <p class="truncate text-xs text-stone-500">{{ $trainee->email }}</p>
+                                    <p class="mt-1 text-[11px] text-stone-400">Tel: {{ $trainee->contact_number }}</p>
+                                </div>
+                            </div>
                         </td>
                         <td>
                             <p class="font-bold text-stone-900">{{ $trainee->batch ? $trainee->batch->name.' '.$trainee->batch->year : 'Unassigned' }}</p>
