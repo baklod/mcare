@@ -220,7 +220,7 @@
                 <label class="lms-check">
                     <input type="hidden" name="is_published" value="0">
                     <input type="checkbox" name="is_published" value="1" @checked(old('is_published', true))>
-                    <span>Publish to trainees immediately (notifies enrolled trainees)</span>
+                    <span>Make this the active batch module. The previous active delivery closes only to future enrollees.</span>
                 </label>
             </div>
             <div class="lms-form-actions lms-field-wide">
@@ -349,7 +349,7 @@
             @forelse($modules as $module)
                 @php
                     $isPrivate = filled($module->target_enrollment_application_id);
-                    $completedCount = $module->progressRecords->where('status', 'completed')->count();
+                    $assignedCount = $module->progressRecords->count();
                     $competentCount = $module->progressRecords->where('competency_outcome', 'competent')->count();
                 @endphp
                 <article class="lms-module-card" data-module-card data-module-title="{{ str($module->title)->lower() }}">
@@ -357,7 +357,7 @@
                     <header>
                         <div class="lms-module-icon"><x-dashboard-icon name="book-open" /></div>
                         <div class="lms-module-statuses">
-                            <span class="lms-status-chip {{ $module->is_published ? 'is-green' : 'is-neutral' }}">{{ $module->is_published ? 'Published' : 'Draft' }}</span>
+                            <span class="lms-status-chip {{ $module->delivery_status === 'active' ? 'is-green' : ($module->delivery_status === 'closed' ? 'is-amber' : 'is-neutral') }}">{{ $module->deliveryStatusLabel() }}</span>
                             @if($isPrivate)<span class="lms-status-chip is-purple">Private</span>@endif
                         </div>
                     </header>
@@ -376,7 +376,7 @@
                         <div><dt>Due</dt><dd>{{ $module->due_at?->format('M d, Y g:i A') ?? 'No due date' }}</dd></div>
                     </dl>
                     <div class="lms-progress-summary flex justify-between items-center text-xs">
-                        <span><strong>{{ $completedCount }}</strong> viewed</span>
+                        <span><strong>{{ $assignedCount }}</strong> assigned</span>
                         <span class="font-bold text-emerald-700">{{ $competentCount }} Competent (Passed)</span>
                     </div>
                     <footer class="lms-card-footer">
@@ -386,7 +386,8 @@
                             <details class="lms-action-menu">
                                 <summary class="secondary-action text-xs">More</summary>
                                 <div class="lms-action-menu-popover">
-                                    <form method="POST" action="{{ route('trainer.modules.update', $module) }}">
+                                    @if($module->delivery_status !== 'closed')
+                                    <form method="POST" action="{{ route('trainer.modules.update', $module) }}" data-confirm="{{ $module->delivery_status === 'active' ? 'Close this delivery to future enrollees?' : 'Publish this as the current active module?' }}">
                                         @csrf
                                         @method('PATCH')
                                         <input type="hidden" name="module_code" value="{{ $module->module_code }}">
@@ -402,8 +403,9 @@
                                         <input type="hidden" name="available_at" value="{{ $module->available_at?->format('Y-m-d\TH:i') }}">
                                         <input type="hidden" name="due_at" value="{{ $module->due_at?->format('Y-m-d\TH:i') }}">
                                         <input type="hidden" name="is_published" value="{{ $module->is_published ? 0 : 1 }}">
-                                        <button>{{ $module->is_published ? 'Unpublish' : 'Publish' }}</button>
+                                        <button>{{ $module->delivery_status === 'active' ? 'Close to new enrollees' : 'Publish as active' }}</button>
                                     </form>
+                                    @endif
                                     <form method="POST" action="{{ route('trainer.modules.destroy', $module) }}" data-confirm="Delete '{{ $module->title }}' and its recorded learner progress?">
                                         @csrf
                                         @method('DELETE')

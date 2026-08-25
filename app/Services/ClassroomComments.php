@@ -157,7 +157,16 @@ class ClassroomComments
             ->whereNotNull('user_id')
             ->with('user');
 
-        if ($commentable->target_enrollment_application_id !== null) {
+        $moduleId = $commentable instanceof TrainingModule
+            ? $commentable->id
+            : $commentable->training_module_id;
+
+        if ($moduleId !== null) {
+            $query->whereHas('moduleProgress', fn ($progress) => $progress
+                ->where('training_module_id', $moduleId)
+                ->whereNotNull('unlocked_at')
+                ->where('status', '!=', \App\Models\ModuleProgress::STATUS_LOCKED));
+        } elseif ($commentable->target_enrollment_application_id !== null) {
             $query->whereKey($commentable->target_enrollment_application_id);
         } elseif ($commentable->training_batch_id !== null) {
             $query->where('training_batch_id', $commentable->training_batch_id);

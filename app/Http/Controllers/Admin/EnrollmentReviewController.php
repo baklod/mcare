@@ -7,6 +7,7 @@ use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
 use App\Notifications\EnrollmentStatusUpdatedNotification;
+use App\Services\RollingModuleReleaseService;
 use App\Services\TesdaRegistrationPdfService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,7 +35,7 @@ class EnrollmentReviewController extends Controller
             'status' => ['nullable', 'string', 'max:50'],
             'batch_id' => ['nullable', 'integer', 'exists:training_batches,id'],
             'schedule' => ['nullable', Rule::in(['AM', 'PM'])],
-            'enrollment_state' => ['nullable', Rule::in(['open', 'upcoming', 'closed'])],
+            'enrollment_state' => ['nullable', Rule::in(['open', 'continuous', 'upcoming', 'closed'])],
             'training_state' => ['nullable', Rule::in(['not_started', 'in_progress', 'completed'])],
         ]);
 
@@ -67,12 +68,18 @@ class EnrollmentReviewController extends Controller
                     'open' => $batchQuery
                         ->where('is_active', true)
                         ->where(fn ($query) => $query->whereNull('enrollment_starts_at')->orWhere('enrollment_starts_at', '<=', now()))
-                        ->where('enrollment_ends_at', '>', now()),
+                        ->where(fn ($query) => $query->where('is_continuous_enrollment', true)->orWhere('enrollment_ends_at', '>', now())),
+                    'continuous' => $batchQuery
+                        ->where('is_active', true)
+                        ->where('is_continuous_enrollment', true)
+                        ->where(fn ($query) => $query->whereNull('enrollment_starts_at')->orWhere('enrollment_starts_at', '<=', now())),
                     'upcoming' => $batchQuery
                         ->where('is_active', true)
                         ->where('enrollment_starts_at', '>', now()),
                     'closed' => $batchQuery
-                        ->where(fn ($query) => $query->where('is_active', false)->orWhere('enrollment_ends_at', '<=', now())),
+                        ->where(fn ($query) => $query->where('is_active', false)->orWhere(function ($deadline): void {
+                            $deadline->where('is_continuous_enrollment', false)->where('enrollment_ends_at', '<=', now());
+                        })),
                 };
             });
         }
@@ -139,7 +146,11 @@ class EnrollmentReviewController extends Controller
         ]);
     }
 
-    public function update(Request $request, EnrollmentApplication $enrollmentApplication): RedirectResponse
+    public function update(
+        Request $request,
+        EnrollmentApplication $enrollmentApplication,
+        RollingModuleReleaseService $releases,
+    ): RedirectResponse
     {
         $validated = $request->validate([
             'status' => ['required', Rule::in(EnrollmentApplication::reviewableStatuses())],
@@ -179,6 +190,9 @@ class EnrollmentReviewController extends Controller
             'admin_notes' => $validated['admin_notes'] ?? null,
             'reviewed_at' => now(),
             'reviewed_by_id' => $request->user()->id,
+            'learning_started_at' => $validated['status'] === EnrollmentApplication::STATUS_APPROVED
+                ? ($enrollmentApplication->learning_started_at ?: now())
+                : $enrollmentApplication->learning_started_at,
         ])->save();
 
         $newRole = $validated['status'] === EnrollmentApplication::STATUS_APPROVED
@@ -189,6 +203,11 @@ class EnrollmentReviewController extends Controller
             'applicant_status' => $validated['status'],
             'role' => $newRole,
         ])->save();
+
+        if ($previousStatus !== EnrollmentApplication::STATUS_APPROVED
+            && $validated['status'] === EnrollmentApplication::STATUS_APPROVED) {
+            $releases->assignCurrentTo($enrollmentApplication->fresh());
+        }
 
         AdminActivityLog::record($request->user(), 'enrollment.review.updated', $enrollmentApplication, [
             'status' => $validated['status'],

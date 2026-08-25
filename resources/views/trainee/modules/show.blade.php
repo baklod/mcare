@@ -34,8 +34,8 @@
                             ⏱ {{ $module->estimated_hours }} Hours
                         </span>
                     @endif
-                    <span class="rounded px-2.5 py-0.5 text-xs font-bold {{ $isCompetent ? 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-300' : ($progress?->status === 'completed' ? 'bg-sky-100 text-sky-800' : 'bg-amber-100 text-amber-800') }}">
-                        {{ $isCompetent ? '🟢 Competent (Passed)' : ($progress?->status === 'completed' ? 'Read Complete' : 'In Progress') }}
+                    <span class="rounded px-2.5 py-0.5 text-xs font-bold {{ $isCompetent ? 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-300' : ($progress?->status === 'awaiting_evaluation' ? 'bg-purple-100 text-purple-800' : ($progress?->status === 'needs_remediation' ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800')) }}">
+                        {{ $progress->workflowStatusLabel() }}
                     </span>
                 </div>
 
@@ -53,14 +53,18 @@
             </div>
 
             <div class="flex items-center gap-2">
+                @if(!$progress->isTrainerValidated())
                 <form method="POST" action="{{ route('trainee.modules.progress', $module) }}" data-module-progress-form>
                     @csrf
                     @method('PATCH')
-                    <input type="hidden" name="action" value="{{ $progress->status === 'completed' ? 'reopen' : 'complete' }}">
+                    <input type="hidden" name="action" value="{{ $progress->status === 'awaiting_evaluation' ? 'reopen' : 'submit' }}">
                     <button type="submit" class="secondary-action text-xs" data-action-button>
-                        {{ $progress->status === 'completed' ? 'Mark In Progress' : 'Mark Lesson Read' }}
+                        {{ $progress->status === 'awaiting_evaluation' ? 'Return to In Progress' : ($progress->status === 'needs_remediation' ? 'Resubmit for Evaluation' : 'Mark as Done') }}
                     </button>
                 </form>
+                @else
+                    <span class="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800">Trainer validated</span>
+                @endif
             </div>
         </div>
     </header>

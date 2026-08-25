@@ -83,6 +83,7 @@
                         <select id="enrollment_state" name="enrollment_state" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
                             <option value="">Any window</option>
                             <option value="open" @selected($enrollmentState === 'open')>Open</option>
+                            <option value="continuous" @selected($enrollmentState === 'continuous')>Continuous enrollment</option>
                             <option value="upcoming" @selected($enrollmentState === 'upcoming')>Starting soon</option>
                             <option value="closed" @selected($enrollmentState === 'closed')>Closed</option>
                         </select>

@@ -32,8 +32,8 @@
                             ⏱ {{ $module->estimated_hours }} Hours
                         </span>
                     @endif
-                    <span class="rounded px-2.5 py-0.5 text-xs font-bold {{ $module->is_published ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-200 text-stone-700' }}">
-                        {{ $module->is_published ? 'Published' : 'Draft' }}
+                    <span class="rounded px-2.5 py-0.5 text-xs font-bold {{ $module->delivery_status === 'active' ? 'bg-emerald-100 text-emerald-800' : ($module->delivery_status === 'closed' ? 'bg-amber-100 text-amber-800' : 'bg-stone-200 text-stone-700') }}">
+                        {{ $module->deliveryStatusLabel() }}
                     </span>
                 </div>
 
@@ -51,7 +51,8 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
-                <form method="POST" action="{{ route('trainer.modules.update', $module) }}">
+                @if($module->delivery_status !== 'closed')
+                <form method="POST" action="{{ route('trainer.modules.update', $module) }}" data-confirm="{{ $module->delivery_status === 'active' ? 'Close this module to future enrollees? Existing assigned trainees will keep access.' : 'Publish this as the current active module? The previous active module will close to new enrollees.' }}">
                     @csrf
                     @method('PATCH')
                     <input type="hidden" name="module_code" value="{{ $module->module_code }}">
@@ -69,9 +70,12 @@
                     <input type="hidden" name="is_published" value="{{ $module->is_published ? 0 : 1 }}">
                     <input type="hidden" name="_return_to_module" value="1">
                     <button class="secondary-action text-xs">
-                        {{ $module->is_published ? 'Unpublish' : 'Publish' }}
+                        {{ $module->delivery_status === 'active' ? 'Close to New Enrollees' : 'Publish as Active Module' }}
                     </button>
                 </form>
+                @else
+                    <span class="max-w-xs text-xs leading-5 text-amber-800">Historical delivery: visible only to trainees who were assigned before it closed.</span>
+                @endif
             </div>
         </div>
 
@@ -323,8 +327,8 @@
                                     </div>
                                 </td>
                                 <td>
-                                    <span class="inline-flex items-center gap-1 text-xs font-semibold {{ ($progress?->progress_percent ?? 0) >= 100 ? 'text-emerald-700' : 'text-stone-600' }}">
-                                        {{ ($progress?->progress_percent ?? 0) >= 100 ? '✅ 100% Viewed' : ($progress ? $progress->progress_percent.'% in progress' : 'Not started') }}
+                                    <span class="inline-flex items-center gap-1 text-xs font-semibold {{ $progress?->isTrainerValidated() ? 'text-emerald-700' : ($progress?->status === 'awaiting_evaluation' ? 'text-purple-700' : 'text-stone-600') }}">
+                                        {{ $progress?->workflowStatusLabel() ?? 'Not assigned' }}
                                     </span>
                                 </td>
                                 <td>
@@ -346,14 +350,20 @@
                                     @endif
                                 </td>
                                 <td>
+                                    @if($progress?->status === 'locked')
+                                        <span class="inline-flex max-w-44 rounded-lg bg-stone-100 px-3 py-2 text-xs font-semibold leading-5 text-stone-600">Evaluation opens after this trainee becomes competent in the previous assigned module.</span>
+                                    @else
                                     <details class="relative">
                                         <summary class="cursor-pointer rounded-lg bg-stone-100 hover:bg-stone-200 px-3 py-1.5 text-xs font-bold text-stone-800 select-none">
-                                            Evaluate
+                                            {{ $progress?->status === 'awaiting_evaluation' ? 'Evaluate Submission' : 'Review' }}
                                         </summary>
                                         <div class="absolute right-0 z-20 mt-2 w-80 rounded-2xl border border-stone-200 bg-white p-4 shadow-xl text-xs space-y-3">
                                             <div class="font-bold text-stone-900 border-b border-stone-100 pb-2">
                                                 Grade: {{ $trainee->first_name }} {{ $trainee->last_name }}
                                             </div>
+                                            @if(!$progress?->submitted_at)
+                                                <p class="rounded-lg bg-amber-50 p-2 text-amber-800">Final Competent/NYC outcomes stay blocked until the trainee clicks Mark as Done.</p>
+                                            @endif
                                             <form method="POST" action="{{ route('trainer.modules.evaluate', $module) }}" class="space-y-3">
                                                 @csrf
                                                 <input type="hidden" name="enrollment_application_id" value="{{ $trainee->id }}">
@@ -392,6 +402,7 @@
                                             </form>
                                         </div>
                                     </details>
+                                    @endif
                                 </td>
                             </tr>
                         @empty

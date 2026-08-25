@@ -20,6 +20,10 @@ class TrainingModule extends Model
     public const CATEGORY_BASIC = 'basic';
     public const CATEGORY_CUSTOM = 'custom';
 
+    public const DELIVERY_DRAFT = 'draft';
+    public const DELIVERY_ACTIVE = 'active';
+    public const DELIVERY_CLOSED = 'closed';
+
     protected $fillable = [
         'trainer_id',
         'training_batch_id',
@@ -36,7 +40,10 @@ class TrainingModule extends Model
         'file_size',
         'supplementary_files',
         'is_published',
+        'delivery_status',
         'published_at',
+        'activated_at',
+        'closed_at',
         'available_at',
         'due_at',
         'position',
@@ -47,6 +54,8 @@ class TrainingModule extends Model
         return [
             'is_published' => 'boolean',
             'published_at' => 'datetime',
+            'activated_at' => 'datetime',
+            'closed_at' => 'datetime',
             'available_at' => 'datetime',
             'due_at' => 'datetime',
             'position' => 'integer',
@@ -119,16 +128,19 @@ class TrainingModule extends Model
             ->where(fn (Builder $builder) => $builder
                 ->whereNull('available_at')
                 ->orWhere('available_at', '<=', now()))
-            ->where(function (Builder $builder) use ($application): void {
-                $builder->where('target_enrollment_application_id', $application->id)
-                    ->orWhere(function (Builder $batchQuery) use ($application): void {
-                        $batchQuery->whereNull('target_enrollment_application_id')
-                            ->where(function (Builder $scopeQuery) use ($application): void {
-                                $scopeQuery->whereNull('training_batch_id')
-                                    ->orWhere('training_batch_id', $application->training_batch_id);
-                            });
-                    });
-            });
+            ->whereHas('progressRecords', fn (Builder $progress) => $progress
+                ->where('enrollment_application_id', $application->id)
+                ->whereNotNull('unlocked_at')
+                ->where('status', '!=', ModuleProgress::STATUS_LOCKED));
+    }
+
+    public function deliveryStatusLabel(): string
+    {
+        return match ($this->delivery_status) {
+            self::DELIVERY_ACTIVE => 'Active module',
+            self::DELIVERY_CLOSED => 'Closed to new enrollees',
+            default => 'Draft',
+        };
     }
 
     public function previewKind(): string

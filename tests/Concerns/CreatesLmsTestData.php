@@ -6,6 +6,7 @@ use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
 use App\Models\User;
+use App\Services\RollingModuleReleaseService;
 
 trait CreatesLmsTestData
 {
@@ -63,7 +64,10 @@ trait CreatesLmsTestData
             'status' => EnrollmentApplication::STATUS_APPROVED,
             'learning_status' => EnrollmentApplication::LEARNING_ACTIVE,
             'reviewed_at' => now(),
+            'learning_started_at' => now(),
         ], $overrides));
+
+        app(RollingModuleReleaseService::class)->assignCurrentTo($application);
 
         return compact('user', 'application');
     }
@@ -73,7 +77,7 @@ trait CreatesLmsTestData
         TrainingBatch $batch,
         array $overrides = [],
     ): TrainingModule {
-        return TrainingModule::create(array_merge([
+        $module = TrainingModule::create(array_merge([
             'trainer_id' => $trainer->id,
             'training_batch_id' => $batch->id,
             'title' => 'Safe Patient Transfer',
@@ -85,5 +89,11 @@ trait CreatesLmsTestData
             'is_published' => true,
             'published_at' => now(),
         ], $overrides));
+
+        if ($module->is_published) {
+            app(RollingModuleReleaseService::class)->activate($module);
+        }
+
+        return $module;
     }
 }

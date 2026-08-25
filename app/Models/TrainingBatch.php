@@ -17,6 +17,7 @@ class TrainingBatch extends Model
         'year',
         'trainer_id',
         'is_active',
+        'is_continuous_enrollment',
         'enrollment_starts_at',
         'enrollment_ends_at',
         'training_starts_at',
@@ -36,6 +37,7 @@ class TrainingBatch extends Model
     {
         return [
             'is_active' => 'boolean',
+            'is_continuous_enrollment' => 'boolean',
             'enrollment_starts_at' => 'datetime',
             'enrollment_ends_at' => 'datetime',
             'training_starts_at' => 'datetime',
@@ -121,7 +123,8 @@ class TrainingBatch extends Model
     {
         return self::query()
             ->where('is_active', true)
-            ->orderBy('enrollment_ends_at')
+            ->orderByDesc('training_starts_at')
+            ->orderByDesc('id')
             ->first();
     }
 
@@ -133,8 +136,12 @@ class TrainingBatch extends Model
                 $query->whereNull('enrollment_starts_at')
                     ->orWhere('enrollment_starts_at', '<=', now());
             })
-            ->where('enrollment_ends_at', '>', now())
-            ->orderBy('enrollment_ends_at')
+            ->where(function ($query): void {
+                $query->where('is_continuous_enrollment', true)
+                    ->orWhere('enrollment_ends_at', '>', now());
+            })
+            ->orderByDesc('training_starts_at')
+            ->orderByDesc('id')
             ->first();
     }
 
@@ -142,7 +149,7 @@ class TrainingBatch extends Model
     {
         return $this->is_active
             && (! $this->enrollment_starts_at || $this->enrollment_starts_at->isPast())
-            && $this->enrollment_ends_at->isFuture();
+            && ($this->is_continuous_enrollment || $this->enrollment_ends_at?->isFuture());
     }
 
     public function enrollmentState(): string
@@ -155,13 +162,18 @@ class TrainingBatch extends Model
             return 'upcoming';
         }
 
-        return $this->enrollment_ends_at->isFuture() ? 'open' : 'closed';
+        if ($this->is_continuous_enrollment) {
+            return 'continuous';
+        }
+
+        return $this->enrollment_ends_at?->isFuture() ? 'open' : 'closed';
     }
 
     public function enrollmentStateLabel(): string
     {
         return match ($this->enrollmentState()) {
             'open' => 'Open for enrollment',
+            'continuous' => 'Continuous enrollment open',
             'upcoming' => 'Enrollment starting soon',
             'closed' => 'Enrollment closed',
             default => 'Not accepting enrollment',

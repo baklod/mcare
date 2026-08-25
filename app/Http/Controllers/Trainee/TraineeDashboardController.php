@@ -619,18 +619,45 @@ class TraineeDashboardController extends Controller
     {
         $application = $this->approvedApplicationFor($request);
         $this->authorizeModule($application, $module);
-        $validated = $request->validate(['action' => ['required', 'in:complete,reopen']]);
-        $completed = $validated['action'] === 'complete';
-        $progress = ModuleProgress::query()->firstOrCreate([
+        $validated = $request->validate(['action' => ['required', 'in:submit,complete,reopen']]);
+        $submitting = in_array($validated['action'], ['submit', 'complete'], true);
+        $progress = ModuleProgress::query()->where([
             'enrollment_application_id' => $application->id,
             'training_module_id' => $module->id,
-        ]);
+        ])->firstOrFail();
+
+        if ($progress->isTrainerValidated()) {
+            throw ValidationException::withMessages([
+                'action' => 'A trainer-validated module cannot be returned to in progress.',
+            ]);
+        }
+
+        if ($submitting) {
+            $requiredQuizIds = $module->quizzes()->released()->pluck('id');
+            $passedQuizIds = \App\Models\QuizAttempt::query()
+                ->where('enrollment_application_id', $application->id)
+                ->whereIn('quiz_id', $requiredQuizIds)
+                ->where('status', \App\Models\QuizAttempt::STATUS_GRADED)
+                ->where('passed', true)
+                ->distinct()
+                ->pluck('quiz_id');
+
+            if ($passedQuizIds->count() !== $requiredQuizIds->count()) {
+                throw ValidationException::withMessages([
+                    'action' => 'Pass every available module quiz before submitting this lesson for trainer evaluation.',
+                ]);
+            }
+        }
+
         $progress->forceFill([
-            'status' => $completed ? ModuleProgress::STATUS_COMPLETED : ModuleProgress::STATUS_IN_PROGRESS,
-            'progress_percent' => $completed ? 100 : 10,
+            'status' => $submitting
+                ? ModuleProgress::STATUS_AWAITING_EVALUATION
+                : ModuleProgress::STATUS_IN_PROGRESS,
+            'progress_percent' => $submitting ? max(95, (int) $progress->progress_percent) : 10,
             'first_opened_at' => $progress->first_opened_at ?: now(),
             'last_viewed_at' => now(),
-            'completed_at' => $completed ? now() : null,
+            'submitted_at' => $submitting ? now() : null,
+            'completed_at' => null,
         ])->save();
 
         AdminActivityLog::record($request->user(), 'trainee.module.progress.updated', $progress, [
@@ -640,7 +667,9 @@ class TraineeDashboardController extends Controller
 
         return redirect()
             ->route('trainee.modules.show', $module)
-            ->with('saved', $completed ? 'Module marked complete.' : 'Module returned to in progress.');
+            ->with('saved', $submitting
+                ? 'Module submitted. Your trainer must validate the competency before the next module unlocks.'
+                : 'Module returned to in progress.');
     }
 
     public function securityEvent(Request $request, TrainingModule $module): Response
@@ -666,14 +695,12 @@ class TraineeDashboardController extends Controller
         abort_unless($application, 403);
         abort_unless($module->is_published, 404);
         abort_if($module->available_at?->isFuture(), 404);
-        abort_unless(
-            $module->target_enrollment_application_id === $application->id
-                || (
-                    $module->target_enrollment_application_id === null
-                    && ($module->training_batch_id === null || $module->training_batch_id === $application->training_batch_id)
-                ),
-            403
-        );
+        abort_unless(ModuleProgress::query()
+            ->where('enrollment_application_id', $application->id)
+            ->where('training_module_id', $module->id)
+            ->whereNotNull('unlocked_at')
+            ->where('status', '!=', ModuleProgress::STATUS_LOCKED)
+            ->exists(), 404);
 
     }
 
@@ -699,10 +726,10 @@ class TraineeDashboardController extends Controller
         EnrollmentApplication $application,
         TrainingModule $module,
     ): ModuleProgress {
-        $progress = ModuleProgress::query()->firstOrCreate([
+        $progress = ModuleProgress::query()->where([
             'enrollment_application_id' => $application->id,
             'training_module_id' => $module->id,
-        ]);
+        ])->firstOrFail();
 
         if ($progress->wasRecentlyCreated || $progress->status === ModuleProgress::STATUS_NOT_STARTED) {
             $progress->forceFill([

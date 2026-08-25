@@ -6,6 +6,7 @@ use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
 use App\Models\User;
+use App\Services\RollingModuleReleaseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -98,7 +99,7 @@ class TraineePortalTest extends TestCase
         $batch = $this->batch();
         $this->approvedReadyApplication($trainee, EnrollmentApplication::STATUS_APPROVED, $batch);
 
-        TrainingModule::create([
+        $module = TrainingModule::create([
             'trainer_id' => $trainer->id,
             'training_batch_id' => $batch->id,
             'title' => 'Infection Control',
@@ -108,6 +109,7 @@ class TraineePortalTest extends TestCase
             'is_published' => true,
             'published_at' => now(),
         ]);
+        app(RollingModuleReleaseService::class)->activate($module);
 
         $this->actingAs($trainee)
             ->get(route('trainee.dashboard'))
@@ -156,6 +158,7 @@ class TraineePortalTest extends TestCase
             'is_published' => true,
             'published_at' => now(),
         ]);
+        app(RollingModuleReleaseService::class)->activate($module);
 
         $this->actingAs($targetUser)
             ->get(route('trainee.dashboard'))
@@ -169,7 +172,7 @@ class TraineePortalTest extends TestCase
 
         $this->actingAs($otherUser)
             ->get(route('trainee.modules.content', $module))
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     public function test_module_viewing_and_completion_are_recorded_on_the_server(): void
@@ -191,6 +194,7 @@ class TraineePortalTest extends TestCase
             'is_published' => true,
             'published_at' => now(),
         ]);
+        app(RollingModuleReleaseService::class)->activate($module);
 
         $this->actingAs($trainee)
             ->get(route('trainee.modules.show', $module))
@@ -220,8 +224,8 @@ class TraineePortalTest extends TestCase
         $this->assertDatabaseHas('module_progress', [
             'enrollment_application_id' => $application->id,
             'training_module_id' => $module->id,
-            'status' => 'completed',
-            'progress_percent' => 100,
+            'status' => 'awaiting_evaluation',
+            'progress_percent' => 95,
         ]);
         $this->assertDatabaseHas('admin_activity_logs', [
             'user_id' => $trainee->id,

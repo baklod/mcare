@@ -111,6 +111,15 @@ class Quiz extends Model
 
     public function targets(EnrollmentApplication $application): bool
     {
+        if ($this->training_module_id !== null) {
+            return ModuleProgress::query()
+                ->where('enrollment_application_id', $application->id)
+                ->where('training_module_id', $this->training_module_id)
+                ->whereNotNull('unlocked_at')
+                ->where('status', '!=', ModuleProgress::STATUS_LOCKED)
+                ->exists();
+        }
+
         if ($this->target_enrollment_application_id !== null) {
             return (int) $this->target_enrollment_application_id === $application->getKey();
         }

@@ -149,7 +149,7 @@
                 <div class="mt-5 rounded-3xl border border-purple-100 bg-purple-50 p-4">
                     <p class="text-xs font-black uppercase tracking-wide text-purple-700">Enrollment Deadline</p>
                     <p class="mt-2 text-sm font-black text-slate-950">
-                        {{ $activeBatch?->enrollment_ends_at?->format('M d, Y g:i A') ?? 'Set active batch deadline' }}
+                        {{ $activeBatch?->is_continuous_enrollment ? 'Continuous enrollment — no deadline' : ($activeBatch?->enrollment_ends_at?->format('M d, Y g:i A') ?? 'Set active batch deadline') }}
                     </p>
                 </div>
             </aside>

@@ -11,6 +11,7 @@ use App\Models\TrainerAnnouncement;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
 use App\Models\User;
+use App\Services\RollingModuleReleaseService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\SendQueuedNotifications;
@@ -123,7 +124,10 @@ class AdminAccountController extends Controller
         return $this->accountCreatedResponse($request, $trainer, "Trainer account created for {$trainer->name}.");
     }
 
-    public function storeTrainee(Request $request): RedirectResponse
+    public function storeTrainee(
+        Request $request,
+        RollingModuleReleaseService $releases,
+    ): RedirectResponse
     {
         $request->merge([
             'first_name' => trim((string) $request->input('first_name')),
@@ -179,6 +183,7 @@ class AdminAccountController extends Controller
                 'privacy_consent' => false,
                 'date_accomplished' => today(),
                 'reviewed_at' => now(),
+                'learning_started_at' => now(),
                 'reviewed_by_id' => $request->user()->id,
                 'admin_notes' => 'Trainee account created by an administrator.',
             ]);
@@ -190,6 +195,8 @@ class AdminAccountController extends Controller
             'user_id' => $trainee->id,
             'email' => $trainee->email,
         ]);
+
+        $releases->assignCurrentTo($application);
 
         return $this->accountCreatedResponse($request, $trainee, "Trainee account created for {$trainee->name}.");
     }

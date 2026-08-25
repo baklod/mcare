@@ -245,6 +245,12 @@ class ModuleManagementTest extends TestCase
 
         $module = $this->lmsModule($trainer, $batch, ['module_code' => 'HCS323301']);
 
+        $this->actingAs($trainee)
+            ->patch(route('trainee.modules.progress', $module), [
+                'action' => 'submit',
+            ])
+            ->assertSessionHasNoErrors();
+
         $response = $this->actingAs($trainer)
             ->post(route('trainer.modules.evaluate', $module), [
                 'enrollment_application_id' => $application->id,
@@ -357,7 +363,7 @@ class ModuleManagementTest extends TestCase
     {
         $trainer = $this->lmsUser('trainer');
         $batch = $this->lmsBatch();
-        ['application' => $assigned] = $this->lmsTrainee($batch);
+        ['user' => $assignedUser, 'application' => $assigned] = $this->lmsTrainee($batch);
         ['application' => $other] = $this->lmsTrainee($batch);
         $module = $this->lmsModule($trainer, $batch, [
             'target_enrollment_application_id' => $assigned->id,
@@ -369,6 +375,12 @@ class ModuleManagementTest extends TestCase
                 'competency_outcome' => ModuleProgress::OUTCOME_COMPETENT,
             ])
             ->assertSessionHasErrors('enrollment_application_id');
+
+        $this->actingAs($assignedUser)
+            ->patch(route('trainee.modules.progress', $module), [
+                'action' => 'submit',
+            ])
+            ->assertSessionHasNoErrors();
 
         $this->actingAs($trainer)
             ->post(route('trainer.modules.evaluate', $module), [
@@ -388,7 +400,7 @@ class ModuleManagementTest extends TestCase
             ->where('enrollment_application_id', $assigned->id)
             ->where('training_module_id', $module->id)
             ->firstOrFail();
-        $this->assertSame(ModuleProgress::STATUS_IN_PROGRESS, $progress->status);
+        $this->assertSame(ModuleProgress::STATUS_NEEDS_REMEDIATION, $progress->status);
         $this->assertSame(99, $progress->progress_percent);
         $this->assertNull($progress->completed_at);
     }

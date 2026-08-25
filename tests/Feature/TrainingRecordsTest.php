@@ -8,10 +8,12 @@ use App\Jobs\GenerateOfficialDocument;
 use App\Models\BatchDocumentExport;
 use App\Models\CompetencyUnit;
 use App\Models\EnrollmentApplication;
+use App\Models\ModuleProgress;
 use App\Models\OfficialDocument;
 use App\Models\TraineeCompetencyRecord;
 use App\Models\TraineeOutcomeResult;
 use App\Models\TrainingBatch;
+use App\Models\TrainingModule;
 use App\Models\User;
 use App\Services\CompletionEligibilityService;
 use App\Services\CompetencyWorkbookExporter;
@@ -72,7 +74,7 @@ class TrainingRecordsTest extends TestCase
         $this->assertSame($unit->outcomes->count(), TraineeOutcomeResult::query()->count());
     }
 
-    public function test_completion_requires_every_unit_and_achievement_outcome(): void
+    public function test_completion_requires_every_core_unit_module_and_achievement_outcome(): void
     {
         $trainer = User::factory()->create(['role' => 'trainer']);
         $trainee = User::factory()->create(['role' => 'trainee']);
@@ -82,10 +84,14 @@ class TrainingRecordsTest extends TestCase
         $eligibility = app(CompletionEligibilityService::class)->evaluate($application->fresh('batch'));
 
         $this->assertTrue($eligibility['eligible']);
-        $this->assertSame(24, $eligibility['counts']['competent_units']);
+        $this->assertSame(11, $eligibility['counts']['competent_units']);
         $this->assertGreaterThan(24, $eligibility['counts']['competent_outcomes']);
 
-        TraineeOutcomeResult::query()->firstOrFail()->update([
+        TraineeOutcomeResult::query()
+            ->whereHas('outcome.unit', fn ($query) => $query
+                ->where('category', TrainingModule::CATEGORY_CORE))
+            ->firstOrFail()
+            ->update([
             'status' => TraineeCompetencyRecord::STATUS_NOT_YET_COMPETENT,
         ]);
 
@@ -358,6 +364,7 @@ class TrainingRecordsTest extends TestCase
             'learning_status' => EnrollmentApplication::LEARNING_ACTIVE,
             'payment_status' => EnrollmentApplication::PAYMENT_PAID,
             'reviewed_at' => now(),
+            'learning_started_at' => now(),
         ]);
     }
 
@@ -383,6 +390,40 @@ class TrainingRecordsTest extends TestCase
                     'assessed_at' => now(),
                 ]);
             }
+
+            if ($unit->category !== TrainingModule::CATEGORY_CORE || ! $unit->is_required) {
+                return;
+            }
+
+            $module = TrainingModule::create([
+                'trainer_id' => $trainer->id,
+                'training_batch_id' => $application->training_batch_id,
+                'module_code' => $unit->code,
+                'competency_category' => TrainingModule::CATEGORY_CORE,
+                'title' => $unit->title,
+                'description' => 'Completed core competency delivery.',
+                'file_path' => "training-modules/testing/{$unit->code}.pdf",
+                'original_file_name' => "{$unit->code}.pdf",
+                'is_published' => true,
+                'delivery_status' => TrainingModule::DELIVERY_CLOSED,
+                'published_at' => now()->subDay(),
+                'activated_at' => now()->subDay(),
+                'closed_at' => now(),
+            ]);
+
+            ModuleProgress::create([
+                'enrollment_application_id' => $application->id,
+                'training_module_id' => $module->id,
+                'status' => ModuleProgress::STATUS_COMPLETED,
+                'progress_percent' => 100,
+                'assigned_at' => now()->subDay(),
+                'unlocked_at' => now()->subDay(),
+                'submitted_at' => now(),
+                'competency_outcome' => ModuleProgress::OUTCOME_COMPETENT,
+                'evaluated_by_id' => $trainer->id,
+                'evaluated_at' => now(),
+                'completed_at' => now(),
+            ]);
         });
     }
 }

@@ -138,7 +138,7 @@
 
             <label class="flex items-center gap-3 text-sm font-semibold text-slate-700">
                 <input type="hidden" name="is_published" value="0">
-                <input name="is_published" type="checkbox" value="1" @checked(old('is_published', true))> Publish immediately
+                <input name="is_published" type="checkbox" value="1" @checked(old('is_published', true))> Publish as the current active batch module
             </label>
 
             <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 md:col-span-2 md:flex-row md:justify-end xl:col-span-3">
@@ -214,8 +214,8 @@
                             @endif
                         </td>
                         <td>
-                            <span class="dashboard-pill {{ $module->is_published ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-slate-100 text-slate-700 ring-slate-200' }}">
-                                {{ $module->is_published ? 'Published' : 'Draft' }}
+                            <span class="dashboard-pill {{ $module->delivery_status === 'active' ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : ($module->delivery_status === 'closed' ? 'bg-amber-50 text-amber-700 ring-amber-100' : 'bg-slate-100 text-slate-700 ring-slate-200') }}">
+                                {{ $module->deliveryStatusLabel() }}
                             </span>
                             <p class="mt-2 text-xs text-slate-500">{{ $module->published_at?->format('M d, Y g:i A') ?? 'Not published' }}</p>
                         </td>

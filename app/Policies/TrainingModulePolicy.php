@@ -39,14 +39,11 @@ class TrainingModulePolicy
             return false;
         }
 
-        return $module->target_enrollment_application_id === $application->getKey()
-            || (
-                $module->target_enrollment_application_id === null
-                && (
-                    $module->training_batch_id === null
-                    || (int) $module->training_batch_id === (int) $application->training_batch_id
-                )
-            );
+        return $module->progressRecords()
+            ->where('enrollment_application_id', $application->getKey())
+            ->whereNotNull('unlocked_at')
+            ->where('status', '!=', \App\Models\ModuleProgress::STATUS_LOCKED)
+            ->exists();
     }
 
     public function create(User $user): bool

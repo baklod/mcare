@@ -11,23 +11,24 @@ use App\Models\Quiz;
 use App\Models\TraineeCompetencyRecord;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
-use App\Models\User;
-use App\Notifications\LmsModulePublished;
 use App\Rules\TrainingModuleFileType;
+use App\Services\RollingModuleReleaseService;
 use App\Support\TrainingModuleFiles;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class TrainingModuleController extends Controller
 {
-    public function store(Request $request): RedirectResponse
+    public function store(
+        Request $request,
+        RollingModuleReleaseService $releases,
+    ): RedirectResponse
     {
         $validated = $this->validatedPayload($request, true);
         [$batchId, $targetTrainee] = $this->resolveAudience($validated);
@@ -106,7 +107,7 @@ class TrainingModuleController extends Controller
         ]);
 
         if ($module->is_published) {
-            $this->notifyTrainees($module);
+            $releases->activate($module);
         }
 
         return redirect()
@@ -119,10 +120,17 @@ class TrainingModuleController extends Controller
     public function update(
         Request $request,
         TrainingModule $module,
+        RollingModuleReleaseService $releases,
     ): RedirectResponse {
         $this->authorize('update', $module);
 
         $wasPublished = $module->is_published;
+        $requestedPublished = $request->has('is_published')
+            ? $request->boolean('is_published')
+            : $module->is_published;
+        $shouldCloseDelivery = $module->delivery_status === TrainingModule::DELIVERY_ACTIVE
+            && $wasPublished
+            && ! $requestedPublished;
         $validated = $this->validatedPayload($request, false, count($module->supplementaryList()));
         [$batchId, $targetTrainee] = $this->resolveAudience($validated);
         $this->assertTrainerBatch($request, $batchId, $targetTrainee);
@@ -157,10 +165,16 @@ class TrainingModuleController extends Controller
                 $replacement,
                 $replacementPath,
                 $currentSupplementary,
+                $shouldCloseDelivery,
             ): void {
                 $published = $request->has('is_published')
                     ? $request->boolean('is_published')
                     : $module->is_published;
+                if ($shouldCloseDelivery || $module->delivery_status === TrainingModule::DELIVERY_CLOSED) {
+                    // Closing controls future assignment only. Existing recipients
+                    // retain access to their historical delivery and evidence.
+                    $published = true;
+                }
                 $attributes = [
                     'training_batch_id' => $batchId,
                     'target_enrollment_application_id' => $targetTrainee?->id,
@@ -210,19 +224,25 @@ class TrainingModuleController extends Controller
             'file_replaced' => (bool) $replacementPath,
         ]);
 
-        if (! $wasPublished && $module->is_published) {
-            $this->notifyTrainees($module);
+        if ($shouldCloseDelivery) {
+            $releases->close($module);
+        } elseif (! $wasPublished && $module->is_published) {
+            $releases->activate($module);
         }
 
         if ($request->boolean('_return_to_module')) {
             return redirect()
                 ->route('trainer.modules.show', $module)
-                ->with('saved', 'Learning material updated.');
+                ->with('saved', $shouldCloseDelivery
+                    ? 'Module closed to future enrollees. Existing assigned trainees keep their access.'
+                    : 'Learning material updated.');
         }
 
         return redirect()
             ->route('trainer.resources')
-            ->with('saved', 'Learning material updated.');
+            ->with('saved', $shouldCloseDelivery
+                ? 'Module closed to future enrollees. Existing assigned trainees keep their access.'
+                : 'Learning material updated.');
     }
 
     public function destroy(
@@ -230,6 +250,12 @@ class TrainingModuleController extends Controller
         TrainingModule $module,
     ): RedirectResponse {
         $this->authorize('delete', $module);
+
+        if ($module->progressRecords()->exists()) {
+            return back()->withErrors([
+                'module' => 'This delivery has trainee assignments or evidence and cannot be deleted. Close it to future enrollees instead.',
+            ]);
+        }
 
         $title = $module->title;
         $path = $module->file_path;
@@ -279,7 +305,11 @@ class TrainingModuleController extends Controller
             ->with('saved', 'Supplementary attachment removed.');
     }
 
-    public function evaluate(Request $request, TrainingModule $module): RedirectResponse
+    public function evaluate(
+        Request $request,
+        TrainingModule $module,
+        RollingModuleReleaseService $releases,
+    ): RedirectResponse
     {
         $this->authorize('update', $module);
 
@@ -307,11 +337,30 @@ class TrainingModuleController extends Controller
             ]);
         }
 
+        $assignedProgress = ModuleProgress::query()
+            ->where('enrollment_application_id', $application->id)
+            ->where('training_module_id', $module->id)
+            ->where('status', '!=', ModuleProgress::STATUS_LOCKED)
+            ->first();
+
+        if (! $assignedProgress) {
+            throw ValidationException::withMessages([
+                'enrollment_application_id' => 'This trainee was never assigned this delivery. Closed historical modules cannot be graded for late enrollees.',
+            ]);
+        }
+
+        if ($validated['competency_outcome'] !== ModuleProgress::OUTCOME_IN_PROGRESS
+            && ! $assignedProgress->submitted_at) {
+            throw ValidationException::withMessages([
+                'competency_outcome' => 'The trainee must submit Mark as Done before a final trainer outcome can be recorded.',
+            ]);
+        }
+
         $progress = DB::transaction(function () use ($request, $validated, $application, $module): ModuleProgress {
-            $progress = ModuleProgress::query()->firstOrNew([
+            $progress = ModuleProgress::query()->where([
                 'enrollment_application_id' => $application->id,
                 'training_module_id' => $module->id,
-            ]);
+            ])->lockForUpdate()->firstOrFail();
 
             $isCompetent = $validated['competency_outcome'] === ModuleProgress::OUTCOME_COMPETENT;
             $currentProgress = (int) ($progress->progress_percent ?: 50);
@@ -322,8 +371,13 @@ class TrainingModuleController extends Controller
                 'evaluation_remarks' => $validated['evaluation_remarks'] ?? null,
                 'evaluated_by_id' => $request->user()->id,
                 'evaluated_at' => now(),
-                'status' => $isCompetent ? ModuleProgress::STATUS_COMPLETED : ModuleProgress::STATUS_IN_PROGRESS,
+                'status' => match ($validated['competency_outcome']) {
+                    ModuleProgress::OUTCOME_COMPETENT => ModuleProgress::STATUS_COMPLETED,
+                    ModuleProgress::OUTCOME_NOT_YET_COMPETENT => ModuleProgress::STATUS_NEEDS_REMEDIATION,
+                    default => ModuleProgress::STATUS_IN_PROGRESS,
+                },
                 'progress_percent' => $isCompetent ? 100 : min($currentProgress, 99),
+                'submitted_at' => $isCompetent ? $progress->submitted_at : null,
                 'completed_at' => $isCompetent ? ($progress->completed_at ?: now()) : null,
             ])->save();
 
@@ -354,6 +408,10 @@ class TrainingModuleController extends Controller
 
             return $progress;
         }, 3);
+
+        if ($progress->isTrainerValidated()) {
+            $releases->unlockNext($application);
+        }
 
         AdminActivityLog::record($request->user(), 'trainer.module.evaluated', $progress, [
             'module_id' => $module->id,
@@ -521,31 +579,4 @@ class TrainingModuleController extends Controller
         }
     }
 
-    private function notifyTrainees(TrainingModule $module): void
-    {
-        if (! $module->is_published || ($module->available_at && $module->available_at->isFuture())) {
-            return;
-        }
-
-        $query = EnrollmentApplication::query()
-            ->where('status', EnrollmentApplication::STATUS_APPROVED)
-            ->whereNotNull('user_id');
-
-        if ($module->target_enrollment_application_id !== null) {
-            $query->whereKey($module->target_enrollment_application_id);
-        } elseif ($module->training_batch_id) {
-            $query->where('training_batch_id', $module->training_batch_id);
-        }
-
-        $traineeIds = $query->pluck('user_id')->unique();
-
-        $trainees = User::query()
-            ->where('role', 'trainee')
-            ->whereIn('id', $traineeIds)
-            ->get();
-
-        if ($trainees->isNotEmpty()) {
-            Notification::send($trainees, new LmsModulePublished($module));
-        }
-    }
 }

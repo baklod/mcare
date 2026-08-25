@@ -164,12 +164,14 @@ class BatchScheduleController extends Controller
                 Rule::exists('users', 'id')->where(fn ($query) => $query->where('role', 'trainer')),
             ],
             'is_active' => ['nullable', 'boolean'],
+            'is_continuous_enrollment' => ['nullable', 'boolean'],
             'enrollment_starts_at' => ['nullable', 'date'],
             // A new batch must open a future enrollment window. Existing
             // batches may have closed enrollment deadlines and still need
             // schedule, room, or trainer edits afterward.
             'enrollment_ends_at' => [
-                'required',
+                'nullable',
+                'required_unless:is_continuous_enrollment,1',
                 'date',
                 ...($batch ? [] : ['after:now']),
             ],
@@ -195,6 +197,10 @@ class BatchScheduleController extends Controller
         ]);
 
         $validated['is_active'] = $request->boolean('is_active');
+        $validated['is_continuous_enrollment'] = $request->boolean('is_continuous_enrollment');
+        if ($validated['is_continuous_enrollment']) {
+            $validated['enrollment_ends_at'] = null;
+        }
         $validated['am_days'] = strtoupper(trim($validated['am_days']));
         $validated['pm_days'] = strtoupper(trim($validated['pm_days']));
 

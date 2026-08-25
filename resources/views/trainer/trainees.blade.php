@@ -78,7 +78,8 @@
                         </td>
                         <td>
                             <span class="font-bold text-emerald-700">{{ $trainee->moduleProgress->where('status', 'completed')->count() }} complete</span>
-                            <p class="text-xs text-stone-500">{{ $trainee->moduleProgress->where('status', 'in_progress')->count() }} in progress</p>
+                            <p class="text-xs text-amber-700">{{ $trainee->moduleProgress->where('status', 'awaiting_evaluation')->count() }} awaiting evaluation</p>
+                            <p class="text-xs text-stone-500">{{ $trainee->moduleProgress->whereIn('status', ['not_started', 'in_progress', 'needs_remediation'])->count() }} active or for remediation</p>
                         </td>
                         <td>
                             <div class="space-y-1.5 text-xs">

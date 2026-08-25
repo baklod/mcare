@@ -40,17 +40,25 @@ class MobileDashboardApiController extends Controller
             ->limit(5)
             ->get();
 
-        $quizzes = Quiz::withCount('questions')
-            ->where('is_published', true)
-            ->when($batchId, fn ($query) => $query->where('training_batch_id', $batchId))
-            ->orderByDesc('created_at')
-            ->limit(5)
-            ->get();
+        $modules = $application && $application->status === EnrollmentApplication::STATUS_APPROVED
+            ? TrainingModule::query()
+                ->availableTo($application)
+                ->orderBy('position')
+                ->orderByDesc('published_at')
+                ->limit(5)
+                ->get()
+            : collect();
 
-        $modules = TrainingModule::where('is_published', true)
-            ->orderBy('sequence_order')
-            ->limit(5)
-            ->get();
+        $quizzes = $application && $application->status === EnrollmentApplication::STATUS_APPROVED
+            ? Quiz::query()
+                ->withCount('questions')
+                ->released()
+                ->orderByDesc('created_at')
+                ->get()
+                ->filter(fn (Quiz $quiz): bool => $quiz->targets($application))
+                ->take(5)
+                ->values()
+            : collect();
 
         return response()->json([
             'status' => 'success',

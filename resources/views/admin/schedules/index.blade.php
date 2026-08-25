@@ -5,7 +5,7 @@
         $batch = $editingBatch;
         $formAction = $batch ? route('admin.schedules.update', $batch) : route('admin.schedules.store');
         $batchFormHasErrors = collect([
-            'name', 'year', 'is_active', 'enrollment_starts_at', 'enrollment_ends_at',
+            'name', 'year', 'is_active', 'is_continuous_enrollment', 'enrollment_starts_at', 'enrollment_ends_at',
             'training_starts_at', 'training_ends_at', 'am_days', 'am_start_time',
             'am_end_time', 'am_room', 'pm_days', 'pm_start_time', 'pm_end_time',
             'pm_room', 'trainer_id', 'notes',
@@ -86,6 +86,12 @@
                         @method('PATCH')
                     @endif
 
+                    <label class="flex items-start gap-3 rounded-xl border border-purple-200 bg-purple-50 p-4">
+                        <input type="hidden" name="is_continuous_enrollment" value="0">
+                        <input type="checkbox" name="is_continuous_enrollment" value="1" @checked(old('is_continuous_enrollment', $batch?->is_continuous_enrollment ?? true)) class="mt-1 rounded border-purple-300 text-purple-700 focus:ring-purple-600">
+                        <span><strong class="block text-sm text-purple-950">Continuous enrollment</strong><span class="mt-1 block text-xs leading-5 text-purple-800">Keep this latest active batch open while training is already in progress. New trainees receive only its currently active module.</span></span>
+                    </label>
+
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
                             <label for="name" class="mb-1 block text-xs font-semibold text-slate-700">Batch name</label>
@@ -126,7 +132,8 @@
                         </div>
                         <div>
                             <label for="enrollment_ends_at" class="mb-1 block text-xs font-semibold text-slate-700">Enrollment deadline</label>
-                            <input id="enrollment_ends_at" name="enrollment_ends_at" type="datetime-local" value="{{ old('enrollment_ends_at', $batch?->enrollment_ends_at?->format('Y-m-d\TH:i')) }}" required class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                            <input id="enrollment_ends_at" name="enrollment_ends_at" type="datetime-local" value="{{ old('enrollment_ends_at', $batch?->enrollment_ends_at?->format('Y-m-d\TH:i')) }}" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                            <p class="mt-1 text-[11px] text-slate-500">Optional when continuous enrollment is enabled.</p>
                             @error('enrollment_ends_at') <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
@@ -236,7 +243,7 @@
                                     <span class="rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 {{ $item->acceptsEnrollment() ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-slate-100 text-slate-700 ring-slate-200' }}">{{ $item->enrollmentStateLabel() }}</span>
                                     <span class="rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-bold text-purple-700 ring-1 ring-purple-100">{{ $item->trainingStateLabel() }}</span>
                                 </div>
-                                <p class="mt-1 text-xs text-slate-500">Enrollment ends {{ $item->enrollment_ends_at->format('M d, Y g:i A') }}</p>
+                                <p class="mt-1 text-xs text-slate-500">{{ $item->is_continuous_enrollment ? 'No enrollment deadline' : 'Enrollment ends '.$item->enrollment_ends_at?->format('M d, Y g:i A') }}</p>
                                 <p class="mt-1 text-xs font-semibold {{ $item->trainer ? 'text-violet-700' : 'text-amber-700' }}">
                                     Trainer: {{ $item->trainer?->name ?? 'Needs assignment' }}
                                 </p>

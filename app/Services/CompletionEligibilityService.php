@@ -26,8 +26,10 @@ class CompletionEligibilityService
     {
         $requiredUnits = CompetencyUnit::query()
             ->where('program_code', CaregivingNcIiCatalog::PROGRAM_CODE)
+            ->where('category', TrainingModule::CATEGORY_CORE)
             ->where('is_required', true);
         $requiredUnitIds = (clone $requiredUnits)->pluck('id');
+        $requiredUnitCodes = (clone $requiredUnits)->pluck('code');
         $requiredOutcomeIds = CompetencyOutcome::query()
             ->whereIn('competency_unit_id', $requiredUnitIds)
             ->where('is_required', true)
@@ -45,14 +47,22 @@ class CompletionEligibilityService
             ->where('status', TraineeCompetencyRecord::STATUS_COMPETENT)
             ->count();
 
-        $modules = $this->moduleQuery($application)->pluck('id');
-        $completedModules = ModuleProgress::query()
+        $assignedCoreProgress = ModuleProgress::query()
+            ->with('module:id,module_code')
             ->where('enrollment_application_id', $application->id)
-            ->whereIn('training_module_id', $modules)
-            ->where('status', ModuleProgress::STATUS_COMPLETED)
-            ->count();
+            ->whereHas('module', fn ($query) => $query->whereIn('module_code', $requiredUnitCodes))
+            ->get();
+        $modules = $assignedCoreProgress->pluck('training_module_id')->unique()->values();
+        $completedModuleCodes = $assignedCoreProgress
+            ->filter(fn (ModuleProgress $progress): bool => $progress->isTrainerValidated())
+            ->pluck('module.module_code')
+            ->filter()
+            ->unique();
 
-        $quizzes = $this->quizQuery($application)->pluck('id');
+        $quizzes = Quiz::query()
+            ->where('is_published', true)
+            ->whereIn('training_module_id', $modules)
+            ->pluck('id');
         $passedQuizzes = $quizzes->filter(fn ($quizId) => QuizAttempt::query()
             ->where('quiz_id', $quizId)
             ->where('enrollment_application_id', $application->id)
@@ -62,7 +72,8 @@ class CompletionEligibilityService
 
         $unitCount = $requiredUnitIds->count();
         $outcomeCount = $requiredOutcomeIds->count();
-        $moduleCount = $modules->count();
+        $moduleCount = $requiredUnitCodes->count();
+        $completedModules = $completedModuleCodes->count();
         $quizCount = $quizzes->count();
 
         $checks = [
@@ -77,9 +88,9 @@ class CompletionEligibilityService
                 $application->paymentStatusLabel(),
             ),
             'batch' => $this->check(
-                $application->batch?->trainingState() === 'completed',
-                'Training period completed',
-                $application->batch?->trainingStateLabel() ?? 'No batch assigned',
+                $application->learning_started_at !== null,
+                'Rolling training started',
+                $application->learning_started_at?->format('M d, Y g:i A') ?? 'No active-module enrollment snapshot',
             ),
             'units' => $this->check(
                 $unitCount > 0 && $competentRecords === $unitCount,
@@ -92,8 +103,8 @@ class CompletionEligibilityService
                 "{$competentOutcomes} of {$outcomeCount} competent",
             ),
             'modules' => $this->check(
-                $completedModules === $moduleCount,
-                'Required learning modules completed',
+                $moduleCount > 0 && $completedModules === $moduleCount,
+                'Required core modules completed',
                 "{$completedModules} of {$moduleCount} complete",
             ),
             'quizzes' => $this->check(
@@ -117,36 +128,6 @@ class CompletionEligibilityService
                 'passed_quizzes' => $passedQuizzes,
             ],
         ];
-    }
-
-    private function moduleQuery(EnrollmentApplication $application)
-    {
-        return TrainingModule::query()
-            ->where('is_published', true)
-            ->where(function ($query) use ($application) {
-                $query->where('target_enrollment_application_id', $application->id)
-                    ->orWhere(function ($batchQuery) use ($application) {
-                        $batchQuery->whereNull('target_enrollment_application_id')
-                            ->where(fn ($scopeQuery) => $scopeQuery
-                                ->whereNull('training_batch_id')
-                                ->orWhere('training_batch_id', $application->training_batch_id));
-                    });
-            });
-    }
-
-    private function quizQuery(EnrollmentApplication $application)
-    {
-        return Quiz::query()
-            ->where('is_published', true)
-            ->where(function ($query) use ($application) {
-                $query->where('target_enrollment_application_id', $application->id)
-                    ->orWhere(function ($batchQuery) use ($application) {
-                        $batchQuery->whereNull('target_enrollment_application_id')
-                            ->where(fn ($scopeQuery) => $scopeQuery
-                                ->whereNull('training_batch_id')
-                                ->orWhere('training_batch_id', $application->training_batch_id));
-                    });
-            });
     }
 
     /** @return array{passed: bool, label: string, detail: string} */

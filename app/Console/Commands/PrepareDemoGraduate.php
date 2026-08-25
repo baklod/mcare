@@ -20,6 +20,7 @@ use App\Support\CaregivingNcIiCatalog;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 
@@ -151,12 +152,13 @@ class PrepareDemoGraduate extends Command
                     'payment_verified_at' => now()->subMonths(10),
                     'reviewed_by_id' => $admin->id,
                     'reviewed_at' => now()->subMonths(11),
+                    'learning_started_at' => now()->subMonths(10),
                     'admin_notes' => 'Demo graduate prepared for capstone workflow presentation.',
                 ],
             );
 
             $this->completeCompetencies($application, $assessor, $gradeScale);
-            $this->completeLearningRequirements($application);
+            $this->completeLearningRequirements($application, $assessor);
 
             return compact('user', 'batch', 'application', 'password');
         });
@@ -240,17 +242,69 @@ class PrepareDemoGraduate extends Command
             });
     }
 
-    private function completeLearningRequirements(EnrollmentApplication $application): void
+    private function completeLearningRequirements(EnrollmentApplication $application, User $assessor): void
     {
-        $this->moduleQuery($application)->each(function (TrainingModule $module) use ($application): void {
+        CompetencyUnit::query()
+            ->where('program_code', CaregivingNcIiCatalog::PROGRAM_CODE)
+            ->where('category', TrainingModule::CATEGORY_CORE)
+            ->where('is_required', true)
+            ->orderBy('sort_order')
+            ->each(function (CompetencyUnit $unit) use ($application, $assessor): void {
+                $path = sprintf(
+                    'training-modules/demo/%d/%s.txt',
+                    $application->id,
+                    Str::slug($unit->code),
+                );
+
+                if (! Storage::disk('local')->exists($path)) {
+                    Storage::disk('local')->put(
+                        $path,
+                        "MCARE demo completion record for {$unit->code}: {$unit->title}",
+                    );
+                }
+
+                TrainingModule::query()->updateOrCreate(
+                    [
+                        'training_batch_id' => $application->training_batch_id,
+                        'target_enrollment_application_id' => $application->id,
+                        'module_code' => $unit->code,
+                    ],
+                    [
+                        'trainer_id' => $assessor->id,
+                        'competency_category' => TrainingModule::CATEGORY_CORE,
+                        'title' => $unit->title,
+                        'description' => 'Trainer-validated demo completion for this required core competency.',
+                        'file_path' => $path,
+                        'original_file_name' => $unit->code.'.txt',
+                        'mime_type' => 'text/plain',
+                        'file_size' => Storage::disk('local')->size($path),
+                        'is_published' => true,
+                        'delivery_status' => TrainingModule::DELIVERY_CLOSED,
+                        'published_at' => now()->subMonths(10),
+                        'activated_at' => now()->subMonths(10),
+                        'closed_at' => now()->subMonths(9),
+                        'position' => $unit->sort_order,
+                    ],
+                );
+            });
+
+        $this->moduleQuery($application)->each(function (TrainingModule $module) use ($application, $assessor): void {
             ModuleProgress::query()->updateOrCreate(
                 [
                     'enrollment_application_id' => $application->id,
                     'training_module_id' => $module->id,
                 ],
                 [
+                    'sequence_number' => $module->position ?: $module->id,
                     'status' => ModuleProgress::STATUS_COMPLETED,
                     'progress_percent' => 100,
+                    'assigned_at' => now()->subMonths(10),
+                    'unlocked_at' => now()->subMonths(10),
+                    'submitted_at' => now()->subDays(3),
+                    'practical_rating' => ModuleProgress::RATING_COMPETENT,
+                    'competency_outcome' => ModuleProgress::OUTCOME_COMPETENT,
+                    'evaluated_by_id' => $assessor->id,
+                    'evaluated_at' => now()->subDays(3),
                     'first_opened_at' => now()->subMonth(),
                     'last_viewed_at' => now()->subDays(3),
                     'completed_at' => now()->subDays(3),

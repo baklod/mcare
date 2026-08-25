@@ -276,10 +276,8 @@ class TrainerDashboardController extends Controller
         $activeBatch = $module->batch ?? TrainingBatch::assignedTo($request->user());
         $trainees = $activeBatch
             ? $this->approvedTraineesFor($activeBatch)
-                ->when(
-                    $module->target_enrollment_application_id !== null,
-                    fn ($query) => $query->whereKey($module->target_enrollment_application_id),
-                )
+                ->whereHas('moduleProgress', fn ($query) => $query
+                    ->where('training_module_id', $module->id))
                 ->get()
             : collect();
         $progressRecords = $module->progressRecords()->with(['application', 'evaluator'])->get();

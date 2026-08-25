@@ -10,6 +10,8 @@ use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
 use App\Models\User;
 use App\Rules\TrainingModuleFileType;
+use App\Services\CompletionEligibilityService;
+use App\Services\RollingModuleReleaseService;
 use App\Services\TraineeRosterCsv;
 use App\Support\TrainingModuleFiles;
 use Illuminate\Http\RedirectResponse;
@@ -18,6 +20,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -108,7 +111,12 @@ class AdminLearningSystemController extends Controller
         return $csv->download($trainees, 'mcare-trainee-roster-'.$scope.'-'.now()->format('Y-m-d').'.csv');
     }
 
-    public function updateTraineeStatus(Request $request, EnrollmentApplication $enrollmentApplication): RedirectResponse
+    public function updateTraineeStatus(
+        Request $request,
+        EnrollmentApplication $enrollmentApplication,
+        CompletionEligibilityService $eligibility,
+        RollingModuleReleaseService $releases,
+    ): RedirectResponse
     {
         abort_unless(
             $enrollmentApplication->status === EnrollmentApplication::STATUS_APPROVED,
@@ -122,6 +130,20 @@ class AdminLearningSystemController extends Controller
         ]);
 
         $previousStatus = $enrollmentApplication->learning_status ?: EnrollmentApplication::LEARNING_ACTIVE;
+
+        if ($validated['learning_status'] === EnrollmentApplication::LEARNING_GRADUATED) {
+            $completion = $eligibility->evaluate($enrollmentApplication->fresh('batch'));
+            if (! $completion['eligible']) {
+                $blockers = collect($completion['checks'])
+                    ->reject(fn (array $check): bool => $check['passed'])
+                    ->map(fn (array $check): string => $check['label'].': '.$check['detail'])
+                    ->implode(' ');
+
+                throw ValidationException::withMessages([
+                    'learning_status' => 'Graduation is blocked. '.$blockers,
+                ]);
+            }
+        }
 
         DB::transaction(function () use ($enrollmentApplication, $previousStatus, $request, $validated): void {
             $enrollmentApplication->update([
@@ -150,6 +172,11 @@ class AdminLearningSystemController extends Controller
                 ]);
             }
         });
+
+        if ($validated['learning_status'] === EnrollmentApplication::LEARNING_ACTIVE
+            && $previousStatus !== EnrollmentApplication::LEARNING_ACTIVE) {
+            $releases->assignCurrentTo($enrollmentApplication->fresh());
+        }
 
         AdminActivityLog::record($request->user(), 'trainee.learning-status.updated', $enrollmentApplication, [
             'from' => $previousStatus,
@@ -198,7 +225,10 @@ class AdminLearningSystemController extends Controller
         ]);
     }
 
-    public function storeModule(Request $request): RedirectResponse
+    public function storeModule(
+        Request $request,
+        RollingModuleReleaseService $releases,
+    ): RedirectResponse
     {
         $validated = $request->validate([
             'trainer_id' => [
@@ -279,11 +309,21 @@ class AdminLearningSystemController extends Controller
             'module_code' => $module->module_code,
         ]);
 
+        if ($module->is_published) {
+            $releases->activate($module);
+        }
+
         return back()->with('saved', "Module {$module->title} was added.");
     }
 
     public function destroyModule(Request $request, TrainingModule $module): RedirectResponse
     {
+        if ($module->progressRecords()->exists()) {
+            return back()->withErrors([
+                'module' => 'This delivery has trainee assignments or evidence and cannot be deleted. Historical learning records must be preserved.',
+            ]);
+        }
+
         $title = $module->title;
         $path = $module->file_path;
         $supplementary = $module->supplementaryList();

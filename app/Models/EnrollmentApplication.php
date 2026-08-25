@@ -111,6 +111,7 @@ class EnrollmentApplication extends Model
         'payment_verification_notes',
         'admin_notes',
         'reviewed_at',
+        'learning_started_at',
         'reviewed_by_id',
     ];
 
@@ -131,6 +132,7 @@ class EnrollmentApplication extends Model
             'document_review' => 'array',
             'documents_reviewed_at' => 'datetime',
             'reviewed_at' => 'datetime',
+            'learning_started_at' => 'datetime',
             'learning_status_changed_at' => 'datetime',
         ];
     }

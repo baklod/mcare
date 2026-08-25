@@ -11,7 +11,10 @@ class ModuleProgress extends Model
     use HasFactory;
 
     public const STATUS_NOT_STARTED = 'not_started';
+    public const STATUS_LOCKED = 'locked';
     public const STATUS_IN_PROGRESS = 'in_progress';
+    public const STATUS_AWAITING_EVALUATION = 'awaiting_evaluation';
+    public const STATUS_NEEDS_REMEDIATION = 'needs_remediation';
     public const STATUS_COMPLETED = 'completed';
 
     public const RATING_COMPETENT = 'competent';
@@ -27,8 +30,12 @@ class ModuleProgress extends Model
     protected $fillable = [
         'enrollment_application_id',
         'training_module_id',
+        'sequence_number',
         'status',
         'progress_percent',
+        'assigned_at',
+        'unlocked_at',
+        'submitted_at',
         'quiz_score',
         'practical_rating',
         'competency_outcome',
@@ -44,6 +51,10 @@ class ModuleProgress extends Model
     {
         return [
             'quiz_score' => 'decimal:2',
+            'sequence_number' => 'integer',
+            'assigned_at' => 'datetime',
+            'unlocked_at' => 'datetime',
+            'submitted_at' => 'datetime',
             'evaluated_at' => 'datetime',
             'first_opened_at' => 'datetime',
             'last_viewed_at' => 'datetime',
@@ -81,6 +92,29 @@ class ModuleProgress extends Model
             self::OUTCOME_COMPETENT => 'Competent (Passed)',
             self::OUTCOME_NOT_YET_COMPETENT => 'For Remediation',
             default => 'In Progress',
+        };
+    }
+
+    public function isAccessible(): bool
+    {
+        return $this->unlocked_at !== null && $this->status !== self::STATUS_LOCKED;
+    }
+
+    public function isTrainerValidated(): bool
+    {
+        return $this->status === self::STATUS_COMPLETED
+            && $this->competency_outcome === self::OUTCOME_COMPETENT;
+    }
+
+    public function workflowStatusLabel(): string
+    {
+        return match ($this->status) {
+            self::STATUS_LOCKED => 'Locked until the previous module is competent',
+            self::STATUS_NOT_STARTED => 'Ready to start',
+            self::STATUS_AWAITING_EVALUATION => 'Awaiting trainer evaluation',
+            self::STATUS_NEEDS_REMEDIATION => 'Needs remediation',
+            self::STATUS_COMPLETED => 'Competent',
+            default => 'In progress',
         };
     }
 }

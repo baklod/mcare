@@ -8,6 +8,7 @@ use App\Models\ModuleProgress;
 use App\Models\Quiz;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
+use App\Services\CompletionEligibilityService;
 use App\Services\TraineeRosterCsv;
 use App\Services\TrainingCalendarService;
 use Illuminate\Http\Request;
@@ -136,15 +137,21 @@ class TrainerPortalController extends Controller
         ]);
     }
 
-    public function certificates(): View
+    public function certificates(CompletionEligibilityService $eligibility): View
     {
         $assignedBatch = TrainingBatch::assignedTo(request()->user());
+        $trainees = $this->approvedTrainees($assignedBatch)
+            ->with(['batch', 'user'])
+            ->orderBy('last_name')
+            ->get();
 
         return view('trainer.certificates', [
-            'trainees' => $this->approvedTrainees($assignedBatch)
-                ->with(['batch', 'user'])
-                ->orderBy('last_name')
-                ->get(),
+            'trainees' => $trainees,
+            'eligibilityByTrainee' => $trainees->mapWithKeys(
+                fn (EnrollmentApplication $trainee): array => [
+                    $trainee->id => $eligibility->evaluate($trainee),
+                ],
+            ),
         ]);
     }
 

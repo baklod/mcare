@@ -3,8 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\AdminActivityLog;
+use App\Models\CompetencyUnit;
 use App\Models\EnrollmentApplication;
 use App\Models\ModuleProgress;
+use App\Models\TraineeCompetencyRecord;
+use App\Models\TraineeOutcomeResult;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
 use App\Models\User;
@@ -199,6 +202,7 @@ class AdminLearningSystemTest extends TestCase
             'enrollment_ends_at' => now()->addMonth(),
         ]);
         $application = $this->approvedApplication($trainee, $batch);
+        $this->makeEligibleForGraduation($application, $admin);
 
         $this->actingAs($admin)
             ->patch(route('admin.learning.trainees.status', $application), [
@@ -268,6 +272,8 @@ class AdminLearningSystemTest extends TestCase
             'training_module_id' => $module->id,
             'status' => ModuleProgress::STATUS_COMPLETED,
             'progress_percent' => 100,
+            'assigned_at' => now(),
+            'unlocked_at' => now(),
             'last_viewed_at' => now(),
             'completed_at' => now(),
         ]);
@@ -414,6 +420,70 @@ class AdminLearningSystemTest extends TestCase
             'status' => EnrollmentApplication::STATUS_APPROVED,
             'learning_status' => EnrollmentApplication::LEARNING_ACTIVE,
             'reviewed_at' => now(),
+            'learning_started_at' => now(),
         ]);
+    }
+
+    private function makeEligibleForGraduation(EnrollmentApplication $application, User $assessor): void
+    {
+        $application->update([
+            'payment_status' => EnrollmentApplication::PAYMENT_PAID,
+            'learning_started_at' => now(),
+        ]);
+
+        CompetencyUnit::query()
+            ->where('category', TrainingModule::CATEGORY_CORE)
+            ->where('is_required', true)
+            ->with('outcomes')
+            ->each(function (CompetencyUnit $unit) use ($application, $assessor): void {
+                $record = TraineeCompetencyRecord::create([
+                    'enrollment_application_id' => $application->id,
+                    'competency_unit_id' => $unit->id,
+                    'status' => TraineeCompetencyRecord::STATUS_COMPETENT,
+                    'percentage_score' => 95,
+                    'assessed_by_id' => $assessor->id,
+                    'assessed_at' => now(),
+                ]);
+
+                foreach ($unit->outcomes as $outcome) {
+                    TraineeOutcomeResult::create([
+                        'trainee_competency_record_id' => $record->id,
+                        'competency_outcome_id' => $outcome->id,
+                        'status' => TraineeCompetencyRecord::STATUS_COMPETENT,
+                        'assessed_by_id' => $assessor->id,
+                        'assessed_at' => now(),
+                    ]);
+                }
+
+                $module = TrainingModule::create([
+                    'trainer_id' => $assessor->id,
+                    'training_batch_id' => $application->training_batch_id,
+                    'module_code' => $unit->code,
+                    'competency_category' => TrainingModule::CATEGORY_CORE,
+                    'title' => $unit->title,
+                    'description' => 'Completed required core delivery.',
+                    'file_path' => "training-modules/testing/{$unit->code}.pdf",
+                    'original_file_name' => "{$unit->code}.pdf",
+                    'is_published' => true,
+                    'delivery_status' => TrainingModule::DELIVERY_CLOSED,
+                    'published_at' => now()->subDay(),
+                    'activated_at' => now()->subDay(),
+                    'closed_at' => now(),
+                ]);
+
+                ModuleProgress::create([
+                    'enrollment_application_id' => $application->id,
+                    'training_module_id' => $module->id,
+                    'status' => ModuleProgress::STATUS_COMPLETED,
+                    'progress_percent' => 100,
+                    'assigned_at' => now()->subDay(),
+                    'unlocked_at' => now()->subDay(),
+                    'submitted_at' => now(),
+                    'competency_outcome' => ModuleProgress::OUTCOME_COMPETENT,
+                    'evaluated_by_id' => $assessor->id,
+                    'evaluated_at' => now(),
+                    'completed_at' => now(),
+                ]);
+            });
     }
 }
