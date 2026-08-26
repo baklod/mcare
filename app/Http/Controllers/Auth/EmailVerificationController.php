@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
+use App\Models\HistoricalAlumniClaim;
 use App\Models\User;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\RedirectResponse;
@@ -23,8 +24,19 @@ class EmailVerificationController extends Controller
             AdminActivityLog::record($user, 'account.email.verified', $user);
         }
 
+        $historicalClaim = $user->historicalAlumniClaim()->first();
+        if ($historicalClaim?->status === HistoricalAlumniClaim::STATUS_PENDING_EMAIL) {
+            $historicalClaim->forceFill([
+                'status' => HistoricalAlumniClaim::STATUS_PENDING_ONSITE,
+            ])->save();
+
+            AdminActivityLog::record($user, 'historical-alumni.email.verified', $historicalClaim);
+        }
+
         return redirect()
             ->route('login')
-            ->with('verified', 'Email verified. You can now sign in with your MCARE account.');
+            ->with('verified', $historicalClaim
+                ? 'Email verified. Your alumni claim is waiting for on-site identity and training-record verification.'
+                : 'Email verified. You can now sign in with your MCARE account.');
     }
 }

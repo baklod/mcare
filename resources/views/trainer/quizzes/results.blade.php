@@ -56,6 +56,7 @@
                         <th>Learner</th>
                         <th>Attempt</th>
                         <th>Submitted</th>
+                        <th>Files / Activity</th>
                         <th>Points</th>
                         <th>Score</th>
                         <th>Result</th>
@@ -68,6 +69,7 @@
                             $learnerName = $learner
                                 ? trim($learner->first_name.' '.$learner->last_name)
                                 : ($attempt->application?->user?->name ?? 'Trainee');
+                            $submittedFiles = collect($attempt->answers ?? [])->filter(fn ($ans) => is_array($ans) && ($ans['type'] ?? null) === 'file');
                         @endphp
                         <tr>
                             <td data-label="Learner">
@@ -82,6 +84,20 @@
                             </td>
                             <td data-label="Attempt">#{{ $attempt->attempt_number }}</td>
                             <td data-label="Submitted">{{ $attempt->submitted_at?->format('M d, Y g:i A') ?? '-' }}</td>
+                            <td data-label="Files / Activity">
+                                @if($submittedFiles->isNotEmpty())
+                                    <div class="flex flex-wrap gap-1.5">
+                                        @foreach($submittedFiles as $qId => $fileAnswer)
+                                            <a href="{{ route('trainer.quizzes.attempts.download', ['quiz' => $quiz, 'attempt' => $attempt, 'question' => $qId]) }}" class="inline-flex items-center gap-1 rounded-md bg-purple-50 px-2 py-1 text-[11px] font-bold text-purple-700 hover:bg-purple-100 hover:text-purple-900" title="{{ $fileAnswer['original_name'] ?? 'Document' }}">
+                                                <x-dashboard-icon name="document" class="h-3.5 w-3.5 text-purple-600" />
+                                                <span>{{ str($fileAnswer['original_name'] ?? 'File')->limit(16) }}</span>
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <span class="text-xs text-slate-400">-</span>
+                                @endif
+                            </td>
                             <td data-label="Points">{{ number_format((float) $attempt->earned_points, 1) }} / {{ number_format((float) $attempt->total_points, 1) }}</td>
                             <td data-label="Score"><strong>{{ number_format((float) $attempt->score_percent, 1) }}%</strong></td>
                             <td data-label="Result">
@@ -92,7 +108,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6">
+                            <td colspan="7">
                                 <div class="lms-empty-state">
                                     <x-dashboard-icon name="clipboard-list" />
                                     <h2>No submissions yet</h2>

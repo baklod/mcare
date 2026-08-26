@@ -176,7 +176,7 @@
                             <option value="">Choose approved trainee</option>
                             @foreach($trainees as $trainee)
                                 <option value="{{ $trainee->id }}" @selected((string) old('target_enrollment_application_id') === (string) $trainee->id)>
-                                    {{ $trainee->last_name }}, {{ $trainee->first_name }} - {{ $trainee->batch?->name ?? 'No class' }}
+                                    {{ $trainee->last_name }}, {{ $trainee->first_name }} - {{ $trainee->batch?->name ?? 'No class' }}{{ $trainee->learning_status === \App\Models\EnrollmentApplication::LEARNING_GRADUATED ? ' - Graduated in this batch' : '' }}
                                 </option>
                             @endforeach
                         </select>
@@ -288,7 +288,7 @@
                             <option value="">Choose approved trainee</option>
                             @foreach($trainees as $trainee)
                                 <option value="{{ $trainee->id }}">
-                                    {{ $trainee->last_name }}, {{ $trainee->first_name }} - {{ $trainee->batch?->name ?? 'No class' }}
+                                    {{ $trainee->last_name }}, {{ $trainee->first_name }} - {{ $trainee->batch?->name ?? 'No class' }}{{ $trainee->learning_status === \App\Models\EnrollmentApplication::LEARNING_GRADUATED ? ' - Graduated in this batch' : '' }}
                                 </option>
                             @endforeach
                         </select>

@@ -111,6 +111,10 @@ class Quiz extends Model
 
     public function targets(EnrollmentApplication $application): bool
     {
+        if ($application->is_historical_record) {
+            return false;
+        }
+
         if ($this->training_module_id !== null) {
             return ModuleProgress::query()
                 ->where('enrollment_application_id', $application->id)

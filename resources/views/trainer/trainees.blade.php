@@ -68,6 +68,7 @@
                                 <div class="min-w-0">
                                     <p class="font-bold text-stone-950">{{ $trainee->last_name }}, {{ $trainee->first_name }}</p>
                                     <p class="truncate text-xs text-stone-500">{{ $trainee->email }}</p>
+                                    <x-graduate-batch-badge :application="$trainee" class="mt-1.5" />
                                     <p class="mt-1 text-[11px] text-stone-400">Tel: {{ $trainee->contact_number }}</p>
                                 </div>
                             </div>
@@ -125,7 +126,10 @@
                                 @endif
                             </div>
                         </td>
-                        <td>{{ $trainee->batch?->trainingStateLabel() ?? 'No batch' }}</td>
+                        <td>
+                            <p>{{ $trainee->batch?->trainingStateLabel() ?? 'No batch' }}</p>
+                            <x-graduate-batch-badge :application="$trainee" class="mt-2" />
+                        </td>
                     </tr>
                 @empty
                     <tr>

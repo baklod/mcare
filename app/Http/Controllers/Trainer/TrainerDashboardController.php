@@ -38,13 +38,16 @@ class TrainerDashboardController extends Controller
             ->values();
 
         $progressRows = $assignedTrainees->map(function (EnrollmentApplication $application) {
+            $isGraduate = $application->learning_status === EnrollmentApplication::LEARNING_GRADUATED;
+
             return [
                 'name' => trim($application->first_name.' '.$application->last_name),
                 'email' => $application->email,
                 'training' => $application->program ?: 'Caregiving NC II',
                 'schedule' => $application->batch?->scheduleLabelFor($application->schedule_preference)
                     ?? $application->schedule_preference,
-                'status' => 'Assigned',
+                'is_graduate' => $isGraduate,
+                'status' => $isGraduate ? 'Graduated in this batch' : 'Assigned',
             ];
         });
 
@@ -105,8 +108,10 @@ class TrainerDashboardController extends Controller
                 ...$row,
                 'initial' => mb_strtoupper(mb_substr($row['name'], 0, 1)),
                 'needs_action' => false,
-                'action' => $row['schedule'] ?: 'Assigned to the current training batch',
-                'priority' => 'On track',
+                'action' => $row['is_graduate']
+                    ? ($row['schedule'] ?: 'Batch schedule recorded').' · Training history retained.'
+                    : ($row['schedule'] ?: 'Assigned to the current training batch'),
+                'priority' => $row['is_graduate'] ? 'Graduate' : 'On track',
             ];
         });
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth bg-white">
+<html lang="en" class="scroll-smooth scroll-pt-20 bg-white sm:scroll-pt-24">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,7 +16,7 @@
             background-size: 20px 20px, 20px 20px, 100% 100%, 100% 100%;
         }
 
-        /* Path: resources/views/landing/home.blade.php | Label: Solid sticky header */
+        /* Path: resources/views/landing/home.blade.php | Label: Solid fixed header */
         .site-header {
             transition: border-color 180ms ease, box-shadow 180ms ease;
         }
@@ -181,7 +181,7 @@
         }
     </style>
 </head>
-<body class="relative overflow-x-hidden bg-white font-sans text-slate-900 antialiased">
+<body class="relative overflow-x-hidden bg-white pt-16 font-sans text-slate-900 antialiased sm:pt-20">
     @php
         // Replace these placeholder URLs with MCARE's official social pages.
         $socialLinks = [
@@ -219,7 +219,7 @@
     <div class="landing-grid-bg pointer-events-none fixed inset-0 z-0"></div>
 
     <!-- Path: resources/views/landing/home.blade.php | Label: Clean single-row header -->
-    <header id="site-header" class="site-header sticky top-0 z-50 border-b border-slate-200 bg-white">
+    <header id="site-header" class="site-header fixed inset-x-0 top-0 z-50 border-b border-slate-200 bg-white">
         <nav class="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-4 px-4 py-2 sm:min-h-20 sm:px-6 lg:px-8" aria-label="Main navigation">
             <a href="{{ route('landing') }}" class="flex min-w-0 items-center gap-3">
                 <img src="{{ asset('assets/mcare-mark.png') }}" alt="MCARE mark" class="h-10 w-10 shrink-0 rounded-lg border border-slate-100 bg-white object-contain sm:h-12 sm:w-12">
@@ -266,6 +266,7 @@
                     </details>
                 @else
                     <a href="{{ route('login') }}" class="inline-flex rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-purple-200 hover:text-purple-700">Sign in</a>
+                    <a href="{{ route('alumni.claim.create') }}" class="hidden rounded-lg border border-purple-200 bg-purple-50 px-4 py-2.5 text-sm font-semibold text-purple-700 hover:bg-purple-100 xl:inline-flex">Alumni claim</a>
                     <a href="{{ route('enrollment.create') }}" class="inline-flex rounded-lg bg-purple-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-purple-800">Enroll now</a>
                 @endauth
 
@@ -769,7 +770,7 @@
         </div>
     </footer>
 
-    <!-- Path: resources/views/landing/home.blade.php | Label: Header blur and mobile sidebar script -->
+    <!-- Path: resources/views/landing/home.blade.php | Label: Fixed header and mobile sidebar script -->
     <script>
         const siteHeader = document.getElementById('site-header');
         const mobileSidebar = document.getElementById('mobile-sidebar');

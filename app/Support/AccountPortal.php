@@ -9,6 +9,10 @@ class AccountPortal
 {
     public static function roleLabelFor(?User $user): string
     {
+        if ($user?->isGraduate()) {
+            return 'Alumni';
+        }
+
         return match ($user?->role) {
             'admin' => 'Admin',
             'trainer' => 'Trainer',
@@ -20,6 +24,10 @@ class AccountPortal
 
     public static function ctaLabelFor(?User $user): string
     {
+        if ($user?->isGraduate()) {
+            return 'Open Alumni Career Hub';
+        }
+
         return match ($user?->role) {
             'admin' => 'Open Admin Center',
             'trainer' => 'Open Trainer Portal',

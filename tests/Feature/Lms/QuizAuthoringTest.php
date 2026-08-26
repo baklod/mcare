@@ -266,6 +266,87 @@ class QuizAuthoringTest extends TestCase
         ], $overrides);
     }
 
+    public function test_trainer_can_create_quiz_with_file_upload_and_enumeration_questions(): void
+    {
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch();
+        $module = $this->lmsModule($trainer, $batch);
+
+        $payload = $this->quizPayload($batch->id, [
+            'training_module_id' => $module->id,
+            'title' => 'Practical Activity Assessment',
+            'questions' => [
+                [
+                    'type' => 'file_upload',
+                    'prompt' => 'Upload your completed Caregiving Activity Sheet (.docx or .pdf).',
+                    'points' => 5,
+                    'position' => 0,
+                ],
+                [
+                    'type' => 'enumeration',
+                    'prompt' => 'Enumerate the 5 steps of hand washing hygiene.',
+                    'points' => 5,
+                    'position' => 1,
+                ],
+            ],
+        ]);
+
+        $this->actingAs($trainer)
+            ->post(route('trainer.quizzes.store'), $payload)
+            ->assertRedirect(route('trainer.modules.show', $module).'#assessments')
+            ->assertSessionHas('saved');
+
+        $quiz = Quiz::query()->where('title', 'Practical Activity Assessment')->firstOrFail();
+        $this->assertCount(2, $quiz->questions);
+        $this->assertSame('file_upload', $quiz->questions[0]->type);
+        $this->assertSame('enumeration', $quiz->questions[1]->type);
+    }
+
+    public function test_evaluating_module_atomically_updates_competency_unit_outcomes_and_tor_grade(): void
+    {
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch();
+        $trainee = $this->lmsTrainee($batch)['application'];
+        $module = $this->lmsModule($trainer, $batch, [
+            'module_code' => '500311105',
+            'title' => 'Participate in Workplace Communication',
+        ]);
+
+        $unit = \App\Models\CompetencyUnit::where('title', 'Participate in Workplace Communication')->firstOrFail();
+
+        \App\Models\ModuleProgress::updateOrCreate([
+            'enrollment_application_id' => $trainee->id,
+            'training_module_id' => $module->id,
+        ], [
+            'sequence_number' => 1,
+            'status' => \App\Models\ModuleProgress::STATUS_AWAITING_EVALUATION,
+            'progress_percent' => 100,
+            'submitted_at' => now(),
+        ]);
+
+        $this->actingAs($trainer)
+            ->post(route('trainer.modules.evaluate', $module), [
+                'enrollment_application_id' => $trainee->id,
+                'quiz_score' => 90,
+                'practical_rating' => 'competent',
+                'competency_outcome' => 'competent',
+                'evaluation_remarks' => 'Demonstrated clear communication techniques.',
+            ])
+            ->assertRedirect(route('trainer.modules.show', $module))
+            ->assertSessionHas('saved');
+
+        $record = \App\Models\TraineeCompetencyRecord::query()
+            ->where('enrollment_application_id', $trainee->id)
+            ->where('competency_unit_id', $unit->id)
+            ->firstOrFail();
+
+        $this->assertSame('competent', $record->status);
+        $this->assertEquals(90.00, (float) $record->percentage_score);
+        $this->assertEquals(1.75, (float) $record->tor_grade);
+        $this->assertCount(3, $record->outcomeResults);
+        $this->assertTrue($record->outcomeResults->every(fn ($res) => $res->status === 'competent'));
+    }
+
     private function quiz(int $trainerId, int $batchId, array $overrides = []): Quiz
     {
         return Quiz::create(array_merge([

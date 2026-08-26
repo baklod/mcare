@@ -426,4 +426,33 @@ class TrainingRecordsTest extends TestCase
             ]);
         });
     }
+
+    public function test_admin_can_graduate_trainee_directly_and_fulfill_competencies_without_blocking(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $application = $this->approvedApplication($trainee, completed: false);
+
+        $this->actingAs($admin)
+            ->patch(route('admin.learning.trainees.status', $application), [
+                'learning_status' => 'graduated',
+                'learning_status_notes' => 'Completed requirements through direct onsite evaluation.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('saved');
+
+        $application->refresh();
+        $this->assertSame('graduated', $application->learning_status);
+
+        // Competency records are marked Competent
+        $compRecords = TraineeCompetencyRecord::where('enrollment_application_id', $application->id)->get();
+        $this->assertNotEmpty($compRecords);
+        $this->assertTrue($compRecords->every(fn ($r) => $r->status === 'competent'));
+
+        // Trainee can open grades page with official notice
+        $this->actingAs($trainee)
+            ->get(route('trainee.grades'))
+            ->assertOk()
+            ->assertSee('Official Certificate and Transcript of Records (TOR) Notice');
+    }
 }

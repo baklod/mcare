@@ -76,15 +76,36 @@ class QuizGradingService
         ): void {
             $questionId = $question->getKey();
             $answer = $answers[$questionId] ?? $answers[(string) $questionId] ?? null;
-            $normalizedAnswer = $question->normalizedOptionIndex($answer);
             $points = (float) $question->points;
-
-            // Extra client keys are discarded; only this quiz's questions are persisted.
-            $normalizedAnswers[(string) $questionId] = $normalizedAnswer;
             $totalPoints += $points;
 
-            if ($question->isCorrectOption($normalizedAnswer)) {
-                $earnedPoints += $points;
+            if ($question->isFileUpload()) {
+                if (is_array($answer) && ($answer['type'] ?? null) === 'file') {
+                    $normalizedAnswers[(string) $questionId] = $answer;
+                    $earnedPoints += $points;
+                } else {
+                    $normalizedAnswers[(string) $questionId] = null;
+                }
+            } elseif ($question->isEnumeration()) {
+                if (is_array($answer) && ($answer['type'] ?? null) === 'file') {
+                    $normalizedAnswers[(string) $questionId] = $answer;
+                    $earnedPoints += $points;
+                } elseif (is_array($answer) && ($answer['type'] ?? null) === 'text') {
+                    $normalizedAnswers[(string) $questionId] = $answer;
+                    $earnedPoints += $points;
+                } elseif (is_string($answer) && filled(trim($answer))) {
+                    $normalizedAnswers[(string) $questionId] = ['type' => 'text', 'content' => trim($answer)];
+                    $earnedPoints += $points;
+                } else {
+                    $normalizedAnswers[(string) $questionId] = null;
+                }
+            } else {
+                $normalizedAnswer = $question->normalizedOptionIndex($answer);
+                $normalizedAnswers[(string) $questionId] = $normalizedAnswer;
+
+                if ($question->isCorrectOption($normalizedAnswer)) {
+                    $earnedPoints += $points;
+                }
             }
         });
 
@@ -99,7 +120,7 @@ class QuizGradingService
             'earned_points' => $earnedPoints,
             'total_points' => $totalPoints,
             'score_percent' => $scorePercent,
-            'passed' => $scorePercent >= (float) $quiz->passing_score_percent,
+            'passed' => $totalPoints > 0 ? ($scorePercent >= (float) $quiz->passing_score_percent) : true,
         ];
     }
 }

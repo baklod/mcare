@@ -4,15 +4,19 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
+use App\Models\CompetencyUnit;
 use App\Models\EnrollmentApplication;
 use App\Models\ModuleProgress;
+use App\Models\TraineeCompetencyRecord;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
 use App\Models\User;
+use App\Notifications\TrainerModuleAssignedByAdmin;
 use App\Rules\TrainingModuleFileType;
 use App\Services\CompletionEligibilityService;
 use App\Services\RollingModuleReleaseService;
 use App\Services\TraineeRosterCsv;
+use App\Support\CaregivingNcIiCatalog;
 use App\Support\TrainingModuleFiles;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,6 +26,8 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdminLearningSystemController extends Controller
@@ -130,29 +136,73 @@ class AdminLearningSystemController extends Controller
         ]);
 
         $previousStatus = $enrollmentApplication->learning_status ?: EnrollmentApplication::LEARNING_ACTIVE;
+        $isExpeditedGraduation = false;
 
         if ($validated['learning_status'] === EnrollmentApplication::LEARNING_GRADUATED) {
             $completion = $eligibility->evaluate($enrollmentApplication->fresh('batch'));
-            if (! $completion['eligible']) {
-                $blockers = collect($completion['checks'])
-                    ->reject(fn (array $check): bool => $check['passed'])
-                    ->map(fn (array $check): string => $check['label'].': '.$check['detail'])
-                    ->implode(' ');
-
-                throw ValidationException::withMessages([
-                    'learning_status' => 'Graduation is blocked. '.$blockers,
-                ]);
-            }
+            $isExpeditedGraduation = ! $completion['eligible'];
         }
 
-        DB::transaction(function () use ($enrollmentApplication, $previousStatus, $request, $validated): void {
+        DB::transaction(function () use ($enrollmentApplication, $previousStatus, $request, $validated, $isExpeditedGraduation): void {
+            if ($validated['learning_status'] === EnrollmentApplication::LEARNING_GRADUATED && $isExpeditedGraduation) {
+                // Fulfill and record all standard Caregiving NC II units & outcomes as Competent
+                $requiredUnits = CompetencyUnit::query()
+                    ->with('outcomes')
+                    ->where('program_code', CaregivingNcIiCatalog::PROGRAM_CODE)
+                    ->get();
+
+                foreach ($requiredUnits as $unit) {
+                    $compRecord = TraineeCompetencyRecord::query()->firstOrNew([
+                        'enrollment_application_id' => $enrollmentApplication->id,
+                        'competency_unit_id' => $unit->id,
+                    ]);
+
+                    if ($compRecord->status !== TraineeCompetencyRecord::STATUS_COMPETENT) {
+                        $compRecord->fill([
+                            'status' => TraineeCompetencyRecord::STATUS_COMPETENT,
+                            'percentage_score' => null, // Hidden/omitted for offline/direct graduation
+                            'tor_grade' => null,
+                            'notes' => 'Administrative Graduation (Offline/Onsite Assessment Verified)',
+                            'assessed_by_id' => $request->user()->id,
+                            'assessed_at' => now(),
+                        ])->save();
+                    }
+
+                    foreach ($unit->outcomes as $outcome) {
+                        $compRecord->outcomeResults()->updateOrCreate(
+                            ['competency_outcome_id' => $outcome->id],
+                            [
+                                'status' => TraineeCompetencyRecord::STATUS_COMPETENT,
+                                'assessed_by_id' => $request->user()->id,
+                                'assessed_at' => now(),
+                            ]
+                        );
+                    }
+                }
+
+                // Mark any assigned module progress as completed with competent rating
+                ModuleProgress::query()
+                    ->where('enrollment_application_id', $enrollmentApplication->id)
+                    ->where('status', '!=', ModuleProgress::STATUS_COMPLETED)
+                    ->update([
+                        'status' => ModuleProgress::STATUS_COMPLETED,
+                        'progress_percent' => 100,
+                        'competency_outcome' => ModuleProgress::OUTCOME_COMPETENT,
+                        'practical_rating' => ModuleProgress::RATING_COMPETENT,
+                        'evaluated_by_id' => $request->user()->id,
+                        'evaluated_at' => now(),
+                        'completed_at' => now(),
+                    ]);
+            }
+
             $enrollmentApplication->update([
                 'learning_status' => $validated['learning_status'],
                 'learning_status_notes' => filled($validated['learning_status_notes'] ?? null)
                     ? trim($validated['learning_status_notes'])
-                    : null,
+                    : ($isExpeditedGraduation ? 'Administrative Graduation (Offline/Onsite Course Completion)' : null),
                 'learning_status_changed_at' => now(),
                 'learning_status_changed_by_id' => $request->user()->id,
+                'learning_started_at' => $enrollmentApplication->learning_started_at ?: now(),
             ]);
 
             $user = User::query()->lockForUpdate()->find($enrollmentApplication->user_id);
@@ -313,7 +363,56 @@ class AdminLearningSystemController extends Controller
             $releases->activate($module);
         }
 
+        $module->loadMissing(['batch', 'trainer']);
+        $module->trainer?->notify(new TrainerModuleAssignedByAdmin($module));
+
         return back()->with('saved', "Module {$module->title} was added.");
+    }
+
+    public function previewModule(Request $request, TrainingModule $module): View
+    {
+        AdminActivityLog::record($request->user(), 'admin.module.preview.opened', $module, [
+            'title' => $module->title,
+        ]);
+
+        return view('admin.learning.module-preview', [
+            'module' => $module->load(['batch', 'trainer']),
+        ]);
+    }
+
+    public function moduleContent(Request $request, TrainingModule $module): BinaryFileResponse
+    {
+        abort_unless(Storage::disk('local')->exists($module->file_path), 404);
+
+        AdminActivityLog::record($request->user(), 'admin.module.content.viewed', $module, [
+            'mime_type' => $module->mime_type,
+        ]);
+
+        return $this->moduleFileResponse($module, HeaderUtils::DISPOSITION_INLINE);
+    }
+
+    public function downloadModule(Request $request, TrainingModule $module): BinaryFileResponse
+    {
+        abort_unless(Storage::disk('local')->exists($module->file_path), 404);
+
+        AdminActivityLog::record($request->user(), 'admin.module.content.downloaded', $module, [
+            'mime_type' => $module->mime_type,
+        ]);
+
+        return $this->moduleFileResponse($module, HeaderUtils::DISPOSITION_ATTACHMENT);
+    }
+
+    private function moduleFileResponse(TrainingModule $module, string $disposition): BinaryFileResponse
+    {
+        $filename = basename($module->original_file_name);
+        $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
+
+        return response()->file(Storage::disk('local')->path($module->file_path), [
+            'Content-Type' => $module->mime_type ?: 'application/octet-stream',
+            'Content-Disposition' => HeaderUtils::makeDisposition($disposition, $filename, $fallbackFilename),
+            'Accept-Ranges' => 'bytes',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function destroyModule(Request $request, TrainingModule $module): RedirectResponse

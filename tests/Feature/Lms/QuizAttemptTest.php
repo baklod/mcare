@@ -440,6 +440,73 @@ class QuizAttemptTest extends TestCase
             ->assertSee('Perform hand hygiene');
     }
 
+    public function test_trainee_can_submit_docx_activity_file_and_download_it(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch();
+        ['user' => $trainee, 'application' => $application] = $this->lmsTrainee($batch);
+        $module = $this->lmsModule($trainer, $batch);
+        $quiz = $this->publishedQuiz($trainer, $batch, [
+            'training_module_id' => $module->id,
+            'attempt_limit' => 1,
+        ]);
+
+        $fileQuestion = QuizQuestion::create([
+            'quiz_id' => $quiz->id,
+            'type' => 'file_upload',
+            'prompt' => 'Upload your completed Caregiving Activity Sheet (.docx).',
+            'options' => [],
+            'correct_option' => null,
+            'points' => 10,
+            'position' => 0,
+        ]);
+
+        $attempt = QuizAttempt::create([
+            'quiz_id' => $quiz->id,
+            'enrollment_application_id' => $application->id,
+            'attempt_number' => 1,
+            'status' => QuizAttempt::STATUS_IN_PROGRESS,
+            'started_at' => now(),
+        ]);
+
+        $docxFile = \Illuminate\Http\UploadedFile::fake()->create('My_Activity.docx', 100, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+
+        $this->actingAs($trainee)
+            ->post(route('trainee.quiz-attempts.submit', $attempt), [
+                'file_answers' => [
+                    $fileQuestion->id => $docxFile,
+                ],
+            ])
+            ->assertRedirect(route('trainee.quiz-attempts.result', $attempt));
+
+        $attempt->refresh();
+        $this->assertSame('graded', $attempt->status);
+        $this->assertEquals(10.0, (float) $attempt->earned_points);
+        $this->assertEquals(100.0, (float) $attempt->score_percent);
+        $this->assertTrue($attempt->passed);
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.quiz-attempts.result', $attempt))
+            ->assertOk()
+            ->assertSee('My_Activity.docx')
+            ->assertSee(route('trainee.quiz-attempts.download', ['attempt' => $attempt, 'question' => $fileQuestion->id]));
+
+        $download = $this->actingAs($trainee)
+            ->get(route('trainee.quiz-attempts.download', ['attempt' => $attempt, 'question' => $fileQuestion->id]));
+
+        $download->assertOk()
+            ->assertHeader('Content-Disposition', 'attachment; filename=My_Activity.docx');
+
+        // Trainer can also download the student's submission from quiz results
+        $trainerDownload = $this->actingAs($trainer)
+            ->get(route('trainer.quizzes.attempts.download', ['quiz' => $quiz, 'attempt' => $attempt, 'question' => $fileQuestion->id]));
+
+        $trainerDownload->assertOk()
+            ->assertHeader('Content-Disposition', 'attachment; filename=My_Activity.docx');
+    }
+
     private function publishedQuiz(
         User $trainer,
         TrainingBatch $batch,

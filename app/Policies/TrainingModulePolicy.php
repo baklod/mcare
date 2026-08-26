@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use App\Models\EnrollmentApplication;
+use App\Models\ModuleProgress;
 use App\Models\TrainingModule;
 use App\Models\User;
 
@@ -39,10 +40,15 @@ class TrainingModulePolicy
             return false;
         }
 
+        if ($application->is_historical_record
+            || $application->learning_status === EnrollmentApplication::LEARNING_GRADUATED) {
+            return false;
+        }
+
         return $module->progressRecords()
             ->where('enrollment_application_id', $application->getKey())
             ->whereNotNull('unlocked_at')
-            ->where('status', '!=', \App\Models\ModuleProgress::STATUS_LOCKED)
+            ->where('status', '!=', ModuleProgress::STATUS_LOCKED)
             ->exists();
     }
 

@@ -40,7 +40,12 @@ class CertificationController extends Controller
             ->withQueryString();
 
         $records->getCollection()->transform(function ($application) use ($eligibility) {
-            $application->completion_eligibility = $eligibility->evaluate($application);
+            $isGraduated = $application->learning_status === EnrollmentApplication::LEARNING_GRADUATED;
+            $eval = $eligibility->evaluate($application);
+            if ($isGraduated) {
+                $eval['eligible'] = true;
+            }
+            $application->completion_eligibility = $eval;
 
             return $application;
         });

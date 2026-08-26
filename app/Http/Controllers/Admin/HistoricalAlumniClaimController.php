@@ -1,0 +1,174 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\AdminActivityLog;
+use App\Models\AlumniProfile;
+use App\Models\EnrollmentApplication;
+use App\Models\HistoricalAlumniClaim;
+use App\Notifications\HistoricalAlumniClaimStatusUpdated;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\HeaderUtils;
+use Throwable;
+
+class HistoricalAlumniClaimController extends Controller
+{
+    public function update(Request $request, HistoricalAlumniClaim $historicalAlumniClaim): RedirectResponse
+    {
+        $validated = $request->validateWithBag('historicalClaimReview', [
+            'decision' => ['required', Rule::in(['approve', 'reject'])],
+            'identity_verified' => ['accepted_if:decision,approve'],
+            'training_evidence_verified' => ['accepted_if:decision,approve'],
+            'archive_record_verified' => ['accepted_if:decision,approve'],
+            'admin_notes' => ['required', 'string', 'max:2000'],
+        ], [
+            '*.accepted_if' => 'Complete all three on-site verification checks before approving this alumni claim.',
+        ]);
+
+        $historicalAlumniClaim->load('user');
+        if ($validated['decision'] === 'approve' && ! $historicalAlumniClaim->user?->hasVerifiedEmail()) {
+            return back()->withErrors([
+                'historical_alumni' => 'The claimant must verify their email before MCARE can activate alumni access.',
+            ]);
+        }
+
+        if ($historicalAlumniClaim->status === HistoricalAlumniClaim::STATUS_APPROVED) {
+            return back()->withErrors([
+                'historical_alumni' => 'This historical alumni claim is already approved.',
+            ]);
+        }
+
+        $claim = DB::transaction(function () use ($request, $validated, $historicalAlumniClaim): HistoricalAlumniClaim {
+            $claim = HistoricalAlumniClaim::query()
+                ->with('user')
+                ->lockForUpdate()
+                ->findOrFail($historicalAlumniClaim->id);
+            $approved = $validated['decision'] === 'approve';
+
+            $claim->forceFill([
+                'status' => $approved ? HistoricalAlumniClaim::STATUS_APPROVED : HistoricalAlumniClaim::STATUS_REJECTED,
+                'verification_checks' => $approved ? [
+                    'identity_verified' => true,
+                    'training_evidence_verified' => true,
+                    'archive_record_verified' => true,
+                ] : null,
+                'onsite_verified_at' => $approved ? now() : null,
+                'onsite_verified_by_id' => $approved ? $request->user()->id : null,
+                'admin_notes' => $validated['admin_notes'],
+                'reviewed_at' => now(),
+                'reviewed_by_id' => $request->user()->id,
+            ])->save();
+
+            if ($approved) {
+                $application = EnrollmentApplication::query()->firstOrCreate(
+                    ['user_id' => $claim->user_id],
+                    [
+                        'email' => $claim->user->email,
+                        'program' => 'Caregiving NC II',
+                        'intake_channel' => 'historical_alumni',
+                        'is_historical_record' => true,
+                        'training_batch_id' => null,
+                        'first_name' => $claim->first_name,
+                        'middle_name' => $claim->middle_name,
+                        'last_name' => $claim->last_name,
+                        'birth_date' => $claim->birth_date,
+                        'gender' => $claim->gender,
+                        'contact_number' => $claim->contact_number,
+                        'schedule_preference' => $claim->training_schedule,
+                        'street' => $claim->street,
+                        'barangay' => $claim->barangay,
+                        'city' => $claim->city,
+                        'province' => $claim->province,
+                        'zip_code' => $claim->zip_code,
+                        'educational_attainment' => $claim->educational_attainment,
+                        'school_name' => $claim->school_name,
+                        'year_graduated' => $claim->education_year_graduated,
+                        'privacy_consent' => true,
+                        'date_accomplished' => $claim->created_at->toDateString(),
+                        'status' => EnrollmentApplication::STATUS_APPROVED,
+                        'learning_status' => EnrollmentApplication::LEARNING_GRADUATED,
+                        'learning_status_notes' => 'Historical graduate verified from original COTC/TOR and MCARE archive records.',
+                        'learning_status_changed_at' => now(),
+                        'learning_status_changed_by_id' => $request->user()->id,
+                        'admin_notes' => $validated['admin_notes'],
+                        'reviewed_at' => now(),
+                        'reviewed_by_id' => $request->user()->id,
+                    ],
+                );
+
+                // A pre-existing enrollment cannot be silently converted into a
+                // historical graduate record through this claim workflow.
+                abort_unless($application->wasRecentlyCreated || $application->is_historical_record, 409);
+
+                $claim->user->forceFill([
+                    'role' => 'trainee',
+                    'applicant_status' => EnrollmentApplication::STATUS_APPROVED,
+                ])->save();
+
+                AlumniProfile::query()->firstOrCreate(
+                    ['user_id' => $claim->user_id],
+                    ['is_available_for_duty' => false],
+                );
+            } else {
+                $claim->user->forceFill([
+                    'applicant_status' => 'historical_claim_rejected',
+                ])->save();
+            }
+
+            return $claim->fresh(['user']);
+        });
+
+        AdminActivityLog::record($request->user(), 'historical-alumni.claim.reviewed', $claim, [
+            'decision' => $validated['decision'],
+            'claimant_email' => $claim->user->email,
+        ]);
+
+        try {
+            $claim->user->notify(new HistoricalAlumniClaimStatusUpdated($claim));
+        } catch (Throwable $exception) {
+            report($exception);
+        }
+
+        return back()->with('saved', $validated['decision'] === 'approve'
+            ? "Historical alumni access activated for {$claim->user->name}."
+            : "Historical alumni claim for {$claim->user->name} was returned for follow-up.");
+    }
+
+    public function evidence(Request $request, HistoricalAlumniClaim $historicalAlumniClaim): BinaryFileResponse
+    {
+        $validated = $request->validate([
+            'page' => ['nullable', 'integer', Rule::in([1, 2])],
+            'disposition' => ['nullable', Rule::in(['inline', 'attachment'])],
+        ]);
+        $page = (int) ($validated['page'] ?? 1);
+        $path = $page === 2
+            ? $historicalAlumniClaim->evidence_document_page_2_path
+            : $historicalAlumniClaim->evidence_document_path;
+
+        abort_unless(is_string($path) && Storage::disk('local')->exists($path), 404);
+
+        $disposition = ($validated['disposition'] ?? 'inline') === 'attachment'
+            ? HeaderUtils::DISPOSITION_ATTACHMENT
+            : HeaderUtils::DISPOSITION_INLINE;
+        $extension = pathinfo($path, PATHINFO_EXTENSION);
+        $filename = 'historical-alumni-evidence-'.$historicalAlumniClaim->id.'-page-'.$page.($extension ? '.'.$extension : '');
+
+        AdminActivityLog::record($request->user(), 'historical-alumni.evidence.opened', $historicalAlumniClaim, [
+            'page' => $page,
+            'disposition' => $disposition,
+        ]);
+
+        return response()->file(Storage::disk('local')->path($path), [
+            'Content-Type' => Storage::disk('local')->mimeType($path) ?: 'application/octet-stream',
+            'Content-Disposition' => HeaderUtils::makeDisposition($disposition, $filename),
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+}

@@ -100,7 +100,7 @@
                             <select name="target_enrollment_application_id" data-audience-trainee aria-label="Choose trainee">
                                 <option value="">Choose approved trainee</option>
                                 @foreach($trainees as $trainee)
-                                    <option value="{{ $trainee->id }}" @selected((string) old('target_enrollment_application_id', $quiz?->target_enrollment_application_id) === (string) $trainee->id)>{{ $trainee->last_name }}, {{ $trainee->first_name }} - {{ $trainee->batch?->name ?? 'No class' }}</option>
+                                    <option value="{{ $trainee->id }}" @selected((string) old('target_enrollment_application_id', $quiz?->target_enrollment_application_id) === (string) $trainee->id)>{{ $trainee->last_name }}, {{ $trainee->first_name }} - {{ $trainee->batch?->name ?? 'No class' }}{{ $trainee->learning_status === \App\Models\EnrollmentApplication::LEARNING_GRADUATED ? ' - Graduated in this batch' : '' }}</option>
                                 @endforeach
                             </select>
                         </label>
@@ -143,6 +143,8 @@
                                 <select id="question-{{ $questionIndex }}-type" name="questions[{{ $questionIndex }}][type]" data-question-type>
                                     <option value="multiple_choice" @selected($questionType === 'multiple_choice')>Multiple choice</option>
                                     <option value="true_false" @selected($questionType === 'true_false')>True or false</option>
+                                    <option value="file_upload" @selected($questionType === 'file_upload')>Activity Document (.docx, .pdf, images)</option>
+                                    <option value="enumeration" @selected($questionType === 'enumeration')>Enumeration / Written Activity</option>
                                 </select>
                             </div>
                             <div class="lms-field">
@@ -150,27 +152,27 @@
                                 <input id="question-{{ $questionIndex }}-points" type="number" name="questions[{{ $questionIndex }}][points]" value="{{ data_get($question, 'points', 1) }}" min="1" max="100" required>
                             </div>
                             <div class="lms-field lms-field-wide">
-                                <label for="question-{{ $questionIndex }}-prompt">Question</label>
-                                <textarea id="question-{{ $questionIndex }}-prompt" name="questions[{{ $questionIndex }}][prompt]" rows="3" maxlength="1200" required>{{ data_get($question, 'prompt') }}</textarea>
+                                <label for="question-{{ $questionIndex }}-prompt">Question / Activity Instructions</label>
+                                <textarea id="question-{{ $questionIndex }}-prompt" name="questions[{{ $questionIndex }}][prompt]" rows="3" maxlength="1200" required placeholder="Example: Create a DOCX or PDF file answering: Tell me about yourself and your caregiving background.">{{ data_get($question, 'prompt') }}</textarea>
                             </div>
                         </div>
-                        <fieldset class="lms-option-fieldset">
+                        <fieldset class="lms-option-fieldset" @if(in_array($questionType, ['file_upload', 'enumeration'], true)) hidden @endif>
                             <legend>Answer options</legend>
                             <div class="lms-option-list" data-quiz-option-list>
                                 @foreach($questionOptions as $optionIndex => $option)
                                     <div class="lms-option-row" data-quiz-option>
                                         <span class="lms-option-letter" aria-hidden="true">{{ chr(65 + $optionIndex) }}</span>
                                         <label class="sr-only" for="question-{{ $questionIndex }}-option-{{ $optionIndex }}">Option {{ $optionIndex + 1 }}</label>
-                                        <input id="question-{{ $questionIndex }}-option-{{ $optionIndex }}" name="questions[{{ $questionIndex }}][options][{{ $optionIndex }}]" value="{{ $option }}" required @readonly($questionType === 'true_false')>
+                                        <input id="question-{{ $questionIndex }}-option-{{ $optionIndex }}" name="questions[{{ $questionIndex }}][options][{{ $optionIndex }}]" value="{{ $option }}" @if(!in_array($questionType, ['file_upload', 'enumeration'], true)) required @endif @readonly($questionType === 'true_false')>
                                         <button type="button" class="lms-option-remove" data-remove-option aria-label="Remove option {{ $optionIndex + 1 }}">x</button>
                                     </div>
                                 @endforeach
                             </div>
-                            <button type="button" class="lms-text-action" data-add-option @if($questionType === 'true_false') hidden @endif>Add option</button>
+                            <button type="button" class="lms-text-action" data-add-option @if($questionType === 'true_false' || in_array($questionType, ['file_upload', 'enumeration'], true)) hidden @endif>Add option</button>
                         </fieldset>
-                        <div class="lms-field lms-correct-answer">
+                        <div class="lms-field lms-correct-answer" @if(in_array($questionType, ['file_upload', 'enumeration'], true)) hidden @endif>
                             <label for="question-{{ $questionIndex }}-correct">Correct answer</label>
-                            <select id="question-{{ $questionIndex }}-correct" name="questions[{{ $questionIndex }}][correct_option]" data-correct-option>
+                            <select id="question-{{ $questionIndex }}-correct" name="questions[{{ $questionIndex }}][correct_option]" data-correct-option @if(in_array($questionType, ['file_upload', 'enumeration'], true)) disabled @endif>
                                 @foreach($questionOptions as $optionIndex => $option)
                                     <option value="{{ $optionIndex }}" @selected((int) data_get($question, 'correct_option', 0) === $optionIndex)>Option {{ chr(65 + $optionIndex) }}</option>
                                 @endforeach
@@ -182,7 +184,7 @@
 
             <button type="button" class="lms-add-question" data-add-question>
                 <span aria-hidden="true">+</span>
-                <span><strong>Add question</strong><small>Multiple choice or true/false</small></span>
+                <span><strong>Add question / activity</strong><small>Multiple choice, true/false, document upload, or enumeration</small></span>
             </button>
         </section>
 
@@ -197,9 +199,9 @@
             <header><span class="lms-question-number">Question __NUMBER__</span><button type="button" class="lms-text-action is-danger" data-remove-question>Remove</button></header>
             <input type="hidden" name="questions[__INDEX__][id]" value="">
             <div class="lms-form-grid">
-                <div class="lms-field"><label for="question-__INDEX__-type">Question type</label><select id="question-__INDEX__-type" name="questions[__INDEX__][type]" data-question-type><option value="multiple_choice">Multiple choice</option><option value="true_false">True or false</option></select></div>
+                <div class="lms-field"><label for="question-__INDEX__-type">Question type</label><select id="question-__INDEX__-type" name="questions[__INDEX__][type]" data-question-type><option value="multiple_choice">Multiple choice</option><option value="true_false">True or false</option><option value="file_upload">Activity Document (.docx, .pdf, images)</option><option value="enumeration">Enumeration / Written Activity</option></select></div>
                 <div class="lms-field"><label for="question-__INDEX__-points">Points</label><input id="question-__INDEX__-points" type="number" name="questions[__INDEX__][points]" value="1" min="1" max="100" required></div>
-                <div class="lms-field lms-field-wide"><label for="question-__INDEX__-prompt">Question</label><textarea id="question-__INDEX__-prompt" name="questions[__INDEX__][prompt]" rows="3" maxlength="1200" required></textarea></div>
+                <div class="lms-field lms-field-wide"><label for="question-__INDEX__-prompt">Question / Activity Instructions</label><textarea id="question-__INDEX__-prompt" name="questions[__INDEX__][prompt]" rows="3" maxlength="1200" required placeholder="Example: Create a DOCX or PDF file answering: Tell me about yourself and your caregiving background."></textarea></div>
             </div>
             <fieldset class="lms-option-fieldset">
                 <legend>Answer options</legend>

@@ -42,6 +42,22 @@ class TraineeDashboardController extends Controller
         return $this->portalView($request, 'trainee.modules.index');
     }
 
+    public function grades(Request $request): View|RedirectResponse
+    {
+        $application = $this->approvedApplicationFor($request);
+
+        if (! $application) {
+            return redirect()
+                ->route('payment.show')
+                ->with('payment_notice', 'Your trainee dashboard opens after admin approval.');
+        }
+
+        return $this->portalView($request, 'trainee.grades', [
+            'gradeRecords' => $this->evaluatedGradesFor($application)->get(),
+            'competencyRecords' => $application->competencyRecords()->with('unit')->get(),
+        ], $application);
+    }
+
     public function stream(Request $request): View|RedirectResponse
     {
         $application = $this->approvedApplicationFor($request);
@@ -463,7 +479,10 @@ class TraineeDashboardController extends Controller
         }
 
         $application->load('batch');
-        $modules = $this->availableModulesFor($application)->get();
+        $isGraduate = $application->learning_status === EnrollmentApplication::LEARNING_GRADUATED;
+        $modules = $isGraduate
+            ? collect()
+            : $this->availableModulesFor($application)->get();
         $progressByModule = ModuleProgress::query()
             ->where('enrollment_application_id', $application->id)
             ->whereIn('training_module_id', $modules->pluck('id'))
@@ -472,7 +491,6 @@ class TraineeDashboardController extends Controller
         $progressPercent = $modules->isEmpty()
             ? 0
             : (int) round($modules->sum(fn ($module) => $progressByModule->get($module->id)?->progress_percent ?? 0) / $modules->count());
-        $isGraduate = $application->learning_status === EnrollmentApplication::LEARNING_GRADUATED;
         if ($isGraduate && $view === 'trainee.dashboard') {
             // Graduates keep the trainee shell and account, but receive the Career Hub home content.
             $view = 'trainee.graduate-dashboard';
@@ -486,6 +504,7 @@ class TraineeDashboardController extends Controller
                 ->orderBy('estimated_start_date')
                 ->take(3)
                 ->get(),
+            'evaluatedGradeCount' => $this->evaluatedGradesFor($application)->count(),
         ] : [];
 
         return view($view, array_merge([
@@ -555,7 +574,7 @@ class TraineeDashboardController extends Controller
     public function supplementaryDownload(Request $request, TrainingModule $module, int $index): BinaryFileResponse
     {
         $application = $this->approvedApplicationFor($request);
-        $this->authorizeModule($application, $module);
+        $this->authorizeModule($application, $module, allowEvaluated: false);
         $list = $module->supplementaryList();
         abort_unless(isset($list[$index]), 404);
 
@@ -584,7 +603,7 @@ class TraineeDashboardController extends Controller
     public function moduleContent(Request $request, TrainingModule $module): BinaryFileResponse
     {
         $application = $this->approvedApplicationFor($request);
-        $this->authorizeModule($application, $module);
+        $this->authorizeModule($application, $module, allowEvaluated: false);
         abort_unless(Storage::disk('local')->exists($module->file_path), 404);
 
         // The protected content URL can be opened directly by the browser, so
@@ -603,7 +622,7 @@ class TraineeDashboardController extends Controller
     public function moduleDownload(Request $request, TrainingModule $module): BinaryFileResponse
     {
         $application = $this->approvedApplicationFor($request);
-        $this->authorizeModule($application, $module);
+        $this->authorizeModule($application, $module, allowEvaluated: false);
         abort_unless(Storage::disk('local')->exists($module->file_path), 404);
         $this->touchModuleProgress($application, $module);
 
@@ -665,11 +684,13 @@ class TraineeDashboardController extends Controller
             'status' => $progress->status,
         ]);
 
-        return redirect()
-            ->route('trainee.modules.show', $module)
-            ->with('saved', $submitting
-                ? 'Module submitted. Your trainer must validate the competency before the next module unlocks.'
-                : 'Module returned to in progress.');
+        $redirect = $submitting
+            ? redirect()->route('trainee.modules.index')
+            : redirect()->route('trainee.modules.show', $module);
+
+        return $redirect->with('saved', $submitting
+            ? 'Module submitted. Your trainer must validate the competency before the next module unlocks.'
+            : 'Module returned to in progress.');
     }
 
     public function securityEvent(Request $request, TrainingModule $module): Response
@@ -689,19 +710,28 @@ class TraineeDashboardController extends Controller
         return response()->noContent();
     }
 
-    private function authorizeModule(?EnrollmentApplication $application, TrainingModule $module): void
+    private function authorizeModule(?EnrollmentApplication $application, TrainingModule $module, bool $allowEvaluated = true): void
     {
-
         abort_unless($application, 403);
+        abort_if(
+            $application->is_historical_record
+            || $application->learning_status === EnrollmentApplication::LEARNING_GRADUATED,
+            403
+        );
         abort_unless($module->is_published, 404);
         abort_if($module->available_at?->isFuture(), 404);
-        abort_unless(ModuleProgress::query()
+        $progress = ModuleProgress::query()
             ->where('enrollment_application_id', $application->id)
             ->where('training_module_id', $module->id)
             ->whereNotNull('unlocked_at')
             ->where('status', '!=', ModuleProgress::STATUS_LOCKED)
-            ->exists(), 404);
+            ->first();
 
+        abort_unless($progress, 404);
+
+        if (! $allowEvaluated) {
+            abort_if($progress->isTrainerValidated(), 403, 'Learning files and downloads are closed for evaluated and completed modules.');
+        }
     }
 
     private function approvedApplicationFor(Request $request): ?EnrollmentApplication
@@ -720,6 +750,18 @@ class TraineeDashboardController extends Controller
             ->availableTo($application)
             ->orderBy('position')
             ->latest('published_at');
+    }
+
+    private function evaluatedGradesFor(EnrollmentApplication $application)
+    {
+        return ModuleProgress::query()
+            ->with(['module.trainer', 'evaluator'])
+            ->where('enrollment_application_id', $application->id)
+            ->whereNotNull('evaluated_at')
+            ->whereNotNull('evaluated_by_id')
+            ->whereHas('module')
+            ->when($application->is_historical_record, fn ($query) => $query->whereRaw('1 = 0'))
+            ->latest('evaluated_at');
     }
 
     private function touchModuleProgress(

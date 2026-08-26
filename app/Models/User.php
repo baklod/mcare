@@ -107,6 +107,11 @@ class User extends Authenticatable implements MustVerifyEmailContract
         return $this->hasOne(AlumniProfile::class);
     }
 
+    public function historicalAlumniClaim(): HasOne
+    {
+        return $this->hasOne(HistoricalAlumniClaim::class);
+    }
+
     public function enrollmentApplication(): HasOne
     {
         return $this->hasOne(EnrollmentApplication::class);

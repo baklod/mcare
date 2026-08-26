@@ -144,6 +144,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         dialog.addEventListener('click', (event) => {
+            // Only a click on the native dialog backdrop may dismiss it.
+            // Descendant controls (notably programmatic file-input clicks) can
+            // report 0,0 coordinates and must not be mistaken for backdrop clicks.
+            if (event.target !== dialog) return;
+
             const bounds = dialog.getBoundingClientRect();
             const outside = event.clientX < bounds.left || event.clientX > bounds.right
                 || event.clientY < bounds.top || event.clientY > bounds.bottom;
@@ -303,6 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const fitWidthBtn = container.querySelector('[data-pdf-fit-width]');
         const loadingEl = container.querySelector('[data-pdf-loading]');
         const containerWrapper = container.querySelector('[data-pdf-canvas-container]');
+        const fitMode = container.dataset.pdfFitMode === 'page' ? 'page' : 'width';
 
         let pdfDoc = null;
         let pageNum = 1;
@@ -383,16 +389,40 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
+        const fitCurrentPage = () => {
+            if (!pdfDoc || !containerWrapper) return;
+
+            pdfDoc.getPage(pageNum).then((page) => {
+                const unscaledViewport = page.getViewport({ scale: 1.0 });
+                const availableWidth = Math.max(0, containerWrapper.clientWidth - 32);
+                const availableHeight = Math.max(0, containerWrapper.clientHeight - 32);
+                if (!availableWidth || !unscaledViewport.width) return;
+
+                const widthScale = availableWidth / unscaledViewport.width;
+                const heightScale = availableHeight && unscaledViewport.height
+                    ? availableHeight / unscaledViewport.height
+                    : widthScale;
+                const fittedScale = fitMode === 'page'
+                    ? Math.min(widthScale, heightScale)
+                    : widthScale;
+
+                scale = Math.max(0.5, Math.min(2.5, fittedScale));
+                queueRenderPage(pageNum);
+            });
+        };
+
         prevBtn?.addEventListener('click', () => {
             if (pageNum <= 1) return;
             pageNum--;
-            queueRenderPage(pageNum);
+            if (fitMode === 'page') fitCurrentPage();
+            else queueRenderPage(pageNum);
         });
 
         nextBtn?.addEventListener('click', () => {
             if (!pdfDoc || pageNum >= pdfDoc.numPages) return;
             pageNum++;
-            queueRenderPage(pageNum);
+            if (fitMode === 'page') fitCurrentPage();
+            else queueRenderPage(pageNum);
         });
 
         zoomInBtn?.addEventListener('click', () => {
@@ -407,17 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
             queueRenderPage(pageNum);
         });
 
-        fitWidthBtn?.addEventListener('click', () => {
-            if (!pdfDoc || !containerWrapper) return;
-            pdfDoc.getPage(pageNum).then((page) => {
-                const unscaledViewport = page.getViewport({ scale: 1.0 });
-                const containerWidth = containerWrapper.clientWidth - 48;
-                if (containerWidth > 0 && unscaledViewport.width > 0) {
-                    scale = Math.max(0.5, Math.min(2.5, containerWidth / unscaledViewport.width));
-                    queueRenderPage(pageNum);
-                }
-            });
-        });
+        fitWidthBtn?.addEventListener('click', fitCurrentPage);
 
         container.addEventListener('contextmenu', (event) => event.preventDefault());
         container.addEventListener('dragstart', (event) => event.preventDefault());
@@ -430,12 +450,23 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingTask.promise.then((pdf) => {
             pdfDoc = pdf;
             if (totalPagesEl) totalPagesEl.textContent = String(pdf.numPages);
-            renderPage(pageNum);
+            if (fitMode === 'page') fitCurrentPage();
+            else renderPage(pageNum);
         }).catch(() => {
             if (loadingEl) {
                 loadingEl.innerHTML = `<div class="p-6 text-center text-sm text-red-300">Unable to load document in canvas viewer. <a href="${url}" target="_blank" class="underline font-bold text-white">Open file directly</a></div>`;
             }
         });
+
+        if (fitMode === 'page' && containerWrapper && 'ResizeObserver' in window) {
+            let resizeTimer = null;
+            const resizeObserver = new ResizeObserver(() => {
+                if (!pdfDoc) return;
+                window.clearTimeout(resizeTimer);
+                resizeTimer = window.setTimeout(fitCurrentPage, 120);
+            });
+            resizeObserver.observe(containerWrapper);
+        }
     };
 
     document.querySelectorAll('[data-pdf-canvas-viewer]').forEach(initPdfCanvasViewer);
@@ -842,8 +873,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const updateOptionControls = (question) => {
             const type = question.querySelector('[data-question-type]')?.value || 'multiple_choice';
+            const optionFieldset = question.querySelector('.lms-option-fieldset');
+            const correctField = question.querySelector('.lms-correct-answer');
             const optionList = question.querySelector('[data-quiz-option-list]');
             const addOptionButton = question.querySelector('[data-add-option]');
+
+            if (type === 'file_upload' || type === 'enumeration') {
+                if (optionFieldset) optionFieldset.hidden = true;
+                if (correctField) correctField.hidden = true;
+                optionList?.querySelectorAll('input').forEach((input) => {
+                    input.disabled = true;
+                    input.required = false;
+                });
+                if (correctField?.querySelector('select')) {
+                    correctField.querySelector('select').disabled = true;
+                }
+                return;
+            }
+
+            if (optionFieldset) optionFieldset.hidden = false;
+            if (correctField) correctField.hidden = false;
+            optionList?.querySelectorAll('input').forEach((input) => {
+                input.disabled = false;
+                input.required = true;
+            });
+            if (correctField?.querySelector('select')) {
+                correctField.querySelector('select').disabled = false;
+            }
+
             if (!optionList) return;
 
             if (type === 'true_false') {

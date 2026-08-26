@@ -255,6 +255,10 @@ class OfficialDocumentManager
 
     private function assertEligible(EnrollmentApplication $application): void
     {
+        if ($application->learning_status === EnrollmentApplication::LEARNING_GRADUATED) {
+            return;
+        }
+
         $eligibility = $this->eligibility->evaluate($application);
 
         if ($eligibility['eligible']) {

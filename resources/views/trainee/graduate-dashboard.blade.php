@@ -12,18 +12,18 @@
 
     <div class="grid gap-4 sm:grid-cols-3">
         <article class="dashboard-panel"><p class="text-xs font-black uppercase tracking-wide text-slate-500">Training status</p><p class="mt-2 text-xl font-black text-slate-950">{{ $application->learningStatusLabel() }}</p><p class="mt-1 text-sm text-slate-500">Your account keeps its training record.</p></article>
-        <article class="dashboard-panel"><p class="text-xs font-black uppercase tracking-wide text-slate-500">Module history</p><p class="mt-2 text-xl font-black text-slate-950">{{ $stats['modules'] }} modules</p><p class="mt-1 text-sm text-slate-500">{{ $stats['progress'] }}% recorded completion</p></article>
+        <article class="dashboard-panel"><p class="text-xs font-black uppercase tracking-wide text-slate-500">Course grades</p><p class="mt-2 text-xl font-black text-slate-950">{{ $application->program ?: 'Caregiving NC II' }}</p><p class="mt-1 text-sm text-slate-500">{{ $evaluatedGradeCount }} trainer-validated {{ str('grade')->plural($evaluatedGradeCount) }}</p><a href="{{ route('trainee.grades') }}" class="mt-2 inline-flex text-sm font-bold text-purple-700 hover:text-purple-900">View Grades →</a></article>
         <article class="dashboard-panel"><p class="text-xs font-black uppercase tracking-wide text-slate-500">Documents</p><p class="mt-2 text-xl font-black text-slate-950">{{ $stats['documents'] }} files</p><a href="{{ route('trainee.documents') }}" class="mt-1 inline-flex text-sm font-bold text-purple-700 hover:text-purple-900">View certificates and records</a></article>
     </div>
 
     <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <section class="dashboard-panel" aria-labelledby="graduate-history-title">
-            <div class="flex items-center justify-between gap-3"><div><p class="dashboard-section-kicker">Completed training</p><h2 id="graduate-history-title" class="mt-1 text-2xl font-black text-slate-950">Your MCARE history</h2></div><span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">Verified graduate</span></div>
+            <div class="flex items-center justify-between gap-3"><div><p class="dashboard-section-kicker">Completed training</p><h2 id="graduate-history-title" class="mt-1 text-2xl font-black text-slate-950">Your MCARE history</h2></div><span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">{{ $batch ? 'Graduated in this batch' : 'Verified graduate' }}</span></div>
             <div class="mt-5 grid gap-3 sm:grid-cols-2">
                 <div class="rounded-xl border border-slate-100 bg-slate-50 p-4"><p class="text-xs font-bold uppercase text-slate-500">Program</p><p class="mt-1 font-bold text-slate-950">{{ $application->program }}</p></div>
                 <div class="rounded-xl border border-slate-100 bg-slate-50 p-4"><p class="text-xs font-bold uppercase text-slate-500">Batch</p><p class="mt-1 font-bold text-slate-950">{{ $batch ? $batch->name.' '.$batch->year : 'Recorded training batch' }}</p></div>
             </div>
-            <p class="mt-5 text-sm leading-6 text-slate-600">Payments, quizzes, and active learning controls are closed after graduation. Your records remain available under Documents.</p>
+            <p class="mt-5 text-sm leading-6 text-slate-600">Uploaded learning modules, quizzes, progress controls, and classroom posting close after graduation. Only grades formally evaluated by a trainer remain visible under Grades, while certificates and official records stay under Documents.</p>
         </section>
         <section class="dashboard-panel" aria-labelledby="graduate-jobs-title">
             <div class="flex items-center justify-between gap-3"><h2 id="graduate-jobs-title" class="text-xl font-black text-slate-950">Latest opportunities</h2><a href="{{ route('trainee.career-hub') }}" class="text-sm font-bold text-purple-700">View all</a></div>

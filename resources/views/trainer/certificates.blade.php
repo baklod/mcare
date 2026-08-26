@@ -21,6 +21,7 @@
                     <div class="min-w-0">
                         <p class="truncate font-bold text-stone-950">{{ $trainee->first_name }} {{ $trainee->last_name }}</p>
                         <p class="text-sm text-stone-500">{{ $completedModules }} of {{ $requiredModules }} required core modules trainer-validated</p>
+                        <x-graduate-batch-badge :application="$trainee" class="mt-1.5" />
                     </div>
                 </div>
                 <span class="w-fit px-3 py-1 text-xs font-bold {{ $eligible ? 'bg-emerald-50 text-emerald-800' : 'bg-stone-100 text-stone-600' }}">

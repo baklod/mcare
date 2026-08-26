@@ -192,7 +192,11 @@
                                         <form method="POST" action="{{ route('admin.learning.trainees.status', $trainee) }}">@csrf @method('PATCH')<input type="hidden" name="learning_status" value="active"><button class="min-h-10 rounded-lg border border-emerald-200 bg-emerald-50 px-4 text-xs font-bold text-emerald-800 hover:bg-emerald-100">Resume</button></form>
                                     @endif
                                     @if ($trainee->learning_status !== \App\Models\EnrollmentApplication::LEARNING_GRADUATED)
-                                        <form method="POST" action="{{ route('admin.learning.trainees.status', $trainee) }}">@csrf @method('PATCH')<input type="hidden" name="learning_status" value="graduated"><button class="min-h-10 rounded-lg border border-purple-200 bg-purple-50 px-4 text-xs font-bold text-purple-800 hover:bg-purple-100">Graduate</button></form>
+                                        <form method="POST" action="{{ route('admin.learning.trainees.status', $trainee) }}">
+                                            @csrf @method('PATCH')
+                                            <input type="hidden" name="learning_status" value="graduated">
+                                            <button class="min-h-10 rounded-lg border border-purple-200 bg-purple-50 px-4 text-xs font-bold text-purple-800 hover:bg-purple-100" data-confirm="Graduate {{ $trainee->first_name }} {{ $trainee->last_name }}? If requirements were completed offline or on-site, competencies will be marked Competent and COTC will be available online.">Graduate</button>
+                                        </form>
                                     @endif
                                 </div>
                                 <form method="POST" action="{{ route('admin.learning.trainees.status', $trainee) }}" class="mt-3 grid max-w-3xl gap-2 sm:grid-cols-[12rem_minmax(14rem,1fr)_auto]">

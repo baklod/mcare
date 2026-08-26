@@ -14,6 +14,10 @@ class QuizQuestion extends Model
 
     public const TYPE_TRUE_FALSE = 'true_false';
 
+    public const TYPE_FILE_UPLOAD = 'file_upload';
+
+    public const TYPE_ENUMERATION = 'enumeration';
+
     protected $fillable = [
         'quiz_id',
         'type',
@@ -40,7 +44,24 @@ class QuizQuestion extends Model
         return [
             self::TYPE_MULTIPLE_CHOICE,
             self::TYPE_TRUE_FALSE,
+            self::TYPE_FILE_UPLOAD,
+            self::TYPE_ENUMERATION,
         ];
+    }
+
+    public function isFileUpload(): bool
+    {
+        return $this->type === self::TYPE_FILE_UPLOAD;
+    }
+
+    public function isEnumeration(): bool
+    {
+        return $this->type === self::TYPE_ENUMERATION;
+    }
+
+    public function requiresOptions(): bool
+    {
+        return in_array($this->type, [self::TYPE_MULTIPLE_CHOICE, self::TYPE_TRUE_FALSE], true);
     }
 
     public function quiz(): BelongsTo
@@ -63,6 +84,10 @@ class QuizQuestion extends Model
 
     public function isCorrectOption(mixed $value): bool
     {
+        if ($this->isFileUpload() || $this->isEnumeration()) {
+            return filled($value);
+        }
+
         $index = $this->normalizedOptionIndex($value);
 
         return $index !== null && $index === $this->correct_option;

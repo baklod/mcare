@@ -11,6 +11,14 @@ class LmsResponsiveRenderingTest extends TestCase
     use CreatesLmsTestData;
     use RefreshDatabase;
 
+    public function test_shared_dialog_backdrop_handler_ignores_clicks_from_file_controls(): void
+    {
+        $script = file_get_contents(resource_path('js/app.js'));
+
+        $this->assertIsString($script);
+        $this->assertStringContainsString('if (event.target !== dialog) return;', $script);
+    }
+
     public function test_trainer_lms_pages_expose_stable_mobile_safe_structure(): void
     {
         $trainer = $this->lmsUser('trainer');
@@ -90,7 +98,9 @@ class LmsResponsiveRenderingTest extends TestCase
         $this->actingAs($trainer)
             ->get(route('trainer.modules.show', $module))
             ->assertOk()
-            ->assertSee('https://example.test/module-trainee-avatar.jpg', false);
+            ->assertSee('https://example.test/module-trainee-avatar.jpg', false)
+            ->assertSee('data-module-file-preview', false)
+            ->assertSee('data-pdf-fit-mode="page"', false);
 
         $this->actingAs($trainer)
             ->get(route('trainer.trainees'))

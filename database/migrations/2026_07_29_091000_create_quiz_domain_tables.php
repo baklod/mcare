@@ -45,7 +45,7 @@ return new class extends Migration
             $table->text('prompt');
             $table->json('options');
             // Option indexes are zero-based so they map directly to the stored JSON array.
-            $table->unsignedSmallInteger('correct_option');
+            $table->unsignedSmallInteger('correct_option')->nullable();
             $table->decimal('points', 8, 2)->default(1);
             $table->unsignedInteger('position')->default(0);
             $table->timestamps();

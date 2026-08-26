@@ -294,7 +294,7 @@
                     </div>
 
                     <div class="space-y-2 pt-1">
-                        <a href="{{ route('payment.receipt') }}" target="_blank" class="primary-action w-full justify-center">
+                        <a href="{{ route('payment.receipt') }}" target="_blank" rel="noopener noreferrer" class="primary-action w-full justify-center">
                             <x-dashboard-icon name="print" class="h-4 w-4" />
                             <span>View & Print Official Slip</span>
                         </a>

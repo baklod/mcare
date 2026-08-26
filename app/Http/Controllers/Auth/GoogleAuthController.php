@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\EnrollmentApplication;
+use App\Models\HistoricalAlumniClaim;
 use App\Models\User;
 use App\Support\AccountPortal;
 use Illuminate\Http\RedirectResponse;
@@ -95,6 +96,24 @@ class GoogleAuthController extends Controller
         }
 
         $application = $user->enrollmentApplication()->latest()->first();
+        $historicalClaim = $user->historicalAlumniClaim()->first();
+
+        if ($user->role === 'applicant' && $historicalClaim) {
+            if ($historicalClaim->status === HistoricalAlumniClaim::STATUS_PENDING_EMAIL) {
+                $historicalClaim->forceFill([
+                    'status' => HistoricalAlumniClaim::STATUS_PENDING_ONSITE,
+                ])->save();
+                $user->forceFill([
+                    'applicant_status' => 'historical_claim_pending_onsite',
+                ])->save();
+            }
+
+            $request->session()->regenerate();
+
+            return redirect()
+                ->route('login')
+                ->with('verified', 'Google verified your email and profile picture. Your alumni account remains locked until MCARE checks your valid ID, original COTC/TOR, and archive record onsite.');
+        }
 
         if ($user->role === 'applicant' && $application?->status === EnrollmentApplication::STATUS_DENIED) {
             Auth::login($user, true);

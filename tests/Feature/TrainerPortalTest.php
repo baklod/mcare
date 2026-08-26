@@ -68,13 +68,20 @@ class TrainerPortalTest extends TestCase
             'school_name' => 'MCARE High School',
             'year_graduated' => 2020,
             'status' => EnrollmentApplication::STATUS_APPROVED,
+            'learning_status' => EnrollmentApplication::LEARNING_GRADUATED,
         ]);
 
         $this->actingAs($trainer)
             ->get(route('trainer.dashboard'))
             ->assertOk()
             ->assertSee('Ana')
+            ->assertSee('Graduated in this batch')
             ->assertSee('MWF | 8:00 AM - 12:00 PM');
+
+        $this->actingAs($trainer)
+            ->get(route('trainer.trainees'))
+            ->assertOk()
+            ->assertSee('Graduated in this batch');
     }
 
     public function test_trainer_can_upload_private_module(): void

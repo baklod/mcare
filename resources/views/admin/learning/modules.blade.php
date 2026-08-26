@@ -221,6 +221,7 @@
                         </td>
                         <td>
                             <div class="flex flex-wrap gap-2">
+                                <a href="{{ route('admin.learning.modules.preview', $module) }}" class="secondary-action text-xs">Preview</a>
                                 <a href="{{ route('classroom-comments.index', ['type' => 'module', 'id' => $module->id]) }}" class="secondary-action text-xs">Comments</a>
                                 <form method="POST" action="{{ route('admin.learning.modules.destroy', $module) }}" data-confirm="Remove this module and its recorded progress?">
                                     @csrf

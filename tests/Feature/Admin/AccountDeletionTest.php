@@ -132,9 +132,11 @@ class AccountDeletionTest extends TestCase
         $this->assertTrue(Storage::disk('local')->exists($photoPath));
         $this->assertTrue(Storage::disk('local')->exists($receiptPath));
 
-        $response = $this->actingAs($admin)->delete(route('admin.accounts.destroy', $applicantUser));
+        $response = $this->actingAs($admin)
+            ->from(route('admin.accounts.photo', $applicantUser))
+            ->delete(route('admin.accounts.destroy', $applicantUser));
 
-        $response->assertRedirect();
+        $response->assertRedirect(route('admin.accounts.index'));
         $response->assertSessionHas('saved');
 
         // Database records must be removed
@@ -196,7 +198,7 @@ class AccountDeletionTest extends TestCase
         // 2. Admin deletes the account
         $this->actingAs($admin)
             ->delete(route('admin.accounts.destroy', $applicantUser))
-            ->assertRedirect();
+            ->assertRedirect(route('admin.accounts.index'));
 
         $this->assertDatabaseMissing('users', ['email' => $testEmail]);
         $this->assertDatabaseMissing('enrollment_applications', ['email' => $testEmail]);

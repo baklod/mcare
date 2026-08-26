@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\EnrollmentApplication;
+use App\Models\PaymentTransaction;
 use App\Models\TrainingBatch;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -86,12 +87,26 @@ class TraineePaymentReceiptTest extends TestCase
             ->assertOk()
             ->assertSee($firstReceiptNumber)
             ->assertSee('Ana Reyes')
-            ->assertSee('PHP 22,000.00');
+            ->assertSee('PHP 22,000.00')
+            ->assertSee('Print / Save PDF');
+
+        // Once the cashier has verified the active ticket, the dashboard
+        // presents the official receipt action instead of the pending ticket.
+        $application->paymentTransactions()->update([
+            'status' => PaymentTransaction::STATUS_VERIFIED,
+            'or_number' => 'OR-TEST-22000',
+            'paid_at' => now(),
+            'verified_at' => now(),
+        ]);
 
         // Trainee billing summary shows the active slip details
         $this->actingAs($trainee)
             ->get(route('trainee.payments'))
             ->assertOk()
-            ->assertSee($firstReceiptNumber);
+            ->assertSee($firstReceiptNumber)
+            ->assertSee('View & Print Official Slip', false)
+            ->assertSee('href="'.route('payment.receipt').'"', false)
+            ->assertSee('target="_blank"', false)
+            ->assertSee('rel="noopener noreferrer"', false);
     }
 }

@@ -45,28 +45,47 @@
 
         @foreach($quiz->questions as $questionIndex => $question)
             @php
-                $selectedIndex = $answers->get((string) $question->id, $answers->get($question->id));
-                $selectedOption = is_numeric($selectedIndex) ? data_get($question->options, (int) $selectedIndex) : null;
-                $correctOption = $answerReviewAvailable
+                $rawAnswer = $answers->get((string) $question->id, $answers->get($question->id));
+                $isFile = is_array($rawAnswer) && ($rawAnswer['type'] ?? null) === 'file';
+                $isText = is_array($rawAnswer) && ($rawAnswer['type'] ?? null) === 'text';
+                $selectedIndex = is_numeric($rawAnswer) ? (int) $rawAnswer : null;
+                $selectedOption = $selectedIndex !== null ? data_get($question->options, $selectedIndex) : null;
+                $correctOption = $answerReviewAvailable && $question->requiresOptions()
                     ? data_get($question->options, (int) $question->correct_option)
                     : null;
                 $isCorrect = $answerReviewAvailable
-                    && (int) $selectedIndex === (int) $question->correct_option
-                    && $selectedIndex !== null;
+                    ? ($question->requiresOptions() ? ($selectedIndex !== null && $selectedIndex === (int) $question->correct_option) : ($isFile || $isText))
+                    : false;
             @endphp
             <article class="lms-review-card {{ $answerReviewAvailable ? ($isCorrect ? 'is-correct' : 'is-incorrect') : '' }}">
                 <header>
                     <span>Question {{ $questionIndex + 1 }}</span>
                     @if($answerReviewAvailable)
-                        <span class="lms-status-chip {{ $isCorrect ? 'is-green' : 'is-red' }}">{{ $isCorrect ? 'Correct' : 'Incorrect' }}</span>
+                        <span class="lms-status-chip {{ $isCorrect ? 'is-green' : 'is-red' }}">{{ $isCorrect ? 'Completed' : 'Incorrect' }}</span>
                     @else
                         <span class="lms-status-chip is-neutral">Recorded</span>
                     @endif
                 </header>
                 <h3>{{ $question->prompt }}</h3>
                 <dl>
-                    <div><dt>Your answer</dt><dd>{{ $selectedOption ?? 'No answer' }}</dd></div>
-                    @if($answerReviewAvailable && ! $isCorrect)
+                    <div>
+                        <dt>Your answer</dt>
+                        <dd>
+                            @if($isFile)
+                                <div class="mt-1 flex items-center gap-2">
+                                    <span class="font-medium text-slate-800">{{ $rawAnswer['original_name'] ?? 'Submitted Document' }}</span>
+                                    <a href="{{ route('trainee.quiz-attempts.download', ['attempt' => $attempt, 'question' => $question->id]) }}" class="inline-flex items-center gap-1 rounded-md bg-purple-100 px-2.5 py-1 text-xs font-bold text-purple-800 hover:bg-purple-200">
+                                        Download File
+                                    </a>
+                                </div>
+                            @elseif($isText)
+                                <p class="whitespace-pre-line text-slate-800">{{ $rawAnswer['content'] }}</p>
+                            @else
+                                {{ $selectedOption ?? 'No answer' }}
+                            @endif
+                        </dd>
+                    </div>
+                    @if($answerReviewAvailable && ! $isCorrect && $correctOption)
                         <div><dt>Correct answer</dt><dd>{{ $correctOption }}</dd></div>
                     @endif
                 </dl>

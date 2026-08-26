@@ -40,6 +40,12 @@
                     </div>
                 @endif
 
+                @if (session('verified'))
+                    <div class="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-sm font-medium leading-6 text-emerald-900" role="status">
+                        {{ session('verified') }}
+                    </div>
+                @endif
+
                 @if ($errors->any())
                     <div class="mb-5 rounded-xl border border-red-200 bg-red-50 p-3.5 text-sm font-medium text-red-700">
                         {{ $mfaPending ? 'Please check the verification code and try again.' : 'Please check your account credentials and try again.' }}
@@ -120,6 +126,10 @@
                             <a href="{{ route('enrollment.create') }}" class="font-semibold text-purple-700 hover:text-purple-800 hover:underline">
                                 Start your enrollment application
                             </a>
+                        </p>
+                        <p class="mt-2 text-xs text-slate-500">
+                            Graduated before the MCARE website?
+                            <a href="{{ route('alumni.claim.create') }}" class="font-semibold text-purple-700 hover:text-purple-800 hover:underline">Claim your alumni record</a>
                         </p>
                     </div>
                     @endif

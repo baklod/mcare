@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
+use App\Models\HistoricalAlumniClaim;
 use App\Models\User;
 use App\Services\EmailTwoFactorService;
 use App\Support\AccountPortal;
@@ -66,6 +67,17 @@ class AccountSessionController extends Controller
         }
 
         $application = $user->enrollmentApplication()->latest()->first();
+        $historicalClaim = $user->historicalAlumniClaim()->first();
+
+        if ($user->role === 'applicant' && $historicalClaim) {
+            $message = $historicalClaim->status === HistoricalAlumniClaim::STATUS_REJECTED
+                ? 'Your historical alumni claim needs attention. Please contact MCARE administration and bring the requested records.'
+                : 'Your email is verified. Please complete the on-site alumni verification using your valid ID and original COTC or TOR before account access is activated.';
+
+            return back()
+                ->withErrors(['email' => $message])
+                ->onlyInput('email');
+        }
 
         if ($user->role === 'applicant'
             && $application?->status !== EnrollmentApplication::STATUS_DENIED

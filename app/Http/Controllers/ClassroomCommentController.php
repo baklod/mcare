@@ -34,6 +34,7 @@ class ClassroomCommentController extends Controller
 
     public function store(Request $request, ClassroomComments $comments): RedirectResponse
     {
+        $this->authorizeActiveClassroomMutation($request);
         abort_unless($request->user()->hasPermissionTo('comments.create'), 403);
 
         $validated = $request->validate([
@@ -100,6 +101,7 @@ class ClassroomCommentController extends Controller
         ClassroomComment $comment,
         ClassroomComments $comments,
     ): RedirectResponse {
+        $this->authorizeActiveClassroomMutation($request);
         $this->authorize('update', $comment);
         $validated = $request->validate([
             'body' => ['required', 'string', 'min:1', 'max:2000', 'not_regex:/<[^>]+>/u'],
@@ -128,6 +130,7 @@ class ClassroomCommentController extends Controller
         ClassroomComment $comment,
         ClassroomComments $comments,
     ): RedirectResponse {
+        $this->authorizeActiveClassroomMutation($request);
         $this->authorize('delete', $comment);
         $commentable = $comment->commentable;
         abort_unless($commentable, 404);
@@ -140,5 +143,12 @@ class ClassroomCommentController extends Controller
         return redirect()
             ->to($comments->pathFor($request->user(), $commentable))
             ->with('saved', 'Comment removed.');
+    }
+
+    private function authorizeActiveClassroomMutation(Request $request): void
+    {
+        $user = $request->user();
+
+        abort_if($user?->hasRole('trainee') && $user->isGraduate(), 403);
     }
 }

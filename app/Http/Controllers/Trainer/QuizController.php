@@ -146,6 +146,10 @@ class QuizController extends Controller
             $attributes = [
                 'title' => $validated['title'],
                 'instructions' => $validated['instructions'] ?? null,
+                'available_at' => $validated['available_at'] ?? null,
+                'due_at' => $validated['due_at'] ?? null,
+                'time_limit_minutes' => $validated['time_limit_minutes'] ?? null,
+                'attempt_limit' => $validated['attempt_limit'],
                 'is_published' => $published,
                 'published_at' => $published ? ($lockedQuiz->published_at ?? now()) : null,
             ];
@@ -156,10 +160,6 @@ class QuizController extends Controller
                     'training_module_id' => $parentModule?->id,
                     'training_batch_id' => $batchId,
                     'target_enrollment_application_id' => $targetTrainee?->id,
-                    'available_at' => $validated['available_at'] ?? null,
-                    'due_at' => $validated['due_at'] ?? null,
-                    'time_limit_minutes' => $validated['time_limit_minutes'] ?? null,
-                    'attempt_limit' => $validated['attempt_limit'],
                     'passing_score_percent' => $validated['passing_score_percent'],
                 ];
             }
@@ -294,11 +294,11 @@ class QuizController extends Controller
             'passing_score_percent' => ['required', 'numeric', 'min:1', 'max:100'],
             'is_published' => ['nullable', 'boolean'],
             'questions' => ['required', 'array', 'min:1', 'max:50'],
-            'questions.*.type' => ['required', Rule::in(['multiple_choice', 'true_false'])],
+            'questions.*.type' => ['required', Rule::in(['multiple_choice', 'true_false', 'file_upload', 'enumeration'])],
             'questions.*.prompt' => ['required', 'string', 'max:2000'],
-            'questions.*.options' => ['required', 'array', 'min:2', 'max:6'],
-            'questions.*.options.*' => ['required', 'string', 'max:500'],
-            'questions.*.correct_option' => ['required', 'integer', 'min:0', 'max:5'],
+            'questions.*.options' => ['nullable', 'array'],
+            'questions.*.options.*' => ['nullable', 'string', 'max:500'],
+            'questions.*.correct_option' => ['nullable', 'integer', 'min:0', 'max:5'],
             'questions.*.points' => ['required', 'numeric', 'min:0.25', 'max:100'],
             'questions.*.position' => ['nullable', 'integer', 'min:0', 'max:10000'],
         ]);
@@ -326,21 +326,33 @@ class QuizController extends Controller
 
         foreach (array_values($questions) as $index => $question) {
             $type = $question['type'];
-            $options = $type === 'true_false'
-                ? ['True', 'False']
-                : array_map(static fn ($option) => trim((string) $option), array_values($question['options']));
-            $correctOption = (int) $question['correct_option'];
+            if (in_array($type, ['file_upload', 'enumeration'], true)) {
+                $options = [];
+                $correctOption = null;
+            } else {
+                $rawOptions = array_values(array_filter($question['options'] ?? [], fn ($opt) => filled(trim((string) $opt))));
+                $options = $type === 'true_false'
+                    ? ['True', 'False']
+                    : array_map(static fn ($option) => trim((string) $option), $rawOptions);
+                $correctOption = (int) ($question['correct_option'] ?? 0);
 
-            if (count(array_unique(array_map('mb_strtolower', $options))) !== count($options)) {
-                throw ValidationException::withMessages([
-                    "questions.{$index}.options" => 'Answer options must be unique.',
-                ]);
-            }
+                if (count($options) < 2) {
+                    throw ValidationException::withMessages([
+                        "questions.{$index}.options" => 'Provide at least two answer options.',
+                    ]);
+                }
 
-            if (! array_key_exists($correctOption, $options)) {
-                throw ValidationException::withMessages([
-                    "questions.{$index}.correct_option" => 'Choose a valid correct answer.',
-                ]);
+                if (count(array_unique(array_map('mb_strtolower', $options))) !== count($options)) {
+                    throw ValidationException::withMessages([
+                        "questions.{$index}.options" => 'Answer options must be unique.',
+                    ]);
+                }
+
+                if (! array_key_exists($correctOption, $options)) {
+                    throw ValidationException::withMessages([
+                        "questions.{$index}.correct_option" => 'Choose a valid correct answer.',
+                    ]);
+                }
             }
 
             $normalized[] = [
@@ -491,8 +503,8 @@ class QuizController extends Controller
             ->map(fn ($question, $index) => [
                 'type' => $question->type,
                 'prompt' => $question->prompt,
-                'options' => array_values($question->options),
-                'correct_option' => (int) $question->correct_option,
+                'options' => array_values($question->options ?? []),
+                'correct_option' => $question->correct_option !== null ? (int) $question->correct_option : null,
                 'points' => (float) $question->points,
                 'position' => (int) ($question->position ?? $index),
             ])
@@ -532,25 +544,6 @@ class QuizController extends Controller
             !== $this->nullableInt($targetTrainee?->id)
         ) {
             $errors['target_enrollment_application_id'] = $message;
-        }
-
-        if (! $this->sameDateTime($quiz->available_at, $validated['available_at'] ?? null)) {
-            $errors['available_at'] = $message;
-        }
-
-        if (! $this->sameDateTime($quiz->due_at, $validated['due_at'] ?? null)) {
-            $errors['due_at'] = $message;
-        }
-
-        if (
-            $this->nullableInt($quiz->time_limit_minutes)
-            !== $this->nullableInt($validated['time_limit_minutes'] ?? null)
-        ) {
-            $errors['time_limit_minutes'] = $message;
-        }
-
-        if ((int) $quiz->attempt_limit !== (int) $validated['attempt_limit']) {
-            $errors['attempt_limit'] = $message;
         }
 
         if (
@@ -614,5 +607,35 @@ class QuizController extends Controller
         if ($trainees->isNotEmpty()) {
             Notification::send($trainees, new LmsQuizPublished($quiz));
         }
+    }
+
+    public function downloadAttemptSubmission(
+        Request $request,
+        Quiz $quiz,
+        QuizAttempt $attempt,
+        int $questionId,
+    ): \Symfony\Component\HttpFoundation\BinaryFileResponse {
+        $this->authorize('view', $quiz);
+        abort_unless((int) $attempt->quiz_id === (int) $quiz->id, 404);
+
+        $answers = $attempt->answers ?? [];
+        $answer = $answers[$questionId] ?? $answers[(string) $questionId] ?? null;
+
+        abort_unless(is_array($answer) && ($answer['type'] ?? null) === 'file', 404);
+        $path = $answer['file_path'] ?? null;
+        abort_unless(is_string($path) && \Illuminate\Support\Facades\Storage::disk('local')->exists($path), 404);
+
+        $filename = basename($answer['original_name'] ?? 'submission');
+        $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
+
+        return response()->file(\Illuminate\Support\Facades\Storage::disk('local')->path($path), [
+            'Content-Type' => ($answer['mime_type'] ?? null) ?: 'application/octet-stream',
+            'Content-Disposition' => \Symfony\Component\HttpFoundation\HeaderUtils::makeDisposition(
+                \Symfony\Component\HttpFoundation\HeaderUtils::DISPOSITION_ATTACHMENT,
+                $filename,
+                $fallbackFilename
+            ),
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 }

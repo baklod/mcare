@@ -1,0 +1,219 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\EnrollmentApplication;
+use App\Models\HistoricalAlumniClaim;
+use App\Models\TrainingModule;
+use App\Models\User;
+use App\Notifications\HistoricalAlumniClaimStatusUpdated;
+use App\Notifications\QueuedVerifyEmail;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
+use Tests\TestCase;
+
+class HistoricalAlumniClaimTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_historical_graduate_can_submit_and_verify_email_but_cannot_sign_in_before_onsite_review(): void
+    {
+        Notification::fake();
+        Storage::fake('local');
+
+        $this->post(route('alumni.claim.store'), [
+            ...$this->claimPayload(),
+            'evidence_document' => UploadedFile::fake()->create('cotc-page-1.pdf', 100, 'application/pdf'),
+            'evidence_document_page_2' => UploadedFile::fake()->create('cotc-page-2.pdf', 100, 'application/pdf'),
+        ])->assertRedirect(route('alumni.claim.create'))
+            ->assertSessionHas('claim_submitted');
+
+        $user = User::query()->where('email', 'legacy.graduate@example.test')->firstOrFail();
+        $claim = $user->historicalAlumniClaim()->firstOrFail();
+
+        $this->assertSame('applicant', $user->role);
+        $this->assertFalse($user->hasVerifiedEmail());
+        $this->assertSame(HistoricalAlumniClaim::STATUS_PENDING_EMAIL, $claim->status);
+        Storage::disk('local')->assertExists($claim->evidence_document_path);
+        Storage::disk('local')->assertExists($claim->evidence_document_page_2_path);
+        Notification::assertSentTo($user, QueuedVerifyEmail::class);
+
+        $verificationUrl = URL::temporarySignedRoute(
+            'verification.verify',
+            now()->addHour(),
+            ['id' => $user->id, 'hash' => sha1($user->email)],
+        );
+
+        $this->get($verificationUrl)
+            ->assertRedirect(route('login'))
+            ->assertSessionHas('verified');
+
+        $this->assertTrue($user->fresh()->hasVerifiedEmail());
+        $this->assertSame(
+            HistoricalAlumniClaim::STATUS_PENDING_ONSITE,
+            $claim->fresh()->status,
+        );
+
+        $this->post(route('login.store'), [
+            'email' => $user->email,
+            'password' => 'Password123!',
+        ])->assertSessionHasErrors('email');
+        $this->assertGuest();
+    }
+
+    public function test_admin_approval_creates_a_graduated_record_and_historical_alumni_never_inherits_modules(): void
+    {
+        Notification::fake();
+        Storage::fake('local');
+        $admin = User::factory()->create(['role' => 'admin']);
+        $user = User::factory()->create([
+            'name' => 'Legacy Graduate',
+            'email' => 'verified.legacy@example.test',
+            'role' => 'applicant',
+            'applicant_status' => 'historical_claim_pending_onsite',
+        ]);
+        $claim = $this->createClaim($user);
+
+        $this->actingAs($admin)
+            ->patch(route('admin.accounts.historical-alumni.update', $claim), [
+                'decision' => 'approve',
+                'identity_verified' => '1',
+                'training_evidence_verified' => '1',
+                'archive_record_verified' => '1',
+                'admin_notes' => 'Original COTC 2018-114 and paper graduate registry entry were verified onsite.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('saved');
+
+        $application = EnrollmentApplication::query()->where('user_id', $user->id)->firstOrFail();
+        $this->assertDatabaseHas('historical_alumni_claims', [
+            'id' => $claim->id,
+            'status' => HistoricalAlumniClaim::STATUS_APPROVED,
+            'onsite_verified_by_id' => $admin->id,
+        ]);
+        $this->assertDatabaseHas('enrollment_applications', [
+            'id' => $application->id,
+            'status' => EnrollmentApplication::STATUS_APPROVED,
+            'learning_status' => EnrollmentApplication::LEARNING_GRADUATED,
+            'intake_channel' => 'historical_alumni',
+            'is_historical_record' => true,
+            'training_batch_id' => null,
+        ]);
+        $this->assertDatabaseHas('alumni_profiles', ['user_id' => $user->id]);
+        $this->assertSame('trainee', $user->fresh()->role);
+        Notification::assertSentTo($user, HistoricalAlumniClaimStatusUpdated::class);
+
+        $trainer = User::factory()->create(['role' => 'trainer']);
+        $module = TrainingModule::create([
+            'trainer_id' => $trainer->id,
+            'training_batch_id' => null,
+            'title' => 'Current Global Module That Legacy Alumni Must Not See',
+            'description' => 'Current classroom content.',
+            'file_path' => 'modules/current-global.pdf',
+            'original_file_name' => 'current-global.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size' => 100,
+            'is_published' => true,
+            'published_at' => now(),
+        ]);
+
+        $this->actingAs($user->fresh())
+            ->get(route('trainee.modules.index'))
+            ->assertForbidden();
+
+        $this->actingAs($user->fresh())
+            ->get(route('trainee.modules.show', $module))
+            ->assertForbidden();
+
+        $this->actingAs($user->fresh())
+            ->get(route('trainee.grades'))
+            ->assertOk()
+            ->assertSee('No trainer-validated grades yet')
+            ->assertDontSee($module->title);
+    }
+
+    public function test_admin_cannot_approve_a_claim_until_email_is_verified(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $user = User::factory()->unverified()->create([
+            'role' => 'applicant',
+            'applicant_status' => 'historical_claim_pending_email',
+        ]);
+        $claim = $this->createClaim($user, HistoricalAlumniClaim::STATUS_PENDING_EMAIL);
+
+        $this->actingAs($admin)
+            ->patch(route('admin.accounts.historical-alumni.update', $claim), [
+                'decision' => 'approve',
+                'identity_verified' => '1',
+                'training_evidence_verified' => '1',
+                'archive_record_verified' => '1',
+                'admin_notes' => 'Documents appear valid but email remains pending.',
+            ])
+            ->assertSessionHasErrors('historical_alumni');
+
+        $this->assertDatabaseMissing('enrollment_applications', ['user_id' => $user->id]);
+        $this->assertSame(HistoricalAlumniClaim::STATUS_PENDING_EMAIL, $claim->fresh()->status);
+    }
+
+    private function claimPayload(): array
+    {
+        return [
+            'first_name' => 'Legacy',
+            'middle_name' => 'M',
+            'last_name' => 'Graduate',
+            'email' => 'legacy.graduate@example.test',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            'birth_date' => '1990-05-10',
+            'gender' => 'Female',
+            'contact_number' => '09171234567',
+            'street' => '14 Archive Street',
+            'barangay' => 'Central',
+            'city' => 'Iriga City',
+            'province' => 'Camarines Sur',
+            'zip_code' => '4431',
+            'educational_attainment' => 'High School Graduate',
+            'school_name' => 'Iriga National High School',
+            'education_year_graduated' => 2007,
+            'training_completion_year' => 2018,
+            'historical_batch_name' => 'Batch 2018-A',
+            'training_schedule' => 'AM',
+            'evidence_type' => 'both',
+            'certificate_number' => 'COTC-2018-114',
+            'tor_reference' => 'TOR-2018-114',
+            'privacy_consent' => '1',
+        ];
+    }
+
+    private function createClaim(User $user, string $status = HistoricalAlumniClaim::STATUS_PENDING_ONSITE): HistoricalAlumniClaim
+    {
+        return HistoricalAlumniClaim::create([
+            'user_id' => $user->id,
+            'first_name' => 'Legacy',
+            'middle_name' => 'M',
+            'last_name' => 'Graduate',
+            'birth_date' => '1990-05-10',
+            'gender' => 'Female',
+            'contact_number' => '09171234567',
+            'street' => '14 Archive Street',
+            'barangay' => 'Central',
+            'city' => 'Iriga City',
+            'province' => 'Camarines Sur',
+            'zip_code' => '4431',
+            'educational_attainment' => 'High School Graduate',
+            'school_name' => 'Iriga National High School',
+            'education_year_graduated' => 2007,
+            'training_completion_year' => 2018,
+            'historical_batch_name' => 'Batch 2018-A',
+            'training_schedule' => 'AM',
+            'evidence_type' => 'both',
+            'certificate_number' => 'COTC-2018-114',
+            'tor_reference' => 'TOR-2018-114',
+            'status' => $status,
+            'privacy_consent_at' => now(),
+        ]);
+    }
+}

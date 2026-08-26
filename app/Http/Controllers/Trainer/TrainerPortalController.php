@@ -113,16 +113,13 @@ class TrainerPortalController extends Controller
                 'quizzes.attempts.application',
             ])
             ->where('trainer_id', $request->user()->id)
-            ->when($assignedBatch, fn ($query) => $query->where('training_batch_id', $assignedBatch->id))
-            ->when(! $assignedBatch, fn ($query) => $query->whereRaw('1 = 0'))
             ->latest('published_at')
+            ->latest('id')
             ->get();
 
         $quizzes = Quiz::query()
             ->with(['trainingModule', 'batch', 'targetTrainee', 'questions', 'attempts.application'])
             ->where('trainer_id', $request->user()->id)
-            ->when($assignedBatch, fn ($query) => $query->where('training_batch_id', $assignedBatch->id))
-            ->when(! $assignedBatch, fn ($query) => $query->whereRaw('1 = 0'))
             ->latest('id')
             ->get();
 

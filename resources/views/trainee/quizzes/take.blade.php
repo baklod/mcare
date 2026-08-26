@@ -25,7 +25,7 @@
         </div>
     @endif
 
-    <form method="POST" action="{{ route('trainee.quiz-attempts.submit', $attempt) }}" class="lms-attempt-form" data-quiz-attempt-form data-confirm="Submit this quiz now? You will not be able to change this attempt after submission.">
+    <form method="POST" action="{{ route('trainee.quiz-attempts.submit', $attempt) }}" enctype="multipart/form-data" class="lms-attempt-form" data-quiz-attempt-form data-confirm="Submit this quiz now? You will not be able to change this attempt after submission.">
         @csrf
         <nav class="lms-question-jump" aria-label="Jump to a quiz question">
             @foreach($quiz->questions as $questionIndex => $question)
@@ -41,15 +41,35 @@
                         <strong>{{ $question->prompt }}</strong>
                         <small>{{ number_format((float) $question->points, 1) }} {{ str('point')->plural((float) $question->points) }}</small>
                     </legend>
-                    <div class="lms-answer-options">
-                        @foreach($question->options as $optionIndex => $option)
-                            <label class="lms-answer-option">
-                                <input type="radio" name="answers[{{ $question->id }}]" value="{{ $optionIndex }}" @checked((string) old('answers.'.$question->id) === (string) $optionIndex)>
-                                <span class="lms-answer-letter">{{ chr(65 + $optionIndex) }}</span>
-                                <span>{{ $option }}</span>
-                            </label>
-                        @endforeach
-                    </div>
+
+                    @if($question->isFileUpload())
+                        <div class="rounded-2xl border-2 border-dashed border-purple-200 bg-purple-50/40 p-5 text-center transition hover:border-purple-300 hover:bg-purple-50">
+                            <x-dashboard-icon name="upload-cloud" class="mx-auto h-8 w-8 text-purple-600" />
+                            <p class="mt-2 text-sm font-bold text-slate-900">Upload your completed activity document</p>
+                            <p class="mt-1 text-xs text-slate-500">Accepted formats: <strong>Word Document (.docx, .doc), PDF (.pdf), or image (.png, .jpg)</strong> (Max 20MB, No .zip)</p>
+                            <div class="mt-4 flex justify-center">
+                                <input type="file" name="file_answers[{{ $question->id }}]" accept=".docx,.doc,.pdf,.png,.jpg,.jpeg" class="block w-full max-w-md text-xs text-slate-700 file:mr-4 file:rounded-full file:border-0 file:bg-purple-600 file:px-4 file:py-2.5 file:text-xs file:font-bold file:text-white file:transition hover:file:bg-purple-700 cursor-pointer">
+                            </div>
+                        </div>
+                    @elseif($question->isEnumeration())
+                        <div class="space-y-3">
+                            <textarea name="text_answers[{{ $question->id }}]" rows="4" maxlength="5000" class="w-full rounded-xl border border-slate-200 bg-white p-3.5 text-xs text-slate-800 focus:border-purple-300 focus:ring-4 focus:ring-purple-100" placeholder="Type your enumeration or written answers here...">{{ old('text_answers.'.$question->id) }}</textarea>
+                            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
+                                <span class="font-bold text-slate-700">Or attach your activity document (.docx, .doc, .pdf, images):</span>
+                                <input type="file" name="file_answers[{{ $question->id }}]" accept=".docx,.doc,.pdf,.png,.jpg,.jpeg" class="mt-2 block w-full text-xs text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-purple-100 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-purple-800 hover:file:bg-purple-200">
+                            </div>
+                        </div>
+                    @else
+                        <div class="lms-answer-options">
+                            @foreach($question->options as $optionIndex => $option)
+                                <label class="lms-answer-option">
+                                    <input type="radio" name="answers[{{ $question->id }}]" value="{{ $optionIndex }}" @checked((string) old('answers.'.$question->id) === (string) $optionIndex)>
+                                    <span class="lms-answer-letter">{{ chr(65 + $optionIndex) }}</span>
+                                    <span>{{ $option }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    @endif
                 </fieldset>
             @endforeach
         </div>

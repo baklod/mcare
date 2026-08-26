@@ -272,6 +272,34 @@ When `TWO_FACTOR_ENABLED=true` and `MAIL_MAILER=log`, the development email is w
 
 `INFO Nothing to migrate` is normal when the local database is already updated.
 
+## 11. Ngrok Tunneling & Public Testing
+
+To expose your local Laravel app for mobile or remote testing:
+
+1. **Terminal 1 (Laravel Web Server)**:
+   ```powershell
+   php artisan serve
+   ```
+2. **Terminal 2 (Background Mail Queue)**:
+   ```powershell
+   php artisan queue:work --queue=mail,default --tries=3 --timeout=120
+   ```
+3. **Terminal 3 (Ngrok Tunnel)**:
+   - For custom reserved domains (ngrok v3):
+     ```powershell
+     ngrok http 8000 --url https://freewill-pacemaker-outflank.ngrok-free.dev
+     ```
+   - For free dynamic domains:
+     ```powershell
+     ngrok http 8000
+     ```
+
+Make sure your `.env` has:
+```env
+APP_URL=https://freewill-pacemaker-outflank.ngrok-free.dev
+TRUSTED_PROXIES=*
+```
+
 ## Security Reminders
 
 - Never commit the `.env` file.

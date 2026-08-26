@@ -6,13 +6,16 @@ use App\Models\AdminActivityLog;
 use App\Models\CompetencyUnit;
 use App\Models\EnrollmentApplication;
 use App\Models\ModuleProgress;
+use App\Models\PaymentTransaction;
 use App\Models\TraineeCompetencyRecord;
 use App\Models\TraineeOutcomeResult;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
 use App\Models\User;
+use App\Notifications\TrainerModuleAssignedByAdmin;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -292,13 +295,16 @@ class AdminLearningSystemTest extends TestCase
 
     public function test_admin_can_add_and_remove_a_training_module(): void
     {
+        Notification::fake();
         Storage::fake('local');
         $admin = User::factory()->create(['role' => 'admin']);
         $trainer = User::factory()->create(['role' => 'trainer']);
+        $batchTrainer = User::factory()->create(['role' => 'trainer']);
         $batch = TrainingBatch::create([
             'name' => 'Batch 10',
             'year' => 2026,
             'is_active' => true,
+            'trainer_id' => $batchTrainer->id,
             'enrollment_ends_at' => now()->addMonth(),
         ]);
 
@@ -317,6 +323,30 @@ class AdminLearningSystemTest extends TestCase
         $this->assertEquals('HCS323302', $module->module_code);
         $this->assertEquals('Bathe and dress children', $module->topic);
         Storage::disk('local')->assertExists($module->file_path);
+
+        $this->actingAs($trainer)
+            ->get(route('trainer.resources'))
+            ->assertOk()
+            ->assertSee('Provide Care and Support to Children');
+
+        Notification::assertSentTo(
+            $trainer,
+            TrainerModuleAssignedByAdmin::class,
+            fn (TrainerModuleAssignedByAdmin $notification): bool => $notification->module->is($module)
+                && $notification->via($trainer) === ['database', 'mail']
+                && $notification->queue === 'mail',
+        );
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.modules.preview', $module))
+            ->assertOk()
+            ->assertSee('data-module-file-preview', false)
+            ->assertSee('data-pdf-fit-mode="page"', false);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.modules.content', $module))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
 
         $this->actingAs($admin)
             ->delete(route('admin.learning.modules.destroy', $module))
@@ -364,6 +394,16 @@ class AdminLearningSystemTest extends TestCase
             'educational_attainment' => 'College Graduate',
             'school_name' => 'MCARE School',
             'year_graduated' => 2023,
+            'birth_certificate_onsite' => '1',
+            'education_document_onsite' => '1',
+            'good_moral_onsite' => '1',
+            'id_photo_onsite' => '1',
+            'signature_onsite' => '1',
+            'privacy_consent_onsite' => '1',
+            'onsite_payment_received' => '1',
+            'onsite_payment_amount' => '2000.00',
+            'onsite_or_number' => 'OR-ASSISTED-001',
+            'onsite_verification_notes' => 'Original requirements, consent, and downpayment receipt were verified onsite.',
         ])->assertRedirect()->assertSessionHas('saved');
 
         $this->assertDatabaseHas('users', ['email' => 'new.trainer@example.test', 'role' => 'trainer']);
@@ -372,6 +412,13 @@ class AdminLearningSystemTest extends TestCase
             'email' => 'new.trainee@example.test',
             'training_batch_id' => $batch->id,
             'status' => EnrollmentApplication::STATUS_APPROVED,
+            'intake_channel' => 'admin_assisted',
+            'payment_verified_by_id' => $admin->id,
+        ]);
+        $this->assertDatabaseHas('payment_transactions', [
+            'user_id' => User::query()->where('email', 'new.trainee@example.test')->value('id'),
+            'or_number' => 'OR-ASSISTED-001',
+            'status' => PaymentTransaction::STATUS_VERIFIED,
         ]);
     }
 

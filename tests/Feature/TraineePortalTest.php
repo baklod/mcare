@@ -219,7 +219,7 @@ class TraineePortalTest extends TestCase
 
         $this->actingAs($trainee)
             ->patch(route('trainee.modules.progress', $module), ['action' => 'complete'])
-            ->assertRedirect(route('trainee.modules.show', $module));
+            ->assertRedirect(route('trainee.modules.index'));
 
         $this->assertDatabaseHas('module_progress', [
             'enrollment_application_id' => $application->id,

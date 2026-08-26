@@ -38,11 +38,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(SecurityHeaders::class);
 
         // Preserve ngrok/reverse-proxy HTTPS and host information when the
-        // proxy is explicitly trusted (loopback-only by default).
-        $trustedProxies = array_values(array_filter(array_map(
-            static fn (string $proxy): string => trim($proxy),
-            explode(',', (string) env('TRUSTED_PROXIES', '127.0.0.1,::1'))
-        )));
+        // proxy is explicitly trusted (loopback-only by default, or * for all).
+        $rawProxies = (string) env('TRUSTED_PROXIES', '127.0.0.1,::1');
+        $trustedProxies = $rawProxies === '*'
+            ? '*'
+            : array_values(array_filter(array_map(
+                static fn (string $proxy): string => trim($proxy),
+                explode(',', $rawProxies)
+            )));
         $middleware->trustProxies(at: $trustedProxies);
 
         $middleware->alias([

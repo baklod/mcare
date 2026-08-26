@@ -2,7 +2,6 @@
 
 @section('content')
 @php
-    $previewKind = $module->previewKind();
     $viewerUrl = route('trainer.modules.content', $module);
     $downloadUrl = route('trainer.modules.download', $module);
     $supplementaryList = $module->supplementaryList();
@@ -113,39 +112,7 @@
                 </div>
             </div>
 
-            <!-- Media Preview Embed -->
-            <div class="min-h-[50vh] overflow-hidden rounded-xl border border-stone-200 bg-stone-950">
-                @if($previewKind === 'video')
-                    <video class="mx-auto max-h-[75vh] w-full" controls controlsList="nodownload noremoteplayback" disablePictureInPicture>
-                        <source src="{{ $viewerUrl }}" type="{{ $module->mime_type }}">
-                    </video>
-                @elseif($previewKind === 'audio')
-                    <div class="grid min-h-[35vh] place-items-center bg-white p-8">
-                        <div class="w-full max-w-2xl text-center">
-                            <x-dashboard-icon name="volume-2" class="mx-auto h-10 w-10 text-purple-600" />
-                            <p class="mt-4 font-bold text-stone-950">{{ $module->original_file_name }}</p>
-                            <audio class="mt-5 w-full" controls preload="metadata"><source src="{{ $viewerUrl }}" type="{{ $module->mime_type }}"></audio>
-                        </div>
-                    </div>
-                @elseif($previewKind === 'image')
-                    <div class="flex min-h-[50vh] items-start justify-center overflow-auto p-4">
-                        <img src="{{ $viewerUrl }}" alt="{{ $module->title }}" class="h-auto max-w-full object-contain">
-                    </div>
-                @elseif($previewKind === 'pdf')
-                    <iframe class="h-[75vh] min-h-[600px] w-full bg-white" src="{{ $viewerUrl }}#toolbar=1&navpanes=0&scrollbar=1&view=FitH" title="{{ $module->title }} PDF preview"></iframe>
-                @else
-                    <div class="grid min-h-[35vh] place-items-center bg-white p-8 text-center text-stone-700">
-                        <div>
-                            <x-dashboard-icon name="file-text" class="mx-auto h-10 w-10 text-purple-600" />
-                            <p class="mt-4 font-bold">{{ $module->fileTypeLabel() }}</p>
-                            <p class="mt-2 text-sm text-stone-500">Document available for download or external application viewing.</p>
-                            <div class="mt-5 flex justify-center gap-2">
-                                <a href="{{ $downloadUrl }}" class="primary-action text-xs">Download Attachment</a>
-                            </div>
-                        </div>
-                    </div>
-                @endif
-            </div>
+            <x-module-file-preview :module="$module" :viewer-url="$viewerUrl" />
 
             <!-- Supplementary Files List -->
             @if(count($supplementaryList) > 0)
@@ -323,6 +290,7 @@
                                         <div class="min-w-0">
                                             <p class="font-bold text-stone-950">{{ $trainee->last_name }}, {{ $trainee->first_name }}</p>
                                             <p class="truncate text-[11px] text-stone-500">{{ $trainee->email }}</p>
+                                            <x-graduate-batch-badge :application="$trainee" class="mt-1.5" />
                                         </div>
                                     </div>
                                 </td>

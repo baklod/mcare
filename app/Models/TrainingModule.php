@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use App\Support\TrainingModuleFiles;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -16,12 +16,17 @@ class TrainingModule extends Model
     use HasFactory;
 
     public const CATEGORY_CORE = 'core';
+
     public const CATEGORY_COMMON = 'common';
+
     public const CATEGORY_BASIC = 'basic';
+
     public const CATEGORY_CUSTOM = 'custom';
 
     public const DELIVERY_DRAFT = 'draft';
+
     public const DELIVERY_ACTIVE = 'active';
+
     public const DELIVERY_CLOSED = 'closed';
 
     protected $fillable = [
@@ -123,6 +128,12 @@ class TrainingModule extends Model
 
     public function scopeAvailableTo(Builder $query, EnrollmentApplication $application): Builder
     {
+        // Historical alumni records preserve verified graduation history only.
+        // They must never inherit an active rolling-enrollment module release.
+        if ($application->is_historical_record) {
+            return $query->whereRaw('1 = 0');
+        }
+
         return $query
             ->where('is_published', true)
             ->where(fn (Builder $builder) => $builder

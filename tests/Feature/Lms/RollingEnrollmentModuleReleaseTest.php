@@ -121,7 +121,14 @@ class RollingEnrollmentModuleReleaseTest extends TestCase
             ->assertNotFound();
 
         $this->actingAs($trainee)
+            ->get(route('trainee.modules.show', $firstModule))
+            ->assertOk()
+            ->assertSee('data-module-progress-form', false)
+            ->assertSee('target="_self"', false);
+
+        $this->actingAs($trainee)
             ->patch(route('trainee.modules.progress', $firstModule), ['action' => 'submit'])
+            ->assertRedirect(route('trainee.modules.index'))
             ->assertSessionHasNoErrors();
 
         $this->assertSame(
@@ -154,6 +161,7 @@ class RollingEnrollmentModuleReleaseTest extends TestCase
 
         $this->actingAs($trainee)
             ->patch(route('trainee.modules.progress', $firstModule), ['action' => 'submit'])
+            ->assertRedirect(route('trainee.modules.index'))
             ->assertSessionHasNoErrors();
         $this->actingAs($trainer)
             ->post(route('trainer.modules.evaluate', $firstModule), [
@@ -208,6 +216,7 @@ class RollingEnrollmentModuleReleaseTest extends TestCase
 
         $this->actingAs($trainee)
             ->patch(route('trainee.modules.progress', $module), ['action' => 'submit'])
+            ->assertRedirect(route('trainee.modules.index'))
             ->assertSessionHasNoErrors();
 
         $progress = $this->progressFor($application->id, $module->id);

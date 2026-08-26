@@ -69,7 +69,7 @@
                                     :name="trim($trainee->first_name.' '.$trainee->last_name)"
                                     class="grid h-8 w-8 place-items-center rounded-full bg-purple-100 text-[10px] font-black text-purple-800"
                                 />
-                                <span class="min-w-0"><span class="block truncate">{{ $trainee->last_name }}, {{ $trainee->first_name }}</span><small>{{ $trainee->schedule_preference }} | {{ $trainee->email }}</small></span>
+                                <span class="min-w-0"><span class="block truncate">{{ $trainee->last_name }}, {{ $trainee->first_name }}</span><small>{{ $trainee->schedule_preference }} | {{ $trainee->email }}</small><x-graduate-batch-badge :application="$trainee" class="mt-1.5" /></span>
                             </span>
                         </th>
                         @foreach($unitsByCategory as $category => $units)

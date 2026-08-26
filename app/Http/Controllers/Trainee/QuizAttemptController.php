@@ -61,18 +61,50 @@ class QuizAttemptController extends Controller
         $this->ensureAttemptIsAvailable($attempt);
         $validated = $request->validate([
             'answers' => ['nullable', 'array'],
-            'answers.*' => ['nullable', 'integer', 'min:0', 'max:5'],
+            'answers.*' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'text_answers' => ['nullable', 'array'],
+            'text_answers.*' => ['nullable', 'string', 'max:5000'],
+            'file_answers' => ['nullable', 'array'],
+            'file_answers.*' => [
+                'nullable',
+                'file',
+                'max:20480',
+                'mimes:doc,docx,pdf,png,jpg,jpeg',
+            ],
         ]);
         $expired = $attempt->isExpiredAt();
-        $answers = $validated['answers'] ?? [];
+        $processedAnswers = $validated['answers'] ?? [];
+
+        $files = $request->file('file_answers', []);
+        foreach ($files as $qId => $file) {
+            if ($file && $file->isValid()) {
+                $path = $file->store("activity-submissions/{$attempt->enrollment_application_id}/{$attempt->quiz_id}", 'local');
+                $processedAnswers[(string) $qId] = [
+                    'type' => 'file',
+                    'file_path' => $path,
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'file_size' => $file->getSize(),
+                ];
+            }
+        }
+
+        foreach (($validated['text_answers'] ?? []) as $qId => $text) {
+            if (filled($text) && ! isset($processedAnswers[(string) $qId])) {
+                $processedAnswers[(string) $qId] = [
+                    'type' => 'text',
+                    'content' => trim($text),
+                ];
+            }
+        }
 
         // A short grace window accepts the browser's automatic submission at
         // zero. Later requests cannot use answers chosen after the deadline.
         if ($expired && ! $attempt->acceptsExpirationSubmissionAt()) {
-            $answers = $attempt->answers ?? [];
+            $processedAnswers = $attempt->answers ?? [];
         }
 
-        $gradedAttempt = $gradingService->grade($attempt, $answers);
+        $gradedAttempt = $gradingService->grade($attempt, $processedAnswers);
         $this->recordSubmission($request, $gradedAttempt, $expired);
 
         $response = redirect()->route('trainee.quiz-attempts.result', $gradedAttempt);
@@ -82,6 +114,34 @@ class QuizAttemptController extends Controller
         }
 
         return $response;
+    }
+
+    public function downloadSubmission(
+        Request $request,
+        QuizAttempt $attempt,
+        int $questionId,
+    ): \Symfony\Component\HttpFoundation\BinaryFileResponse {
+        $this->authorize('view', $attempt);
+
+        $answers = $attempt->answers ?? [];
+        $answer = $answers[$questionId] ?? $answers[(string) $questionId] ?? null;
+
+        abort_unless(is_array($answer) && ($answer['type'] ?? null) === 'file', 404);
+        $path = $answer['file_path'] ?? null;
+        abort_unless(is_string($path) && \Illuminate\Support\Facades\Storage::disk('local')->exists($path), 404);
+
+        $filename = basename($answer['original_name'] ?? 'submission');
+        $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
+
+        return response()->file(\Illuminate\Support\Facades\Storage::disk('local')->path($path), [
+            'Content-Type' => ($answer['mime_type'] ?? null) ?: 'application/octet-stream',
+            'Content-Disposition' => \Symfony\Component\HttpFoundation\HeaderUtils::makeDisposition(
+                \Symfony\Component\HttpFoundation\HeaderUtils::DISPOSITION_ATTACHMENT,
+                $filename,
+                $fallbackFilename
+            ),
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function result(Request $request, QuizAttempt $attempt): View|RedirectResponse

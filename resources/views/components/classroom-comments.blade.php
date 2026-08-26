@@ -2,6 +2,7 @@
     'commentable',
     'comments' => collect(),
     'privateRecipients' => collect(),
+    'readOnly' => false,
 ])
 
 @php
@@ -11,6 +12,7 @@
     $privateComments = collect($comments)->where('visibility', \App\Models\ClassroomComment::VISIBILITY_PRIVATE);
     $privateRecipientList = collect($privateRecipients);
     $traineePrivateRecipient = $viewer?->role === 'trainee' ? $privateRecipientList->first() : null;
+    $readOnly = (bool) $readOnly;
 @endphp
 
 <section id="classroom-comments" class="lms-comments-panel" aria-labelledby="classroom-comments-title">
@@ -18,7 +20,7 @@
         <div>
             <p class="lms-eyebrow">Classroom conversation</p>
             <h2 id="classroom-comments-title">Comments and private feedback</h2>
-            <p>Class comments are visible to participants. Private comments are limited to their participants and authorized classroom staff.</p>
+            <p>{{ $readOnly ? 'This archived conversation remains visible as part of your completed training record. New posts and edits are locked.' : 'Class comments are visible to participants. Private comments are limited to their participants and authorized classroom staff.' }}</p>
         </div>
         <span class="lms-comment-count">{{ collect($comments)->count() }} {{ str('comment')->plural(collect($comments)->count()) }}</span>
     </header>
@@ -39,28 +41,30 @@
                                 <span>{{ $comment->created_at?->format('M d, Y g:i A') }}@if($comment->edited_at) · Edited @endif</span>
                             </div>
                             <p>{!! nl2br(e($comment->body)) !!}</p>
-                            @canany(['update', 'delete'], $comment)
-                                <details class="lms-comment-manage">
-                                    <summary>Manage</summary>
-                                    <div>
-                                        @can('update', $comment)
-                                            <form method="POST" action="{{ route('classroom-comments.update', $comment) }}" class="space-y-2">
-                                                @csrf
-                                                @method('PATCH')
-                                                <textarea name="body" maxlength="2000" required class="form-field min-h-20">{{ $comment->body }}</textarea>
-                                                <button class="secondary-action text-xs">Save edit</button>
-                                            </form>
-                                        @endcan
-                                        @can('delete', $comment)
-                                            <form method="POST" action="{{ route('classroom-comments.destroy', $comment) }}" data-confirm="Remove this class comment?">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button class="lms-text-action is-danger text-xs">Remove</button>
-                                            </form>
-                                        @endcan
-                                    </div>
-                                </details>
-                            @endcanany
+                            @unless($readOnly)
+                                @canany(['update', 'delete'], $comment)
+                                    <details class="lms-comment-manage">
+                                        <summary>Manage</summary>
+                                        <div>
+                                            @can('update', $comment)
+                                                <form method="POST" action="{{ route('classroom-comments.update', $comment) }}" class="space-y-2">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <textarea name="body" maxlength="2000" required class="form-field min-h-20">{{ $comment->body }}</textarea>
+                                                    <button class="secondary-action text-xs">Save edit</button>
+                                                </form>
+                                            @endcan
+                                            @can('delete', $comment)
+                                                <form method="POST" action="{{ route('classroom-comments.destroy', $comment) }}" data-confirm="Remove this class comment?">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button class="lms-text-action is-danger text-xs">Remove</button>
+                                                </form>
+                                            @endcan
+                                        </div>
+                                    </details>
+                                @endcanany
+                            @endunless
                         </div>
                     </article>
                 @empty
@@ -68,18 +72,22 @@
                 @endforelse
             </div>
 
-            <form method="POST" action="{{ route('classroom-comments.store') }}" class="lms-comment-composer" data-dashboard-dialog-form data-submit-label="Posting...">
-                @csrf
-                <input type="hidden" name="commentable_type" value="{{ $commentableType }}">
-                <input type="hidden" name="commentable_id" value="{{ $commentable->id }}">
-                <input type="hidden" name="visibility" value="class">
-                <label for="class-comment-{{ $commentableType }}-{{ $commentable->id }}" class="flex items-center gap-2">
-                    <x-user-avatar :user="$viewer" :name="$viewer?->name ?? 'MCARE user'" class="lms-comment-avatar" />
-                    <span>Comment as {{ $viewer?->name ?? 'MCARE user' }}</span>
-                </label>
-                <textarea id="class-comment-{{ $commentableType }}-{{ $commentable->id }}" name="body" required maxlength="2000" rows="3" placeholder="Write a helpful question, answer, or update..."></textarea>
-                <div><span>Plain text · 2,000 characters maximum</span><button class="primary-action text-xs" data-action-button>Post comment</button></div>
-            </form>
+            @if($readOnly)
+                <p class="lms-comment-empty">Classroom posting is locked after graduation.</p>
+            @else
+                <form method="POST" action="{{ route('classroom-comments.store') }}" class="lms-comment-composer" data-dashboard-dialog-form data-submit-label="Posting...">
+                    @csrf
+                    <input type="hidden" name="commentable_type" value="{{ $commentableType }}">
+                    <input type="hidden" name="commentable_id" value="{{ $commentable->id }}">
+                    <input type="hidden" name="visibility" value="class">
+                    <label for="class-comment-{{ $commentableType }}-{{ $commentable->id }}" class="flex items-center gap-2">
+                        <x-user-avatar :user="$viewer" :name="$viewer?->name ?? 'MCARE user'" class="lms-comment-avatar" />
+                        <span>Comment as {{ $viewer?->name ?? 'MCARE user' }}</span>
+                    </label>
+                    <textarea id="class-comment-{{ $commentableType }}-{{ $commentable->id }}" name="body" required maxlength="2000" rows="3" placeholder="Write a helpful question, answer, or update..."></textarea>
+                    <div><span>Plain text · 2,000 characters maximum</span><button class="primary-action text-xs" data-action-button>Post comment</button></div>
+                </form>
+            @endif
         </section>
 
         <section class="lms-comment-column is-private" aria-labelledby="private-comments-title">
@@ -103,28 +111,30 @@
                             </div>
                             <span class="lms-private-context">Private with {{ $privateCounterpart?->name ?? 'classroom staff' }}</span>
                             <p>{!! nl2br(e($comment->body)) !!}</p>
-                            @canany(['update', 'delete'], $comment)
-                                <details class="lms-comment-manage">
-                                    <summary>Manage</summary>
-                                    <div>
-                                        @can('update', $comment)
-                                            <form method="POST" action="{{ route('classroom-comments.update', $comment) }}" class="space-y-2">
-                                                @csrf
-                                                @method('PATCH')
-                                                <textarea name="body" maxlength="2000" required class="form-field min-h-20">{{ $comment->body }}</textarea>
-                                                <button class="secondary-action text-xs">Save edit</button>
-                                            </form>
-                                        @endcan
-                                        @can('delete', $comment)
-                                            <form method="POST" action="{{ route('classroom-comments.destroy', $comment) }}" data-confirm="Remove this private comment?">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button class="lms-text-action is-danger text-xs">Remove</button>
-                                            </form>
-                                        @endcan
-                                    </div>
-                                </details>
-                            @endcanany
+                            @unless($readOnly)
+                                @canany(['update', 'delete'], $comment)
+                                    <details class="lms-comment-manage">
+                                        <summary>Manage</summary>
+                                        <div>
+                                            @can('update', $comment)
+                                                <form method="POST" action="{{ route('classroom-comments.update', $comment) }}" class="space-y-2">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <textarea name="body" maxlength="2000" required class="form-field min-h-20">{{ $comment->body }}</textarea>
+                                                    <button class="secondary-action text-xs">Save edit</button>
+                                                </form>
+                                            @endcan
+                                            @can('delete', $comment)
+                                                <form method="POST" action="{{ route('classroom-comments.destroy', $comment) }}" data-confirm="Remove this private comment?">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button class="lms-text-action is-danger text-xs">Remove</button>
+                                                </form>
+                                            @endcan
+                                        </div>
+                                    </details>
+                                @endcanany
+                            @endunless
                         </div>
                     </article>
                 @empty
@@ -132,7 +142,9 @@
                 @endforelse
             </div>
 
-            @if($privateRecipientList->isNotEmpty())
+            @if($readOnly)
+                <p class="lms-comment-empty">Private classroom messaging is locked after graduation.</p>
+            @elseif($privateRecipientList->isNotEmpty())
                 <form method="POST" action="{{ route('classroom-comments.store') }}" class="lms-comment-composer is-private" data-dashboard-dialog-form data-submit-label="Sending...">
                     @csrf
                     <input type="hidden" name="commentable_type" value="{{ $commentableType }}">

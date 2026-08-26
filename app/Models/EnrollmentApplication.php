@@ -44,6 +44,8 @@ class EnrollmentApplication extends Model
         'user_id',
         'email',
         'program',
+        'intake_channel',
+        'is_historical_record',
         'training_batch_id',
         'first_name',
         'middle_name',
@@ -86,6 +88,9 @@ class EnrollmentApplication extends Model
         'document_review',
         'documents_reviewed_at',
         'documents_reviewed_by_id',
+        'onsite_requirements_verified_at',
+        'onsite_requirements_verified_by_id',
+        'onsite_requirements_notes',
         'date_accomplished',
         'status',
         'learning_status',
@@ -121,6 +126,7 @@ class EnrollmentApplication extends Model
             'birth_date' => 'date',
             'date_accomplished' => 'date',
             'privacy_consent' => 'boolean',
+            'is_historical_record' => 'boolean',
             'total_program_fee' => 'decimal:2',
             'downpayment_amount' => 'decimal:2',
             'total_paid_amount' => 'decimal:2',
@@ -131,6 +137,7 @@ class EnrollmentApplication extends Model
             'payment_verified_at' => 'datetime',
             'document_review' => 'array',
             'documents_reviewed_at' => 'datetime',
+            'onsite_requirements_verified_at' => 'datetime',
             'reviewed_at' => 'datetime',
             'learning_started_at' => 'datetime',
             'learning_status_changed_at' => 'datetime',
@@ -271,6 +278,11 @@ class EnrollmentApplication extends Model
     public function documentReviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'documents_reviewed_by_id');
+    }
+
+    public function onsiteRequirementsVerifier(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'onsite_requirements_verified_by_id');
     }
 
     public function learningStatusChangedBy(): BelongsTo

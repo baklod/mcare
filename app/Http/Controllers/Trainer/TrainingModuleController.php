@@ -382,27 +382,64 @@ class TrainingModuleController extends Controller
             ])->save();
 
             // Keep the module evaluation and the official competency record atomic.
+            $unit = null;
             if (filled($module->module_code)) {
-                $unit = CompetencyUnit::query()->where('code', $module->module_code)->first();
-                if ($unit) {
-                    $compRecord = TraineeCompetencyRecord::query()->firstOrNew([
-                        'enrollment_application_id' => $application->id,
-                        'competency_unit_id' => $unit->id,
-                    ]);
+                $unit = CompetencyUnit::query()->with('outcomes')->where('code', $module->module_code)->first();
+            }
+            if (! $unit && filled($module->title)) {
+                $unit = CompetencyUnit::query()->with('outcomes')->where('title', $module->title)->first()
+                    ?? CompetencyUnit::query()->with('outcomes')->where('title', 'like', "%{$module->title}%")->first();
+            }
+            if (! $unit && filled($module->topic)) {
+                $unit = CompetencyUnit::query()->with('outcomes')->where('title', $module->topic)->first()
+                    ?? CompetencyUnit::query()->with('outcomes')->where('title', 'like', "%{$module->topic}%")->first();
+            }
 
-                    $compStatus = match ($validated['competency_outcome']) {
-                        ModuleProgress::OUTCOME_COMPETENT => TraineeCompetencyRecord::STATUS_COMPETENT,
-                        ModuleProgress::OUTCOME_NOT_YET_COMPETENT => TraineeCompetencyRecord::STATUS_NOT_YET_COMPETENT,
+            if ($unit) {
+                $compRecord = TraineeCompetencyRecord::query()->firstOrNew([
+                    'enrollment_application_id' => $application->id,
+                    'competency_unit_id' => $unit->id,
+                ]);
+
+                $compStatus = match ($validated['competency_outcome']) {
+                    ModuleProgress::OUTCOME_COMPETENT => TraineeCompetencyRecord::STATUS_COMPETENT,
+                    ModuleProgress::OUTCOME_NOT_YET_COMPETENT => TraineeCompetencyRecord::STATUS_NOT_YET_COMPETENT,
+                    default => TraineeCompetencyRecord::STATUS_IN_PROGRESS,
+                };
+
+                $score = filled($validated['quiz_score'] ?? null)
+                    ? (float) $validated['quiz_score']
+                    : ($isCompetent ? 85.00 : null);
+
+                $torGrade = ($compStatus === TraineeCompetencyRecord::STATUS_COMPETENT && $score !== null)
+                    ? app(\App\Services\TorGradeScale::class)->fromPercentage($score)
+                    : null;
+
+                $compRecord->fill([
+                    'status' => $compStatus,
+                    'percentage_score' => $score,
+                    'tor_grade' => $torGrade,
+                    'notes' => $validated['evaluation_remarks'] ?? $compRecord->notes,
+                    'assessed_by_id' => $request->user()->id,
+                    'assessed_at' => now(),
+                ])->save();
+
+                // Atomically update all individual outcome results for the competency unit!
+                foreach ($unit->outcomes as $outcome) {
+                    $outcomeStatus = match ($compStatus) {
+                        TraineeCompetencyRecord::STATUS_COMPETENT => TraineeCompetencyRecord::STATUS_COMPETENT,
+                        TraineeCompetencyRecord::STATUS_NOT_YET_COMPETENT => TraineeCompetencyRecord::STATUS_NOT_YET_COMPETENT,
                         default => TraineeCompetencyRecord::STATUS_IN_PROGRESS,
                     };
 
-                    $compRecord->fill([
-                        'status' => $compStatus,
-                        'percentage_score' => $validated['quiz_score'] ?? ($isCompetent ? 85.00 : null),
-                        'notes' => $validated['evaluation_remarks'] ?? $compRecord->notes,
-                        'assessed_by_id' => $request->user()->id,
-                        'assessed_at' => now(),
-                    ])->save();
+                    $compRecord->outcomeResults()->updateOrCreate(
+                        ['competency_outcome_id' => $outcome->id],
+                        [
+                            'status' => $outcomeStatus,
+                            'assessed_by_id' => $request->user()->id,
+                            'assessed_at' => now(),
+                        ]
+                    );
                 }
             }
 

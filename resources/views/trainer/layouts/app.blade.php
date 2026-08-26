@@ -135,6 +135,25 @@
             @if (session('saved'))
                 <div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800" role="status" aria-live="polite" data-auto-dismiss="5000">{{ session('saved') }}</div>
             @endif
+
+            @if (session('error') || session('alert'))
+                <div class="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800" role="alert">{{ session('error') ?? session('alert') }}</div>
+            @endif
+
+            @if ($errors->any())
+                <div class="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800" role="alert">
+                    @if($errors->count() === 1)
+                        <p>{{ $errors->first() }}</p>
+                    @else
+                        <ul class="list-disc pl-4 space-y-1">
+                            @foreach($errors->all() as $err)
+                                <li>{{ $err }}</li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </div>
+            @endif
+
             @yield('content')
         </main>
     </div>

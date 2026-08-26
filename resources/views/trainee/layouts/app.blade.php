@@ -19,6 +19,7 @@
             : route('trainee.dashboard');
         $traineePrimaryNav = $isGraduate ? [
             ['label' => 'Career Hub', 'short' => 'Career Hub', 'icon' => 'fa-briefcase', 'href' => route('trainee.career-hub'), 'active' => request()->routeIs('trainee.career-hub')],
+            ['label' => 'Grades', 'short' => 'Grades', 'icon' => 'fa-chart-column', 'href' => route('trainee.grades'), 'active' => request()->routeIs('trainee.grades')],
             ['label' => 'Calendar', 'short' => 'Calendar', 'icon' => 'fa-calendar-days', 'href' => route('trainee.schedule'), 'active' => request()->routeIs('trainee.schedule')],
         ] : [
             ['label' => 'Stream', 'short' => 'Stream', 'icon' => 'fa-bell', 'href' => $traineeStreamHref, 'active' => request()->routeIs('trainee.stream')],
@@ -35,7 +36,7 @@
         ];
         $traineeAllNav = collect(array_merge($traineePrimaryNav, $traineeSecondaryNav))->keyBy('label');
         $traineeMobileLabels = $isGraduate
-            ? ['Home', 'Career Hub', 'Calendar', 'Documents']
+            ? ['Home', 'Career Hub', 'Grades', 'Documents']
             : ['Home', 'Stream', 'Classwork'];
         $traineeMobilePrimary = collect($traineeMobileLabels)
             ->map(fn (string $label) => $traineeAllNav->get($label))
@@ -127,6 +128,32 @@
                 <div class="mb-6 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold leading-6 text-emerald-700" role="status" aria-live="polite" data-auto-dismiss="5000" data-flash-icon="{{ session('saved_icon', 'circle-check') }}">
                     <x-dashboard-icon :name="session('saved_icon', 'circle-check')" class="h-5 w-5 shrink-0" />
                     {{ session('saved') }}
+                </div>
+            @endif
+
+            @if (session('error') || session('alert'))
+                <div class="mb-6 flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-semibold leading-6 text-rose-800" role="alert">
+                    <x-dashboard-icon name="alert-triangle" class="h-5 w-5 shrink-0 text-rose-600" />
+                    {{ session('error') ?? session('alert') }}
+                </div>
+            @endif
+
+            @if ($errors->any())
+                <div class="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-semibold leading-6 text-rose-800" role="alert">
+                    <div class="flex items-start gap-3">
+                        <x-dashboard-icon name="alert-triangle" class="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
+                        <div>
+                            @if($errors->count() === 1)
+                                <p>{{ $errors->first() }}</p>
+                            @else
+                                <ul class="list-disc pl-4 space-y-1">
+                                    @foreach($errors->all() as $err)
+                                        <li>{{ $err }}</li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
+                    </div>
                 </div>
             @endif
 

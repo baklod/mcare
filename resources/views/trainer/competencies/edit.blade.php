@@ -3,7 +3,7 @@
 @section('content')
 <section class="mx-auto max-w-6xl space-y-6">
     <header class="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
-        <div><p class="dashboard-section-kicker">Caregiving NC II record</p><h1 class="dashboard-section-title mt-2 text-3xl">{{ $trainee->first_name }} {{ $trainee->last_name }}</h1><p class="mt-2 text-sm text-slate-600">{{ $trainee->batch?->name }} {{ $trainee->batch?->year }} · {{ $trainee->schedule_preference }} class</p></div>
+        <div><p class="dashboard-section-kicker">Caregiving NC II record</p><h1 class="dashboard-section-title mt-2 text-3xl">{{ $trainee->first_name }} {{ $trainee->last_name }}</h1><p class="mt-2 text-sm text-slate-600">{{ $trainee->batch?->name }} {{ $trainee->batch?->year }} · {{ $trainee->schedule_preference }} class</p><x-graduate-batch-badge :application="$trainee" class="mt-2" /></div>
         <a class="secondary-action" href="{{ route('trainer.competencies.index') }}">Back to records</a>
     </header>
 

@@ -2340,6 +2340,14 @@ html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-context-link.i
     border-top: 1px solid var(--lms-border);
 }
 
+.universal-dashboard dialog:not([open]),
+.universal-dashboard .lms-confirm-dialog:not([open]),
+.universal-dashboard .lms-workflow-dialog:not([open]) {
+    display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+}
+
 .universal-dashboard .lms-workflow-dialog {
     width: min(96vw, 68rem);
     max-width: none;
@@ -2507,6 +2515,20 @@ html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-context-link.i
 
 .universal-dashboard .lms-file-preview.is-compact {
     min-height: 60px;
+}
+
+.universal-dashboard .lms-module-preview-frame {
+    width: min(100%, 68rem);
+    height: clamp(26rem, 66vh, 44rem);
+    height: clamp(26rem, 66dvh, 44rem);
+    margin-inline: auto;
+}
+
+@media (max-width: 640px) {
+    .universal-dashboard .lms-module-preview-frame {
+        height: clamp(22rem, 60vh, 32rem);
+        height: clamp(22rem, 60dvh, 32rem);
+    }
 }
 
 .universal-dashboard .lms-module-grid,
@@ -3671,7 +3693,13 @@ html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-context-link.i
 }
 
 .universal-dashboard .lms-confirm-dialog {
+    position: fixed;
+    inset: 0;
     width: min(440px, calc(100vw - 32px));
+    max-width: none;
+    max-height: calc(100dvh - 32px);
+    margin: auto;
+    overflow: auto;
     border: 0;
     border-radius: var(--lms-radius);
     background: transparent;

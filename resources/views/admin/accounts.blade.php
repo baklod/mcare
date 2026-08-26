@@ -4,6 +4,7 @@
 @php
     $trainerErrors = $errors->getBag('trainer');
     $traineeErrors = $errors->getBag('trainee');
+    $historicalReviewErrors = $errors->getBag('historicalClaimReview');
     $currentRole = $roleFilter ?? 'all';
     $searchQuery = $search ?? '';
 @endphp
@@ -14,16 +15,19 @@
             <p class="dashboard-section-kicker">Administration - Accounts</p>
             <h1 class="dashboard-section-title mt-2 text-3xl">User account management</h1>
             <p class="mt-2 text-sm leading-6 text-slate-600">
-                Manage trainer, trainee, and applicant accounts. Deleting an account safely purges its enrollment data, files, and payment attempts, allowing the applicant to re-register cleanly.
+                Manage verified staff access, assisted onsite trainees, applicants, and historical graduates who did not experience the MCARE website.
             </p>
         </div>
         <div class="flex flex-wrap gap-2">
             <button type="button" data-dashboard-dialog-open="trainer-account-dialog" class="secondary-action inline-flex items-center justify-center gap-2">
                 <x-dashboard-icon name="plus" class="h-4 w-4" />Add trainer
             </button>
-            <button type="button" data-dashboard-dialog-open="trainee-account-dialog" class="primary-action inline-flex items-center justify-center gap-2">
-                <x-dashboard-icon name="plus" class="h-4 w-4" />Add trainee
+            <button type="button" data-dashboard-dialog-open="trainee-account-dialog" class="secondary-action inline-flex items-center justify-center gap-2">
+                <x-dashboard-icon name="plus" class="h-4 w-4" />Assisted trainee intake
             </button>
+            <a href="{{ route('alumni.claim.create') }}" class="primary-action inline-flex items-center justify-center gap-2">
+                <x-dashboard-icon name="user-check" class="h-4 w-4" />Start alumni claim
+            </a>
         </div>
     </header>
 
@@ -32,11 +36,91 @@
             {{ $errors->first('account') }}
         </div>
     @endif
+    @if($errors->has('historical_alumni'))
+        <div class="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-800" role="alert">
+            {{ $errors->first('historical_alumni') }}
+        </div>
+    @endif
     @if(session('verification_notice'))
         <div class="rounded-xl border border-purple-200 bg-purple-50 px-5 py-4 text-sm font-semibold text-purple-900" role="status" data-auto-dismiss="7000">
             {{ session('verification_notice') }}
         </div>
     @endif
+
+    <section id="historical-alumni-claims" class="dashboard-panel scroll-mt-24 space-y-5">
+        <div class="flex flex-col gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <p class="dashboard-section-kicker">Historical alumni verification</p>
+                <h2 class="dashboard-section-title mt-2 text-xl">Claims requiring email and on-site proof</h2>
+                <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Email ownership is separate from graduation verification. Approve only after checking a valid ID, original COTC/TOR, and MCARE archive records.</p>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
+                @foreach(\App\Models\HistoricalAlumniClaim::statuses() as $status => $label)
+                    <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"><strong class="block text-lg text-slate-900">{{ $historicalClaimCounts[$status] ?? 0 }}</strong><span class="text-[10px] font-bold uppercase tracking-wide text-slate-500">{{ $label }}</span></div>
+                @endforeach
+            </div>
+        </div>
+
+        @if($historicalReviewErrors->any())<div class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">Review the highlighted historical alumni verification fields.</div>@endif
+
+        <div class="grid gap-4 xl:grid-cols-2">
+            @forelse($historicalClaims as $claim)
+                @php
+                    $claimStatusClasses = match($claim->status) {
+                        \App\Models\HistoricalAlumniClaim::STATUS_APPROVED => 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+                        \App\Models\HistoricalAlumniClaim::STATUS_REJECTED => 'bg-red-50 text-red-700 ring-red-100',
+                        \App\Models\HistoricalAlumniClaim::STATUS_PENDING_EMAIL => 'bg-amber-50 text-amber-700 ring-amber-100',
+                        default => 'bg-purple-50 text-purple-700 ring-purple-100',
+                    };
+                @endphp
+                <article class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="flex min-w-0 items-center gap-3">
+                            <x-user-avatar :user="$claim->user" class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-purple-100 text-sm font-black text-purple-800" />
+                            <div class="min-w-0"><h3 class="truncate font-bold text-slate-900">{{ $claim->user->name }}</h3><p class="truncate text-xs text-slate-500">{{ $claim->user->email }}</p></div>
+                        </div>
+                        <span class="dashboard-pill {{ $claimStatusClasses }}">{{ $claim->statusLabel() }}</span>
+                    </div>
+                    <dl class="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-4 text-xs sm:grid-cols-3">
+                        <div><dt class="font-bold uppercase tracking-wide text-slate-400">Email</dt><dd class="mt-1 font-semibold {{ $claim->user->hasVerifiedEmail() ? 'text-emerald-700' : 'text-amber-700' }}">{{ $claim->user->hasVerifiedEmail() ? 'Verified' : 'Pending' }}</dd></div>
+                        <div><dt class="font-bold uppercase tracking-wide text-slate-400">Completed</dt><dd class="mt-1 font-semibold text-slate-700">{{ $claim->training_completion_year }}</dd></div>
+                        <div><dt class="font-bold uppercase tracking-wide text-slate-400">Old batch</dt><dd class="mt-1 font-semibold text-slate-700">{{ $claim->historical_batch_name ?: 'Not known' }}</dd></div>
+                        <div><dt class="font-bold uppercase tracking-wide text-slate-400">Evidence</dt><dd class="mt-1 font-semibold text-slate-700">{{ str($claim->evidence_type)->headline() }}</dd></div>
+                        <div><dt class="font-bold uppercase tracking-wide text-slate-400">COTC no.</dt><dd class="mt-1 font-semibold text-slate-700">{{ $claim->certificate_number ?: 'Not provided' }}</dd></div>
+                        <div><dt class="font-bold uppercase tracking-wide text-slate-400">TOR ref.</dt><dd class="mt-1 font-semibold text-slate-700">{{ $claim->tor_reference ?: 'Not provided' }}</dd></div>
+                    </dl>
+                    @if($claim->evidence_document_path)
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            <a class="secondary-action text-xs" target="_blank" rel="noopener" href="{{ route('admin.accounts.historical-alumni.evidence', [$claim, 'page' => 1]) }}">View evidence page 1</a>
+                            <a class="secondary-action text-xs" href="{{ route('admin.accounts.historical-alumni.evidence', [$claim, 'page' => 1, 'disposition' => 'attachment']) }}">Download</a>
+                            @if($claim->evidence_document_page_2_path)<a class="secondary-action text-xs" target="_blank" rel="noopener" href="{{ route('admin.accounts.historical-alumni.evidence', [$claim, 'page' => 2]) }}">View page 2</a>@endif
+                        </div>
+                    @endif
+
+                    @if($claim->status !== \App\Models\HistoricalAlumniClaim::STATUS_APPROVED)
+                        <form method="POST" action="{{ route('admin.accounts.historical-alumni.update', $claim) }}" class="mt-5 space-y-3 border-t border-slate-200 pt-4" data-dashboard-dialog-form data-submit-label="Saving alumni review...">
+                            @csrf @method('PATCH')
+                            <p class="text-xs font-black uppercase tracking-wide text-slate-500">On-site verification checklist</p>
+                            @foreach(['identity_verified' => 'Valid government or accepted ID matches the claimant', 'training_evidence_verified' => 'Original COTC and/or TOR was physically inspected', 'archive_record_verified' => 'MCARE archive/paper record confirms graduation'] as $field => $label)
+                                <label class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 text-xs leading-5 text-slate-700"><input type="checkbox" name="{{ $field }}" value="1" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-purple-700 focus:ring-purple-600"><span>{{ $label }}</span></label>
+                            @endforeach
+                            <div><label class="form-label" for="historical-notes-{{ $claim->id }}">Verification notes</label><textarea id="historical-notes-{{ $claim->id }}" name="admin_notes" rows="3" class="form-field" required placeholder="Record the archive reference, documents inspected, or reason for follow-up.">{{ old('admin_notes', $claim->admin_notes) }}</textarea></div>
+                            <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                                <button type="submit" name="decision" value="reject" class="secondary-action justify-center border-red-200 text-red-700 hover:bg-red-50">Return for follow-up</button>
+                                <button type="submit" name="decision" value="approve" class="primary-action justify-center" @disabled(!$claim->user->hasVerifiedEmail())>Verify and activate alumni</button>
+                            </div>
+                            @unless($claim->user->hasVerifiedEmail())<p class="text-xs font-semibold text-amber-700">Approval unlocks after the claimant verifies their email.</p>@endunless
+                        </form>
+                    @else
+                        <div class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs leading-5 text-emerald-800"><strong class="block">Verified by {{ $claim->onsiteVerifier?->name ?? 'MCARE administrator' }}</strong>{{ $claim->onsite_verified_at?->format('M d, Y g:i A') }} · {{ $claim->admin_notes }}</div>
+                    @endif
+                </article>
+            @empty
+                <div class="rounded-xl border border-dashed border-slate-300 p-10 text-center text-sm text-slate-500 xl:col-span-2">No historical alumni claims yet.</div>
+            @endforelse
+        </div>
+        @if($historicalClaims->hasPages())<div class="border-t border-slate-200 pt-4">{{ $historicalClaims->links() }}</div>@endif
+    </section>
 
     <!-- Role Filter Tabs & Search Bar -->
     <div class="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
@@ -52,6 +136,10 @@
             <a href="{{ route('admin.accounts.index', ['role' => 'trainee', 'search' => $searchQuery]) }}"
                class="rounded-xl px-4 py-2 text-xs font-bold transition {{ $currentRole === 'trainee' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
                 Trainees ({{ $counts['trainee'] ?? 0 }})
+            </a>
+            <a href="{{ route('admin.accounts.index', ['role' => 'alumni', 'search' => $searchQuery]) }}"
+               class="rounded-xl px-4 py-2 text-xs font-bold transition {{ $currentRole === 'alumni' ? 'bg-purple-700 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
+                Alumni ({{ $counts['alumni'] ?? 0 }})
             </a>
             <a href="{{ route('admin.accounts.index', ['role' => 'applicant', 'search' => $searchQuery]) }}"
                class="rounded-xl px-4 py-2 text-xs font-bold transition {{ $currentRole === 'applicant' ? 'bg-amber-700 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
@@ -99,6 +187,8 @@
                             'applicant' => 'bg-amber-50 text-amber-800 ring-amber-100',
                             default => 'bg-purple-50 text-purple-700 ring-purple-100',
                         };
+                        $isAlumni = $account->isGraduate();
+                        if ($isAlumni) $roleBadge = 'bg-purple-50 text-purple-700 ring-purple-100';
                     @endphp
                     <tr>
                         <td>
@@ -122,13 +212,13 @@
                         </td>
                         <td>
                             <span class="dashboard-pill {{ $roleBadge }}">
-                                {{ str($account->role)->headline() }}
+                                {{ $isAlumni ? 'Alumni' : str($account->role)->headline() }}
                             </span>
                         </td>
                         <td>
                             @if($app)
                                 <div class="text-xs font-semibold text-slate-900">
-                                    {{ $app->batch ? $app->batch->name.' '.$app->batch->year : 'No batch assigned' }}
+                                    {{ $app->is_historical_record ? 'Historical verified record' : ($app->batch ? $app->batch->name.' '.$app->batch->year : 'No batch assigned') }}
                                 </div>
                                 <div class="flex items-center gap-1 mt-0.5">
                                     <span class="rounded px-1.5 py-0.5 text-[10px] font-bold {{ $app->status === 'approved' ? 'bg-emerald-100 text-emerald-800' : ($app->status === 'denied' ? 'bg-red-100 text-red-800' : 'bg-stone-100 text-stone-700') }}">
@@ -149,6 +239,9 @@
                             {{ $account->created_at?->format('M d, Y g:i A') }}
                         </td>
                         <td class="text-right">
+                            @if($app?->is_historical_record && $isAlumni)
+                                <span class="text-xs font-semibold text-slate-400">Protected record</span>
+                            @else
                             <form method="POST" action="{{ route('admin.accounts.destroy', $account) }}"
                                   data-confirm="Permanently delete account for '{{ $account->name ?: $account->email }}' ({{ str($account->role)->headline() }})? All related enrollment applications, payment records, uploaded documents, and learning history will be permanently deleted, allowing them to re-enroll if needed.">
                                 @csrf
@@ -158,6 +251,7 @@
                                     <x-dashboard-icon name="trash-2" class="h-4 w-4" />
                                 </button>
                             </form>
+                            @endif
                         </td>
                     </tr>
                 @empty
@@ -198,7 +292,7 @@
     <!-- DIALOG: ADD TRAINEE -->
     <dialog id="trainee-account-dialog" data-dashboard-dialog data-auto-open="{{ $traineeErrors->any() ? 'true' : 'false' }}" class="m-auto max-h-[90vh] w-[min(96vw,64rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/45" aria-labelledby="trainee-account-dialog-title">
         <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4">
-            <div><h2 id="trainee-account-dialog-title" class="font-display text-xl font-bold text-slate-900">Add trainee</h2><p class="mt-1 text-xs text-slate-500">Create an approved trainee and assign their class batch.</p></div>
+            <div><h2 id="trainee-account-dialog-title" class="font-display text-xl font-bold text-slate-900">Assisted trainee intake</h2><p class="mt-1 text-xs text-slate-500">For walk-ins whose original requirements and onsite payment are verified by an administrator.</p></div>
             <button type="button" data-dashboard-dialog-close class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900" aria-label="Close trainee form" title="Close"><x-dashboard-icon name="xmark" class="h-4 w-4" /></button>
         </div>
         <form method="POST" action="{{ route('admin.accounts.trainees.store') }}" class="space-y-5 p-6" data-dashboard-dialog-form data-submit-label="Creating trainee...">
@@ -230,12 +324,26 @@
                 <div><label for="trainee-school" class="form-label">School</label><input id="trainee-school" name="school_name" value="{{ old('school_name') }}" class="form-field" required>@error('school_name', 'trainee')<p class="form-error">{{ $message }}</p>@enderror</div>
                 <div><label for="trainee-year-graduated" class="form-label">Year graduated</label><input id="trainee-year-graduated" name="year_graduated" type="number" min="1950" max="{{ now()->year }}" value="{{ old('year_graduated') }}" class="form-field" required>@error('year_graduated', 'trainee')<p class="form-error">{{ $message }}</p>@enderror</div>
             </div>
+            <div class="rounded-xl border border-purple-200 bg-purple-50 p-4">
+                <p class="text-xs font-black uppercase tracking-wide text-purple-700">Onsite requirements and consent</p>
+                <div class="mt-3 grid gap-3 md:grid-cols-2">
+                    @foreach(['birth_certificate_onsite' => 'Original birth certificate inspected', 'education_document_onsite' => 'Original Form 137/138 or diploma inspected', 'good_moral_onsite' => 'Original good moral certificate inspected', 'id_photo_onsite' => 'ID photo received and identity checked', 'signature_onsite' => 'Applicant signature received', 'privacy_consent_onsite' => 'Applicant signed the privacy consent'] as $field => $label)
+                        <label class="flex items-start gap-3 rounded-lg border border-purple-100 bg-white p-3 text-xs leading-5 text-slate-700"><input type="checkbox" name="{{ $field }}" value="1" @checked(old($field)) class="mt-0.5 h-4 w-4 rounded border-slate-300 text-purple-700 focus:ring-purple-600" required><span>{{ $label }}</span></label>
+                    @endforeach
+                </div>
+            </div>
+            <div class="grid gap-4 md:grid-cols-2">
+                <div><label for="trainee-onsite-payment" class="form-label">Verified onsite payment</label><input id="trainee-onsite-payment" name="onsite_payment_amount" type="number" min="2000" max="22000" step="0.01" value="{{ old('onsite_payment_amount', '2000.00') }}" class="form-field" required>@error('onsite_payment_amount', 'trainee')<p class="form-error">{{ $message }}</p>@enderror</div>
+                <div><label for="trainee-or-number" class="form-label">Official receipt number</label><input id="trainee-or-number" name="onsite_or_number" value="{{ old('onsite_or_number') }}" class="form-field" required>@error('onsite_or_number', 'trainee')<p class="form-error">{{ $message }}</p>@enderror</div>
+            </div>
+            <label class="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900"><input type="checkbox" name="onsite_payment_received" value="1" @checked(old('onsite_payment_received')) class="mt-1 h-4 w-4 rounded border-emerald-300 text-emerald-700 focus:ring-emerald-600" required><span><strong class="block">Payment and receipt verified</strong>I confirm the amount was received onsite and the official receipt number above is accurate.</span></label>
+            <div><label for="trainee-onsite-notes" class="form-label">Verification notes</label><textarea id="trainee-onsite-notes" name="onsite_verification_notes" rows="3" class="form-field" required placeholder="Record who presented the originals, relevant document references, and payment context.">{{ old('onsite_verification_notes') }}</textarea>@error('onsite_verification_notes', 'trainee')<p class="form-error">{{ $message }}</p>@enderror</div>
             <div class="grid gap-4 md:grid-cols-2">
                 <div><label for="trainee-password" class="form-label">Temporary password</label><div class="relative"><input id="trainee-password" name="password" type="password" class="form-field pr-11" required><button type="button" data-password-toggle="trainee-password" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-700" aria-label="Show trainee password" title="Show password"><x-dashboard-icon name="eye" class="h-4 w-4" /></button></div>@error('password', 'trainee')<p class="form-error">{{ $message }}</p>@enderror</div>
                 <div><label for="trainee-password-confirmation" class="form-label">Confirm password</label><div class="relative"><input id="trainee-password-confirmation" name="password_confirmation" type="password" class="form-field pr-11" required><button type="button" data-password-toggle="trainee-password-confirmation" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-700" aria-label="Show password confirmation" title="Show password"><x-dashboard-icon name="eye" class="h-4 w-4" /></button></div></div>
             </div>
             @if($traineeErrors->any())<div class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">Please review the highlighted fields.</div>@endif
-            <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end"><button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button><button type="submit" data-action-button class="primary-action">Create trainee</button></div>
+            <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end"><button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button><button type="submit" data-action-button class="primary-action">Verify intake and create trainee</button></div>
         </form>
     </dialog>
 </section>
