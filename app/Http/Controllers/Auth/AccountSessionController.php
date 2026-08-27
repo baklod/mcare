@@ -7,6 +7,7 @@ use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\HistoricalAlumniClaim;
 use App\Models\User;
+use App\Services\AnnouncementDeliveryService;
 use App\Services\EmailTwoFactorService;
 use App\Support\AccountPortal;
 use Illuminate\Http\RedirectResponse;
@@ -32,8 +33,10 @@ class AccountSessionController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
-    {
+    public function store(
+        Request $request,
+        AnnouncementDeliveryService $announcementDelivery,
+    ): RedirectResponse {
         $credentials = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
@@ -127,8 +130,11 @@ class AccountSessionController extends Controller
             'enrollment.awaiting_approval',
         ]);
 
+        $catchUpCount = $announcementDelivery->catchUpFor($request->user());
+
         AdminActivityLog::record($request->user(), 'account.login.success', $request->user(), [
             'role' => $request->user()?->role,
+            'announcement_catch_up_count' => $catchUpCount,
         ]);
 
         // Admin sessions always start from the operations dashboard. A stale

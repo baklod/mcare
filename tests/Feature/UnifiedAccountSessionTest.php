@@ -18,6 +18,22 @@ class UnifiedAccountSessionTest extends TestCase
         }
     }
 
+    public function test_shared_login_renders_the_responsive_brand_layout_and_all_account_paths(): void
+    {
+        $this->get(route('login'))
+            ->assertOk()
+            ->assertSee('data-auth-dashboard-preview', false)
+            ->assertSee('data-auth-form-card', false)
+            ->assertSee('assets/login-dashboard-preview.png', false)
+            ->assertSee(route('login.store'), false)
+            ->assertSee(route('auth.google.redirect'), false)
+            ->assertSee(route('enrollment.create'), false)
+            ->assertSee(route('alumni.claim.create'), false)
+            ->assertSeeText('Sign in to your account')
+            ->assertSeeText('Remember me')
+            ->assertSeeText('Sign in with Google');
+    }
+
     public function test_every_role_signs_out_through_the_shared_landing_flow(): void
     {
         foreach (['admin', 'trainer', 'trainee', 'alumni'] as $role) {

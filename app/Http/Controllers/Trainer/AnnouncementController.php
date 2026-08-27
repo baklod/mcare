@@ -8,17 +8,20 @@ use App\Models\EnrollmentApplication;
 use App\Models\TrainerAnnouncement;
 use App\Models\TrainingBatch;
 use App\Models\User;
-use App\Notifications\LmsAnnouncementPublished;
+use App\Services\AnnouncementDeliveryService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class AnnouncementController extends Controller
 {
+    public function __construct(
+        private readonly AnnouncementDeliveryService $announcementDelivery,
+    ) {}
+
     public function index(Request $request): View
     {
         $trainer = $request->user();
@@ -236,7 +239,7 @@ class AnnouncementController extends Controller
             ->get();
 
         if ($trainees->isNotEmpty()) {
-            Notification::send($trainees, new LmsAnnouncementPublished($announcement));
+            $this->announcementDelivery->deliverTrainerAnnouncement($announcement, $trainees);
         }
     }
 }

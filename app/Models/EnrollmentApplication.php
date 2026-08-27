@@ -199,6 +199,13 @@ class EnrollmentApplication extends Model
         ];
     }
 
+    public function getFullNameAttribute(): string
+    {
+        $name = trim(($this->first_name ?? '').' '.($this->last_name ?? ''));
+
+        return filled($name) ? $name : ($this->user?->name ?? 'Trainee #'.$this->id);
+    }
+
     public function paymentStatusLabel(): string
     {
         return self::paymentStatuses()[$this->payment_status] ?? str($this->payment_status)->headline()->toString();
@@ -298,6 +305,11 @@ class EnrollmentApplication extends Model
     public function moduleProgress(): HasMany
     {
         return $this->hasMany(ModuleProgress::class, 'enrollment_application_id');
+    }
+
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(TraineeAttendance::class, 'enrollment_application_id');
     }
 
     public function competencyRecords(): HasMany

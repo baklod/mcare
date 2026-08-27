@@ -50,6 +50,11 @@ class TrainingBatch extends Model
         return $this->hasMany(EnrollmentApplication::class);
     }
 
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(TraineeAttendance::class, 'training_batch_id');
+    }
+
     public function trainer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'trainer_id');

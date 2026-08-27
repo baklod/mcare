@@ -25,6 +25,7 @@ return new class extends Migration
             $table->unsignedSmallInteger('time_limit_minutes')->nullable();
             $table->unsignedSmallInteger('attempt_limit')->default(1);
             $table->decimal('passing_score_percent', 5, 2)->default(75);
+            $table->boolean('requires_time_in')->default(false);
             $table->timestamps();
 
             $table->index(
@@ -82,10 +83,42 @@ return new class extends Migration
             );
             $table->index(['quiz_id', 'status'], 'quiz_attempts_quiz_status_index');
         });
+
+        Schema::create('trainee_attendances', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('training_batch_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('enrollment_application_id')
+                ->constrained('enrollment_applications')
+                ->cascadeOnDelete();
+            $table->date('attendance_date');
+            $table->foreignId('quiz_id')->nullable()->constrained('quizzes')->nullOnDelete();
+            $table->string('status', 30)->default('present');
+            $table->string('check_in_type', 40)->default('daily_sheet');
+            $table->dateTime('timed_in_at')->nullable();
+            $table->string('ip_address', 45)->nullable();
+            $table->text('user_agent')->nullable();
+            $table->text('notes')->nullable();
+            $table->foreignId('recorded_by_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamps();
+
+            $table->unique(
+                ['training_batch_id', 'enrollment_application_id', 'attendance_date', 'quiz_id'],
+                'trainee_attendances_batch_date_quiz_unique'
+            );
+            $table->index(
+                ['training_batch_id', 'attendance_date'],
+                'trainee_attendances_batch_date_index'
+            );
+            $table->index(
+                ['enrollment_application_id', 'attendance_date'],
+                'trainee_attendances_trainee_date_index'
+            );
+        });
     }
 
     public function down(): void
     {
+        Schema::dropIfExists('trainee_attendances');
         Schema::dropIfExists('quiz_attempts');
         Schema::dropIfExists('quiz_questions');
         Schema::dropIfExists('quizzes');

@@ -29,6 +29,13 @@
             <strong>{{ $attempts->total() }}</strong>
             <small>Graded attempts</small>
         </article>
+        @if($quiz->requires_time_in)
+            <article class="lms-metric-card" style="border-top: 3px solid #7c3aed;">
+                <span>Activity Time-In</span>
+                <strong style="color: #7c3aed;">{{ $attendances->count() }}</strong>
+                <small>Checked-in trainees</small>
+            </article>
+        @endif
         <article class="lms-metric-card">
             <span>Average score</span>
             <strong>{{ $averageScore !== null ? number_format($averageScore, 1).'%' : '-' }}</strong>
@@ -40,6 +47,44 @@
             <small>Current page</small>
         </article>
     </section>
+
+    @if($quiz->requires_time_in && $attendances->isNotEmpty())
+        <section class="lms-results-panel" style="margin-bottom: 24px;">
+            <div class="lms-section-heading">
+                <div>
+                    <p class="lms-eyebrow">Asynchronous Session Attendance</p>
+                    <h2>Activity Time-In Log</h2>
+                </div>
+            </div>
+            <div class="lms-responsive-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Trainee</th>
+                            <th>Time-In Timestamp</th>
+                            <th>Status</th>
+                            <th>IP / Device</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($attendances as $att)
+                            <tr>
+                                <td>
+                                    <strong>{{ $att->application?->full_name ?? ($att->application?->user?->name ?? 'Trainee') }}</strong>
+                                    <small style="display: block; color: #64748b;">{{ $att->application?->email ?? $att->application?->user?->email }}</small>
+                                </td>
+                                <td>{{ $att->timed_in_at?->format('M d, Y g:i A') ?? '-' }}</td>
+                                <td>
+                                    <span class="lms-status-chip is-green">Present</span>
+                                </td>
+                                <td style="font-size: 11px; color: #64748b;">{{ $att->ip_address ?? 'Recorded online' }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    @endif
 
     <section class="lms-results-panel" aria-labelledby="learner-results-title">
         <div class="lms-section-heading">

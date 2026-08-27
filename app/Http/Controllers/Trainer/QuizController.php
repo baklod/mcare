@@ -18,9 +18,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 
 class QuizController extends Controller
 {
@@ -66,6 +69,7 @@ class QuizController extends Controller
                 'time_limit_minutes' => $validated['time_limit_minutes'] ?? null,
                 'attempt_limit' => $validated['attempt_limit'],
                 'passing_score_percent' => $validated['passing_score_percent'],
+                'requires_time_in' => $request->boolean('requires_time_in'),
                 'is_published' => $published,
                 'published_at' => $published ? now() : null,
             ]);
@@ -94,8 +98,7 @@ class QuizController extends Controller
         Request $request,
         Quiz $quiz,
         ClassroomComments $comments,
-    ): View
-    {
+    ): View {
         $this->authorize('update', $quiz);
 
         return view('trainer.quizzes.edit', [
@@ -150,6 +153,9 @@ class QuizController extends Controller
                 'due_at' => $validated['due_at'] ?? null,
                 'time_limit_minutes' => $validated['time_limit_minutes'] ?? null,
                 'attempt_limit' => $validated['attempt_limit'],
+                'requires_time_in' => $request->has('requires_time_in')
+                    ? $request->boolean('requires_time_in')
+                    : $lockedQuiz->requires_time_in,
                 'is_published' => $published,
                 'published_at' => $published ? ($lockedQuiz->published_at ?? now()) : null,
             ];
@@ -223,6 +229,7 @@ class QuizController extends Controller
 
         return view('trainer.quizzes.results', [
             'quiz' => $quiz->load(['batch', 'targetTrainee', 'questions']),
+            'attendances' => $quiz->attendances()->with(['application.user'])->latest('timed_in_at')->get(),
             'attempts' => $quiz->attempts()
                 ->with(['application.user'])
                 ->where('status', QuizAttempt::STATUS_GRADED)
@@ -292,6 +299,7 @@ class QuizController extends Controller
             'time_limit_minutes' => ['nullable', 'integer', 'min:1', 'max:240'],
             'attempt_limit' => ['required', 'integer', 'min:1', 'max:5'],
             'passing_score_percent' => ['required', 'numeric', 'min:1', 'max:100'],
+            'requires_time_in' => ['nullable', 'boolean'],
             'is_published' => ['nullable', 'boolean'],
             'questions' => ['required', 'array', 'min:1', 'max:50'],
             'questions.*.type' => ['required', Rule::in(['multiple_choice', 'true_false', 'file_upload', 'enumeration'])],
@@ -406,7 +414,7 @@ class QuizController extends Controller
 
         return [
             'batches' => $assignedBatch ? collect([$assignedBatch]) : collect(),
-            'modules' => \App\Models\TrainingModule::query()
+            'modules' => TrainingModule::query()
                 ->where('trainer_id', request()->user()->id)
                 ->orderBy('title')
                 ->get(),
@@ -614,7 +622,7 @@ class QuizController extends Controller
         Quiz $quiz,
         QuizAttempt $attempt,
         int $questionId,
-    ): \Symfony\Component\HttpFoundation\BinaryFileResponse {
+    ): BinaryFileResponse {
         $this->authorize('view', $quiz);
         abort_unless((int) $attempt->quiz_id === (int) $quiz->id, 404);
 
@@ -623,15 +631,15 @@ class QuizController extends Controller
 
         abort_unless(is_array($answer) && ($answer['type'] ?? null) === 'file', 404);
         $path = $answer['file_path'] ?? null;
-        abort_unless(is_string($path) && \Illuminate\Support\Facades\Storage::disk('local')->exists($path), 404);
+        abort_unless(is_string($path) && Storage::disk('local')->exists($path), 404);
 
         $filename = basename($answer['original_name'] ?? 'submission');
         $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
 
-        return response()->file(\Illuminate\Support\Facades\Storage::disk('local')->path($path), [
+        return response()->file(Storage::disk('local')->path($path), [
             'Content-Type' => ($answer['mime_type'] ?? null) ?: 'application/octet-stream',
-            'Content-Disposition' => \Symfony\Component\HttpFoundation\HeaderUtils::makeDisposition(
-                \Symfony\Component\HttpFoundation\HeaderUtils::DISPOSITION_ATTACHMENT,
+            'Content-Disposition' => HeaderUtils::makeDisposition(
+                HeaderUtils::DISPOSITION_ATTACHMENT,
                 $filename,
                 $fallbackFilename
             ),

@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountSettingsController;
 use App\Http\Controllers\Admin\AdminAccountController;
 use App\Http\Controllers\Admin\AdminActivityLogController;
 use App\Http\Controllers\Admin\AdminAnnouncementController;
+use App\Http\Controllers\Admin\AdminAttendanceController;
 use App\Http\Controllers\Admin\AdminCareerHubController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminLearningSystemController;
@@ -28,6 +29,7 @@ use App\Http\Controllers\Trainee\QuizAttemptController as TraineeQuizAttemptCont
 use App\Http\Controllers\Trainee\QuizController as TraineeQuizController;
 use App\Http\Controllers\Trainee\TraineeDashboardController;
 use App\Http\Controllers\Trainer\AnnouncementController as TrainerAnnouncementController;
+use App\Http\Controllers\Trainer\AttendanceController;
 use App\Http\Controllers\Trainer\CompetencyRecordController as TrainerCompetencyRecordController;
 use App\Http\Controllers\Trainer\QuizController as TrainerQuizController;
 use App\Http\Controllers\Trainer\TrainerDashboardController;
@@ -289,6 +291,15 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::patch('/learning/trainees/{enrollmentApplication}/status', [AdminLearningSystemController::class, 'updateTraineeStatus'])
                     ->middleware(['permission:trainees.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.trainees.status');
+                Route::get('/learning/attendance', [AdminAttendanceController::class, 'index'])
+                    ->middleware('permission:trainees.manage')
+                    ->name('learning.attendance');
+                Route::post('/learning/attendance', [AdminAttendanceController::class, 'store'])
+                    ->middleware(['permission:trainees.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.attendance.store');
+                Route::get('/learning/attendance/export/{batch}', [AdminAttendanceController::class, 'export'])
+                    ->middleware(['permission:reports.export', 'throttle:document-downloads'])
+                    ->name('learning.attendance.export');
                 Route::get('/learning/modules', [AdminLearningSystemController::class, 'modules'])
                     ->middleware('permission:modules.manage')
                     ->name('learning.modules');
@@ -418,6 +429,15 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/trainees/export', [TrainerPortalController::class, 'exportTrainees'])
                     ->middleware(['permission:trainees.export', 'throttle:document-downloads'])
                     ->name('trainees.export');
+                Route::get('/attendance', [AttendanceController::class, 'index'])
+                    ->middleware('permission:trainees.view')
+                    ->name('attendance.index');
+                Route::post('/attendance', [AttendanceController::class, 'store'])
+                    ->middleware(['permission:trainees.view', 'throttle:sensitive-mutation'])
+                    ->name('attendance.store');
+                Route::get('/attendance/export/{batch}', [AttendanceController::class, 'export'])
+                    ->middleware(['permission:trainees.export', 'throttle:document-downloads'])
+                    ->name('attendance.export');
                 Route::get('/competency-records', [TrainerCompetencyRecordController::class, 'index'])
                     ->middleware('permission:competencies.assess')
                     ->name('competencies.index');
@@ -569,6 +589,9 @@ Route::middleware('throttle:global-web')->group(function () {
                     Route::get('/quizzes/{quiz}', [TraineeQuizController::class, 'show'])
                         ->middleware('permission:quizzes.take')
                         ->name('quizzes.show');
+                    Route::post('/quizzes/{quiz}/time-in', [TraineeQuizController::class, 'timeIn'])
+                        ->middleware(['permission:quizzes.take', 'throttle:sensitive-mutation'])
+                        ->name('quizzes.time-in');
                     Route::post('/quizzes/{quiz}/attempts', [TraineeQuizController::class, 'start'])
                         ->middleware(['permission:quizzes.take', 'throttle:sensitive-mutation'])
                         ->name('quizzes.start');

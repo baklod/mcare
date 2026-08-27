@@ -8,15 +8,18 @@ use App\Models\AdminAnnouncement;
 use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
 use App\Models\User;
-use App\Notifications\AdminAnnouncementNotification;
+use App\Services\AnnouncementDeliveryService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class AdminAnnouncementController extends Controller
 {
+    public function __construct(
+        private readonly AnnouncementDeliveryService $announcementDelivery,
+    ) {}
+
     public function index(Request $request): View
     {
         $announcements = AdminAnnouncement::query()
@@ -88,7 +91,7 @@ class AdminAnnouncementController extends Controller
         };
 
         if ($recipients->isNotEmpty()) {
-            Notification::send($recipients, new AdminAnnouncementNotification($announcement));
+            $this->announcementDelivery->deliverAdminAnnouncement($announcement, $recipients);
         }
 
         AdminActivityLog::record($request->user(), 'admin.announcement.published', $announcement, [

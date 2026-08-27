@@ -13,7 +13,7 @@ This document records the modifications, architectural enhancements, security fi
 | **Module Completion ("Mark as Done")** | LMS Workflow | Confirmed and hardened the module completion lifecycle in `TraineeDashboardController::updateProgress`, requiring all released quizzes to be passed before submitting for trainer validation. |
 | **Admin & Trainer Graduation Flow** | Lifecycle Workflow | Confirmed the eligibility validation pipeline before status transitions to `graduated`, unlocking the Career Hub and official Grades record while safely transitioning learning module access. |
 | **Frontend Compilation** | Asset Build | Compiled production CSS/JS assets using Vite (`npm run build`). |
-| **Automated Test Suite** | QA Verification | All 198 automated feature and unit tests pass with 1,539 assertions. |
+| **Automated Test Suite** | QA Verification | All 211 automated feature and unit tests pass with 1,654 assertions. |
 
 ---
 
@@ -187,13 +187,88 @@ To resolve issues where buttons or controls might trigger unexpected modals or p
 
 ---
 
-## 11. Verification Results
+## 11. Unified Attendance Tracking System & Activity Time-In
+
+- **`database/migrations/2026_08_26_200000_create_trainee_attendances_and_add_quiz_time_in_flags.php`**:
+  - Added `requires_time_in` column to `quizzes`.
+  - Created `trainee_attendances` table with unique constraint on `['training_batch_id', 'enrollment_application_id', 'attendance_date', 'quiz_id']`.
+- **`app/Models/TraineeAttendance.php`**:
+  - Defined attendance statuses (`present`, `late`, `absent`, `excused`) and check-in types (`daily_sheet`, `activity_time_in`, `admin_override`).
+- **`app/Services/AttendanceService.php`**:
+  - Implemented batch sheet persistence, trainee self check-in, statistics calculation, and stream formatting.
+- **`app/Http/Controllers/Trainer/AttendanceController.php` & `AdminAttendanceController.php`**:
+  - Added full attendance dashboard, batch/date selectors, 1-click bulk Present action, and TESDA summary rosters.
+- **`resources/views/trainer/attendance/index.blade.php` & `admin/learning/attendance.blade.php`**:
+  - Built interactive attendance views with quick radio switches and summary compliance metrics.
+- **`resources/views/trainee/quizzes/show.blade.php`**:
+  - Embedded **Activity Attendance Card** allowing trainees to time-in before the deadline without needing to finish or submit the quiz first.
+
+---
+
+## 12. Polished OpenSpout Excel (.xlsx) Attendance Export & Graduate Exclusion
+
+- **Graduate Filtering Across Attendance Roster**:
+  - Attendance sheets, calculations, and summaries now strictly query active trainees (`learning_status != 'graduated'`), ensuring alumni do not appear in active daily logs.
+- **`app/Services/AttendanceWorkbookExporter.php`**:
+  - Built a multi-sheet OpenSpout Excel (.xlsx) report matching the design and styling of `CompetencyWorkbookExporter.php`:
+    - **Sheet 1: Daily Attendance Sheet**: Includes branded header banner, batch metadata, freeze panes, trainee rows, attendance percentages, and date-by-date status markers with custom color-coded cells (`#DCFCE7` Present, `#FEF3C7` Late, `#FEE2E2` Absent, `#DBEAFE` Excused).
+    - **Sheet 2: TESDA Compliance Roster**: Trainee summary table with session breakdowns, calculated attendance rates, and TESDA benchmark compliance status (`COMPLIANT` &ge; 80%, `AT RISK (<80%)`).
+    - **Sheet 3: Legend & TESDA Guidelines**: Full description of status codes and institutional TESDA 80% attendance policy notes.
+- **Export Controls in UI**:
+  - Added primary **"Export TESDA Workbook (.xlsx)"** button along with raw **"CSV"** export option in both Trainer and Admin attendance interfaces.
+
+---
+
+## 13. Google Sign-In Audit Logs & Late-Login Announcement Catch-Up
+
+- **Google OAuth Audit Trail**:
+  - Google sign-in start, success, failure, rejection, and historical-account verification outcomes are now written to `AdminActivityLog`.
+  - Successful entries record the account role, login flow, catch-up delivery count, IP address, user agent, and timestamp without storing OAuth tokens, OAuth state, or raw Google profile payloads.
+- **`app/Services/AnnouncementDeliveryService.php`**:
+  - Added one shared delivery path for trainer and administrative announcements.
+  - After a successful Google or password login, approved trainees receive any still-visible announcement that was not previously delivered to them.
+  - Catch-up visibility requires a published announcement whose posting time has arrived, whose expiration is either empty or still in the future, and whose audience matches the trainee or their batch.
+- **`announcement_deliveries` ledger**:
+  - Added a unique trainee/source/announcement key so repeated logins cannot resend the same database or email notification.
+  - The migration backfills prior Laravel notification records to prevent a one-time duplicate after deployment.
+- **Publication Integration**:
+  - Trainer and admin publication-time notification dispatch now uses the same delivery ledger as login catch-up, closing the race between an original queued notice and a later login.
+
+---
+
+## 14. Verification Results
 
 ```powershell
-php artisan test
+php artisan test --filter=AttendanceTrackingTest
 ```
 
 ```
-  Tests:    202 passed (1575 assertions)
-  Duration: 11.96s
+   PASS  Tests\Feature\Lms\AttendanceTrackingTest
+  ✓ trainer can view attendance sheet and save daily records                                                     0.73s
+  ✓ graduated trainees are excluded from the attendance sheet                                                    0.05s
+  ✓ trainer and admin can export batch attendance xlsx and csv                                                   0.13s
+  ✓ trainee can record activity time in without taking or submitting quiz                                        0.27s
+  ✓ trainee cannot time in if activity deadline has passed                                                       0.05s
+
+  Tests:    5 passed (34 assertions)
+  Duration: 1.48s
+```
+
+```powershell
+php artisan test tests/Feature/GoogleLoginAnnouncementCatchUpTest.php
+```
+
+```
+   PASS  Tests\Feature\GoogleLoginAnnouncementCatchUpTest
+  ✓ google login is audited and catches up visible announcements exactly once
+  ✓ publication delivery is not duplicated by a later password login
+  ✓ failed google callback is audited without storing exception details
+
+  Tests:    3 passed (34 assertions)
+```
+
+Full Laravel verification after the announcement and Google audit changes:
+
+```
+Tests: 211 passed (1,654 assertions)
 ```

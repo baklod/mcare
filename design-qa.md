@@ -57,3 +57,61 @@
 - P3: The supplied mark has a white raster background. It blends cleanly on the new white surfaces, but a future official transparent export would improve flexibility on non-white backgrounds.
 
 final result: passed
+
+---
+
+# MCARE Login Redesign QA
+
+## Scope
+
+- Source reference: `design-qa/reference-login-desktop.png`
+- Final desktop capture: `design-qa/implementation-login-desktop.png`
+- Final mobile capture: `design-qa/implementation-login-mobile.png`
+- Same-view comparison: `design-qa/comparison-reference-vs-implementation.png`
+- Page under test: `http://127.0.0.1:8000/login`
+
+## Visual comparison
+
+The final desktop implementation was captured at the reference viewport of 1448 × 1086 and placed beside the supplied source image in one comparison canvas. The outer shell, column split, logo scale, welcome copy, dashboard-preview crop, wave placement, form-card width, vertical alignment, radii, border treatment, and purple brand palette match the source design intent.
+
+The final form card measured 530 × 733 at x=818, y=178. This closely matches the source card at approximately 530 × 730 at x=819, y=177. The dashboard preview uses the supplied second image as a real raster asset. The MCARE mark is a lossless crop of the existing project logo, and the wave background is a dedicated high-resolution raster asset.
+
+Deliberate product-preserving differences:
+
+- The applicant-enrollment and historical-alumni recovery links remain available beneath Google sign-in.
+- The reference's inactive Forgot password label was not added because the application has no password-reset route.
+- Non-functional decorative dots and rings were omitted; no fake placeholder art was introduced.
+
+## Responsive verification
+
+| Viewport | Showcase image | Form card | Horizontal overflow | Result |
+| --- | --- | --- | --- | --- |
+| 1448 × 1086 | Visible | 530 × 733 at x=818, y=178 | None | Passed |
+| 768 × 1024 | Hidden | 464 px wide and centered | None | Passed |
+| 390 × 844 | Hidden | 351 px wide at x=12, centered | None | Passed |
+
+At tablet and mobile widths the entire left showcase, including the second/dashboard image, is removed. The sign-in card is centered over the bottom-anchored wave background, with the compact MCARE mark retained inside the card.
+
+## Behavior and accessibility
+
+- Password visibility control changed the input type from `password` to `text` and back to `password`, while updating its accessible label.
+- Email and password inputs retain explicit labels, autocomplete values, required state, and visible focus treatment.
+- Google sign-in resolves to `/auth/google`.
+- Email/password sign-in, MFA verification, notices, error rendering, current-account continuation/switching, enrollment, and alumni-claim paths remain rendered through their existing routes.
+- Mobile primary controls are at least 52 px high and retain clear focus states.
+- Browser console check returned no warnings or errors.
+
+## Verification
+
+- `npm run build`: passed.
+- `php artisan test --compact`: 211 tests passed, 1654 assertions.
+- Targeted authentication suite: 8 tests passed, 85 assertions.
+
+## Iteration history
+
+1. Captured the existing narrow login at the source viewport.
+2. Built the two-column desktop composition and mobile single-card mode with real assets.
+3. Corrected logo whitespace by cropping the existing mark, then refined logo scale, dashboard size, wave placement, and panel split.
+4. Matched the form-card desktop position and dimensions, rechecked desktop/tablet/mobile overflow, and reran behavior and regression tests.
+
+final result: passed

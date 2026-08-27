@@ -7,6 +7,7 @@ use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\Quiz;
 use App\Models\QuizAttempt;
+use App\Services\AttendanceService;
 use App\Services\ClassroomComments;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,8 +32,7 @@ class QuizController extends Controller
         Request $request,
         Quiz $quiz,
         ClassroomComments $comments,
-    ): View|RedirectResponse
-    {
+    ): View|RedirectResponse {
         $application = $this->approvedApplicationFor($request);
 
         if (! $application) {
@@ -40,20 +40,63 @@ class QuizController extends Controller
         }
 
         abort_unless($quiz->isReleasedAt() && $quiz->targets($application), 404);
-        $quiz->load(['trainer', 'batch', 'questions']);
+        $quiz->load(['trainer', 'batch', 'questions', 'attendances']);
         $attempts = $quiz->attempts()
             ->where('enrollment_application_id', $application->id)
             ->latest('attempt_number')
             ->get();
+
+        $attendance = $quiz->attendanceFor($application);
+        $canTimeIn = $quiz->requires_time_in && $quiz->isTimeInAllowed() && ! $attendance;
 
         return view('trainee.quizzes.show', [
             'application' => $application,
             'quiz' => $quiz,
             'attempts' => $attempts,
             'canStart' => $quiz->isOpenAt() && $quiz->attemptsRemainingFor($application) > 0,
+            'attendance' => $attendance,
+            'canTimeIn' => $canTimeIn,
             'classroomComments' => $comments->visibleFor($request->user(), $quiz),
             'privateCommentRecipients' => $comments->privateRecipients($request->user(), $quiz),
         ]);
+    }
+
+    public function timeIn(
+        Request $request,
+        Quiz $quiz,
+        AttendanceService $attendanceService,
+    ): RedirectResponse {
+        $application = $this->approvedApplicationFor($request);
+
+        if (! $application) {
+            return $this->approvalRedirect();
+        }
+
+        abort_unless($quiz->isReleasedAt() && $quiz->targets($application), 404);
+
+        if (! $quiz->requires_time_in) {
+            return redirect()
+                ->route('trainee.quizzes.show', $quiz)
+                ->with('error', 'This activity does not require a separate attendance time-in.');
+        }
+
+        if (! $quiz->isTimeInAllowed()) {
+            return redirect()
+                ->route('trainee.quizzes.show', $quiz)
+                ->with('error', 'The time-in window for this activity is closed or has expired.');
+        }
+
+        $attendance = $attendanceService->recordActivityTimeIn($quiz, $application, $request);
+
+        AdminActivityLog::record($request->user(), 'trainee.activity.timed-in', $attendance, [
+            'quiz_id' => $quiz->id,
+            'quiz_title' => $quiz->title,
+            'timed_in_at' => $attendance->timed_in_at?->toIso8601String(),
+        ]);
+
+        return redirect()
+            ->route('trainee.quizzes.show', $quiz)
+            ->with('status', 'Your time-in for this activity has been successfully recorded as Present.');
     }
 
     public function start(Request $request, Quiz $quiz): RedirectResponse

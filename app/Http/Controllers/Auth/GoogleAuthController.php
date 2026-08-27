@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\HistoricalAlumniClaim;
 use App\Models\User;
+use App\Services\AnnouncementDeliveryService;
 use App\Support\AccountPortal;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,17 +18,25 @@ use Throwable;
 
 class GoogleAuthController extends Controller
 {
-    public function redirect(): RedirectResponse
+    public function redirect(Request $request): RedirectResponse
     {
         $redirectUri = (string) config('services.google.redirect');
 
         if (! config('services.google.client_id') || ! config('services.google.client_secret')) {
+            AdminActivityLog::record($request->user(), 'account.login.google.failed', $request->user(), [
+                'reason' => 'provider_not_configured',
+            ]);
+
             return redirect()
                 ->route('landing')
                 ->with('google_config_missing', 'Google OAuth is installed. Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI to .env to enable sign in.');
         }
 
         if (! $this->hasSafeRedirectUri($redirectUri)) {
+            AdminActivityLog::record($request->user(), 'account.login.google.failed', $request->user(), [
+                'reason' => 'unsafe_callback_configuration',
+            ]);
+
             return redirect()
                 ->route('landing')
                 ->with('auth_error', 'Google sign in is temporarily unavailable because the secure callback URL is not configured correctly. Please use email sign in or contact the administrator.');
@@ -37,11 +47,15 @@ class GoogleAuthController extends Controller
          * Socialite stores an OAuth `state` value in the session and checks it
          * on callback, which helps defend against login CSRF and response mixups.
          */
+        AdminActivityLog::record($request->user(), 'account.login.google.started', $request->user());
+
         return Socialite::driver('google')->redirect();
     }
 
-    public function callback(Request $request): RedirectResponse
-    {
+    public function callback(
+        Request $request,
+        AnnouncementDeliveryService $announcementDelivery,
+    ): RedirectResponse {
         try {
             /*
              * Do NOT call stateless() here. The application already uses web
@@ -49,6 +63,10 @@ class GoogleAuthController extends Controller
              */
             $googleUser = Socialite::driver('google')->user();
         } catch (Throwable) {
+            AdminActivityLog::record($request->user(), 'account.login.google.failed', $request->user(), [
+                'reason' => 'oauth_callback_failed',
+            ]);
+
             return redirect()
                 ->route('landing')
                 ->with('auth_error', 'Google sign in could not be completed. Please try again.');
@@ -57,6 +75,10 @@ class GoogleAuthController extends Controller
         $email = Str::lower(trim((string) $googleUser->getEmail()));
 
         if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            AdminActivityLog::record($request->user(), 'account.login.google.failed', $request->user(), [
+                'reason' => 'email_unavailable',
+            ]);
+
             return redirect()
                 ->route('landing')
                 ->with('auth_error', 'Google did not provide a usable email address. Please choose another Google account.');
@@ -67,6 +89,11 @@ class GoogleAuthController extends Controller
         // Staff accounts must complete password and challenge verification.
         // Applicant OAuth must not become a privileged-session bypass.
         if ($user && in_array($user->role, ['admin', 'trainer'], true)) {
+            AdminActivityLog::record($user, 'account.login.google.rejected', $user, [
+                'role' => $user->role,
+                'reason' => 'staff_password_required',
+            ]);
+
             return redirect()
                 ->route('landing')
                 ->with('auth_error', 'Staff accounts must use email and password on the MCARE sign-in page.');
@@ -110,6 +137,11 @@ class GoogleAuthController extends Controller
 
             $request->session()->regenerate();
 
+            AdminActivityLog::record($user, 'account.google.verification.completed', $user, [
+                'role' => $user->role,
+                'outcome' => 'historical_claim_pending_onsite',
+            ]);
+
             return redirect()
                 ->route('login')
                 ->with('verified', 'Google verified your email and profile picture. Your alumni account remains locked until MCARE checks your valid ID, original COTC/TOR, and archive record onsite.');
@@ -121,6 +153,12 @@ class GoogleAuthController extends Controller
             $request->session()->forget('enrollment.awaiting_approval');
             $request->session()->regenerate();
 
+            $this->recordSuccessfulGoogleLogin(
+                $user,
+                $announcementDelivery,
+                'denied_application_reentry',
+            );
+
             return redirect()
                 ->route('enrollment.create')
                 ->with('reapply_notice', 'Your previous application was not approved. Correct the highlighted information or documents below, then resubmit using this same Google account.');
@@ -131,6 +169,11 @@ class GoogleAuthController extends Controller
             $request->session()->put('enrollment.payment_application_id', $application->id);
             $request->session()->put('enrollment.awaiting_approval', true);
             $request->session()->regenerate();
+
+            AdminActivityLog::record($user, 'account.login.google.rejected', $user, [
+                'role' => $user->role,
+                'reason' => 'awaiting_admin_approval',
+            ]);
 
             return redirect()
                 ->route('landing')
@@ -148,6 +191,8 @@ class GoogleAuthController extends Controller
         // Rotate the session ID after authentication to reduce fixation risk.
         $request->session()->regenerate();
 
+        $this->recordSuccessfulGoogleLogin($user, $announcementDelivery, 'portal_login');
+
         return redirect()
             ->route(AccountPortal::routeNameFor($user))
             ->with('signed_in', $user->enrollmentApplication()->exists()
@@ -157,6 +202,10 @@ class GoogleAuthController extends Controller
 
     public function logout(): RedirectResponse
     {
+        AdminActivityLog::record(request()->user(), 'account.logout.google', request()->user(), [
+            'role' => request()->user()?->role,
+        ]);
+
         Auth::logout();
         request()->session()->invalidate();
         request()->session()->regenerateToken();
@@ -206,5 +255,19 @@ class GoogleAuthController extends Controller
         $callbackPath = rtrim((string) ($redirect['path'] ?? ''), '/') === '/auth/google/callback';
 
         return $secureScheme && $matchingHost && $callbackPath;
+    }
+
+    private function recordSuccessfulGoogleLogin(
+        User $user,
+        AnnouncementDeliveryService $announcementDelivery,
+        string $flow,
+    ): void {
+        $catchUpCount = $announcementDelivery->catchUpFor($user);
+
+        AdminActivityLog::record($user, 'account.login.google.success', $user, [
+            'role' => $user->role,
+            'flow' => $flow,
+            'announcement_catch_up_count' => $catchUpCount,
+        ]);
     }
 }

@@ -28,6 +28,7 @@ class Quiz extends Model
         'time_limit_minutes',
         'attempt_limit',
         'passing_score_percent',
+        'requires_time_in',
     ];
 
     protected function casts(): array
@@ -40,6 +41,7 @@ class Quiz extends Model
             'time_limit_minutes' => 'integer',
             'attempt_limit' => 'integer',
             'passing_score_percent' => 'decimal:2',
+            'requires_time_in' => 'boolean',
         ];
     }
 
@@ -71,6 +73,36 @@ class Quiz extends Model
     public function attempts(): HasMany
     {
         return $this->hasMany(QuizAttempt::class);
+    }
+
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(TraineeAttendance::class, 'quiz_id');
+    }
+
+    public function attendanceFor(EnrollmentApplication $application): ?TraineeAttendance
+    {
+        return $this->attendances->firstWhere('enrollment_application_id', $application->id)
+            ?? $this->attendances()->where('enrollment_application_id', $application->id)->first();
+    }
+
+    public function isTimeInAllowed(?CarbonInterface $at = null): bool
+    {
+        $at ??= now();
+
+        if (! $this->requires_time_in) {
+            return false;
+        }
+
+        if (! $this->isReleasedAt($at)) {
+            return false;
+        }
+
+        if ($this->due_at && $this->due_at->lt($at)) {
+            return false;
+        }
+
+        return true;
     }
 
     public function comments(): MorphMany
