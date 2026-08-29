@@ -14,7 +14,7 @@
         <button type="button" class="primary-action" data-dashboard-dialog-open="admin-module-dialog"><x-dashboard-icon name="plus" class="h-4 w-4" />Add module</button>
     </header>
 
-    <dialog id="admin-module-dialog" data-dashboard-dialog data-auto-open="{{ $errors->hasAny(['trainer_id', 'training_batch_id', 'module_code', 'competency_category', 'estimated_hours', 'title', 'description', 'module_file', 'supplementary_files', 'supplementary_files.*']) ? 'true' : 'false' }}" class="lms-workflow-dialog" aria-labelledby="admin-module-dialog-title">
+    <dialog id="admin-module-dialog" data-dashboard-dialog data-auto-open="{{ $errors->hasAny(['trainer_id', 'training_batch_id', 'module_code', 'competency_category', 'completion_mode', 'estimated_hours', 'title', 'description', 'module_file', 'supplementary_files', 'supplementary_files.*']) ? 'true' : 'false' }}" class="lms-workflow-dialog" aria-labelledby="admin-module-dialog-title">
         <div class="lms-dialog-header">
             <div><p class="lms-eyebrow">Admin LMS</p><h2 id="admin-module-dialog-title">Add a learning module</h2><p>Upload a protected module and assign its trainer and batch.</p></div>
             <button type="button" data-dashboard-dialog-close class="lms-dialog-close" aria-label="Close module creator"><x-dashboard-icon name="xmark" /></button>
@@ -95,6 +95,16 @@
                     <option value="basic" @selected(old('competency_category') === 'basic')>Basic Competency</option>
                 </select>
                 @error('competency_category')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+            </div>
+
+            <div class="md:col-span-2">
+                <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Module Requirement</label>
+                <select name="completion_mode" class="form-field" required>
+                    <option value="assessed" @selected(old('completion_mode', 'assessed') === 'assessed')>Assessed module — classwork and trainer evaluation required</option>
+                    <option value="material_only" @selected(old('completion_mode') === 'material_only')>Learning material only — no Mark as Done</option>
+                </select>
+                <p class="mt-1 text-xs text-slate-500">Material-only modules remain readable but do not create a competency completion requirement.</p>
+                @error('completion_mode')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
             </div>
 
             <div>
@@ -220,14 +230,19 @@
                             <p class="mt-2 text-xs text-slate-500">{{ $module->published_at?->format('M d, Y g:i A') ?? 'Not published' }}</p>
                         </td>
                         <td>
-                            <div class="flex flex-wrap gap-2">
-                                <a href="{{ route('admin.learning.modules.preview', $module) }}" class="secondary-action text-xs">Preview</a>
-                                <a href="{{ route('classroom-comments.index', ['type' => 'module', 'id' => $module->id]) }}" class="secondary-action text-xs">Comments</a>
-                                <form method="POST" action="{{ route('admin.learning.modules.destroy', $module) }}" data-confirm="Remove this module and its recorded progress?">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button class="min-h-10 rounded-lg border border-red-200 bg-white px-3 text-xs font-bold text-red-700 hover:bg-red-50">Remove</button>
-                                </form>
+                            <div class="flex flex-wrap gap-2" aria-label="Module actions">
+                                <a href="{{ route('admin.learning.modules.preview', $module) }}" class="admin-module-action" aria-label="Preview module" title="Preview module">
+                                    <x-dashboard-icon name="eye" class="h-4 w-4" />
+                                    <span class="admin-module-action-tooltip" aria-hidden="true">Preview</span>
+                                </a>
+                                <a href="{{ route('classroom-comments.index', ['type' => 'module', 'id' => $module->id]) }}" class="admin-module-action" aria-label="Open module comments" title="Open module comments">
+                                    <x-dashboard-icon name="message-circle" class="h-4 w-4" />
+                                    <span class="admin-module-action-tooltip" aria-hidden="true">Comments</span>
+                                </a>
+                                <button type="button" data-dashboard-dialog-open="delete-module-{{ $module->id }}" class="admin-module-action is-danger" aria-label="Permanently delete module" title="Permanently delete module">
+                                    <x-dashboard-icon name="trash-2" class="h-4 w-4" />
+                                    <span class="admin-module-action-tooltip" aria-hidden="true">Delete</span>
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -238,6 +253,55 @@
         </table>
         @if($modules->hasPages())<div class="border-t border-slate-200 px-5 py-4">{{ $modules->links() }}</div>@endif
     </div>
+
+    @foreach($modules as $module)
+        @php($impact = $moduleImpacts[$module->id] ?? [])
+        <dialog id="delete-module-{{ $module->id }}" data-dashboard-dialog class="m-auto max-h-[92vh] w-[min(94vw,42rem)] overflow-y-auto rounded-xl border border-red-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/45" aria-labelledby="delete-module-title-{{ $module->id }}">
+            <div class="border-b border-red-100 bg-red-50 px-6 py-5">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p class="dashboard-section-kicker text-red-700">Irreversible admin action</p>
+                        <h2 id="delete-module-title-{{ $module->id }}" class="mt-1 text-xl font-bold text-red-950">Permanently delete module?</h2>
+                        <p class="mt-1 text-sm text-red-800">“{{ $module->title }}” and its module-specific learning history will be removed permanently.</p>
+                    </div>
+                    <button type="button" data-dashboard-dialog-close class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-white" aria-label="Close deletion dialog" title="Close"><x-dashboard-icon name="xmark" /></button>
+                </div>
+            </div>
+            <div class="space-y-5 p-6">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-950">What will be removed</h3>
+                    <dl class="mt-3 grid gap-3 sm:grid-cols-2">
+                        <div class="rounded-lg bg-slate-50 px-3 py-2"><dt class="text-xs text-slate-500">Affected trainees</dt><dd class="text-lg font-bold text-slate-950">{{ $impact['affected_trainees'] ?? 0 }}</dd></div>
+                        <div class="rounded-lg bg-slate-50 px-3 py-2"><dt class="text-xs text-slate-500">Parent progress / grades</dt><dd class="text-lg font-bold text-slate-950">{{ $impact['parent_progress_records'] ?? 0 }}</dd></div>
+                        <div class="rounded-lg bg-slate-50 px-3 py-2"><dt class="text-xs text-slate-500">Submodule progress / grades</dt><dd class="text-lg font-bold text-slate-950">{{ $impact['submodule_progress_records'] ?? 0 }}</dd></div>
+                        <div class="rounded-lg bg-slate-50 px-3 py-2"><dt class="text-xs text-slate-500">Quizzes / attempts</dt><dd class="text-lg font-bold text-slate-950">{{ $impact['quizzes'] ?? 0 }} / {{ $impact['quiz_attempts'] ?? 0 }}</dd></div>
+                        <div class="rounded-lg bg-slate-50 px-3 py-2"><dt class="text-xs text-slate-500">Questions / attendance</dt><dd class="text-lg font-bold text-slate-950">{{ $impact['quiz_questions'] ?? 0 }} / {{ $impact['quiz_attendance'] ?? 0 }}</dd></div>
+                        <div class="rounded-lg bg-slate-50 px-3 py-2"><dt class="text-xs text-slate-500">Comments / notifications</dt><dd class="text-lg font-bold text-slate-950">{{ $impact['comments'] ?? 0 }} / {{ $impact['notifications'] ?? 0 }}</dd></div>
+                        <div class="rounded-lg bg-slate-50 px-3 py-2 sm:col-span-2"><dt class="text-xs text-slate-500">Stored module and submission files</dt><dd class="text-lg font-bold text-slate-950">{{ $impact['stored_files'] ?? 0 }}</dd></div>
+                    </dl>
+                </div>
+
+                @if($impact['official_record_blocked'] ?? false)
+                    <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">{{ $impact['official_record_reason'] }} Deletion is unavailable until the affected official record is handled through the existing revoke workflow.</p>
+                @else
+                    <p class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">This action cannot be undone. Existing official documents are never removed by this action.</p>
+                @endif
+
+                <form method="POST" action="{{ route('admin.learning.modules.destroy', $module) }}" class="space-y-4" data-dashboard-dialog-form data-submit-label="Deleting module...">
+                    @csrf
+                    @method('DELETE')
+                    <div>
+                        <label class="form-label" for="delete-module-confirmation-{{ $module->id }}">Type DELETE to confirm</label>
+                        <input id="delete-module-confirmation-{{ $module->id }}" name="confirmation" class="form-field" type="text" value="" autocomplete="off" autocapitalize="characters" spellcheck="false" pattern="DELETE" required>
+                    </div>
+                    <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:justify-end">
+                        <button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button>
+                        <button type="submit" data-action-button class="min-h-10 rounded-lg border border-red-700 bg-red-700 px-4 text-sm font-bold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50" @disabled($impact['official_record_blocked'] ?? false)>Permanently delete module</button>
+                    </div>
+                </form>
+            </div>
+        </dialog>
+    @endforeach
 </section>
 
 <script>

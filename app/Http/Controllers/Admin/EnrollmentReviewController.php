@@ -47,6 +47,7 @@ class EnrollmentReviewController extends Controller
         $trainingState = $filters['training_state'] ?? null;
 
         $applicationsQuery = EnrollmentApplication::query()
+            ->releasedForReview()
             ->with(['user', 'batch'])
             ->latest();
 
@@ -113,6 +114,7 @@ class EnrollmentReviewController extends Controller
         }
 
         $counts = EnrollmentApplication::query()
+            ->releasedForReview()
             ->selectRaw('status, count(*) as aggregate')
             ->groupBy('status')
             ->pluck('aggregate', 'status');
@@ -128,13 +130,15 @@ class EnrollmentReviewController extends Controller
             'selectedStatus' => $selectedStatus,
             'schedule' => $schedule,
             'statuses' => $statuses,
-            'totalApplications' => EnrollmentApplication::count(),
+            'totalApplications' => EnrollmentApplication::query()->releasedForReview()->count(),
             'trainingState' => $trainingState,
         ]);
     }
 
     public function show(EnrollmentApplication $enrollmentApplication): View
     {
+        $this->ensureReleasedForReview($enrollmentApplication);
+
         $enrollmentApplication->load(['user', 'reviewer', 'batch', 'documentReviewer']);
 
         return view('admin.enrollments.show', [
@@ -150,8 +154,9 @@ class EnrollmentReviewController extends Controller
         Request $request,
         EnrollmentApplication $enrollmentApplication,
         RollingModuleReleaseService $releases,
-    ): RedirectResponse
-    {
+    ): RedirectResponse {
+        $this->ensureReleasedForReview($enrollmentApplication);
+
         $validated = $request->validate([
             'status' => ['required', Rule::in(EnrollmentApplication::reviewableStatuses())],
             'admin_notes' => [
@@ -235,6 +240,8 @@ class EnrollmentReviewController extends Controller
         EnrollmentApplication $enrollmentApplication,
         TesdaRegistrationPdfService $pdfService,
     ): Response {
+        $this->ensureReleasedForReview($enrollmentApplication);
+
         $validated = $request->validate([
             'disposition' => ['nullable', Rule::in(['inline', 'attachment'])],
         ]);
@@ -259,6 +266,8 @@ class EnrollmentReviewController extends Controller
 
     public function updateDocumentReview(Request $request, EnrollmentApplication $enrollmentApplication): RedirectResponse
     {
+        $this->ensureReleasedForReview($enrollmentApplication);
+
         $validated = $request->validate([
             'documents' => ['required', 'array'],
             'documents.*.status' => ['required', Rule::in(['unreviewed', 'accepted', 'replace', 'missing'])],
@@ -291,6 +300,8 @@ class EnrollmentReviewController extends Controller
 
     public function documentPreview(EnrollmentApplication $enrollmentApplication, string $document): View
     {
+        $this->ensureReleasedForReview($enrollmentApplication);
+
         $definition = $this->documentDefinition($document);
         $path = $enrollmentApplication->{$definition['field']};
 
@@ -311,6 +322,8 @@ class EnrollmentReviewController extends Controller
 
     public function documentContent(EnrollmentApplication $enrollmentApplication, string $document): BinaryFileResponse
     {
+        $this->ensureReleasedForReview($enrollmentApplication);
+
         $definition = $this->documentDefinition($document);
         $path = $enrollmentApplication->{$definition['field']};
 
@@ -364,5 +377,10 @@ class EnrollmentReviewController extends Controller
             'id-photo' => ['label' => 'ID Photo', 'field' => 'id_photo_path'],
             'signature' => ['label' => 'E-Signature', 'field' => 'signature_path'],
         ];
+    }
+
+    private function ensureReleasedForReview(EnrollmentApplication $application): void
+    {
+        abort_unless($application->isReleasedForReview(), 404);
     }
 }

@@ -29,6 +29,20 @@ class OfficialDocument extends Model
 
     public const STATUS_REVOKED = 'revoked';
 
+    public static function supportedTypes(): array
+    {
+        return [self::TYPE_COTC, self::TYPE_TOR];
+    }
+
+    public static function templateViewForType(string $type): string
+    {
+        return match ($type) {
+            self::TYPE_COTC => 'documents.pdf.cotc',
+            self::TYPE_TOR => 'documents.pdf.tor',
+            default => throw new \InvalidArgumentException("Unsupported official document type: {$type}"),
+        };
+    }
+
     protected $fillable = [
         'enrollment_application_id',
         'training_batch_id',

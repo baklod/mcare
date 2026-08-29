@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CertificationController extends Controller
@@ -79,7 +80,7 @@ class CertificationController extends Controller
 
         return back()->with(
             'saved',
-            strtoupper($type).' '.$document->status.'. The queue worker will build the PDF.',
+            strtoupper($document->type).' generated successfully as '.$document->document_number.'.',
         );
     }
 
@@ -93,6 +94,25 @@ class CertificationController extends Controller
         return back()->with('saved', 'COTC released. The trainee now has one download.');
     }
 
+    public function preview(OfficialDocument $officialDocument): StreamedResponse
+    {
+        $this->assertAvailable($officialDocument);
+        $stream = Storage::disk($officialDocument->storage_disk)->readStream($officialDocument->file_path);
+        abort_unless(is_resource($stream), 404);
+
+        return response()->stream(function () use ($stream): void {
+            fpassthru($stream);
+            fclose($stream);
+        }, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => HeaderUtils::makeDisposition(
+                HeaderUtils::DISPOSITION_INLINE,
+                $officialDocument->document_number.'.pdf',
+            ),
+            'Cache-Control' => 'private, no-store, max-age=0',
+        ]);
+    }
+
     public function reissue(
         Request $request,
         EnrollmentApplication $enrollmentApplication,
@@ -102,23 +122,14 @@ class CertificationController extends Controller
         $validated = $request->validate([
             'reason' => ['required', 'string', 'min:10', 'max:1000'],
         ]);
-        $manager->reissue($enrollmentApplication, $type, $request->user(), $validated['reason']);
+        $document = $manager->reissue($enrollmentApplication, $type, $request->user(), $validated['reason']);
 
-        return back()->with('saved', strtoupper($type).' reissue queued with a new document number.');
+        return back()->with('saved', strtoupper($document->type).' reissued successfully as '.$document->document_number.'.');
     }
 
     public function download(Request $request, OfficialDocument $officialDocument): StreamedResponse
     {
-        abort_unless(
-            in_array($officialDocument->status, [
-                OfficialDocument::STATUS_GENERATED,
-                OfficialDocument::STATUS_RELEASED,
-                OfficialDocument::STATUS_DOWNLOADED,
-            ], true)
-            && filled($officialDocument->file_path)
-            && Storage::disk($officialDocument->storage_disk)->exists($officialDocument->file_path),
-            404,
-        );
+        $this->assertAvailable($officialDocument);
 
         OfficialDocumentDownload::create([
             'official_document_id' => $officialDocument->id,
@@ -137,6 +148,21 @@ class CertificationController extends Controller
             $officialDocument->file_path,
             $officialDocument->document_number.'.pdf',
             ['Content-Type' => 'application/pdf'],
+        );
+    }
+
+    private function assertAvailable(OfficialDocument $officialDocument): void
+    {
+        abort_unless(
+            in_array($officialDocument->type, OfficialDocument::supportedTypes(), true)
+            && in_array($officialDocument->status, [
+                OfficialDocument::STATUS_GENERATED,
+                OfficialDocument::STATUS_RELEASED,
+                OfficialDocument::STATUS_DOWNLOADED,
+            ], true)
+            && filled($officialDocument->file_path)
+            && Storage::disk($officialDocument->storage_disk)->exists($officialDocument->file_path),
+            404,
         );
     }
 

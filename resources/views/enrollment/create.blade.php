@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Caregiving NC II Enrollment | MCARE</title>
+    <title>{{ $enrollmentBatch?->program?->name ?? 'Training Program' }} Enrollment | MCARE</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         /* Path: resources/views/enrollment/create.blade.php | Label: Phone-first enrollment density */
@@ -142,7 +142,7 @@
                 <img src="{{ asset('assets/official-logo.png') }}" alt="Mission Care Training Center logo" class="enrollment-logo h-16 w-16 rounded-2xl object-contain">
                 <span>
                     <span class="block text-sm font-bold text-slate-900 sm:text-base">Mission Care Training Center</span>
-                    <span class="block text-xs text-slate-500 sm:text-sm">Caregiving NC II Enrollment</span>
+                    <span class="block text-xs text-slate-500 sm:text-sm">MCARE Program Enrollment</span>
                 </span>
             </a>
             <a href="{{ route('landing') }}" class="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:border-purple-200 hover:text-purple-700 sm:h-auto sm:px-5 sm:py-2.5">
@@ -158,18 +158,60 @@
                     TESDA-DPA inspired learner profile
                 </div>
                 <h1 class="mt-5 max-w-4xl text-2xl font-bold leading-tight text-slate-900 sm:mt-7 sm:text-5xl">
-                    Caregiving NC II Enrollment Registration
+                    {{ $enrollmentBatch?->program?->name ?? 'Choose Your Training Program' }} Enrollment
                 </h1>
                 <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600 sm:mt-5 sm:text-lg sm:leading-8">
-                    Complete the learner profile for MCARE's NC II enrollment. Google applicants start with a verified identity, while the remaining TESDA details stay under the applicant's control.
+                    Choose an active batch published by MCARE, then complete the learner profile. After enrollment is saved, you may connect the same registered email to Google for easier sign-in.
                 </p>
+
+                <div class="mt-6 rounded-2xl border border-purple-100 bg-purple-50/60 p-4 sm:mt-8 sm:p-5" aria-labelledby="available-batches-title">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p class="text-xs font-black uppercase tracking-wide text-purple-700">Admin-published enrollment</p>
+                            <h2 id="available-batches-title" class="mt-1 text-lg font-black text-slate-950">Available active batches</h2>
+                        </div>
+                        <span class="w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-purple-700 ring-1 ring-purple-100">{{ $availableBatches->count() }} available</span>
+                    </div>
+
+                    @if ($application && $enrollmentBatch)
+                        <div class="mt-4 rounded-2xl border-2 border-purple-500 bg-white p-4 shadow-sm">
+                            <p class="text-xs font-black uppercase tracking-wide text-purple-700">Your saved batch</p>
+                            <p class="mt-1 text-base font-black text-slate-950">{{ $enrollmentBatch->program?->name ?? $application->program }}</p>
+                            <p class="mt-1 text-sm font-bold text-slate-700">{{ $enrollmentBatch->name }} {{ $enrollmentBatch->year }}</p>
+                        </div>
+                    @elseif ($availableBatches->isNotEmpty())
+                        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                            @foreach ($availableBatches as $availableBatch)
+                                @php
+                                    $isSelectedBatch = (int) optional($enrollmentBatch)->id === (int) $availableBatch->id;
+                                @endphp
+                                <a href="{{ route('enrollment.create', ['batch' => $availableBatch->id]).'#enrollment-form' }}" class="rounded-2xl border-2 p-4 text-left transition focus:outline-none focus:ring-4 focus:ring-purple-100 {{ $isSelectedBatch ? 'border-purple-500 bg-white shadow-md shadow-purple-100' : 'border-white bg-white/80 hover:border-purple-200 hover:bg-white' }}" @if($isSelectedBatch) aria-current="true" @endif>
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p class="text-sm font-black text-slate-950">{{ $availableBatch->program?->name }}</p>
+                                            <p class="mt-1 text-xs font-bold text-slate-600">{{ $availableBatch->name }} {{ $availableBatch->year }}</p>
+                                        </div>
+                                        <span class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide {{ $isSelectedBatch ? 'bg-purple-600 text-white' : 'bg-emerald-50 text-emerald-700' }}">{{ $isSelectedBatch ? 'Selected' : 'Choose' }}</span>
+                                    </div>
+                                    <p class="mt-3 text-xs font-semibold leading-5 text-slate-500">AM: {{ $availableBatch->scheduleLabelFor('AM') }}</p>
+                                    <p class="text-xs font-semibold leading-5 text-slate-500">PM: {{ $availableBatch->scheduleLabelFor('PM') }}</p>
+                                    <p class="mt-2 text-xs font-black text-purple-700">Required downpayment: ₱{{ number_format((float) $availableBatch->program?->downpayment_amount, 2) }}</p>
+                                </a>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900">
+                            No active batch is currently published for enrollment. Please wait for MCARE to open and show the next batch.
+                        </div>
+                    @endif
+                </div>
             </div>
 
             <aside class="enrollment-status-card rounded-3xl border border-slate-100 bg-slate-50 p-7 shadow-sm">
                 <p class="text-sm font-bold uppercase text-purple-600">Application status</p>
                 <div class="mt-4 rounded-2xl bg-white p-4 shadow-sm sm:mt-5 sm:p-5">
                     <p class="text-sm text-slate-500">Program</p>
-                    <p class="mt-1 text-lg font-bold text-slate-900 sm:text-xl">Caregiving NC II</p>
+                    <p class="mt-1 text-lg font-bold text-slate-900 sm:text-xl">{{ $enrollmentBatch?->program?->name ?? 'Select an available batch' }}</p>
                 </div>
                 <div class="mt-3 rounded-2xl bg-white p-4 shadow-sm sm:mt-4 sm:p-5">
                     <p class="text-sm text-slate-500">Current step</p>
@@ -178,14 +220,14 @@
                 <div class="mt-3 rounded-2xl bg-white p-4 shadow-sm sm:mt-4 sm:p-5">
                     <p class="text-sm text-slate-500">Enrollment batch</p>
                     <p class="mt-1 text-lg font-bold text-slate-900 sm:text-xl">
-                        {{ $enrollmentBatch ? $enrollmentBatch->name.' '.$enrollmentBatch->year : 'Enrollment closed' }}
+                        {{ $enrollmentBatch ? $enrollmentBatch->name.' '.$enrollmentBatch->year : 'Not selected' }}
                     </p>
                     @if ($enrollmentBatch)
                         <p class="mt-2 text-xs font-semibold text-purple-700">{{ $enrollmentBatch->enrollmentStateLabel() }} · {{ $enrollmentBatch->trainingStateLabel() }}</p>
                     @endif
                 </div>
                 <p class="mt-4 text-sm leading-6 text-slate-500 sm:mt-5">
-                    After submission, continue to payment. MCARE will email you as documents and application status are reviewed.
+                    After submission, continue to payment. The application becomes available to Admin Review only after the required payment is verified.
                 </p>
             </aside>
         </section>
@@ -226,7 +268,7 @@
         <section class="enrollment-form-shell mt-8 rounded-3xl border border-slate-100 bg-white p-6 shadow-xl shadow-slate-200/60 sm:p-8">
             @if (! $application && ! $enrollmentBatch)
                 <div class="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-semibold leading-6 text-amber-800">
-                    This batch is no longer accepting new applications. The form remains visible for reference, but submission will reopen only when an administrator activates a valid enrollment window.
+                    Choose an active batch from the window above. Only batches that are active, inside their enrollment window, and explicitly shown by an administrator can be selected.
                 </div>
             @endif
             @if (session('saved'))
@@ -266,8 +308,10 @@
                 </section>
             @endif
 
-            <form method="POST" action="{{ route('enrollment.store') }}" enctype="multipart/form-data" class="enrollment-form space-y-10">
+            <form id="enrollment-form" method="POST" action="{{ route('enrollment.store') }}" enctype="multipart/form-data" class="enrollment-form space-y-10">
                 @csrf
+                <input type="hidden" name="training_batch_id" value="{{ $enrollmentBatch?->id }}">
+                @error('training_batch_id') <p class="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-bold leading-6 text-red-700">{{ $message }}</p> @enderror
 
                 <div id="enrollment-account" class="enrollment-jump-target">
                     <div class="enrollment-section-heading border-b border-slate-100 pb-5">
@@ -742,17 +786,24 @@
                 <div id="enrollment-submit" class="enrollment-submit-row enrollment-jump-target border-t border-slate-100 pt-6">
                     <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <p class="text-sm leading-6 text-slate-500">Date accomplished will be recorded automatically when the form is submitted.</p>
-                        <button type="submit" data-default-label="{{ $application?->status === \App\Models\EnrollmentApplication::STATUS_DENIED ? 'Resubmit corrected enrollment' : 'Submit NC II enrollment' }}" @disabled(! $application && ! $enrollmentBatch) class="inline-flex h-12 items-center justify-center rounded-full bg-purple-600 px-8 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:h-auto sm:py-4">
-                            {{ $application?->status === \App\Models\EnrollmentApplication::STATUS_DENIED ? 'Resubmit corrected enrollment' : 'Submit NC II enrollment' }}
+                        <button type="submit" data-default-label="{{ $application?->status === \App\Models\EnrollmentApplication::STATUS_DENIED ? 'Resubmit corrected enrollment' : 'Submit enrollment' }}" @disabled(! $application && ! $enrollmentBatch) class="inline-flex h-12 items-center justify-center rounded-full bg-purple-600 px-8 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:h-auto sm:py-4">
+                            {{ $application?->status === \App\Models\EnrollmentApplication::STATUS_DENIED ? 'Resubmit corrected enrollment' : 'Submit enrollment' }}
                         </button>
                     </div>
 
                     <div id="enrollment-submit-progress" class="mt-4 hidden rounded-2xl border border-purple-200 bg-purple-50 p-4" role="status" aria-live="polite">
                         <div class="flex items-start gap-3">
                             <span class="mt-0.5 inline-block h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-purple-200 border-t-purple-700" aria-hidden="true"></span>
-                            <div>
+                            <div class="min-w-0 flex-1">
                                 <p id="enrollment-submit-title" class="text-sm font-black text-purple-900">Uploading your enrollment securely...</p>
                                 <p id="enrollment-submit-detail" class="mt-1 text-xs font-semibold leading-5 text-purple-700">Keep this page open while the documents upload.</p>
+                                <div class="mt-3 h-2 overflow-hidden rounded-full bg-purple-100" role="progressbar" aria-label="Enrollment upload progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="enrollment-upload-progress">
+                                    <span id="enrollment-upload-progress-bar" class="block h-full w-0 rounded-full bg-purple-600 transition-[width] duration-300"></span>
+                                </div>
+                                <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+                                    <p id="enrollment-upload-percent" class="text-xs font-black text-purple-800">Preparing upload…</p>
+                                    <button id="enrollment-upload-cancel" type="button" class="hidden rounded-full border border-purple-200 bg-white px-4 py-2 text-xs font-black text-purple-700 hover:border-purple-300 hover:text-purple-900">Cancel upload</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -773,11 +824,20 @@
         const enrollmentSubmitProgress = document.getElementById('enrollment-submit-progress');
         const enrollmentSubmitTitle = document.getElementById('enrollment-submit-title');
         const enrollmentSubmitDetail = document.getElementById('enrollment-submit-detail');
+        const enrollmentUploadProgress = document.getElementById('enrollment-upload-progress');
+        const enrollmentUploadProgressBar = document.getElementById('enrollment-upload-progress-bar');
+        const enrollmentUploadPercent = document.getElementById('enrollment-upload-percent');
+        const enrollmentUploadCancel = document.getElementById('enrollment-upload-cancel');
+        const enrollmentPaymentStatusUrl = @json(route('payment.status'));
+        const enrollmentPaymentUrl = @json(route('payment.show'));
         const existingSignatureSaved = @json((bool) ($application->signature_path ?? false));
         const serverErrorFields = @json($errors->keys());
         let signatureDrawn = false;
         let enrollmentSubmitStartedAt = null;
         let enrollmentSubmitTimer = null;
+        let enrollmentUploadStallTimer = null;
+        let activeEnrollmentRequest = null;
+        let enrollmentAbortMessage = null;
 
         function showActionToast(message) {
             if (!actionToast) return;
@@ -1094,6 +1154,264 @@
             syncSignatureMode();
         }
 
+        function setEnrollmentUploadProgress(percent, label = null) {
+            const normalized = Math.max(0, Math.min(100, Math.round(percent)));
+            if (enrollmentUploadProgressBar) enrollmentUploadProgressBar.style.width = `${normalized}%`;
+            enrollmentUploadProgress?.setAttribute('aria-valuenow', String(normalized));
+            if (enrollmentUploadPercent) enrollmentUploadPercent.textContent = label || `${normalized}% uploaded`;
+        }
+
+        function clearEnrollmentUploadTimers() {
+            window.clearInterval(enrollmentSubmitTimer);
+            enrollmentSubmitTimer = null;
+            window.clearTimeout(enrollmentUploadStallTimer);
+            enrollmentUploadStallTimer = null;
+        }
+
+        function unlockEnrollmentSubmission() {
+            if (!enrollmentForm) return;
+
+            enrollmentForm.dataset.submitted = 'false';
+            activeEnrollmentRequest = null;
+            enrollmentAbortMessage = null;
+            clearEnrollmentUploadTimers();
+            enrollmentUploadCancel?.classList.add('hidden');
+
+            if (enrollmentSubmitButton) {
+                enrollmentSubmitButton.disabled = @json(! $application && ! $enrollmentBatch);
+                enrollmentSubmitButton.classList.remove('cursor-not-allowed', 'opacity-70');
+                enrollmentSubmitButton.textContent = enrollmentSubmitButton.dataset.defaultLabel || 'Submit enrollment';
+            }
+        }
+
+        function focusEnrollmentError(fieldName) {
+            if (!fieldName) return;
+
+            const aliases = { signature_data: 'signature_canvas' };
+            const normalizedName = fieldName.split('.')[0];
+            const field = document.getElementById(aliases[normalizedName] || normalizedName);
+            if (!(field instanceof HTMLElement)) return;
+
+            field.setAttribute('aria-invalid', 'true');
+            field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            field.focus?.({ preventScroll: true });
+        }
+
+        async function enrollmentWasSavedDespiteConnectionFailure() {
+            if (!navigator.onLine) return false;
+
+            const controller = new AbortController();
+            const timeout = window.setTimeout(() => controller.abort(), 6000);
+
+            try {
+                const response = await fetch(enrollmentPaymentStatusUrl, {
+                    credentials: 'same-origin',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    cache: 'no-store',
+                    signal: controller.signal,
+                });
+
+                return response.ok;
+            } catch (error) {
+                return false;
+            } finally {
+                window.clearTimeout(timeout);
+            }
+        }
+
+        async function stopEnrollmentUpload(message, errors = {}, checkSavedApplication = false) {
+            clearEnrollmentUploadTimers();
+            enrollmentUploadCancel?.classList.add('hidden');
+
+            if (checkSavedApplication) {
+                if (enrollmentSubmitTitle) enrollmentSubmitTitle.textContent = 'Checking your application…';
+                if (enrollmentSubmitDetail) enrollmentSubmitDetail.textContent = 'The connection stopped. MCARE is checking whether the application was already saved.';
+
+                if (await enrollmentWasSavedDespiteConnectionFailure()) {
+                    if (enrollmentSubmitTitle) enrollmentSubmitTitle.textContent = 'Application saved';
+                    if (enrollmentSubmitDetail) enrollmentSubmitDetail.textContent = 'Opening the payment step now…';
+                    setEnrollmentUploadProgress(100, 'Upload complete');
+                    window.location.assign(enrollmentPaymentUrl);
+                    return;
+                }
+            }
+
+            unlockEnrollmentSubmission();
+            if (enrollmentSubmitTitle) enrollmentSubmitTitle.textContent = 'Upload stopped — safe to retry';
+            if (enrollmentSubmitDetail) enrollmentSubmitDetail.textContent = message;
+            if (enrollmentUploadPercent) enrollmentUploadPercent.textContent = 'Not submitted';
+            showActionToast(message);
+
+            const firstErrorField = Object.keys(errors || {})[0];
+            focusEnrollmentError(firstErrorField);
+        }
+
+        async function optimizeEnrollmentImage(file) {
+            if (!file?.type?.startsWith('image/') || file.size < 1024 * 1024) {
+                return { blob: file, name: file.name };
+            }
+
+            let imageSource = null;
+            let closeImage = () => {};
+
+            try {
+                if ('createImageBitmap' in window) {
+                    imageSource = await createImageBitmap(file, { imageOrientation: 'from-image' });
+                    closeImage = () => imageSource.close?.();
+                } else {
+                    const objectUrl = URL.createObjectURL(file);
+                    imageSource = await new Promise((resolve, reject) => {
+                        const image = new Image();
+                        image.onload = () => resolve(image);
+                        image.onerror = reject;
+                        image.src = objectUrl;
+                    });
+                    closeImage = () => URL.revokeObjectURL(objectUrl);
+                }
+
+                const sourceWidth = imageSource.width || imageSource.naturalWidth;
+                const sourceHeight = imageSource.height || imageSource.naturalHeight;
+                const scale = Math.min(1, 2200 / Math.max(sourceWidth, sourceHeight));
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+                canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+                const context = canvas.getContext('2d');
+                if (!context) return { blob: file, name: file.name };
+
+                context.fillStyle = '#ffffff';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                context.drawImage(imageSource, 0, 0, canvas.width, canvas.height);
+
+                const compressed = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.86));
+                if (!compressed || compressed.size >= file.size) {
+                    return { blob: file, name: file.name };
+                }
+
+                const baseName = file.name.replace(/\.[^.]+$/, '') || 'document';
+
+                return { blob: compressed, name: `${baseName}.jpg` };
+            } catch (error) {
+                return { blob: file, name: file.name };
+            } finally {
+                closeImage();
+            }
+        }
+
+        async function prepareEnrollmentPayload() {
+            const payload = new FormData(enrollmentForm);
+            const fileInputs = [...enrollmentForm.querySelectorAll('input[type="file"]')];
+
+            for (const input of fileInputs) {
+                const file = input.files?.[0];
+                if (!file) continue;
+
+                const optimized = await optimizeEnrollmentImage(file);
+                if (optimized.blob !== file) {
+                    payload.set(input.name, optimized.blob, optimized.name);
+                }
+            }
+
+            const uploadBytes = [...payload.values()]
+                .reduce((total, value) => total + (value instanceof Blob ? value.size : 0), 0);
+
+            return { payload, uploadBytes };
+        }
+
+        function sendEnrollmentPayload(payload, uploadBytes) {
+            const request = new XMLHttpRequest();
+            let finished = false;
+
+            const failOnce = (message, errors = {}, checkSavedApplication = false) => {
+                if (finished) return;
+                finished = true;
+                activeEnrollmentRequest = null;
+                void stopEnrollmentUpload(message, errors, checkSavedApplication);
+            };
+
+            const armStallTimer = (milliseconds = 60000) => {
+                window.clearTimeout(enrollmentUploadStallTimer);
+                enrollmentUploadStallTimer = window.setTimeout(() => {
+                    enrollmentAbortMessage = 'No upload progress was received for one minute. Check the connection, then press Submit enrollment to retry.';
+                    request.abort();
+                }, milliseconds);
+            };
+
+            activeEnrollmentRequest = request;
+            enrollmentAbortMessage = null;
+            request.open(enrollmentForm.method || 'POST', enrollmentForm.action, true);
+            request.setRequestHeader('Accept', 'application/json');
+            request.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            request.timeout = 8 * 60 * 1000;
+
+            request.upload.addEventListener('progress', (progressEvent) => {
+                armStallTimer();
+                const total = progressEvent.lengthComputable ? progressEvent.total : uploadBytes;
+                const percent = total > 0 ? (progressEvent.loaded / total) * 100 : 0;
+                const elapsedSeconds = Math.max(1, Math.round((Date.now() - enrollmentSubmitStartedAt) / 1000));
+
+                setEnrollmentUploadProgress(percent);
+                if (enrollmentSubmitTitle) enrollmentSubmitTitle.textContent = `Uploading documents — ${Math.round(percent)}%`;
+                if (enrollmentSubmitDetail) {
+                    enrollmentSubmitDetail.textContent = `${formatFileSize(progressEvent.loaded)} of ${formatFileSize(total)} sent in ${elapsedSeconds}s. Keep this page open.`;
+                }
+            });
+
+            request.upload.addEventListener('load', () => {
+                armStallTimer(90000);
+                setEnrollmentUploadProgress(100, 'Documents uploaded — saving application');
+                if (enrollmentSubmitTitle) enrollmentSubmitTitle.textContent = 'Documents uploaded securely';
+                if (enrollmentSubmitDetail) enrollmentSubmitDetail.textContent = 'MCARE is validating and saving the application. This normally takes only a few seconds.';
+            });
+
+            request.addEventListener('load', () => {
+                window.clearTimeout(enrollmentUploadStallTimer);
+                let response = {};
+                try {
+                    response = JSON.parse(request.responseText || '{}');
+                } catch (error) {
+                    response = {};
+                }
+
+                if (request.status >= 200 && request.status < 300 && response.redirect) {
+                    finished = true;
+                    activeEnrollmentRequest = null;
+                    if (enrollmentSubmitTitle) enrollmentSubmitTitle.textContent = 'Application saved';
+                    if (enrollmentSubmitDetail) enrollmentSubmitDetail.textContent = 'Opening the payment step now…';
+                    setEnrollmentUploadProgress(100, 'Upload complete');
+                    window.location.assign(response.redirect);
+                    return;
+                }
+
+                const errors = response.errors || {};
+                const firstMessage = Object.values(errors).flat()[0];
+                const fallback = request.status === 413
+                    ? 'The combined upload is too large. Use smaller document images and try again.'
+                    : request.status === 419
+                        ? 'Your session expired. Refresh this page before submitting again.'
+                        : request.status === 429
+                            ? 'Too many submission attempts were made. Wait one minute, then try again.'
+                            : response.message || 'MCARE could not save the application. Review the form and try again.';
+
+                failOnce(firstMessage || fallback, errors);
+            });
+
+            request.addEventListener('error', () => {
+                failOnce('The phone lost its connection to MCARE. Reconnect, then press Submit enrollment to retry.', {}, true);
+            });
+            request.addEventListener('timeout', () => {
+                failOnce('The upload exceeded eight minutes and was stopped. Use a stronger connection or smaller images, then retry.', {}, true);
+            });
+            request.addEventListener('abort', () => {
+                failOnce(enrollmentAbortMessage || 'The upload was cancelled. Your selected files remain on this page and are safe to retry.', {}, true);
+            });
+
+            armStallTimer();
+            request.send(payload);
+        }
+
         function attachSubmitValidation() {
             enrollmentForm?.addEventListener('invalid', (event) => {
                 const invalidField = event.target;
@@ -1114,9 +1432,10 @@
                 }, 0);
             }, true);
 
-            enrollmentForm?.addEventListener('submit', (event) => {
+            enrollmentForm?.addEventListener('submit', async (event) => {
+                event.preventDefault();
+
                 if (enrollmentForm.dataset.submitted === 'true') {
-                    event.preventDefault();
                     showActionToast('Too many actions. Please wait for the current request to finish.');
                     return;
                 }
@@ -1126,7 +1445,6 @@
                 const signatureUpload = document.getElementById('signature_upload');
 
                 if (signatureMode === 'draw' && !signatureDrawn && !existingSignatureSaved) {
-                    event.preventDefault();
                     const status = document.getElementById('signature_draw_status');
                     if (status) status.textContent = 'Draw your signature before submitting.';
                     document.getElementById('signature_canvas')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1138,71 +1456,69 @@
                 }
 
                 if (signatureMode === 'upload' && !signatureUpload?.files?.length && !existingSignatureSaved) {
-                    event.preventDefault();
                     signatureUpload?.setCustomValidity('Upload a signature image or choose Draw Signature.');
                     signatureUpload?.reportValidity();
+                    return;
                 } else {
                     signatureUpload?.setCustomValidity('');
                 }
 
-                if (!event.defaultPrevented) {
-                    enrollmentForm.dataset.submitted = 'true';
-                    const uploadBytes = [...enrollmentForm.querySelectorAll('input[type="file"]')]
-                        .reduce((total, input) => total + (input.files?.[0]?.size || 0), 0);
-
-                    if (enrollmentSubmitButton) {
-                        enrollmentSubmitButton.disabled = true;
-                        enrollmentSubmitButton.classList.add('cursor-not-allowed', 'opacity-70');
-                        enrollmentSubmitButton.textContent = uploadBytes
-                            ? `Uploading ${formatFileSize(uploadBytes)}...`
-                            : 'Submitting securely...';
-                    }
-
-                    enrollmentSubmitStartedAt = Date.now();
-                    enrollmentSubmitProgress?.classList.remove('hidden');
-                    if (enrollmentSubmitTitle) {
-                        enrollmentSubmitTitle.textContent = uploadBytes
-                            ? `Uploading ${formatFileSize(uploadBytes)} securely...`
-                            : 'Submitting your enrollment securely...';
-                    }
-                    if (enrollmentSubmitDetail) {
-                        enrollmentSubmitDetail.textContent = 'Keep this page open. You will continue to payment automatically when the upload finishes.';
-                    }
-
-                    window.clearInterval(enrollmentSubmitTimer);
-                    enrollmentSubmitTimer = window.setInterval(() => {
-                        if (!enrollmentSubmitStartedAt || !enrollmentSubmitDetail) return;
-
-                        const elapsedSeconds = Math.max(1, Math.round((Date.now() - enrollmentSubmitStartedAt) / 1000));
-                        enrollmentSubmitDetail.textContent = elapsedSeconds >= 30
-                            ? `Still working (${elapsedSeconds}s). Phone photo uploads can take a minute; please keep this page open.`
-                            : `Upload in progress (${elapsedSeconds}s). You will continue to payment automatically.`;
-                    }, 1000);
+                if (!navigator.onLine) {
+                    showActionToast('Connect this phone to the internet before submitting.');
+                    return;
                 }
+
+                enrollmentForm.dataset.submitted = 'true';
+                enrollmentSubmitStartedAt = Date.now();
+                enrollmentSubmitProgress?.classList.remove('hidden');
+                enrollmentUploadCancel?.classList.add('hidden');
+                setEnrollmentUploadProgress(0, 'Preparing phone photos…');
+                if (enrollmentSubmitTitle) enrollmentSubmitTitle.textContent = 'Preparing documents for upload';
+                if (enrollmentSubmitDetail) enrollmentSubmitDetail.textContent = 'Large phone photos are being reduced safely before upload.';
+
+                if (enrollmentSubmitButton) {
+                    enrollmentSubmitButton.disabled = true;
+                    enrollmentSubmitButton.classList.add('cursor-not-allowed', 'opacity-70');
+                    enrollmentSubmitButton.textContent = 'Preparing upload…';
+                }
+
+                try {
+                    const { payload, uploadBytes } = await prepareEnrollmentPayload();
+                    if (enrollmentSubmitButton) enrollmentSubmitButton.textContent = `Uploading ${formatFileSize(uploadBytes)}…`;
+                    if (enrollmentSubmitTitle) enrollmentSubmitTitle.textContent = 'Starting secure upload…';
+                    if (enrollmentSubmitDetail) enrollmentSubmitDetail.textContent = 'Connecting this phone to MCARE. Real upload progress will appear below.';
+                    enrollmentUploadCancel?.classList.remove('hidden');
+                    sendEnrollmentPayload(payload, uploadBytes);
+                } catch (error) {
+                    await stopEnrollmentUpload('This phone could not prepare the selected files. Choose smaller JPG, PNG, or PDF files and try again.');
+                }
+            });
+
+            enrollmentUploadCancel?.addEventListener('click', () => {
+                if (!activeEnrollmentRequest) return;
+                enrollmentAbortMessage = 'The upload was cancelled. Your selected files remain on this page and are safe to retry.';
+                activeEnrollmentRequest.abort();
             });
 
             window.addEventListener('offline', () => {
                 if (enrollmentForm?.dataset.submitted !== 'true') return;
 
-                if (enrollmentSubmitTitle) enrollmentSubmitTitle.textContent = 'Connection lost during upload';
-                if (enrollmentSubmitDetail) enrollmentSubmitDetail.textContent = 'Reconnect to the internet and keep this page open. If the page does not continue, go back and submit once more.';
-                showActionToast('Your internet connection was interrupted during the upload.');
+                if (activeEnrollmentRequest) {
+                    enrollmentAbortMessage = 'The phone went offline. Reconnect, then press Submit enrollment to retry.';
+                    activeEnrollmentRequest.abort();
+                } else {
+                    void stopEnrollmentUpload('The phone went offline. Reconnect, then press Submit enrollment to retry.');
+                }
             });
 
             window.addEventListener('pageshow', () => {
                 if (!enrollmentForm) return;
 
-                enrollmentForm.dataset.submitted = 'false';
+                activeEnrollmentRequest?.abort();
                 enrollmentSubmitStartedAt = null;
-                window.clearInterval(enrollmentSubmitTimer);
-                enrollmentSubmitTimer = null;
                 enrollmentSubmitProgress?.classList.add('hidden');
-
-                if (enrollmentSubmitButton) {
-                    enrollmentSubmitButton.disabled = @json(! $application && ! $enrollmentBatch);
-                    enrollmentSubmitButton.classList.remove('cursor-not-allowed', 'opacity-70');
-                    enrollmentSubmitButton.textContent = enrollmentSubmitButton.dataset.defaultLabel || 'Submit NC II enrollment';
-                }
+                setEnrollmentUploadProgress(0, 'Preparing upload…');
+                unlockEnrollmentSubmission();
             });
         }
 

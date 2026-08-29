@@ -311,7 +311,11 @@
                 <div><label for="trainee-gender" class="form-label">Gender</label><select id="trainee-gender" name="gender" class="form-field" required><option value="">Select</option><option @selected(old('gender') === 'Male')>Male</option><option @selected(old('gender') === 'Female')>Female</option></select>@error('gender', 'trainee')<p class="form-error">{{ $message }}</p>@enderror</div>
                 <div><label for="trainee-schedule" class="form-label">Schedule</label><select id="trainee-schedule" name="schedule_preference" class="form-field" required><option value="AM" @selected(old('schedule_preference') === 'AM')>AM</option><option value="PM" @selected(old('schedule_preference') === 'PM')>PM</option></select>@error('schedule_preference', 'trainee')<p class="form-error">{{ $message }}</p>@enderror</div>
             </div>
-            <div><label for="trainee-batch" class="form-label">Batch</label><select id="trainee-batch" name="training_batch_id" class="form-field" required><option value="">Select batch</option>@foreach($batches as $batch)<option value="{{ $batch->id }}" @selected((int)old('training_batch_id') === $batch->id)>{{ $batch->name }} {{ $batch->year }}</option>@endforeach</select>@error('training_batch_id', 'trainee')<p class="form-error">{{ $message }}</p>@enderror</div>
+            @php
+                $selectedIntakeBatch = $batches->firstWhere('id', (int) old('training_batch_id'));
+                $selectedIntakeProgram = $selectedIntakeBatch?->program ?? $defaultProgram;
+            @endphp
+            <div><label for="trainee-batch" class="form-label">Program and batch</label><select id="trainee-batch" name="training_batch_id" class="form-field" required><option value="">Select batch</option>@foreach($batches as $batch)@php($batchProgram = $batch->program ?? $defaultProgram)<option value="{{ $batch->id }}" data-program="{{ $batchProgram?->name ?? 'Program not assigned' }}" data-downpayment="{{ $batchProgram?->downpayment_amount ?? 0 }}" data-total-fee="{{ $batchProgram?->total_program_fee ?? 0 }}" @selected((int)old('training_batch_id') === $batch->id)>{{ $batchProgram?->name ?? 'Program not assigned' }} — {{ $batch->name }} {{ $batch->year }}</option>@endforeach</select>@error('training_batch_id', 'trainee')<p class="form-error">{{ $message }}</p>@enderror</div>
             <div class="grid gap-4 md:grid-cols-2">
                 <div><label for="trainee-street" class="form-label">Number and street</label><input id="trainee-street" name="street" value="{{ old('street') }}" class="form-field" required>@error('street', 'trainee')<p class="form-error">{{ $message }}</p>@enderror</div>
                 <div><label for="trainee-barangay" class="form-label">Barangay</label><input id="trainee-barangay" name="barangay" value="{{ old('barangay') }}" class="form-field" required>@error('barangay', 'trainee')<p class="form-error">{{ $message }}</p>@enderror</div>
@@ -333,7 +337,7 @@
                 </div>
             </div>
             <div class="grid gap-4 md:grid-cols-2">
-                <div><label for="trainee-onsite-payment" class="form-label">Verified onsite payment</label><input id="trainee-onsite-payment" name="onsite_payment_amount" type="number" min="2000" max="22000" step="0.01" value="{{ old('onsite_payment_amount', '2000.00') }}" class="form-field" required>@error('onsite_payment_amount', 'trainee')<p class="form-error">{{ $message }}</p>@enderror</div>
+                <div><label for="trainee-onsite-payment" class="form-label">Verified onsite payment</label><input id="trainee-onsite-payment" name="onsite_payment_amount" type="number" min="{{ $selectedIntakeProgram?->downpayment_amount ?? '0.01' }}" max="{{ $selectedIntakeProgram?->total_program_fee ?? '1000000' }}" step="0.01" value="{{ old('onsite_payment_amount', $selectedIntakeProgram?->downpayment_amount) }}" class="form-field" required><p id="trainee-payment-range" class="mt-1 text-xs text-slate-500">Select a batch to load its required downpayment and total fee.</p>@error('onsite_payment_amount', 'trainee')<p class="form-error">{{ $message }}</p>@enderror</div>
                 <div><label for="trainee-or-number" class="form-label">Official receipt number</label><input id="trainee-or-number" name="onsite_or_number" value="{{ old('onsite_or_number') }}" class="form-field" required>@error('onsite_or_number', 'trainee')<p class="form-error">{{ $message }}</p>@enderror</div>
             </div>
             <label class="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900"><input type="checkbox" name="onsite_payment_received" value="1" @checked(old('onsite_payment_received')) class="mt-1 h-4 w-4 rounded border-emerald-300 text-emerald-700 focus:ring-emerald-600" required><span><strong class="block">Payment and receipt verified</strong>I confirm the amount was received onsite and the official receipt number above is accurate.</span></label>
@@ -346,5 +350,32 @@
             <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end"><button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button><button type="submit" data-action-button class="primary-action">Verify intake and create trainee</button></div>
         </form>
     </dialog>
+    <script>
+        (() => {
+            const batch = document.getElementById('trainee-batch');
+            const amount = document.getElementById('trainee-onsite-payment');
+            const hint = document.getElementById('trainee-payment-range');
+            if (!batch || !amount || !hint) return;
+
+            const money = (value) => Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const syncProgramFees = (replaceAmount = false) => {
+                const option = batch.selectedOptions[0];
+                const downpayment = Number(option?.dataset.downpayment || 0);
+                const totalFee = Number(option?.dataset.totalFee || 0);
+                if (!option?.value || downpayment <= 0 || totalFee <= 0) {
+                    hint.textContent = 'Select a batch to load its required downpayment and total fee.';
+                    return;
+                }
+
+                amount.min = String(downpayment);
+                amount.max = String(totalFee);
+                if (replaceAmount || !amount.value) amount.value = downpayment.toFixed(2);
+                hint.textContent = `${option.dataset.program}: PHP ${money(downpayment)} minimum, PHP ${money(totalFee)} total fee.`;
+            };
+
+            batch.addEventListener('change', () => syncProgramFees(true));
+            syncProgramFees(false);
+        })();
+    </script>
 </section>
 @endsection

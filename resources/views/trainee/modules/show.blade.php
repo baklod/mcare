@@ -9,6 +9,9 @@
     $watermark = $traineeName.' | '.$application->email.' | TRAINEE #'.$application->id.' | '.now()->format('Y-m-d H:i');
     $supplementaryList = $module->supplementaryList();
     $isCompetent = $progress?->competency_outcome === 'competent';
+    $hasClasswork = ($assessmentSummary['required_count'] ?? 0) > 0;
+    $assessmentAverage = $assessmentSummary['average_score'] ?? null;
+    $readyForRemediationEvaluation = (bool) ($assessmentSummary['ready_for_remediation_evaluation'] ?? false);
     $unpassedQuizzes = $quizzes->reject(function ($q) use ($quizAttempts) {
         $attempts = $quizAttempts->get($q->id);
         return $attempts && $attempts->contains('passed', true);
@@ -74,22 +77,12 @@
             </div>
 
             <div class="flex flex-col items-end gap-1.5">
-                @if(!$progress->isTrainerValidated())
-                <form method="POST" action="{{ route('trainee.modules.progress', $module) }}" target="_self" data-module-progress-form data-dashboard-dialog-form data-submit-label="{{ $progress->status === 'awaiting_evaluation' ? 'Reopening...' : 'Submitting...' }}">
-                    @csrf
-                    @method('PATCH')
-                    <input type="hidden" name="action" value="{{ $progress->status === 'awaiting_evaluation' ? 'reopen' : 'submit' }}">
-                    <button type="submit" class="secondary-action text-xs" data-action-button>
-                        {{ $progress->status === 'awaiting_evaluation' ? 'Return to In Progress' : ($progress->status === 'needs_remediation' ? 'Resubmit for Evaluation' : 'Mark as Done') }}
-                    </button>
-                </form>
-                @if($unpassedQuizzes->isNotEmpty() && $progress->status !== 'awaiting_evaluation')
-                    <a href="#assessments" class="text-[11px] font-semibold text-amber-700 hover:underline">
-                        ⚠️ Pass {{ $unpassedQuizzes->count() }} required {{ \Illuminate\Support\Str::plural('quiz', $unpassedQuizzes->count()) }} below to submit
-                    </a>
-                @endif
+                @if(!$module->requiresEvaluation())
+                    <span class="max-w-xs rounded-lg bg-sky-50 px-3 py-2 text-right text-xs font-semibold leading-5 text-sky-800">Learning material only — no Mark as Done required</span>
                 @else
-                    <span class="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800">Trainer validated</span>
+                    <a href="#submodules" class="max-w-xs rounded-lg bg-purple-50 px-3 py-2 text-right text-xs font-bold leading-5 text-purple-800 hover:bg-purple-100">
+                        {{ $progress->isTrainerValidated() ? '✓ All required submodules completed' : 'Complete the required submodules below ↓' }}
+                    </a>
                 @endif
             </div>
         </div>
@@ -117,6 +110,19 @@
 
             <div class="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-600">
                 🔒 <strong>Learning Material Closed:</strong> This learning module has been officially evaluated and completed. The lesson document window and file downloads are closed for completed units. Your official competency results and quiz records remain below for reference.
+            </div>
+        </section>
+    @elseif($progress->status === \App\Models\ModuleProgress::STATUS_AWAITING_EVALUATION)
+        <section class="rounded-2xl border border-purple-200 bg-purple-50/60 p-6 shadow-sm">
+            <div class="flex items-start gap-4">
+                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-purple-700 text-white shadow-md">
+                    <x-dashboard-icon name="clipboard-list" class="h-6 w-6" />
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-slate-950">Submitted for Trainer Evaluation</h2>
+                    <p class="mt-1 text-sm leading-6 text-slate-600">All required submodules are submitted. The main module result is calculated automatically while the trainer reviews each competency outcome.</p>
+                    <p class="mt-2 text-xs font-semibold text-purple-800">Use the submodule controls below if you need to return an unevaluated outcome to In Progress.</p>
+                </div>
             </div>
         </section>
     @else
@@ -231,17 +237,105 @@
         @endif
     @endif
 
-    <!-- IN-MODULE ASSESSMENTS & GRADING OUTCOME -->
+    @if($module->requiresEvaluation())
+    <section id="submodules" class="rounded-2xl border border-purple-200 bg-white p-5 shadow-sm space-y-4">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+                <p class="dashboard-section-kicker">Competency outcomes</p>
+                <h2 class="text-lg font-bold text-slate-950">Required Submodules</h2>
+                <p class="mt-1 text-xs leading-5 text-slate-600">Finish and submit each submodule separately. You cannot mark the main module done; its status updates automatically from these outcomes.</p>
+            </div>
+            <span class="rounded-lg bg-purple-50 px-3 py-2 text-xs font-bold text-purple-800">
+                {{ $submoduleProgressById->filter(fn ($item) => $item->isTrainerValidated())->count() }} / {{ $submodules->where('is_required', true)->count() }} competent
+            </span>
+        </div>
+
+        <div class="grid gap-4 lg:grid-cols-2">
+            @forelse($submodules as $submodule)
+                @php
+                    $childProgress = $submoduleProgressById->get($submodule->id);
+                    $childSummary = $submoduleAssessmentSummaries->get($submodule->id, []);
+                    $childQuizzes = $childSummary['quizzes'] ?? collect();
+                    $childHasClasswork = ($childSummary['required_count'] ?? 0) > 0;
+                    $childAllPassed = (bool) ($childSummary['all_passed'] ?? false);
+                    $childReadyForRemediation = (bool) ($childSummary['ready_for_remediation_evaluation'] ?? false);
+                    $childCompleted = $childProgress?->isTrainerValidated() ?? false;
+                    $childAwaiting = $childProgress?->status === \App\Models\TrainingSubmoduleProgress::STATUS_AWAITING_EVALUATION;
+                @endphp
+                <article class="rounded-2xl border {{ $childCompleted ? 'border-emerald-200 bg-emerald-50/40' : ($childProgress?->status === 'needs_remediation' ? 'border-amber-200 bg-amber-50/40' : 'border-slate-200 bg-slate-50/50') }} p-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-[10px] font-black uppercase tracking-wider text-purple-700">Submodule {{ $submodule->position }}</p>
+                            <h3 class="mt-1 text-sm font-bold leading-5 text-slate-950">{{ $submodule->title }}</h3>
+                        </div>
+                        <span class="shrink-0 rounded px-2 py-1 text-[10px] font-bold {{ $childCompleted ? 'bg-emerald-100 text-emerald-800' : ($childAwaiting ? 'bg-purple-100 text-purple-800' : ($childProgress?->status === 'needs_remediation' ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-700')) }}">
+                            {{ $childProgress?->workflowStatusLabel() ?? 'Ready to start' }}
+                        </span>
+                    </div>
+
+                    <div class="mt-3 rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600">
+                        @if($childHasClasswork)
+                            <strong class="text-slate-900">Classwork:</strong> {{ $childSummary['passed_count'] ?? 0 }} / {{ $childSummary['required_count'] ?? 0 }} passed
+                            @if(($childSummary['average_score'] ?? null) !== null)
+                                · Best average {{ number_format((float) $childSummary['average_score'], 1) }}%
+                            @endif
+                        @else
+                            <strong class="text-slate-900">Classwork:</strong> No quiz assigned; review the learning material before submitting.
+                        @endif
+                    </div>
+
+                    @if($childQuizzes->isNotEmpty())
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            @foreach($childQuizzes as $childQuiz)
+                                <a href="{{ route('trainee.quizzes.show', $childQuiz) }}" class="secondary-action px-3 py-1.5 text-[11px]">{{ $childQuiz->title }}</a>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @if($childProgress?->evaluation_remarks)
+                        <p class="mt-3 rounded-lg bg-white p-2 text-xs text-slate-700"><strong>Trainer feedback:</strong> {{ $childProgress->evaluation_remarks }}</p>
+                    @endif
+
+                    <div class="mt-4 flex flex-wrap items-center justify-between gap-2">
+                        @if($childCompleted)
+                            <span class="text-xs font-bold text-emerald-700">✓ Trainer validated as Competent</span>
+                        @elseif($childReadyForRemediation && !$childProgress?->submitted_at)
+                            <span class="text-xs font-semibold text-amber-700">Attempts exhausted; trainer remediation review is available.</span>
+                        @elseif($childHasClasswork && !$childAllPassed && !$childAwaiting)
+                            <span class="text-xs font-semibold text-amber-700">Pass the assigned classwork before Mark as Done.</span>
+                        @endif
+
+                        @unless($childCompleted || ($childReadyForRemediation && !$childProgress?->submitted_at))
+                            <form method="POST" action="{{ route('trainee.modules.submodules.progress', [$module, $submodule]) }}" target="_self" data-dashboard-dialog-form data-submit-label="{{ $childAwaiting ? 'Reopening...' : 'Submitting...' }}" class="ml-auto">
+                                @csrf
+                                @method('PATCH')
+                                <input type="hidden" name="action" value="{{ $childAwaiting ? 'reopen' : 'submit' }}">
+                                <button type="submit" class="{{ $childAwaiting ? 'secondary-action' : 'primary-action' }} px-3 py-1.5 text-xs" data-action-button @disabled($childHasClasswork && !$childAllPassed && !$childAwaiting)>
+                                    {{ $childAwaiting ? 'Return to In Progress' : ($childProgress?->status === 'needs_remediation' ? 'Resubmit Submodule' : 'Mark Submodule as Done') }}
+                                </button>
+                            </form>
+                        @endunless
+                    </div>
+                </article>
+            @empty
+                <p class="rounded-xl bg-amber-50 p-4 text-xs font-semibold text-amber-800">No competency outcomes are attached to this module yet.</p>
+            @endforelse
+        </div>
+    </section>
+    @endif
+
+    <!-- IN-MODULE ASSESSMENTS & AGGREGATED OUTCOME -->
     <section id="assessments" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
         <h2 class="text-base font-bold text-slate-950">Module Assessments & Performance Outcome</h2>
 
         <!-- Trainer Evaluation Status (F2F & Overall) -->
         <div class="grid gap-4 sm:grid-cols-3">
             <div class="rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs">
-                <span class="block text-slate-500 font-semibold mb-1">Knowledge / Quiz Score</span>
-                <span class="text-base font-bold {{ filled($progress?->quiz_score) ? 'text-purple-900' : 'text-slate-400' }}">
-                    {{ filled($progress?->quiz_score) ? number_format((float)$progress->quiz_score, 1).'%' : 'Not yet scored' }}
+                <span class="block text-slate-500 font-semibold mb-1">Quiz & Activity Average (This Module)</span>
+                <span class="text-base font-bold {{ $assessmentAverage !== null ? 'text-purple-900' : 'text-slate-400' }}">
+                    {{ $assessmentAverage !== null ? number_format((float)$assessmentAverage, 1).'%' : 'No submitted score yet' }}
                 </span>
+                <span class="mt-1 block text-[10px] text-slate-500">Separate from the official overall course grade.</span>
             </div>
             <div class="rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs">
                 <span class="block text-slate-500 font-semibold mb-1">Practical Demonstration Rating</span>
@@ -290,7 +384,7 @@
                                     View Score
                                 </a>
                             @endif
-                            @if(!$progress->isTrainerValidated())
+                            @if(!$progress->isTrainerValidated() && $progress->status !== \App\Models\ModuleProgress::STATUS_AWAITING_EVALUATION)
                                 <a href="{{ route('trainee.quizzes.show', $quiz) }}" class="primary-action text-xs py-1.5 px-3.5">
                                     {{ $bestAttempt ? 'Retake Quiz' : 'Take Quiz' }}
                                 </a>

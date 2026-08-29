@@ -471,6 +471,13 @@ class QuizAttemptTest extends TestCase
             'started_at' => now(),
         ]);
 
+        $this->actingAs($trainee)
+            ->get(route('trainee.quiz-attempts.show', $attempt))
+            ->assertOk()
+            ->assertSee('lms-activity-upload', false)
+            ->assertSee('lms-activity-file-input', false)
+            ->assertSee('type="file"', false);
+
         $docxFile = \Illuminate\Http\UploadedFile::fake()->create('My_Activity.docx', 100, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
 
         $this->actingAs($trainee)

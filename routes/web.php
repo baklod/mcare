@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\CertificationController;
 use App\Http\Controllers\Admin\EnrollmentReviewController;
 use App\Http\Controllers\Admin\HistoricalAlumniClaimController as AdminHistoricalAlumniClaimController;
 use App\Http\Controllers\Admin\PaymentScheduleController;
+use App\Http\Controllers\Admin\TrainingProgramController;
 use App\Http\Controllers\Alumni\AlumniCareerHubController;
 use App\Http\Controllers\Auth\AccountSessionController;
 use App\Http\Controllers\Auth\EmailVerificationController;
@@ -36,6 +37,7 @@ use App\Http\Controllers\Trainer\TrainerDashboardController;
 use App\Http\Controllers\Trainer\TrainerPortalController;
 use App\Http\Controllers\Trainer\TrainingModuleController as TrainerTrainingModuleController;
 use App\Models\EnrollmentApplication;
+use App\Models\OfficialDocument;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -239,6 +241,14 @@ Route::middleware('throttle:global-web')->group(function () {
                     ->middleware(['permission:schedules.manage', 'throttle:sensitive-mutation'])
                     ->name('schedules.store');
 
+                Route::post('/training-programs', [TrainingProgramController::class, 'store'])
+                    ->middleware(['permission:schedules.manage', 'throttle:sensitive-mutation'])
+                    ->name('training-programs.store');
+
+                Route::patch('/training-programs/{trainingProgram}', [TrainingProgramController::class, 'update'])
+                    ->middleware(['permission:schedules.manage', 'throttle:sensitive-mutation'])
+                    ->name('training-programs.update');
+
                 Route::get('/schedules/{trainingBatch}/edit', [BatchScheduleController::class, 'edit'])
                     ->middleware('permission:schedules.manage')
                     ->name('schedules.edit');
@@ -326,14 +336,17 @@ Route::middleware('throttle:global-web')->group(function () {
                     ->name('learning.competency-workbooks.download');
                 Route::post('/learning/certificates/{enrollmentApplication}/{type}', [CertificationController::class, 'generate'])
                     ->middleware(['permission:official-documents.manage', 'throttle:sensitive-mutation'])
-                    ->whereIn('type', ['cotc', 'tor'])
+                    ->whereIn('type', OfficialDocument::supportedTypes())
                     ->name('learning.documents.generate');
                 Route::patch('/learning/official-documents/{officialDocument}/release', [CertificationController::class, 'release'])
                     ->middleware(['permission:official-documents.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.documents.release');
+                Route::get('/learning/official-documents/{officialDocument}/preview', [CertificationController::class, 'preview'])
+                    ->middleware(['permission:official-documents.manage', 'throttle:document-downloads'])
+                    ->name('learning.documents.preview');
                 Route::post('/learning/certificates/{enrollmentApplication}/{type}/reissue', [CertificationController::class, 'reissue'])
                     ->middleware(['permission:official-documents.manage', 'throttle:sensitive-mutation'])
-                    ->whereIn('type', ['cotc', 'tor'])
+                    ->whereIn('type', OfficialDocument::supportedTypes())
                     ->name('learning.documents.reissue');
                 Route::get('/learning/official-documents/{officialDocument}/download', [CertificationController::class, 'download'])
                     ->middleware(['permission:official-documents.manage', 'throttle:document-downloads'])
@@ -580,6 +593,9 @@ Route::middleware('throttle:global-web')->group(function () {
                     Route::patch('/modules/{module}/progress', [TraineeDashboardController::class, 'updateProgress'])
                         ->middleware(['permission:progress.update', 'throttle:sensitive-mutation'])
                         ->name('modules.progress');
+                    Route::patch('/modules/{module}/submodules/{submodule}/progress', [TraineeDashboardController::class, 'updateSubmoduleProgress'])
+                        ->middleware(['permission:progress.update', 'throttle:sensitive-mutation'])
+                        ->name('modules.submodules.progress');
                     Route::post('/modules/{module}/security-event', [TraineeDashboardController::class, 'securityEvent'])
                         ->middleware(['permission:modules.view', 'throttle:20,1'])
                         ->name('modules.security-event');
@@ -589,9 +605,6 @@ Route::middleware('throttle:global-web')->group(function () {
                     Route::get('/quizzes/{quiz}', [TraineeQuizController::class, 'show'])
                         ->middleware('permission:quizzes.take')
                         ->name('quizzes.show');
-                    Route::post('/quizzes/{quiz}/time-in', [TraineeQuizController::class, 'timeIn'])
-                        ->middleware(['permission:quizzes.take', 'throttle:sensitive-mutation'])
-                        ->name('quizzes.time-in');
                     Route::post('/quizzes/{quiz}/attempts', [TraineeQuizController::class, 'start'])
                         ->middleware(['permission:quizzes.take', 'throttle:sensitive-mutation'])
                         ->name('quizzes.start');

@@ -15,9 +15,7 @@ class BrowsershotOfficialDocumentRenderer implements OfficialDocumentRenderer
             'application.competencyRecords.unit',
         ]);
 
-        $view = $document->type === OfficialDocument::TYPE_TOR
-            ? 'documents.pdf.tor'
-            : 'documents.pdf.cotc';
+        $view = OfficialDocument::templateViewForType($document->type);
         $html = view($view, [
             'document' => $document,
             'application' => $document->application,
@@ -32,11 +30,10 @@ class BrowsershotOfficialDocumentRenderer implements OfficialDocumentRenderer
             ->showBackground()
             ->allowFileAccess();
 
-        if ($document->type === OfficialDocument::TYPE_TOR) {
-            $browsershot->format('A4')->margins(0, 0, 0, 0);
-        } else {
-            $browsershot->paperSize(279.4, 215.9, 'mm')->margins(0, 0, 0, 0);
-        }
+        match ($document->type) {
+            OfficialDocument::TYPE_TOR => $browsershot->format('A4')->margins(0, 0, 0, 0),
+            OfficialDocument::TYPE_COTC => $browsershot->paperSize(279.4, 215.9, 'mm')->margins(0, 0, 0, 0),
+        };
 
         $this->applyConfiguredBinaries($browsershot);
 

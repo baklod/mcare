@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Contracts\OfficialDocumentRenderer;
-use App\Jobs\GenerateOfficialDocument;
 use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\OfficialDocument;
@@ -27,7 +26,7 @@ class OfficialDocumentManager
         string $type,
         User $admin,
     ): OfficialDocument {
-        $this->assertType($type);
+        $type = $this->validatedType($type);
         $this->assertEligible($application);
 
         $document = DB::transaction(function () use ($application, $type, $admin): OfficialDocument {
@@ -43,11 +42,12 @@ class OfficialDocumentManager
         });
 
         if ($document->status === OfficialDocument::STATUS_QUEUED) {
-            GenerateOfficialDocument::dispatch($document->id);
+            $document = $this->generateNow($document);
         }
 
-        AdminActivityLog::record($admin, 'admin.official-document.queued', $document, [
-            'type' => $type,
+        AdminActivityLog::record($admin, 'admin.official-document.generated', $document, [
+            'requested_type' => $type,
+            'generated_type' => $document->type,
             'application_id' => $application->id,
             'version' => $document->version,
         ]);
@@ -61,7 +61,7 @@ class OfficialDocumentManager
         User $admin,
         string $reason,
     ): OfficialDocument {
-        $this->assertType($type);
+        $type = $this->validatedType($type);
         $this->assertEligible($application);
 
         $document = DB::transaction(function () use ($application, $type, $admin, $reason): OfficialDocument {
@@ -80,9 +80,10 @@ class OfficialDocumentManager
             return $this->createVersion($application, $type, $admin);
         });
 
-        GenerateOfficialDocument::dispatch($document->id);
+        $document = $this->generateNow($document);
         AdminActivityLog::record($admin, 'admin.official-document.reissued', $document, [
-            'type' => $type,
+            'requested_type' => $type,
+            'generated_type' => $document->type,
             'application_id' => $application->id,
             'version' => $document->version,
             'reason' => $reason,
@@ -93,6 +94,8 @@ class OfficialDocumentManager
 
     public function generateNow(OfficialDocument $document): OfficialDocument
     {
+        $this->validatedType($document->type);
+
         $document = DB::transaction(function () use ($document): OfficialDocument {
             $locked = OfficialDocument::query()->lockForUpdate()->findOrFail($document->id);
 
@@ -275,11 +278,11 @@ class OfficialDocumentManager
         ]);
     }
 
-    private function assertType(string $type): void
+    private function validatedType(mixed $type): string
     {
-        validator(['type' => $type], [
-            'type' => ['required', Rule::in([OfficialDocument::TYPE_COTC, OfficialDocument::TYPE_TOR])],
-        ])->validate();
+        return validator(['type' => $type], [
+            'type' => ['required', Rule::in(OfficialDocument::supportedTypes())],
+        ])->validate()['type'];
     }
 
     private function documentPath(OfficialDocument $document): string

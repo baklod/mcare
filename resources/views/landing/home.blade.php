@@ -430,6 +430,9 @@
                     @if (session('auth_error'))
                         <div class="mt-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-medium leading-6 text-red-700">
                             {{ session('auth_error') }}
+                            @if (session('enrollment_required'))
+                                <a href="{{ route('enrollment.create') }}" class="ml-1 font-black text-purple-700 underline decoration-purple-300 underline-offset-2 hover:text-purple-900">Start enrollment</a>
+                            @endif
                         </div>
                     @endif
 
@@ -595,7 +598,7 @@
                 <div>
                     <p class="text-sm font-bold uppercase text-purple-600">Admissions</p>
                     <h2 class="mt-3 text-2xl font-bold leading-tight text-slate-900 sm:mt-4 sm:text-5xl">A simple enrollment flow before the admin review.</h2>
-                    <p class="mt-4 text-sm leading-6 text-slate-600 sm:mt-6 sm:text-lg sm:leading-8">Applicants verify their identity with Google, then complete the TESDA-inspired Caregiving NC II learner profile with browser-assisted autofill.</p>
+                    <p class="mt-4 text-sm leading-6 text-slate-600 sm:mt-6 sm:text-lg sm:leading-8">Applicants choose an active batch published by MCARE, complete enrollment, and create their MCARE account before optionally connecting the same registered email to Google.</p>
                     <div class="mt-6 sm:mt-10">
                         @auth
                             <a href="{{ $accountCtaUrl }}" class="inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:w-auto">{{ $accountCtaLabel }}</a>
@@ -610,8 +613,8 @@
                         <div class="flex gap-3 sm:gap-5">
                             <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-50 text-sm font-bold text-purple-600 sm:h-10 sm:w-10">1</span>
                             <div>
-                                <h3 class="text-base font-bold text-slate-900 sm:text-lg">Verify with Google</h3>
-                                <p class="mt-1.5 text-sm leading-6 text-slate-600 sm:mt-2 sm:text-base sm:leading-7">The account establishes the applicant name and email before enrollment begins.</p>
+                                <h3 class="text-base font-bold text-slate-900 sm:text-lg">Choose a published batch</h3>
+                                <p class="mt-1.5 text-sm leading-6 text-slate-600 sm:mt-2 sm:text-base sm:leading-7">Only active programs and batches that administrators publish for enrollment are available.</p>
                             </div>
                         </div>
                     </div>
@@ -619,8 +622,8 @@
                         <div class="flex gap-3 sm:gap-5">
                             <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-50 text-sm font-bold text-purple-600 sm:h-10 sm:w-10">2</span>
                             <div>
-                                <h3 class="text-base font-bold text-slate-900 sm:text-lg">Complete applicant details</h3>
-                                <p class="mt-1.5 text-sm leading-6 text-slate-600 sm:mt-2 sm:text-base sm:leading-7">Verified name and email are prefilled; personal information, address, education, contact details, and preferred schedule remain editable for confirmation.</p>
+                                <h3 class="text-base font-bold text-slate-900 sm:text-lg">Enroll and create your account</h3>
+                                <p class="mt-1.5 text-sm leading-6 text-slate-600 sm:mt-2 sm:text-base sm:leading-7">Submit your profile and requirements first. Google sign-in can only be connected afterward using that registered MCARE email.</p>
                             </div>
                         </div>
                     </div>
@@ -628,8 +631,8 @@
                         <div class="flex gap-3 sm:gap-5">
                             <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-50 text-sm font-bold text-purple-600 sm:h-10 sm:w-10">3</span>
                             <div>
-                                <h3 class="text-base font-bold text-slate-900 sm:text-lg">Admin approval next</h3>
-                                <p class="mt-1.5 text-sm leading-6 text-slate-600 sm:mt-2 sm:text-base sm:leading-7">MCARE emails enrollment updates while administrators review documents, payment readiness, and trainee access.</p>
+                                <h3 class="text-base font-bold text-slate-900 sm:text-lg">Verify payment, then admin review</h3>
+                                <p class="mt-1.5 text-sm leading-6 text-slate-600 sm:mt-2 sm:text-base sm:leading-7">The application reaches the admin review queue only after MCARE validates the required payment.</p>
                             </div>
                         </div>
                     </div>
@@ -746,7 +749,7 @@
         <div class="relative z-10 mx-auto flex max-w-7xl flex-col gap-5 px-4 py-10 text-center text-sm text-slate-700 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-12 sm:text-left lg:px-8">
             <div>
                 <p class="font-bold text-slate-900">&copy; {{ date('Y') }} Mission Care Training and Assessment Center.</p>
-                <p class="mt-1 text-slate-600">MCARE Hub | Caregiving NC II | Applicant Management</p>
+                <p class="mt-1 text-slate-600">MCARE Hub | Training Programs | Applicant Management</p>
             </div>
             <div class="flex items-center justify-center gap-3">
                 <a href="{{ $socialLinks['facebook'] }}" target="_blank" rel="noopener noreferrer" aria-label="Open MCARE Facebook page from footer" class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/50 bg-white/85 text-purple-700 shadow-sm hover:bg-white">

@@ -3,9 +3,14 @@
 namespace Tests\Concerns;
 
 use App\Models\EnrollmentApplication;
+use App\Models\Quiz;
+use App\Models\QuizAttempt;
+use App\Models\QuizQuestion;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
+use App\Models\TrainingSubmodule;
 use App\Models\User;
+use App\Services\ModuleSubmoduleService;
 use App\Services\RollingModuleReleaseService;
 
 trait CreatesLmsTestData
@@ -95,5 +100,58 @@ trait CreatesLmsTestData
         }
 
         return $module;
+    }
+
+    protected function lmsPassedAssessment(
+        User $trainer,
+        TrainingModule $module,
+        EnrollmentApplication $application,
+        float $score = 90,
+    ): Quiz {
+        $submodule = $this->lmsSubmodule($module);
+        $quiz = Quiz::create([
+            'trainer_id' => $trainer->id,
+            'training_batch_id' => $module->training_batch_id,
+            'target_enrollment_application_id' => $module->target_enrollment_application_id,
+            'training_module_id' => $module->id,
+            'training_submodule_id' => $submodule->id,
+            'title' => $module->title.' Required Assessment',
+            'instructions' => 'Complete the required module classwork.',
+            'is_published' => true,
+            'published_at' => now(),
+            'attempt_limit' => 1,
+            'passing_score_percent' => 75,
+        ]);
+
+        QuizQuestion::create([
+            'quiz_id' => $quiz->id,
+            'type' => QuizQuestion::TYPE_TRUE_FALSE,
+            'prompt' => 'Required module check',
+            'options' => ['True', 'False'],
+            'correct_option' => 0,
+            'points' => 10,
+            'position' => 0,
+        ]);
+
+        QuizAttempt::create([
+            'quiz_id' => $quiz->id,
+            'enrollment_application_id' => $application->id,
+            'attempt_number' => 1,
+            'status' => QuizAttempt::STATUS_GRADED,
+            'earned_points' => $score / 10,
+            'total_points' => 10,
+            'score_percent' => $score,
+            'passed' => $score >= 75,
+            'started_at' => now()->subMinutes(5),
+            'submitted_at' => now(),
+            'graded_at' => now(),
+        ]);
+
+        return $quiz;
+    }
+
+    protected function lmsSubmodule(TrainingModule $module): TrainingSubmodule
+    {
+        return app(ModuleSubmoduleService::class)->ensureStructure($module)->firstOrFail();
     }
 }

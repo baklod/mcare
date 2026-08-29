@@ -185,6 +185,7 @@ class TrainerEndToEndLifecycleFlowTest extends TestCase
         ]);
 
         $module = TrainingModule::where('module_code', 'HCS323301')->firstOrFail();
+        $submodule = $module->fresh()->submodules()->firstOrFail();
 
         Notification::assertSentTo($traineeUser, LmsModulePublished::class, function ($notification) {
             return $notification->queue === 'mail';
@@ -196,6 +197,7 @@ class TrainerEndToEndLifecycleFlowTest extends TestCase
         $quizResponse = $this->actingAs($trainer)->post(route('trainer.quizzes.store'), [
             'title' => 'Unit Assessment: Infant Care Competency',
             'training_module_id' => $module->id,
+            'training_submodule_id' => $submodule->id,
             'audience_type' => 'batch',
             'training_batch_id' => $batch->id,
             'instructions' => 'Answer all multiple choice questions within 20 minutes.',

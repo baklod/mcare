@@ -168,7 +168,7 @@
                     <img src="{{ $logoSource }}" alt="Mission Care logo">
                     <div>
                         <h1>Mission Care Training Center</h1>
-                        <p>Caregiving NC II pay-on-site receipt</p>
+                        <p>{{ $application->program ?: 'Training program' }} pay-on-site receipt</p>
                     </div>
                 </div>
                 <div class="meta">
@@ -209,7 +209,7 @@
                     </div>
                     <div class="field">
                         <span>Total Program Tuition</span>
-                        <strong style="color: #581c87;">PHP {{ number_format((float) ($application->total_program_fee ?? 22000.00), 2) }}</strong>
+                        <strong style="color: #581c87;">PHP {{ number_format((float) $application->total_program_fee, 2) }}</strong>
                     </div>
                     <div class="field">
                         <span>Remaining Balance</span>

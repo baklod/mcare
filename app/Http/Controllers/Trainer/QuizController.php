@@ -12,6 +12,7 @@ use App\Models\TrainingModule;
 use App\Models\User;
 use App\Notifications\LmsQuizPublished;
 use App\Services\ClassroomComments;
+use App\Services\ModuleAssessmentService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -39,12 +40,13 @@ class QuizController extends Controller
             ->with('saved', 'Open a learning module to create its assessment.');
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, ModuleAssessmentService $assessments): RedirectResponse
     {
         $validated = $this->validatedPayload($request);
         [$batchId, $targetTrainee] = $this->resolveAudience($validated);
         $this->assertTrainerBatch($request, $batchId, $targetTrainee);
         $parentModule = $this->resolveParentModule($request, $validated, $batchId, $targetTrainee);
+        $submodule = $this->resolveSubmodule($parentModule, $validated);
         $questions = $this->normalizedQuestions($validated['questions']);
         $published = $request->boolean('is_published');
 
@@ -54,6 +56,7 @@ class QuizController extends Controller
             $batchId,
             $targetTrainee,
             $parentModule,
+            $submodule,
             $questions,
             $published,
         ): Quiz {
@@ -62,6 +65,7 @@ class QuizController extends Controller
                 'training_batch_id' => $batchId,
                 'target_enrollment_application_id' => $targetTrainee?->id,
                 'training_module_id' => $parentModule?->id,
+                'training_submodule_id' => $submodule?->id,
                 'title' => $validated['title'],
                 'instructions' => $validated['instructions'] ?? null,
                 'available_at' => $validated['available_at'] ?? null,
@@ -69,7 +73,6 @@ class QuizController extends Controller
                 'time_limit_minutes' => $validated['time_limit_minutes'] ?? null,
                 'attempt_limit' => $validated['attempt_limit'],
                 'passing_score_percent' => $validated['passing_score_percent'],
-                'requires_time_in' => $request->boolean('requires_time_in'),
                 'is_published' => $published,
                 'published_at' => $published ? now() : null,
             ]);
@@ -87,6 +90,7 @@ class QuizController extends Controller
         ]);
 
         if ($quiz->is_published) {
+            $assessments->resetPendingProgressForPublishedQuiz($quiz);
             $this->notifyTrainees($quiz);
         }
 
@@ -102,14 +106,14 @@ class QuizController extends Controller
         $this->authorize('update', $quiz);
 
         return view('trainer.quizzes.edit', [
-            'quiz' => $quiz->load(['questions', 'batch', 'targetTrainee']),
+            'quiz' => $quiz->load(['questions', 'batch', 'targetTrainee', 'trainingSubmodule']),
             'classroomComments' => $comments->visibleFor($request->user(), $quiz),
             'privateCommentRecipients' => $comments->privateRecipients($request->user(), $quiz),
             ...$this->formOptions(),
         ]);
     }
 
-    public function update(Request $request, Quiz $quiz): RedirectResponse
+    public function update(Request $request, Quiz $quiz, ModuleAssessmentService $assessments): RedirectResponse
     {
         $this->authorize('update', $quiz);
 
@@ -118,6 +122,7 @@ class QuizController extends Controller
         [$batchId, $targetTrainee] = $this->resolveAudience($validated);
         $this->assertTrainerBatch($request, $batchId, $targetTrainee);
         $parentModule = $this->resolveParentModule($request, $validated, $batchId, $targetTrainee);
+        $submodule = $this->resolveSubmodule($parentModule, $validated, $quiz);
         $questions = $this->normalizedQuestions($validated['questions']);
 
         DB::transaction(function () use (
@@ -127,6 +132,7 @@ class QuizController extends Controller
             $batchId,
             $targetTrainee,
             $parentModule,
+            $submodule,
             $questions,
         ): void {
             $lockedQuiz = Quiz::query()->lockForUpdate()->findOrFail($quiz->id);
@@ -139,6 +145,7 @@ class QuizController extends Controller
                     $batchId,
                     $targetTrainee,
                     $parentModule,
+                    $submodule,
                     $questions,
                 );
             }
@@ -153,9 +160,6 @@ class QuizController extends Controller
                 'due_at' => $validated['due_at'] ?? null,
                 'time_limit_minutes' => $validated['time_limit_minutes'] ?? null,
                 'attempt_limit' => $validated['attempt_limit'],
-                'requires_time_in' => $request->has('requires_time_in')
-                    ? $request->boolean('requires_time_in')
-                    : $lockedQuiz->requires_time_in,
                 'is_published' => $published,
                 'published_at' => $published ? ($lockedQuiz->published_at ?? now()) : null,
             ];
@@ -164,6 +168,7 @@ class QuizController extends Controller
                 $attributes = [
                     ...$attributes,
                     'training_module_id' => $parentModule?->id,
+                    'training_submodule_id' => $submodule?->id,
                     'training_batch_id' => $batchId,
                     'target_enrollment_application_id' => $targetTrainee?->id,
                     'passing_score_percent' => $validated['passing_score_percent'],
@@ -185,6 +190,7 @@ class QuizController extends Controller
         ]);
 
         if (! $wasPublished && $quiz->is_published) {
+            $assessments->resetPendingProgressForPublishedQuiz($quiz);
             $this->notifyTrainees($quiz);
         }
 
@@ -192,8 +198,11 @@ class QuizController extends Controller
             ->with('saved', 'Quiz updated.');
     }
 
-    public function publication(Request $request, Quiz $quiz): RedirectResponse
-    {
+    public function publication(
+        Request $request,
+        Quiz $quiz,
+        ModuleAssessmentService $assessments,
+    ): RedirectResponse {
         $this->authorize('update', $quiz);
         $validated = $request->validate(['is_published' => ['required', 'boolean']]);
         $published = (bool) $validated['is_published'];
@@ -216,6 +225,7 @@ class QuizController extends Controller
         ]);
 
         if (! $wasPublished && $published) {
+            $assessments->resetPendingProgressForPublishedQuiz($quiz);
             $this->notifyTrainees($quiz);
         }
 
@@ -229,7 +239,6 @@ class QuizController extends Controller
 
         return view('trainer.quizzes.results', [
             'quiz' => $quiz->load(['batch', 'targetTrainee', 'questions']),
-            'attendances' => $quiz->attendances()->with(['application.user'])->latest('timed_in_at')->get(),
             'attempts' => $quiz->attempts()
                 ->with(['application.user'])
                 ->where('status', QuizAttempt::STATUS_GRADED)
@@ -285,6 +294,7 @@ class QuizController extends Controller
                     fn ($query) => $query->where('trainer_id', $request->user()->id)
                 ),
             ],
+            'training_submodule_id' => ['nullable', 'integer', 'exists:training_submodules,id'],
             'audience_type' => ['required', Rule::in(['batch', 'trainee'])],
             'training_batch_id' => ['nullable', 'integer', 'exists:training_batches,id'],
             'target_enrollment_application_id' => [
@@ -299,7 +309,6 @@ class QuizController extends Controller
             'time_limit_minutes' => ['nullable', 'integer', 'min:1', 'max:240'],
             'attempt_limit' => ['required', 'integer', 'min:1', 'max:5'],
             'passing_score_percent' => ['required', 'numeric', 'min:1', 'max:100'],
-            'requires_time_in' => ['nullable', 'boolean'],
             'is_published' => ['nullable', 'boolean'],
             'questions' => ['required', 'array', 'min:1', 'max:50'],
             'questions.*.type' => ['required', Rule::in(['multiple_choice', 'true_false', 'file_upload', 'enumeration'])],
@@ -415,7 +424,9 @@ class QuizController extends Controller
         return [
             'batches' => $assignedBatch ? collect([$assignedBatch]) : collect(),
             'modules' => TrainingModule::query()
+                ->with('submodules')
                 ->where('trainer_id', request()->user()->id)
+                ->where('completion_mode', TrainingModule::COMPLETION_ASSESSED)
                 ->orderBy('title')
                 ->get(),
             'trainees' => EnrollmentApplication::query()
@@ -459,7 +470,45 @@ class QuizController extends Controller
             ]);
         }
 
+        if (! $module->requiresEvaluation()) {
+            throw ValidationException::withMessages([
+                'training_module_id' => 'Choose an assessed module. Learning-material-only modules cannot contain required classwork.',
+            ]);
+        }
+
         return $module;
+    }
+
+    /** @param array<string, mixed> $validated */
+    private function resolveSubmodule(
+        TrainingModule $module,
+        array $validated,
+        ?Quiz $existingQuiz = null,
+    ): ?\App\Models\TrainingSubmodule {
+        $submoduleId = $validated['training_submodule_id'] ?? $existingQuiz?->training_submodule_id;
+        if ($submoduleId) {
+            $submodule = $module->submodules()->find($submoduleId);
+            if ($submodule) {
+                return $submodule;
+            }
+
+            throw ValidationException::withMessages([
+                'training_submodule_id' => 'Choose a submodule inside the selected learning module.',
+            ]);
+        }
+
+        $submodules = $module->submodules()->get();
+        if ($submodules->count() === 1) {
+            return $submodules->first();
+        }
+
+        if ($existingQuiz && ! $existingQuiz->training_submodule_id) {
+            return null;
+        }
+
+        throw ValidationException::withMessages([
+            'training_submodule_id' => 'Choose which submodule this assessment evaluates.',
+        ]);
     }
 
     private function moduleRedirect(Quiz $quiz, ?int $moduleId = null): RedirectResponse
@@ -470,7 +519,7 @@ class QuizController extends Controller
             return redirect()->route('trainer.resources');
         }
 
-        return redirect()->to(route('trainer.modules.show', $moduleId).'#assessments');
+        return redirect()->to(route('trainer.modules.show', ['module' => $moduleId, 'tab' => 'assessments']).'#assessments');
     }
 
     private function assertTrainerBatch(
@@ -534,6 +583,7 @@ class QuizController extends Controller
         int $batchId,
         ?EnrollmentApplication $targetTrainee,
         ?TrainingModule $parentModule,
+        ?\App\Models\TrainingSubmodule $submodule,
         array $questions,
     ): void {
         $message = 'This setting is locked because a trainee has already started the quiz.';
@@ -541,6 +591,10 @@ class QuizController extends Controller
 
         if ($this->nullableInt($quiz->training_module_id) !== $this->nullableInt($parentModule?->id)) {
             $errors['training_module_id'] = $message;
+        }
+
+        if ($this->nullableInt($quiz->training_submodule_id) !== $this->nullableInt($submodule?->id)) {
+            $errors['training_submodule_id'] = $message;
         }
 
         if ((int) $quiz->training_batch_id !== $batchId) {
@@ -597,6 +651,8 @@ class QuizController extends Controller
 
         $query = EnrollmentApplication::query()
             ->where('status', EnrollmentApplication::STATUS_APPROVED)
+            ->where('learning_status', '!=', EnrollmentApplication::LEARNING_GRADUATED)
+            ->where('is_historical_record', false)
             ->whereNotNull('user_id');
 
         if ($quiz->target_enrollment_application_id !== null) {
@@ -605,7 +661,10 @@ class QuizController extends Controller
             $query->where('training_batch_id', $quiz->training_batch_id);
         }
 
-        $traineeIds = $query->pluck('user_id')->unique();
+        $traineeIds = $query->get()
+            ->filter(fn (EnrollmentApplication $application): bool => $quiz->targets($application))
+            ->pluck('user_id')
+            ->unique();
 
         $trainees = User::query()
             ->where('role', 'trainee')

@@ -12,7 +12,7 @@
     <form method="POST" action="{{ route('trainer.competencies.update', $trainee) }}" class="space-y-6">
         @csrf
         @method('PATCH')
-        @foreach(['basic' => 'Basic competencies', 'common' => 'Common competencies', 'core' => 'Core competencies'] as $category => $label)
+        @foreach(['basic' => 'Basic competencies', 'common' => 'Common competencies', 'core' => 'Core competencies', 'custom' => 'Institutional / Custom competencies'] as $category => $label)
             <section class="space-y-3">
                 <div><p class="dashboard-section-kicker">{{ $label }}</p><p class="mt-1 text-sm text-slate-500">Progress uses the unit result; Achievement uses every learning outcome below it.</p></div>
                 @foreach($unitsByCategory->get($category, collect()) as $unit)

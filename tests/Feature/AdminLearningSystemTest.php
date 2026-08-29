@@ -12,11 +12,13 @@ use App\Models\TraineeOutcomeResult;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
 use App\Models\User;
+use App\Notifications\LmsQuizPublished;
 use App\Notifications\TrainerModuleAssignedByAdmin;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class AdminLearningSystemTest extends TestCase
@@ -206,17 +208,30 @@ class AdminLearningSystemTest extends TestCase
         ]);
         $application = $this->approvedApplication($trainee, $batch);
         $this->makeEligibleForGraduation($application, $admin);
+        $trainee->notifications()->create([
+            'id' => (string) Str::uuid(),
+            'type' => LmsQuizPublished::class,
+            'data' => [
+                'title' => 'Old quiz notification',
+                'quiz_id' => 999,
+            ],
+        ]);
 
         $this->actingAs($admin)
+            ->from(route('admin.accounts.photo', $trainee))
             ->patch(route('admin.learning.trainees.status', $application), [
                 'learning_status' => EnrollmentApplication::LEARNING_GRADUATED,
             ])
-            ->assertRedirect()
+            ->assertRedirect(route('admin.learning.trainees'))
             ->assertSessionHas('saved');
 
         $this->assertDatabaseHas('users', [
             'id' => $trainee->id,
             'role' => 'trainee',
+        ]);
+        $this->assertDatabaseMissing('notifications', [
+            'notifiable_id' => $trainee->id,
+            'type' => LmsQuizPublished::class,
         ]);
         $this->actingAs($trainee->fresh())
             ->get(route('alumni.dashboard'))
@@ -349,7 +364,9 @@ class AdminLearningSystemTest extends TestCase
             ->assertHeader('content-type', 'application/pdf');
 
         $this->actingAs($admin)
-            ->delete(route('admin.learning.modules.destroy', $module))
+            ->delete(route('admin.learning.modules.destroy', $module), [
+                'confirmation' => 'DELETE',
+            ])
             ->assertRedirect()
             ->assertSessionHas('saved');
 

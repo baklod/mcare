@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\HistoricalAlumniClaim;
 use App\Models\User;
@@ -32,7 +33,7 @@ class GoogleOauthEnrollmentTest extends TestCase
             ->assertSessionHas('auth_error');
     }
 
-    public function test_new_google_applicant_is_verified_and_sent_to_prefilled_enrollment(): void
+    public function test_unknown_google_email_is_rejected_until_enrollment_exists(): void
     {
         $googleUser = SocialiteUser::fake([
             'id' => 'google-123',
@@ -47,21 +48,73 @@ class GoogleOauthEnrollmentTest extends TestCase
         Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
 
         $this->get(route('auth.google.callback'))
-            ->assertRedirect(route('enrollment.create'))
+            ->assertRedirect(route('landing'))
+            ->assertSessionHas('enrollment_required');
+
+        $this->assertGuest();
+        $this->assertDatabaseMissing('users', ['email' => 'maria.santos@gmail.com']);
+        $this->assertDatabaseHas('admin_activity_logs', [
+            'action' => 'account.login.google.rejected',
+        ]);
+        $this->assertSame(
+            'enrollment_required',
+            AdminActivityLog::query()->latest('id')->firstOrFail()->meta['reason'],
+        );
+    }
+
+    public function test_registered_applicant_can_connect_google_and_continue_payment(): void
+    {
+        $user = User::factory()->unverified()->create([
+            'name' => 'Maria Santos',
+            'email' => 'maria.santos@gmail.com',
+            'role' => 'applicant',
+            'google_id' => null,
+        ]);
+        EnrollmentApplication::create([
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => 'Maria',
+            'last_name' => 'Santos',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'street' => 'Training Street',
+            'barangay' => 'Central',
+            'city' => 'Pili',
+            'province' => 'Camarines Sur',
+            'zip_code' => '4418',
+            'educational_attainment' => 'High School Graduate',
+            'school_name' => 'MCARE High School',
+            'year_graduated' => 2020,
+            'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+        ]);
+
+        $googleUser = SocialiteUser::fake([
+            'id' => 'google-123',
+            'name' => 'Different Google Display Name',
+            'email' => $user->email,
+            'avatar' => 'https://example.test/maria.jpg',
+        ]);
+        $provider = Mockery::mock(Provider::class);
+        $provider->shouldReceive('user')->once()->andReturn($googleUser);
+        Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
+
+        $this->get(route('auth.google.callback'))
+            ->assertRedirect(route('payment.show'))
             ->assertSessionHas('signed_in');
 
-        $user = User::query()->where('email', 'maria.santos@gmail.com')->firstOrFail();
         $this->assertAuthenticatedAs($user);
-        $this->assertSame('google-123', $user->google_id);
-        $this->assertSame('https://example.test/maria.jpg', $user->avatar_url);
-        $this->assertNotNull($user->email_verified_at);
+        $this->assertSame('google-123', $user->fresh()->google_id);
+        $this->assertSame('Maria Santos', $user->fresh()->name);
+        $this->assertSame('https://example.test/maria.jpg', $user->fresh()->avatar_url);
+        $this->assertNotNull($user->fresh()->email_verified_at);
 
         $this->get(route('enrollment.create'))
             ->assertOk()
             ->assertSee('Verified by Google')
             ->assertSee('value="maria.santos@gmail.com"', false)
-            ->assertSee('value="Maria"', false)
-            ->assertSee('value="Santos"', false)
             ->assertSee('https://example.test/maria.jpg', false)
             ->assertSee('autocomplete="section-applicant sex"', false)
             ->assertDontSee('name="password"', false)
@@ -121,6 +174,35 @@ class GoogleOauthEnrollmentTest extends TestCase
             ->assertSee('Resubmit corrected enrollment')
             ->assertSee('Contact MCARE regarding the submitted document.')
             ->assertDontSee('Please wait while the administrator completes your account verification');
+    }
+
+    public function test_google_identity_mismatch_does_not_replace_an_existing_link(): void
+    {
+        $user = User::factory()->create([
+            'name' => 'Linked Applicant',
+            'email' => 'linked.applicant@gmail.com',
+            'role' => 'applicant',
+            'google_id' => 'google-original',
+            'avatar_url' => 'https://example.test/original.jpg',
+        ]);
+        $googleUser = SocialiteUser::fake([
+            'id' => 'google-different',
+            'name' => 'Changed Name',
+            'email' => $user->email,
+            'avatar' => 'https://example.test/different.jpg',
+        ]);
+        $provider = Mockery::mock(Provider::class);
+        $provider->shouldReceive('user')->once()->andReturn($googleUser);
+        Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
+
+        $this->get(route('auth.google.callback'))
+            ->assertRedirect(route('landing'))
+            ->assertSessionHas('auth_error');
+
+        $this->assertGuest();
+        $this->assertSame('google-original', $user->fresh()->google_id);
+        $this->assertSame('Linked Applicant', $user->fresh()->name);
+        $this->assertSame('https://example.test/original.jpg', $user->fresh()->avatar_url);
     }
 
     public function test_google_verifies_a_historical_claim_without_bypassing_onsite_review(): void

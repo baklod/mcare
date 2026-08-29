@@ -16,6 +16,7 @@ class AdminDashboardController extends Controller
 
         // These counts power the admin overview cards and keep the dashboard action-first.
         $statusCounts = EnrollmentApplication::query()
+            ->releasedForReview()
             ->selectRaw('status, count(*) as aggregate')
             ->groupBy('status')
             ->pluck('aggregate', 'status')
@@ -27,7 +28,7 @@ class AdminDashboardController extends Controller
             ->pluck('aggregate', 'payment_status')
             ->all();
 
-        $totalApplications = EnrollmentApplication::query()->count();
+        $totalApplications = EnrollmentApplication::query()->releasedForReview()->count();
         $approvedPaid = EnrollmentApplication::query()
             ->where('status', EnrollmentApplication::STATUS_APPROVED)
             ->where('payment_status', EnrollmentApplication::PAYMENT_PAID)
@@ -38,6 +39,7 @@ class AdminDashboardController extends Controller
 
         return view('admin.dashboard', [
             'actionQueue' => EnrollmentApplication::query()
+                ->releasedForReview()
                 ->with(['batch', 'user'])
                 ->whereIn('status', [
                     EnrollmentApplication::STATUS_PROFILE_SUBMITTED,
@@ -49,6 +51,7 @@ class AdminDashboardController extends Controller
             'activeBatch' => $activeBatch,
             'certificatesReady' => $certificatesReady,
             'documentsToVerify' => EnrollmentApplication::query()
+                ->releasedForReview()
                 ->whereIn('status', [
                     EnrollmentApplication::STATUS_PROFILE_SUBMITTED,
                     EnrollmentApplication::STATUS_PRE_ENLISTMENT,

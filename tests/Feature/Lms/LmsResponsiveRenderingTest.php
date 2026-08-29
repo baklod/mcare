@@ -19,6 +19,18 @@ class LmsResponsiveRenderingTest extends TestCase
         $this->assertStringContainsString('if (event.target !== dialog) return;', $script);
     }
 
+    public function test_mobile_quiz_footer_cannot_cover_activity_file_controls(): void
+    {
+        $css = file_get_contents(resource_path('css/universal_dashboard_design.css'));
+
+        $this->assertIsString($css);
+        $this->assertStringContainsString('.universal-dashboard .lms-activity-file-input', $css);
+        $this->assertMatchesRegularExpression(
+            '/@media \(max-width: 700px\).*?\.universal-dashboard \.lms-sticky-submit \{.*?position: static;.*?bottom: auto;/s',
+            $css,
+        );
+    }
+
     public function test_trainer_lms_pages_expose_stable_mobile_safe_structure(): void
     {
         $trainer = $this->lmsUser('trainer');
@@ -98,9 +110,14 @@ class LmsResponsiveRenderingTest extends TestCase
         $this->actingAs($trainer)
             ->get(route('trainer.modules.show', $module))
             ->assertOk()
-            ->assertSee('https://example.test/module-trainee-avatar.jpg', false)
             ->assertSee('data-module-file-preview', false)
             ->assertSee('data-pdf-fit-mode="page"', false);
+
+        $this->actingAs($trainer)
+            ->get(route('trainer.modules.show', ['module' => $module, 'tab' => 'evaluations']))
+            ->assertOk()
+            ->assertSee('https://example.test/module-trainee-avatar.jpg', false)
+            ->assertDontSee('data-module-file-preview', false);
 
         $this->actingAs($trainer)
             ->get(route('trainer.trainees'))

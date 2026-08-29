@@ -109,6 +109,7 @@ class TrainerPortalController extends Controller
                 'batch',
                 'targetTrainee',
                 'progressRecords.application',
+                'submodules',
                 'quizzes.questions',
                 'quizzes.attempts.application',
             ])

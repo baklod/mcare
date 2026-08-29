@@ -9,6 +9,10 @@ use Throwable;
 
 class EnrollmentPaymentLifecycle
 {
+    public function __construct(
+        private readonly AdminOperationsNotifier $adminNotifier,
+    ) {}
+
     public function handleVerifiedPayment(EnrollmentApplication $application): bool
     {
         $result = DB::transaction(function () use ($application): array {
@@ -17,8 +21,13 @@ class EnrollmentPaymentLifecycle
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if (! $locked->isDownpaymentSatisfied()) {
-                return ['cleared' => false, 'notify' => false, 'application' => $locked];
+            if (! $locked->hasEnrollmentPaymentClearance()) {
+                return [
+                    'cleared' => false,
+                    'notify' => false,
+                    'review_released' => false,
+                    'application' => $locked,
+                ];
             }
 
             $meta = $locked->payment_meta ?? [];
@@ -32,6 +41,11 @@ class EnrollmentPaymentLifecycle
                 $locked->status = EnrollmentApplication::STATUS_PRE_ENLISTMENT;
             }
 
+            $reviewReleased = $locked->review_released_at === null;
+            if ($reviewReleased) {
+                $locked->review_released_at = now();
+            }
+
             $locked->payment_meta = $meta;
             $locked->save();
 
@@ -41,7 +55,12 @@ class EnrollmentPaymentLifecycle
                 ])->save();
             }
 
-            return ['cleared' => true, 'notify' => $shouldNotify, 'application' => $locked];
+            return [
+                'cleared' => true,
+                'notify' => $shouldNotify,
+                'review_released' => $reviewReleased,
+                'application' => $locked,
+            ];
         }, 3);
 
         /** @var EnrollmentApplication $verifiedApplication */
@@ -58,6 +77,23 @@ class EnrollmentPaymentLifecycle
                 // or mail transport is temporarily unavailable.
                 report($exception);
             }
+        }
+
+        if ($result['review_released']) {
+            $program = $verifiedApplication->program ?: 'Training program';
+            $applicant = trim($verifiedApplication->first_name.' '.$verifiedApplication->last_name);
+
+            $this->adminNotifier->notify(
+                title: 'Paid application ready for review',
+                message: "{$applicant}'s {$program} application has a verified payment and is ready for document and account review.",
+                url: route('admin.enrollments.show', $verifiedApplication),
+                icon: 'badge-check',
+                event: 'enrollment.review.released',
+                context: [
+                    'enrollment_application_id' => $verifiedApplication->getKey(),
+                    'training_batch_id' => $verifiedApplication->training_batch_id,
+                ],
+            );
         }
 
         return $result['cleared'];

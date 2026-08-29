@@ -171,7 +171,7 @@
         <aside class="dashboard-panel">
             <p class="text-xs font-black uppercase tracking-wide text-purple-600">Need payment action?</p>
             <p class="mt-2 text-sm leading-6 text-slate-500">Use the payment page to review your current online/on-site payment status or receipt.</p>
-            <a href="{{ route('payment.show') }}" class="primary-action mt-5 w-full">Open payment page</a>
+            <a href="{{ route('trainee.payments') }}" class="primary-action mt-5 w-full">Open payment page</a>
         </aside>
     </section>
 

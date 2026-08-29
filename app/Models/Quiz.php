@@ -19,6 +19,7 @@ class Quiz extends Model
         'training_batch_id',
         'target_enrollment_application_id',
         'training_module_id',
+        'training_submodule_id',
         'title',
         'instructions',
         'is_published',
@@ -28,7 +29,6 @@ class Quiz extends Model
         'time_limit_minutes',
         'attempt_limit',
         'passing_score_percent',
-        'requires_time_in',
     ];
 
     protected function casts(): array
@@ -41,7 +41,6 @@ class Quiz extends Model
             'time_limit_minutes' => 'integer',
             'attempt_limit' => 'integer',
             'passing_score_percent' => 'decimal:2',
-            'requires_time_in' => 'boolean',
         ];
     }
 
@@ -60,6 +59,11 @@ class Quiz extends Model
         return $this->belongsTo(TrainingModule::class, 'training_module_id');
     }
 
+    public function trainingSubmodule(): BelongsTo
+    {
+        return $this->belongsTo(TrainingSubmodule::class, 'training_submodule_id');
+    }
+
     public function targetTrainee(): BelongsTo
     {
         return $this->belongsTo(EnrollmentApplication::class, 'target_enrollment_application_id');
@@ -73,36 +77,6 @@ class Quiz extends Model
     public function attempts(): HasMany
     {
         return $this->hasMany(QuizAttempt::class);
-    }
-
-    public function attendances(): HasMany
-    {
-        return $this->hasMany(TraineeAttendance::class, 'quiz_id');
-    }
-
-    public function attendanceFor(EnrollmentApplication $application): ?TraineeAttendance
-    {
-        return $this->attendances->firstWhere('enrollment_application_id', $application->id)
-            ?? $this->attendances()->where('enrollment_application_id', $application->id)->first();
-    }
-
-    public function isTimeInAllowed(?CarbonInterface $at = null): bool
-    {
-        $at ??= now();
-
-        if (! $this->requires_time_in) {
-            return false;
-        }
-
-        if (! $this->isReleasedAt($at)) {
-            return false;
-        }
-
-        if ($this->due_at && $this->due_at->lt($at)) {
-            return false;
-        }
-
-        return true;
     }
 
     public function comments(): MorphMany
@@ -152,7 +126,15 @@ class Quiz extends Model
                 ->where('enrollment_application_id', $application->id)
                 ->where('training_module_id', $this->training_module_id)
                 ->whereNotNull('unlocked_at')
-                ->where('status', '!=', ModuleProgress::STATUS_LOCKED)
+                ->whereNotIn('status', [
+                    ModuleProgress::STATUS_LOCKED,
+                    ModuleProgress::STATUS_AWAITING_EVALUATION,
+                ])
+                ->where(function ($query): void {
+                    $query->where('status', '!=', ModuleProgress::STATUS_COMPLETED)
+                        ->orWhere('competency_outcome', '!=', ModuleProgress::OUTCOME_COMPETENT)
+                        ->orWhereNull('competency_outcome');
+                })
                 ->exists();
         }
 

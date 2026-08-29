@@ -7,6 +7,7 @@ use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
 use App\Models\User;
 use App\Notifications\EnrollmentSubmittedNotification;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -29,7 +30,21 @@ class EnrollmentController extends Controller
             $application = EnrollmentApplication::where('user_id', $request->user()->id)->latest()->first();
         }
 
-        $enrollmentBatch = $application?->batch ?: TrainingBatch::openForEnrollment();
+        $availableBatches = TrainingBatch::query()
+            ->publishedForEnrollment()
+            ->with('program')
+            ->orderBy('enrollment_ends_at')
+            ->orderBy('training_starts_at')
+            ->orderBy('name')
+            ->get();
+        $requestedBatchId = (int) ($request->session()->getOldInput('training_batch_id')
+            ?: $request->query('batch', 0));
+        $enrollmentBatch = $application?->batch?->loadMissing('program')
+            ?: $availableBatches->firstWhere('id', $requestedBatchId);
+
+        if (! $application && ! $enrollmentBatch && $availableBatches->count() === 1) {
+            $enrollmentBatch = $availableBatches->first();
+        }
         $documentLabels = [
             'birth-certificate' => 'Birth Certificate',
             'education-document' => 'Form 137/138 or Diploma',
@@ -42,6 +57,7 @@ class EnrollmentController extends Controller
 
         return view('enrollment.create', [
             'application' => $application,
+            'availableBatches' => $availableBatches,
             'enrollmentBatch' => $enrollmentBatch,
             'user' => $request->user(),
             'googleIdentity' => $this->googleIdentity($request),
@@ -72,7 +88,7 @@ class EnrollmentController extends Controller
             ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|JsonResponse
     {
         $request->merge(
             collect($request->all())
@@ -93,7 +109,10 @@ class EnrollmentController extends Controller
             : null;
         $isDeniedResubmission = $currentApplication?->status === EnrollmentApplication::STATUS_DENIED;
         $previousDenialNote = $isDeniedResubmission ? $currentApplication->admin_notes : null;
-        $enrollmentBatch = $currentApplication?->batch ?: TrainingBatch::openForEnrollment();
+        $requestedBatchId = $currentApplication?->training_batch_id
+            ?: (int) $request->input('training_batch_id');
+        $enrollmentBatch = $currentApplication?->batch?->loadMissing('program')
+            ?: TrainingBatch::publishedOpenForEnrollment($requestedBatchId ?: null)?->loadMissing('program');
         $isGoogleApplicant = filled($currentUser?->google_id);
         $passwordRules = $isGoogleApplicant
             ? ['exclude']
@@ -104,12 +123,6 @@ class EnrollmentController extends Controller
                 Password::min(10)->mixedCase()->letters()->numbers(),
             ];
 
-        // Existing applicants may update their record; only new entries require an open window.
-        if (! $currentApplication && ! $enrollmentBatch) {
-            throw ValidationException::withMessages([
-                'training_batch' => 'Enrollment is currently closed. Please wait for the next batch enrollment window.',
-            ]);
-        }
         $safeText = ["not_regex:/[<>\"'`;{}|\\\\]/u"];
         $safeOptionalText = ['nullable', 'string', 'max:120', "not_regex:/[<>\"'`;{}|\\\\]/u"];
         $documentRules = ['file', 'mimes:pdf,jpg,jpeg,png', 'extensions:pdf,jpg,jpeg,png', 'max:5120'];
@@ -118,6 +131,11 @@ class EnrollmentController extends Controller
             || filled(data_get($draftUploads, "{$field}.path"));
 
         $validator = Validator::make($request->all(), [
+            'training_batch_id' => [
+                $currentApplication ? 'nullable' : 'required',
+                'integer',
+                'exists:training_batches,id',
+            ],
             'email' => [
                 'required',
                 'email:rfc,dns',
@@ -178,7 +196,17 @@ class EnrollmentController extends Controller
             'signature_upload.required' => 'Upload a signature image or choose Draw Signature.',
             '*.mimes' => 'Accepted formats are PDF, JPG, JPEG, and PNG. ID photo and signature image must be JPG or PNG.',
             '*.max' => 'Each uploaded file must not exceed 5MB.',
+            'training_batch_id.required' => 'Choose one of the active batches published by MCARE before submitting enrollment.',
         ]);
+
+        $validator->after(function ($validator) use ($currentApplication, $enrollmentBatch): void {
+            if (! $currentApplication && ! $enrollmentBatch) {
+                $validator->errors()->add(
+                    'training_batch_id',
+                    'That batch is hidden, inactive, closed, or no longer inside its enrollment window. Choose an available batch and try again.',
+                );
+            }
+        });
 
         if ($validator->fails()) {
             // Keep only files that passed their own validation in a private session draft.
@@ -225,8 +253,12 @@ class EnrollmentController extends Controller
             ])
             ->merge([
                 'user_id' => $user->id,
-                'program' => 'Caregiving NC II',
+                'program' => $currentApplication?->program ?: $enrollmentBatch?->program?->name,
+                'training_program_id' => $currentApplication?->training_program_id ?: $enrollmentBatch?->training_program_id,
                 'training_batch_id' => $currentApplication?->training_batch_id ?: $enrollmentBatch?->id,
+                'total_program_fee' => $currentApplication?->total_program_fee ?: $enrollmentBatch?->program?->total_program_fee,
+                'downpayment_amount' => $currentApplication?->downpayment_amount ?: $enrollmentBatch?->program?->downpayment_amount,
+                'payment_amount' => $currentApplication?->payment_amount ?: $enrollmentBatch?->program?->downpayment_amount,
                 'privacy_consent' => true,
                 'date_accomplished' => now()->toDateString(),
                 'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
@@ -300,11 +332,22 @@ class EnrollmentController extends Controller
             report($exception);
         }
 
+        $paymentNotice = $isDeniedResubmission
+            ? 'Your corrected enrollment was resubmitted for admin review. Your existing verified payment remains recorded.'
+            : ($application->program ?: 'Training program').' enrollment registration saved. Choose your payment method to continue.';
+
+        if ($request->expectsJson()) {
+            $request->session()->flash('payment_notice', $paymentNotice);
+
+            return response()->json([
+                'message' => $paymentNotice,
+                'redirect' => route('payment.show'),
+            ]);
+        }
+
         return redirect()
             ->route('payment.show')
-            ->with('payment_notice', $isDeniedResubmission
-                ? 'Your corrected enrollment was resubmitted for admin review. Your existing verified payment remains recorded.'
-                : 'Caregiving NC II enrollment registration saved. Choose your payment method to continue.');
+            ->with('payment_notice', $paymentNotice);
     }
 
     /** @return array{email: string, first_name: string, middle_name: string, last_name: string, full_name: string, avatar_url: ?string} */

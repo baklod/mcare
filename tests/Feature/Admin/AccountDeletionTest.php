@@ -6,6 +6,7 @@ use App\Models\EnrollmentApplication;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentTransaction;
 use App\Models\TrainingBatch;
+use App\Models\TrainingProgram;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -54,7 +55,11 @@ class AccountDeletionTest extends TestCase
             'year_graduated' => 2022,
             'program' => 'Caregiving NC II',
             'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
-            'payment_status' => EnrollmentApplication::PAYMENT_NOT_SELECTED,
+            'payment_status' => EnrollmentApplication::PAYMENT_PARTIALLY_PAID,
+            'downpayment_amount' => 2000,
+            'total_paid_amount' => 2000,
+            'payment_verified_at' => now(),
+            'review_released_at' => now(),
             'training_batch_id' => $batch->id,
         ]);
 
@@ -155,10 +160,19 @@ class AccountDeletionTest extends TestCase
         Notification::fake();
         Storage::fake('local');
         $admin = $this->adminUser();
+        $program = TrainingProgram::create([
+            'name' => 'Caregiving NC II',
+            'code' => 'CG-NC-II',
+            'total_program_fee' => 22000,
+            'downpayment_amount' => 2000,
+            'is_active' => true,
+        ]);
         $batch = TrainingBatch::create([
+            'training_program_id' => $program->id,
             'name' => 'Batch 2026',
             'year' => 2026,
             'is_active' => true,
+            'show_on_enrollment_page' => true,
             'enrollment_starts_at' => now()->subDay(),
             'enrollment_ends_at' => now()->addWeek(),
         ]);
@@ -208,6 +222,7 @@ class AccountDeletionTest extends TestCase
         $signature = 'data:image/png;base64,'.base64_encode('fake-signature-bytes');
 
         $enrollmentResponse = $this->post(route('enrollment.store'), [
+            'training_batch_id' => $batch->id,
             'email' => $testEmail,
             'password' => 'Password123',
             'password_confirmation' => 'Password123',
@@ -271,7 +286,28 @@ class AccountDeletionTest extends TestCase
 
         User::factory()->create(['role' => 'trainer', 'name' => 'Special Trainer', 'email' => 'special.trainer@gmail.com']);
         User::factory()->create(['role' => 'trainee', 'name' => 'Special Trainee', 'email' => 'special.trainee@gmail.com']);
-        User::factory()->create(['role' => 'applicant', 'name' => 'Special Applicant', 'email' => 'special.applicant@gmail.com']);
+        $applicant = User::factory()->create(['role' => 'applicant', 'name' => 'Special Applicant', 'email' => 'special.applicant@gmail.com']);
+        EnrollmentApplication::create([
+            'user_id' => $applicant->id,
+            'email' => $applicant->email,
+            'first_name' => 'Special',
+            'last_name' => 'Applicant',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'street' => 'Test Street',
+            'barangay' => 'Test Barangay',
+            'city' => 'Iriga City',
+            'province' => 'Camarines Sur',
+            'zip_code' => '4431',
+            'educational_attainment' => 'High School Graduate',
+            'school_name' => 'Test School',
+            'year_graduated' => 2020,
+            'program' => 'Caregiving NC II',
+            'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+            'review_released_at' => now(),
+        ]);
 
         // Search
         $response = $this->actingAs($admin)->get(route('admin.accounts.index', ['search' => 'Special Trainer']));

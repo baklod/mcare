@@ -13,10 +13,12 @@ class TrainingBatch extends Model
     use HasFactory;
 
     protected $fillable = [
+        'training_program_id',
         'name',
         'year',
         'trainer_id',
         'is_active',
+        'show_on_enrollment_page',
         'is_continuous_enrollment',
         'enrollment_starts_at',
         'enrollment_ends_at',
@@ -37,6 +39,7 @@ class TrainingBatch extends Model
     {
         return [
             'is_active' => 'boolean',
+            'show_on_enrollment_page' => 'boolean',
             'is_continuous_enrollment' => 'boolean',
             'enrollment_starts_at' => 'datetime',
             'enrollment_ends_at' => 'datetime',
@@ -48,6 +51,11 @@ class TrainingBatch extends Model
     public function applications(): HasMany
     {
         return $this->hasMany(EnrollmentApplication::class);
+    }
+
+    public function program(): BelongsTo
+    {
+        return $this->belongsTo(TrainingProgram::class, 'training_program_id');
     }
 
     public function attendances(): HasMany
@@ -133,9 +141,9 @@ class TrainingBatch extends Model
             ->first();
     }
 
-    public static function openForEnrollment(): ?self
+    public function scopeAcceptingEnrollment(Builder $query): Builder
     {
-        return self::query()
+        return $query
             ->where('is_active', true)
             ->where(function ($query) {
                 $query->whereNull('enrollment_starts_at')
@@ -144,7 +152,31 @@ class TrainingBatch extends Model
             ->where(function ($query): void {
                 $query->where('is_continuous_enrollment', true)
                     ->orWhere('enrollment_ends_at', '>', now());
-            })
+            });
+    }
+
+    public function scopePublishedForEnrollment(Builder $query): Builder
+    {
+        return $query
+            ->acceptingEnrollment()
+            ->where('show_on_enrollment_page', true)
+            ->whereHas('program', fn (Builder $program): Builder => $program->where('is_active', true));
+    }
+
+    public static function openForEnrollment(): ?self
+    {
+        return self::query()
+            ->acceptingEnrollment()
+            ->orderByDesc('training_starts_at')
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    public static function publishedOpenForEnrollment(?int $batchId = null): ?self
+    {
+        return self::query()
+            ->publishedForEnrollment()
+            ->when($batchId, fn (Builder $query): Builder => $query->whereKey($batchId))
             ->orderByDesc('training_starts_at')
             ->orderByDesc('id')
             ->first();

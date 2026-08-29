@@ -25,7 +25,7 @@
             <div>
                 <h1 class="font-display text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">Applicant queue</h1>
                 <p class="mt-1.5 max-w-3xl text-sm text-slate-600">
-                    Review submitted Caregiving NC II learner profiles and move qualified applicants into pre-enlistment, approval, or denial.
+                    Review payment-released learner profiles across active programs and move qualified applicants into pre-enlistment, approval, or denial.
                 </p>
             </div>
             <div class="rounded-xl border border-purple-100 bg-purple-50 px-5 py-3 text-right">

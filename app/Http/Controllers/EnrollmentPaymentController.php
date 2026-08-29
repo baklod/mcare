@@ -5,14 +5,15 @@ namespace App\Http\Controllers;
 use App\Exceptions\PayMongoCheckoutException;
 use App\Models\EnrollmentApplication;
 use App\Models\PaymentAttempt;
+use App\Models\PaymentTransaction;
 use App\Services\EnrollmentPaymentLifecycle;
 use App\Services\PayMongoCheckoutService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -20,8 +21,6 @@ use Illuminate\View\View;
 class EnrollmentPaymentController extends Controller
 {
     private const DEFAULT_DOWNPAYMENT = '2000.00';
-
-    private const DEFAULT_DOWNPAYMENT_MINOR = 200000;
 
     public function __construct(
         private readonly PayMongoCheckoutService $payMongo,
@@ -350,11 +349,12 @@ class EnrollmentPaymentController extends Controller
             $ticketNumber = $lockedApplication->payment_receipt_number ?: $this->uniqueReference('MCR');
             $refNumber = $lockedApplication->payment_reference ?: $this->uniqueReference('MCARE-SITE');
             $expiresAt = $lockedApplication->payment_receipt_expires_at ?: $this->defaultDeadlineFor($lockedApplication);
+            $downpayment = round((float) ($lockedApplication->downpayment_amount ?: self::DEFAULT_DOWNPAYMENT), 2);
 
             $lockedApplication->forceFill([
                 'payment_method' => 'onsite',
                 'payment_status' => $lockedApplication->payment_status === EnrollmentApplication::PAYMENT_PAID ? EnrollmentApplication::PAYMENT_PAID : EnrollmentApplication::PAYMENT_ONSITE_PENDING,
-                'payment_amount' => $lockedApplication->payment_amount ?: self::DEFAULT_DOWNPAYMENT,
+                'payment_amount' => $downpayment,
                 'payment_currency' => 'PHP',
                 'payment_reference' => $refNumber,
                 'payment_receipt_number' => $ticketNumber,
@@ -371,19 +371,19 @@ class EnrollmentPaymentController extends Controller
                 ],
             ])->save();
 
-            \App\Models\PaymentTransaction::firstOrCreate(
+            PaymentTransaction::firstOrCreate(
                 [
                     'enrollment_application_id' => $lockedApplication->id,
-                    'payment_channel' => \App\Models\PaymentTransaction::CHANNEL_ONSITE,
-                    'transaction_type' => \App\Models\PaymentTransaction::TYPE_DOWNPAYMENT,
+                    'payment_channel' => PaymentTransaction::CHANNEL_ONSITE,
+                    'transaction_type' => PaymentTransaction::TYPE_DOWNPAYMENT,
                     'ticket_number' => $ticketNumber,
                 ],
                 [
                     'user_id' => $lockedApplication->user_id,
-                    'amount' => self::DEFAULT_DOWNPAYMENT,
-                    'status' => \App\Models\PaymentTransaction::STATUS_PENDING,
+                    'amount' => $downpayment,
+                    'status' => PaymentTransaction::STATUS_PENDING,
                     'paid_at' => now(),
-                    'notes' => 'On-site downpayment order (₱2,000.00) for cashier verification.',
+                    'notes' => 'On-site downpayment order (₱'.number_format($downpayment, 2).') for cashier verification.',
                 ]
             );
 
@@ -441,12 +441,16 @@ class EnrollmentPaymentController extends Controller
                 return $existing;
             }
 
+            $downpaymentMinor = (int) round(
+                (float) ($lockedApplication->downpayment_amount ?: self::DEFAULT_DOWNPAYMENT) * 100,
+            );
+
             $createdAttempt = PaymentAttempt::create([
                 'enrollment_application_id' => $lockedApplication->getKey(),
                 'provider' => 'paymongo',
                 'merchant_reference' => $this->uniqueReference('MCARE-ONLINE'),
                 'idempotency_key' => (string) Str::uuid(),
-                'amount_minor' => self::DEFAULT_DOWNPAYMENT_MINOR,
+                'amount_minor' => $downpaymentMinor,
                 'currency' => 'PHP',
                 'status' => PaymentAttempt::STATUS_CREATING,
                 'livemode' => $this->payMongo->isLiveMode(),

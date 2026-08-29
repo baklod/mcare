@@ -2,7 +2,9 @@
 
 namespace App\Notifications;
 
+use App\Models\EnrollmentApplication;
 use App\Models\Quiz;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -25,9 +27,34 @@ class LmsQuizPublished extends Notification implements ShouldQueue
     /** @return list<string> */
     public function via(object $notifiable): array
     {
+        if (! $notifiable instanceof User || ! $this->isStillEligible($notifiable)) {
+            return [];
+        }
+
         return filled($notifiable->email)
             ? ['database', 'mail']
             : ['database'];
+    }
+
+    private function isStillEligible(User $notifiable): bool
+    {
+        if ($notifiable->role !== 'trainee') {
+            return false;
+        }
+
+        $quiz = Quiz::query()->find($this->quiz->getKey());
+
+        if (! $quiz || ! $quiz->isReleasedAt()) {
+            return false;
+        }
+
+        return EnrollmentApplication::query()
+            ->where('user_id', $notifiable->id)
+            ->where('status', EnrollmentApplication::STATUS_APPROVED)
+            ->where('learning_status', '!=', EnrollmentApplication::LEARNING_GRADUATED)
+            ->where('is_historical_record', false)
+            ->get()
+            ->contains(fn (EnrollmentApplication $application): bool => $quiz->targets($application));
     }
 
     /** @return array<string, mixed> */

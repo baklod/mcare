@@ -12,6 +12,7 @@ class TraineeOutcomeResult extends Model
 
     protected $fillable = [
         'trainee_competency_record_id',
+        'training_module_id',
         'competency_outcome_id',
         'status',
         'assessed_by_id',
@@ -26,6 +27,11 @@ class TraineeOutcomeResult extends Model
     public function record(): BelongsTo
     {
         return $this->belongsTo(TraineeCompetencyRecord::class, 'trainee_competency_record_id');
+    }
+
+    public function module(): BelongsTo
+    {
+        return $this->belongsTo(TrainingModule::class, 'training_module_id');
     }
 
     public function outcome(): BelongsTo

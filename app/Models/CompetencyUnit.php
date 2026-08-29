@@ -37,4 +37,9 @@ class CompetencyUnit extends Model
     {
         return $this->hasMany(TraineeCompetencyRecord::class);
     }
+
+    public function trainingModules(): HasMany
+    {
+        return $this->hasMany(TrainingModule::class, 'competency_unit_id');
+    }
 }

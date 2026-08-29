@@ -29,12 +29,25 @@ class TrainingModule extends Model
 
     public const DELIVERY_CLOSED = 'closed';
 
+    public const DELIVERY_AVAILABLE = 'available';
+
+    public const RELEASE_ROLLING = 'rolling';
+
+    public const RELEASE_SUPPLEMENTAL = 'supplemental';
+
+    public const COMPLETION_ASSESSED = 'assessed';
+
+    public const COMPLETION_MATERIAL_ONLY = 'material_only';
+
     protected $fillable = [
         'trainer_id',
         'training_batch_id',
         'target_enrollment_application_id',
         'module_code',
         'competency_category',
+        'competency_unit_id',
+        'completion_mode',
+        'release_mode',
         'title',
         'description',
         'topic',
@@ -84,6 +97,18 @@ class TrainingModule extends Model
         return $this->belongsTo(EnrollmentApplication::class, 'target_enrollment_application_id');
     }
 
+    public function competencyUnit(): BelongsTo
+    {
+        return $this->belongsTo(CompetencyUnit::class, 'competency_unit_id');
+    }
+
+    public function submodules(): HasMany
+    {
+        return $this->hasMany(TrainingSubmodule::class, 'training_module_id')
+            ->orderBy('position')
+            ->orderBy('id');
+    }
+
     public function progressRecords(): HasMany
     {
         return $this->hasMany(ModuleProgress::class, 'training_module_id');
@@ -112,6 +137,23 @@ class TrainingModule extends Model
             self::CATEGORY_BASIC => 'Basic Competency',
             default => 'Institutional Learning Module',
         };
+    }
+
+    public function requiresEvaluation(): bool
+    {
+        return $this->completion_mode !== self::COMPLETION_MATERIAL_ONLY;
+    }
+
+    public function isSupplemental(): bool
+    {
+        return $this->release_mode === self::RELEASE_SUPPLEMENTAL;
+    }
+
+    public function completionModeLabel(): string
+    {
+        return $this->requiresEvaluation()
+            ? 'Classwork and trainer evaluation required'
+            : 'Learning material only';
     }
 
     public function supplementaryList(): array
@@ -149,6 +191,7 @@ class TrainingModule extends Model
     {
         return match ($this->delivery_status) {
             self::DELIVERY_ACTIVE => 'Active module',
+            self::DELIVERY_AVAILABLE => 'Available custom module',
             self::DELIVERY_CLOSED => 'Closed to new enrollees',
             default => 'Draft',
         };

@@ -6,7 +6,13 @@
     $downloadUrl = route('trainer.modules.download', $module);
     $supplementaryList = $module->supplementaryList();
     $isPrivate = filled($module->target_enrollment_application_id);
-    $activeTab = request()->query('tab', 'materials');
+    $requestedTab = request()->query('tab', 'materials');
+    $activeTab = in_array($requestedTab, ['materials', 'assessments', 'evaluations'], true)
+        ? $requestedTab
+        : 'materials';
+    if (!$module->requiresEvaluation()) {
+        $activeTab = 'materials';
+    }
 @endphp
 
 <div class="mx-auto max-w-7xl space-y-6" data-trainer-module-hub>
@@ -34,6 +40,9 @@
                     <span class="rounded px-2.5 py-0.5 text-xs font-bold {{ $module->delivery_status === 'active' ? 'bg-emerald-100 text-emerald-800' : ($module->delivery_status === 'closed' ? 'bg-amber-100 text-amber-800' : 'bg-stone-200 text-stone-700') }}">
                         {{ $module->deliveryStatusLabel() }}
                     </span>
+                    <span class="rounded px-2.5 py-0.5 text-xs font-bold {{ $module->requiresEvaluation() ? 'bg-purple-100 text-purple-800' : 'bg-sky-100 text-sky-800' }}">
+                        {{ $module->completionModeLabel() }}
+                    </span>
                 </div>
 
                 <h1 class="text-2xl font-bold text-stone-950 sm:text-3xl">{{ $module->title }}</h1>
@@ -56,6 +65,7 @@
                     @method('PATCH')
                     <input type="hidden" name="module_code" value="{{ $module->module_code }}">
                     <input type="hidden" name="competency_category" value="{{ $module->competency_category }}">
+                    <input type="hidden" name="completion_mode" value="{{ $module->completion_mode ?? 'assessed' }}">
                     <input type="hidden" name="title" value="{{ $module->title }}">
                     <input type="hidden" name="description" value="{{ $module->description }}">
                     <input type="hidden" name="topic" value="{{ $module->topic }}">
@@ -80,15 +90,17 @@
 
         <!-- Section Navigation Tabs -->
         <nav class="mt-6 flex flex-wrap gap-2 border-t border-stone-100 pt-4" aria-label="Module Hub sections">
-            <a href="#materials" class="rounded-xl px-4 py-2 text-xs font-bold transition {{ $activeTab === 'materials' ? 'bg-purple-700 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200' }}">
+            <a href="{{ route('trainer.modules.show', ['module' => $module, 'tab' => 'materials']) }}#materials" class="rounded-xl px-4 py-2 text-xs font-bold transition {{ $activeTab === 'materials' ? 'bg-purple-700 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200' }}">
                 📖 1. Learning Materials & Files ({{ count($supplementaryList) + 1 }})
             </a>
-            <a href="#assessments" class="rounded-xl px-4 py-2 text-xs font-bold transition {{ $activeTab === 'assessments' ? 'bg-purple-700 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200' }}">
+            @if($module->requiresEvaluation())
+            <a href="{{ route('trainer.modules.show', ['module' => $module, 'tab' => 'assessments']) }}#assessments" class="rounded-xl px-4 py-2 text-xs font-bold transition {{ $activeTab === 'assessments' ? 'bg-purple-700 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200' }}">
                 📝 2. Assessments ({{ $quizzes->count() }})
             </a>
-            <a href="#evaluations" class="rounded-xl px-4 py-2 text-xs font-bold transition {{ $activeTab === 'evaluations' ? 'bg-purple-700 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200' }}">
+            <a href="{{ route('trainer.modules.show', ['module' => $module, 'tab' => 'evaluations']) }}#evaluations" class="rounded-xl px-4 py-2 text-xs font-bold transition {{ $activeTab === 'evaluations' ? 'bg-purple-700 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200' }}">
                 📊 3. Learner Grades & Competency Matrix ({{ $trainees->count() }})
             </a>
+            @endif
         </nav>
     </header>
 
@@ -99,6 +111,7 @@
     @endif
 
     <!-- SECTION 1: LEARNING MATERIALS & PREVIEW -->
+    @if($activeTab === 'materials')
     <section id="materials" class="space-y-4">
         <div class="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-4">
             <div class="flex items-center justify-between border-b border-stone-100 pb-3">
@@ -151,6 +164,7 @@
                     @method('PATCH')
                     <input type="hidden" name="module_code" value="{{ $module->module_code }}">
                     <input type="hidden" name="competency_category" value="{{ $module->competency_category }}">
+                    <input type="hidden" name="completion_mode" value="{{ $module->completion_mode ?? 'assessed' }}">
                     <input type="hidden" name="title" value="{{ $module->title }}">
                     <input type="hidden" name="description" value="{{ $module->description }}">
                     <input type="hidden" name="topic" value="{{ $module->topic }}">
@@ -172,8 +186,10 @@
             </details>
         </div>
     </section>
+    @endif
 
     <!-- SECTION 2: MODULE ASSESSMENTS -->
+    @if($activeTab === 'assessments' && $module->requiresEvaluation())
     <section id="assessments" class="space-y-4">
         <div class="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-4">
             <div class="flex items-center justify-between border-b border-stone-100 pb-3">
@@ -196,6 +212,7 @@
                             </div>
                             <p class="mt-1 text-xs text-stone-600">{{ $quiz->questions->count() }} Questions · Passing Score: {{ number_format($quiz->passing_score_percent, 0) }}% · Time Limit: {{ $quiz->time_limit_minutes ? $quiz->time_limit_minutes.' mins' : 'Unlimited' }}</p>
                             @if($quiz->instructions)<p class="mt-1 text-xs text-stone-500 italic">{{ str($quiz->instructions)->limit(120) }}</p>@endif
+                            <p class="mt-1 text-[11px] font-semibold {{ $quiz->trainingSubmodule ? 'text-purple-700' : 'text-amber-700' }}">{{ $quiz->trainingSubmodule?->title ?? 'Legacy module-wide assessment' }}</p>
                         </div>
                         <div class="flex items-center gap-2">
                             <a href="{{ route('trainer.quizzes.edit', $quiz) }}" class="secondary-action text-xs py-1.5 px-3">
@@ -226,6 +243,16 @@
                         <input name="title" required maxlength="160" placeholder="e.g. {{ $module->title }} - Mastery Assessment" class="form-field">
                     </div>
                     <div class="sm:col-span-2">
+                        <label class="block text-xs font-bold text-purple-900 mb-1">Competency Submodule</label>
+                        <select name="training_submodule_id" class="form-field" required>
+                            <option value="">Choose the outcome this quiz measures</option>
+                            @foreach($submodules as $submodule)
+                                <option value="{{ $submodule->id }}" @selected((string) old('training_submodule_id') === (string) $submodule->id)>{{ $submodule->position }}. {{ $submodule->title }}</option>
+                            @endforeach
+                        </select>
+                        <p class="mt-1 text-[10px] text-stone-500">A trainee must pass this quiz before marking the selected submodule done.</p>
+                    </div>
+                    <div class="sm:col-span-2">
                         <label class="block text-xs font-bold text-purple-900 mb-1">Instructions</label>
                         <textarea name="instructions" rows="2" placeholder="Instructions for trainees before starting the quiz..." class="form-field"></textarea>
                     </div>
@@ -246,21 +273,125 @@
             </dialog>
         </div>
     </section>
+    @endif
 
     <!-- SECTION 3: LEARNER GRADES & EVALUATION MATRIX -->
+    @if($activeTab === 'evaluations' && $module->requiresEvaluation())
     <section id="evaluations" class="space-y-4">
         <div class="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-4">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-stone-100 pb-3">
                 <div>
-                    <h2 class="text-lg font-bold text-stone-950">Learner Evaluation & Grading Matrix</h2>
-                    <p class="text-xs text-stone-500">Record practical demonstration ratings, written test scores, and award competency outcomes.</p>
+                    <h2 class="text-lg font-bold text-stone-950">Submodule Competency Evaluation</h2>
+                    <p class="text-xs text-stone-500">Evaluate each competency outcome separately. The main module result is calculated automatically and has no manual dropdown.</p>
                 </div>
                 <div class="text-xs text-stone-600">
                     Batch: <strong>{{ $module->batch ? $module->batch->name.' '.$module->batch->year : 'Current Roster' }}</strong>
                 </div>
             </div>
 
-            <div class="overflow-x-auto">
+            <div class="space-y-5">
+                @forelse($trainees as $trainee)
+                    @php
+                        $parentProgress = $progressByApp->get($trainee->id);
+                        $traineeChildProgress = $submoduleProgressByApp->get($trainee->id, collect());
+                        $traineeChildSummaries = $submoduleAssessmentSummaryByApp->get($trainee->id, collect());
+                    @endphp
+                    <article class="rounded-2xl border border-stone-200 bg-stone-50/60 p-4">
+                        <div class="flex flex-col gap-3 border-b border-stone-200 pb-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="flex items-center gap-3">
+                                <x-user-avatar :user="$trainee->user" :name="trim($trainee->first_name.' '.$trainee->last_name)" class="grid h-10 w-10 place-items-center rounded-full bg-purple-100 text-xs font-black text-purple-800" />
+                                <div>
+                                    <p class="font-bold text-stone-950">{{ $trainee->last_name }}, {{ $trainee->first_name }}</p>
+                                    <p class="text-[11px] text-stone-500">{{ $trainee->email }}</p>
+                                </div>
+                            </div>
+                            <div class="text-xs text-stone-600">
+                                Main module: <strong class="{{ $parentProgress?->isTrainerValidated() ? 'text-emerald-700' : 'text-purple-800' }}">{{ $parentProgress?->workflowStatusLabel() ?? 'Not assigned' }}</strong>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 grid gap-4 xl:grid-cols-2">
+                            @foreach($submodules as $submodule)
+                                @php
+                                    $childProgress = $traineeChildProgress->get($submodule->id);
+                                    $childSummary = $traineeChildSummaries->get($submodule->id, []);
+                                    $childAverage = $childSummary['average_score'] ?? null;
+                                    $childHasQuiz = ($childSummary['required_count'] ?? 0) > 0;
+                                    $childAllPassed = (bool) ($childSummary['all_passed'] ?? false);
+                                    $childReadyForRemediation = (bool) ($childSummary['ready_for_remediation_evaluation'] ?? false);
+                                    $canMarkCompetent = (bool) $childProgress?->submitted_at && (!$childHasQuiz || $childAllPassed);
+                                @endphp
+                                <form method="POST" action="{{ route('trainer.modules.evaluate', $module) }}" class="space-y-3 rounded-xl border border-stone-200 bg-white p-4">
+                                    @csrf
+                                    <input type="hidden" name="enrollment_application_id" value="{{ $trainee->id }}">
+                                    <input type="hidden" name="training_submodule_id" value="{{ $submodule->id }}">
+
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p class="text-[10px] font-black uppercase tracking-wider text-purple-700">Outcome {{ $submodule->position }}</p>
+                                            <h3 class="mt-1 text-sm font-bold leading-5 text-stone-950">{{ $submodule->title }}</h3>
+                                        </div>
+                                        <span class="shrink-0 rounded px-2 py-1 text-[10px] font-bold {{ $childProgress?->isTrainerValidated() ? 'bg-emerald-100 text-emerald-800' : ($childProgress?->status === 'awaiting_evaluation' ? 'bg-purple-100 text-purple-800' : ($childProgress?->status === 'needs_remediation' ? 'bg-amber-100 text-amber-800' : 'bg-stone-100 text-stone-700')) }}">
+                                            {{ $childProgress?->workflowStatusLabel() ?? 'Ready to start' }}
+                                        </span>
+                                    </div>
+
+                                    <div class="grid gap-2 text-xs sm:grid-cols-2">
+                                        <div class="rounded-lg bg-purple-50 p-2.5 text-purple-900">
+                                            <span class="block text-[10px] font-semibold">Quiz / activity</span>
+                                            <strong>{{ $childHasQuiz ? (($childSummary['passed_count'] ?? 0).' / '.($childSummary['required_count'] ?? 0).' passed') : 'No quiz assigned' }}</strong>
+                                            @if($childAverage !== null)<span class="block text-[10px]">Average {{ number_format((float) $childAverage, 1) }}%</span>@endif
+                                        </div>
+                                        <div class="rounded-lg bg-stone-100 p-2.5 text-stone-800">
+                                            <span class="block text-[10px] font-semibold">Trainee submission</span>
+                                            <strong>{{ $childProgress?->submitted_at ? $childProgress->submitted_at->format('M d, g:i A') : 'Not submitted' }}</strong>
+                                        </div>
+                                    </div>
+
+                                    @if(!$childProgress?->submitted_at && !$childReadyForRemediation)
+                                        <p class="rounded-lg bg-amber-50 p-2 text-[11px] font-semibold leading-4 text-amber-800">Competent and NYC require this submodule's Mark as Done submission.</p>
+                                    @elseif($childReadyForRemediation && !$childProgress?->submitted_at)
+                                        <p class="rounded-lg bg-amber-50 p-2 text-[11px] font-semibold leading-4 text-amber-800">Attempts are exhausted. You may record Not Yet Competent with remediation feedback.</p>
+                                    @endif
+
+                                    <div class="grid gap-3 sm:grid-cols-2">
+                                        <div>
+                                            <label class="mb-1 block text-xs font-semibold text-stone-700">Practical Rating</label>
+                                            <select name="practical_rating" class="form-field">
+                                                <option value="pending" @selected(!$childProgress || $childProgress->practical_rating === 'pending')>Pending</option>
+                                                <option value="competent" @selected($childProgress?->practical_rating === 'competent')>Competent</option>
+                                                <option value="not_yet_competent" @selected($childProgress?->practical_rating === 'not_yet_competent')>Not Yet Competent</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="mb-1 block text-xs font-semibold text-stone-700">Outcome</label>
+                                            <select name="competency_outcome" class="form-field" required>
+                                                <option value="in_progress" @selected(!$childProgress || $childProgress->competency_outcome === 'in_progress')>In Progress</option>
+                                                <option value="competent" @selected($childProgress?->competency_outcome === 'competent')>Competent (Passed)</option>
+                                                <option value="not_yet_competent" @selected($childProgress?->competency_outcome === 'not_yet_competent')>Not Yet Competent</option>
+                                            </select>
+                                            @unless($canMarkCompetent)
+                                                <p class="mt-1 text-[10px] font-semibold leading-4 text-amber-700">Competent unlocks after submission and passed assigned classwork.</p>
+                                            @endunless
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label class="mb-1 block text-xs font-semibold text-stone-700">Trainer Remarks</label>
+                                        <textarea name="evaluation_remarks" rows="2" placeholder="Practical demonstration or remediation feedback..." class="form-field">{{ $childProgress?->evaluation_remarks }}</textarea>
+                                    </div>
+
+                                    <button type="submit" class="primary-action w-full justify-center py-2 text-xs">Save Submodule Evaluation</button>
+                                </form>
+                            @endforeach
+                        </div>
+                    </article>
+                @empty
+                    <p class="rounded-xl bg-stone-50 p-6 text-center text-xs text-stone-500">No approved trainees are assigned to this delivery.</p>
+                @endforelse
+            </div>
+
+            <div class="hidden" aria-hidden="true">
                 <table class="dashboard-table min-w-[58rem]">
                     <thead>
                         <tr>
@@ -278,6 +409,11 @@
                                 $progress = $progressByApp->get($trainee->id);
                                 $isCompetent = $progress?->competency_outcome === 'competent';
                                 $isNyc = $progress?->competency_outcome === 'not_yet_competent';
+                                $assessmentSummary = $assessmentSummaryByApp->get($trainee->id, []);
+                                $assessmentAverage = $assessmentSummary['average_score'] ?? null;
+                                $readyForRemediation = (bool) ($assessmentSummary['ready_for_remediation_evaluation'] ?? false);
+                                $canMarkCompetent = (bool) $progress?->submitted_at
+                                    && (bool) ($assessmentSummary['all_passed'] ?? false);
                             @endphp
                             <tr class="align-middle">
                                 <td>
@@ -300,9 +436,10 @@
                                     </span>
                                 </td>
                                 <td>
-                                    <span class="font-bold {{ filled($progress?->quiz_score) ? 'text-purple-900' : 'text-stone-400' }}">
-                                        {{ filled($progress?->quiz_score) ? number_format((float)$progress->quiz_score, 1).'%' : 'N/A' }}
+                                    <span class="font-bold {{ $assessmentAverage !== null ? 'text-purple-900' : 'text-stone-400' }}">
+                                        {{ $assessmentAverage !== null ? number_format((float)$assessmentAverage, 1).'%' : 'N/A' }}
                                     </span>
+                                    <span class="mt-1 block text-[10px] text-stone-500">Quiz/activity only</span>
                                 </td>
                                 <td>
                                     <span class="rounded px-2 py-0.5 text-xs font-bold {{ $progress?->practical_rating === 'competent' ? 'bg-emerald-100 text-emerald-800' : ($progress?->practical_rating === 'not_yet_competent' ? 'bg-rose-100 text-rose-800' : 'bg-stone-100 text-stone-600') }}">
@@ -323,22 +460,25 @@
                                     @else
                                     <details class="relative">
                                         <summary class="cursor-pointer rounded-lg bg-stone-100 hover:bg-stone-200 px-3 py-1.5 text-xs font-bold text-stone-800 select-none">
-                                            {{ $progress?->status === 'awaiting_evaluation' ? 'Evaluate Submission' : 'Review' }}
+                                            {{ $progress?->status === 'awaiting_evaluation' ? 'Evaluate Submission' : ($readyForRemediation ? 'Evaluate Remediation' : ($progress?->isTrainerValidated() ? 'View Completed Record' : 'Review')) }}
                                         </summary>
                                         <div class="absolute right-0 z-20 mt-2 w-80 rounded-2xl border border-stone-200 bg-white p-4 shadow-xl text-xs space-y-3">
                                             <div class="font-bold text-stone-900 border-b border-stone-100 pb-2">
                                                 Grade: {{ $trainee->first_name }} {{ $trainee->last_name }}
                                             </div>
-                                            @if(!$progress?->submitted_at)
+                                            @if(!$progress?->submitted_at && !$readyForRemediation)
                                                 <p class="rounded-lg bg-amber-50 p-2 text-amber-800">Final Competent/NYC outcomes stay blocked until the trainee clicks Mark as Done.</p>
+                                            @elseif($readyForRemediation && !$progress?->submitted_at)
+                                                <p class="rounded-lg bg-amber-50 p-2 text-amber-800">The trainee used every attempt and still has failed classwork. You may record Not Yet Competent and remediation feedback without a Mark as Done submission.</p>
                                             @endif
                                             <form method="POST" action="{{ route('trainer.modules.evaluate', $module) }}" class="space-y-3">
                                                 @csrf
                                                 <input type="hidden" name="enrollment_application_id" value="{{ $trainee->id }}">
 
-                                                <div>
-                                                    <label class="block font-semibold text-stone-700 mb-1">Knowledge / Quiz Score (%)</label>
-                                                    <input type="number" step="0.1" name="quiz_score" value="{{ old('quiz_score', $progress?->quiz_score) }}" min="0" max="100" placeholder="e.g. 85.0" class="form-field">
+                                                <div class="rounded-lg border border-purple-100 bg-purple-50 p-3">
+                                                    <span class="block font-semibold text-purple-900">Quiz & Activity Average</span>
+                                                    <strong class="mt-1 block text-lg text-purple-950">{{ $assessmentAverage !== null ? number_format((float)$assessmentAverage, 1).'%' : 'No submitted score' }}</strong>
+                                                    <span class="mt-1 block text-[10px] text-purple-700">Calculated from this module's classwork only. This is not the official overall course grade.</span>
                                                 </div>
 
                                                 <div>
@@ -353,10 +493,13 @@
                                                 <div>
                                                     <label class="block font-semibold text-stone-700 mb-1">Overall Module Outcome</label>
                                                     <select name="competency_outcome" class="form-field" required>
-                                                        <option value="competent" @selected($progress?->competency_outcome === 'competent')>Competent (Passed & Sync to TOR)</option>
+                                                        <option value="competent" data-competent-outcome-option @selected($progress?->competency_outcome === 'competent')>Competent (Passed)</option>
                                                         <option value="not_yet_competent" @selected($progress?->competency_outcome === 'not_yet_competent')>Not Yet Competent (For Remediation)</option>
                                                         <option value="in_progress" @selected(!$progress || $progress->competency_outcome === 'in_progress')>In Progress</option>
                                                     </select>
+                                                    @unless($canMarkCompetent)
+                                                        <p class="mt-1 text-[10px] font-semibold leading-4 text-amber-700">Competent is selectable, but saving it requires passed classwork and the trainee's Mark as Done submission.</p>
+                                                    @endunless
                                                 </div>
 
                                                 <div>
@@ -383,6 +526,7 @@
             </div>
         </div>
     </section>
+    @endif
 
     <x-classroom-comments :commentable="$module" :comments="$classroomComments" :private-recipients="$privateCommentRecipients" />
 </div>

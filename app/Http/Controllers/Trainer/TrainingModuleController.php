@@ -4,14 +4,16 @@ namespace App\Http\Controllers\Trainer;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
-use App\Models\CompetencyUnit;
 use App\Models\EnrollmentApplication;
 use App\Models\ModuleProgress;
 use App\Models\Quiz;
-use App\Models\TraineeCompetencyRecord;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
+use App\Models\TrainingSubmodule;
+use App\Models\TrainingSubmoduleProgress;
 use App\Rules\TrainingModuleFileType;
+use App\Services\ModuleAssessmentService;
+use App\Services\ModuleSubmoduleService;
 use App\Services\RollingModuleReleaseService;
 use App\Support\TrainingModuleFiles;
 use Illuminate\Http\RedirectResponse;
@@ -28,9 +30,10 @@ class TrainingModuleController extends Controller
     public function store(
         Request $request,
         RollingModuleReleaseService $releases,
-    ): RedirectResponse
-    {
+        ModuleSubmoduleService $submodules,
+    ): RedirectResponse {
         $validated = $this->validatedPayload($request, true);
+        $this->assertCustomAudience($validated);
         [$batchId, $targetTrainee] = $this->resolveAudience($validated);
         $this->assertTrainerBatch($request, $batchId, $targetTrainee);
         $trainer = $request->user();
@@ -62,17 +65,22 @@ class TrainingModuleController extends Controller
                 $targetTrainee,
                 $supplementaryList,
                 $request,
+                $submodules,
             ): TrainingModule {
                 $published = $request->has('is_published')
                     ? $request->boolean('is_published')
                     : true;
 
-                return TrainingModule::create([
+                $module = TrainingModule::create([
                     'trainer_id' => $trainer->id,
                     'training_batch_id' => $batchId,
                     'target_enrollment_application_id' => $targetTrainee?->id,
                     'module_code' => $validated['module_code'] ?? null,
                     'competency_category' => $validated['competency_category'] ?? null,
+                    'completion_mode' => $validated['completion_mode'],
+                    'release_mode' => ($validated['competency_category'] ?? null) === TrainingModule::CATEGORY_CUSTOM
+                        ? TrainingModule::RELEASE_SUPPLEMENTAL
+                        : TrainingModule::RELEASE_ROLLING,
                     'title' => $validated['title'],
                     'description' => $validated['description'],
                     'topic' => $validated['topic'] ?? null,
@@ -88,6 +96,10 @@ class TrainingModuleController extends Controller
                     'is_published' => $published,
                     'published_at' => $published ? now() : null,
                 ]);
+
+                $submodules->ensureStructure($module, $validated['submodule_titles'] ?? []);
+
+                return $module;
             });
         } catch (\Throwable $exception) {
             if ($path) {
@@ -121,6 +133,7 @@ class TrainingModuleController extends Controller
         Request $request,
         TrainingModule $module,
         RollingModuleReleaseService $releases,
+        ModuleSubmoduleService $submodules,
     ): RedirectResponse {
         $this->authorize('update', $module);
 
@@ -128,10 +141,32 @@ class TrainingModuleController extends Controller
         $requestedPublished = $request->has('is_published')
             ? $request->boolean('is_published')
             : $module->is_published;
-        $shouldCloseDelivery = $module->delivery_status === TrainingModule::DELIVERY_ACTIVE
+        $shouldCloseDelivery = in_array($module->delivery_status, [
+            TrainingModule::DELIVERY_ACTIVE,
+            TrainingModule::DELIVERY_AVAILABLE,
+        ], true)
             && $wasPublished
             && ! $requestedPublished;
         $validated = $this->validatedPayload($request, false, count($module->supplementaryList()));
+        $this->assertCustomAudience($validated);
+        if ($module->isSupplemental()
+            && ($validated['competency_category'] ?? null) !== TrainingModule::CATEGORY_CUSTOM) {
+            throw ValidationException::withMessages([
+                'competency_category' => 'A supplemental custom module cannot be converted into the active rolling competency delivery.',
+            ]);
+        }
+        if ($validated['completion_mode'] === TrainingModule::COMPLETION_MATERIAL_ONLY
+            && $module->requiresEvaluation()
+            && ($module->quizzes()->exists()
+                || $module->progressRecords()
+                    ->where(fn ($query) => $query
+                        ->whereNotNull('submitted_at')
+                        ->orWhereNotNull('evaluated_at'))
+                    ->exists())) {
+            throw ValidationException::withMessages([
+                'completion_mode' => 'An assessed module with classwork or submitted evaluations cannot be converted to learning-material-only.',
+            ]);
+        }
         [$batchId, $targetTrainee] = $this->resolveAudience($validated);
         $this->assertTrainerBatch($request, $batchId, $targetTrainee);
         $replacement = $request->file('module_file');
@@ -180,6 +215,10 @@ class TrainingModuleController extends Controller
                     'target_enrollment_application_id' => $targetTrainee?->id,
                     'module_code' => $validated['module_code'] ?? null,
                     'competency_category' => $validated['competency_category'] ?? null,
+                    'completion_mode' => $validated['completion_mode'],
+                    'release_mode' => ($validated['competency_category'] ?? null) === TrainingModule::CATEGORY_CUSTOM
+                        ? TrainingModule::RELEASE_SUPPLEMENTAL
+                        : TrainingModule::RELEASE_ROLLING,
                     'title' => $validated['title'],
                     'description' => $validated['description'],
                     'topic' => $validated['topic'] ?? null,
@@ -204,6 +243,7 @@ class TrainingModuleController extends Controller
 
                 $module->update($attributes);
             });
+            $submodules->ensureStructure($module->fresh(), $validated['submodule_titles'] ?? []);
         } catch (\Throwable $exception) {
             if ($replacementPath) {
                 Storage::disk('local')->delete($replacementPath);
@@ -309,11 +349,20 @@ class TrainingModuleController extends Controller
         Request $request,
         TrainingModule $module,
         RollingModuleReleaseService $releases,
-    ): RedirectResponse
-    {
+        ModuleAssessmentService $assessments,
+        ModuleSubmoduleService $submodules,
+    ): RedirectResponse {
         $this->authorize('update', $module);
+        $moduleSubmodules = $submodules->ensureStructure($module);
 
         $validated = $request->validate([
+            'training_submodule_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('training_submodules', 'id')->where(
+                    fn ($query) => $query->where('training_module_id', $module->id)
+                ),
+            ],
             'enrollment_application_id' => [
                 'required',
                 'integer',
@@ -321,19 +370,32 @@ class TrainingModuleController extends Controller
                     fn ($query) => $query->where('training_batch_id', $module->training_batch_id)
                 ),
             ],
-            'quiz_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'practical_rating' => ['nullable', Rule::in(['competent', 'not_yet_competent', 'pending'])],
             'competency_outcome' => ['required', Rule::in(['competent', 'not_yet_competent', 'in_progress'])],
             'evaluation_remarks' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $application = EnrollmentApplication::findOrFail($validated['enrollment_application_id']);
+        if (! $module->requiresEvaluation()) {
+            throw ValidationException::withMessages([
+                'competency_outcome' => 'Learning-material-only modules do not accept competency evaluations.',
+            ]);
+        }
         if (
             $module->target_enrollment_application_id !== null
             && (int) $module->target_enrollment_application_id !== (int) $application->id
         ) {
             throw ValidationException::withMessages([
                 'enrollment_application_id' => 'This private module can only evaluate its assigned trainee.',
+            ]);
+        }
+
+        $submodule = filled($validated['training_submodule_id'] ?? null)
+            ? $moduleSubmodules->firstWhere('id', (int) $validated['training_submodule_id'])
+            : ($moduleSubmodules->count() === 1 ? $moduleSubmodules->first() : null);
+        if (! $submodule) {
+            throw ValidationException::withMessages([
+                'training_submodule_id' => 'Choose the competency submodule being evaluated.',
             ]);
         }
 
@@ -349,124 +411,114 @@ class TrainingModuleController extends Controller
             ]);
         }
 
-        if ($validated['competency_outcome'] !== ModuleProgress::OUTCOME_IN_PROGRESS
-            && ! $assignedProgress->submitted_at) {
+        $submodules->assignProgress($assignedProgress);
+        $childProgress = TrainingSubmoduleProgress::query()
+            ->where('enrollment_application_id', $application->id)
+            ->where('training_submodule_id', $submodule->id)
+            ->firstOrFail();
+
+        $assessmentSummary = $assessments->summary($module, $application, $submodule);
+
+        if ($validated['competency_outcome'] === ModuleProgress::OUTCOME_COMPETENT
+            && (! $childProgress->submitted_at
+                || ($assessmentSummary['required_count'] > 0 && ! $assessmentSummary['all_passed']))) {
             throw ValidationException::withMessages([
-                'competency_outcome' => 'The trainee must submit Mark as Done before a final trainer outcome can be recorded.',
+                'competency_outcome' => 'A Competent outcome requires this submodule\'s Mark as Done submission and any assigned classwork to be passed.',
             ]);
         }
 
-        $progress = DB::transaction(function () use ($request, $validated, $application, $module): ModuleProgress {
-            $progress = ModuleProgress::query()->where([
+        if ($validated['competency_outcome'] === ModuleProgress::OUTCOME_NOT_YET_COMPETENT
+            && ! $childProgress->submitted_at
+            && ! $assessmentSummary['ready_for_remediation_evaluation']) {
+            throw ValidationException::withMessages([
+                'competency_outcome' => 'Record Not Yet Competent after the trainee submits this submodule or uses all attempts on its unresolved assessment.',
+            ]);
+        }
+
+        $progress = DB::transaction(function () use (
+            $request,
+            $validated,
+            $application,
+            $module,
+            $submodule,
+            $assessmentSummary,
+            $submodules,
+        ): TrainingSubmoduleProgress {
+            $progress = TrainingSubmoduleProgress::query()->where([
                 'enrollment_application_id' => $application->id,
-                'training_module_id' => $module->id,
+                'training_submodule_id' => $submodule->id,
             ])->lockForUpdate()->firstOrFail();
 
             $isCompetent = $validated['competency_outcome'] === ModuleProgress::OUTCOME_COMPETENT;
             $currentProgress = (int) ($progress->progress_percent ?: 50);
             $progress->fill([
-                'quiz_score' => $validated['quiz_score'] ?? $progress->quiz_score,
+                'quiz_score' => $assessmentSummary['average_score'],
                 'practical_rating' => $validated['practical_rating'] ?? $progress->practical_rating,
                 'competency_outcome' => $validated['competency_outcome'],
                 'evaluation_remarks' => $validated['evaluation_remarks'] ?? null,
                 'evaluated_by_id' => $request->user()->id,
                 'evaluated_at' => now(),
                 'status' => match ($validated['competency_outcome']) {
-                    ModuleProgress::OUTCOME_COMPETENT => ModuleProgress::STATUS_COMPLETED,
-                    ModuleProgress::OUTCOME_NOT_YET_COMPETENT => ModuleProgress::STATUS_NEEDS_REMEDIATION,
-                    default => ModuleProgress::STATUS_IN_PROGRESS,
+                    ModuleProgress::OUTCOME_COMPETENT => TrainingSubmoduleProgress::STATUS_COMPLETED,
+                    ModuleProgress::OUTCOME_NOT_YET_COMPETENT => TrainingSubmoduleProgress::STATUS_NEEDS_REMEDIATION,
+                    default => TrainingSubmoduleProgress::STATUS_IN_PROGRESS,
                 },
                 'progress_percent' => $isCompetent ? 100 : min($currentProgress, 99),
                 'submitted_at' => $isCompetent ? $progress->submitted_at : null,
                 'completed_at' => $isCompetent ? ($progress->completed_at ?: now()) : null,
             ])->save();
 
-            // Keep the module evaluation and the official competency record atomic.
-            $unit = null;
-            if (filled($module->module_code)) {
-                $unit = CompetencyUnit::query()->with('outcomes')->where('code', $module->module_code)->first();
-            }
-            if (! $unit && filled($module->title)) {
-                $unit = CompetencyUnit::query()->with('outcomes')->where('title', $module->title)->first()
-                    ?? CompetencyUnit::query()->with('outcomes')->where('title', 'like', "%{$module->title}%")->first();
-            }
-            if (! $unit && filled($module->topic)) {
-                $unit = CompetencyUnit::query()->with('outcomes')->where('title', $module->topic)->first()
-                    ?? CompetencyUnit::query()->with('outcomes')->where('title', 'like', "%{$module->topic}%")->first();
-            }
-
-            if ($unit) {
-                $compRecord = TraineeCompetencyRecord::query()->firstOrNew([
-                    'enrollment_application_id' => $application->id,
-                    'competency_unit_id' => $unit->id,
-                ]);
-
-                $compStatus = match ($validated['competency_outcome']) {
-                    ModuleProgress::OUTCOME_COMPETENT => TraineeCompetencyRecord::STATUS_COMPETENT,
-                    ModuleProgress::OUTCOME_NOT_YET_COMPETENT => TraineeCompetencyRecord::STATUS_NOT_YET_COMPETENT,
-                    default => TraineeCompetencyRecord::STATUS_IN_PROGRESS,
-                };
-
-                $score = filled($validated['quiz_score'] ?? null)
-                    ? (float) $validated['quiz_score']
-                    : ($isCompetent ? 85.00 : null);
-
-                $torGrade = ($compStatus === TraineeCompetencyRecord::STATUS_COMPETENT && $score !== null)
-                    ? app(\App\Services\TorGradeScale::class)->fromPercentage($score)
-                    : null;
-
-                $compRecord->fill([
-                    'status' => $compStatus,
-                    'percentage_score' => $score,
-                    'tor_grade' => $torGrade,
-                    'notes' => $validated['evaluation_remarks'] ?? $compRecord->notes,
-                    'assessed_by_id' => $request->user()->id,
-                    'assessed_at' => now(),
-                ])->save();
-
-                // Atomically update all individual outcome results for the competency unit!
-                foreach ($unit->outcomes as $outcome) {
-                    $outcomeStatus = match ($compStatus) {
-                        TraineeCompetencyRecord::STATUS_COMPETENT => TraineeCompetencyRecord::STATUS_COMPETENT,
-                        TraineeCompetencyRecord::STATUS_NOT_YET_COMPETENT => TraineeCompetencyRecord::STATUS_NOT_YET_COMPETENT,
-                        default => TraineeCompetencyRecord::STATUS_IN_PROGRESS,
-                    };
-
-                    $compRecord->outcomeResults()->updateOrCreate(
-                        ['competency_outcome_id' => $outcome->id],
-                        [
-                            'status' => $outcomeStatus,
-                            'assessed_by_id' => $request->user()->id,
-                            'assessed_at' => now(),
-                        ]
-                    );
-                }
-            }
+            $submodules->syncCompetencyOutcome(
+                $application,
+                $module,
+                $submodule,
+                $progress,
+                $request->user(),
+            );
+            $submodules->recalculateParent($application, $module);
 
             return $progress;
         }, 3);
 
-        if ($progress->isTrainerValidated()) {
+        $parentProgress = ModuleProgress::query()->where([
+            'enrollment_application_id' => $application->id,
+            'training_module_id' => $module->id,
+        ])->firstOrFail();
+        if ($parentProgress->isTrainerValidated()) {
             $releases->unlockNext($application);
         }
 
         AdminActivityLog::record($request->user(), 'trainer.module.evaluated', $progress, [
             'module_id' => $module->id,
             'application_id' => $application->id,
+            'submodule_id' => $submodule->id,
             'trainee_name' => trim($application->first_name.' '.$application->last_name),
             'outcome' => $validated['competency_outcome'],
         ]);
 
         return redirect()
-            ->route('trainer.modules.show', $module)
-            ->with('saved', "Evaluation recorded for {$application->first_name} {$application->last_name}.");
+            ->to(route('trainer.modules.show', ['module' => $module, 'tab' => 'evaluations']).'#evaluations')
+            ->with('saved', "{$submodule->title} evaluation recorded for {$application->first_name} {$application->last_name}.");
     }
 
     public function storeQuiz(Request $request, TrainingModule $module): RedirectResponse
     {
         $this->authorize('update', $module);
 
+        if (! $module->requiresEvaluation()) {
+            throw ValidationException::withMessages([
+                'quiz' => 'This is a learning-material-only module. Create an assessed module before adding required classwork.',
+            ]);
+        }
+
         $validated = $request->validate([
+            'training_submodule_id' => [
+                'required',
+                'integer',
+                Rule::exists('training_submodules', 'id')->where(
+                    fn ($query) => $query->where('training_module_id', $module->id)
+                ),
+            ],
             'title' => ['required', 'string', 'max:160'],
             'instructions' => ['nullable', 'string', 'max:2000'],
             'time_limit_minutes' => ['nullable', 'integer', 'min:1', 'max:180'],
@@ -479,6 +531,7 @@ class TrainingModuleController extends Controller
             'training_batch_id' => $module->training_batch_id,
             'target_enrollment_application_id' => $module->target_enrollment_application_id,
             'training_module_id' => $module->id,
+            'training_submodule_id' => $validated['training_submodule_id'],
             'title' => $validated['title'],
             'instructions' => $validated['instructions'] ?? null,
             'time_limit_minutes' => $validated['time_limit_minutes'] ?? 20,
@@ -505,17 +558,26 @@ class TrainingModuleController extends Controller
         Request $request,
         bool $fileRequired,
         int $existingSupplementaryCount = 0,
-    ): array
-    {
+    ): array {
         $activeBatch = TrainingBatch::assignedTo($request->user());
         $request->merge([
             'audience_type' => $request->input('audience_type', 'batch'),
             'training_batch_id' => $request->input('training_batch_id', $activeBatch?->id),
+            'completion_mode' => $request->input('completion_mode', TrainingModule::COMPLETION_ASSESSED),
         ]);
 
         $validated = $request->validate([
             'module_code' => ['nullable', 'string', 'max:50'],
             'competency_category' => ['nullable', 'string', Rule::in(['core', 'common', 'basic', 'custom'])],
+            'submodule_titles' => ['nullable', 'array', 'max:30'],
+            'submodule_titles.*' => ['nullable', 'string', 'max:255'],
+            'completion_mode' => [
+                'required',
+                Rule::in([
+                    TrainingModule::COMPLETION_ASSESSED,
+                    TrainingModule::COMPLETION_MATERIAL_ONLY,
+                ]),
+            ],
             'title' => ['required', 'string', 'max:160'],
             'description' => ['required', 'string', 'max:5000'],
             'topic' => ['nullable', 'string', 'max:120'],
@@ -616,4 +678,14 @@ class TrainingModuleController extends Controller
         }
     }
 
+    /** @param array<string, mixed> $validated */
+    private function assertCustomAudience(array $validated): void
+    {
+        if (($validated['competency_category'] ?? null) === TrainingModule::CATEGORY_CUSTOM
+            && ($validated['audience_type'] ?? 'batch') !== 'batch') {
+            throw ValidationException::withMessages([
+                'audience_type' => 'Custom modules are supplemental resources for everyone in the trainer\'s assigned class.',
+            ]);
+        }
+    }
 }

@@ -2,7 +2,7 @@
 
 @section('content')
 @php
-    $categoryLabels = ['basic' => 'Basic competencies', 'common' => 'Common competencies', 'core' => 'Core competencies'];
+    $categoryLabels = ['basic' => 'Basic competencies', 'common' => 'Common competencies', 'core' => 'Core competencies', 'custom' => 'Institutional / Custom competencies'];
     $statusSymbols = ['not_assessed' => '-', 'in_progress' => 'IP', 'competent' => 'C', 'not_yet_competent' => 'NYC'];
     $selectedTraineeIds = collect(old('trainee_ids', []))->map(fn ($id) => (int) $id);
 @endphp

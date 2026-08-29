@@ -426,6 +426,23 @@
         @apply border border-purple-200 bg-white text-purple-800 hover:border-purple-300 hover:bg-purple-50 active:translate-y-px;
     }
 
+    .universal-dashboard .admin-module-action {
+        @apply relative inline-flex h-10 w-10 items-center justify-center rounded-lg border border-purple-200 bg-white text-purple-800 outline-none transition duration-150 hover:border-purple-300 hover:bg-purple-50 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 active:translate-y-px;
+    }
+
+    .universal-dashboard .admin-module-action.is-danger {
+        @apply border-red-200 text-red-700 hover:border-red-300 hover:bg-red-50 focus-visible:ring-red-500;
+    }
+
+    .universal-dashboard .admin-module-action-tooltip {
+        @apply pointer-events-none absolute bottom-[calc(100%+0.5rem)] left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2.5 py-1.5 text-[11px] font-bold text-white opacity-0 shadow-lg transition-opacity duration-150;
+    }
+
+    .universal-dashboard .admin-module-action:hover .admin-module-action-tooltip,
+    .universal-dashboard .admin-module-action:focus-visible .admin-module-action-tooltip {
+        @apply opacity-100;
+    }
+
     .universal-dashboard a,
     .universal-dashboard button,
     .universal-dashboard summary,
@@ -3136,6 +3153,18 @@ html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-context-link.i
     box-shadow: 0 12px 36px rgba(15, 23, 42, 0.13);
 }
 
+.universal-dashboard .lms-activity-upload,
+.universal-dashboard .lms-activity-file-input {
+    position: relative;
+    z-index: 1;
+}
+
+.universal-dashboard .lms-activity-file-input {
+    min-height: 44px;
+    max-width: 100%;
+    pointer-events: auto;
+}
+
 .universal-dashboard .lms-results-panel {
     overflow: hidden;
     padding: 22px;
@@ -4057,7 +4086,9 @@ html[data-dashboard-theme="dark"] .universal-dashboard .lms-status-chip.is-red {
     }
 
     .universal-dashboard .lms-sticky-submit {
-        bottom: 84px;
+        position: static;
+        z-index: auto;
+        bottom: auto;
         flex-wrap: wrap;
     }
 

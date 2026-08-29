@@ -110,7 +110,7 @@
             <div class="rounded-3xl border border-purple-100 bg-white p-7 shadow-xl shadow-purple-100/40 sm:p-8">
                 <div class="flex items-center gap-4">
                     <x-user-avatar :user="$application->user" :application="$application" :use-enrollment-photo="true" class="grid h-16 w-16 place-items-center rounded-full bg-purple-100 text-xl font-black text-purple-800" />
-                    <div class="min-w-0"><p class="text-sm font-bold uppercase text-purple-600">Caregiving NC II</p><h1 class="mt-2 truncate text-4xl font-bold leading-tight text-slate-900">{{ $application->last_name }}, {{ $application->first_name }}</h1></div>
+                    <div class="min-w-0"><p class="text-sm font-bold uppercase text-purple-600">{{ $application->program ?: 'Training program' }}</p><h1 class="mt-2 truncate text-4xl font-bold leading-tight text-slate-900">{{ $application->last_name }}, {{ $application->first_name }}</h1></div>
                 </div>
                 <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div class="rounded-2xl bg-slate-50 p-4">

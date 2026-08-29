@@ -126,6 +126,16 @@
                 @error('competency_category')<p class="lms-field-error">{{ $message }}</p>@enderror
             </div>
 
+            <div class="lms-field lms-field-wide">
+                <label for="module-completion-mode">Module Requirement</label>
+                <select id="module-completion-mode" name="completion_mode" class="form-field" required>
+                    <option value="assessed" @selected(old('completion_mode', 'assessed') === 'assessed')>Assessed module — classwork and trainer evaluation required</option>
+                    <option value="material_only" @selected(old('completion_mode') === 'material_only')>Learning material only — no Mark as Done or competency evaluation</option>
+                </select>
+                <small class="text-xs text-slate-500">Choose learning material only for references or lessons that should not block rolling module progression.</small>
+                @error('completion_mode')<p class="lms-field-error">{{ $message }}</p>@enderror
+            </div>
+
             <div class="lms-field">
                 <label for="module-title">Module Title</label>
                 <input id="module-title" name="title" value="{{ old('title') }}" required maxlength="160" placeholder="e.g. Provide Care and Support to Infants and Toddlers">
@@ -136,6 +146,18 @@
                 <label for="module-topic">Sub-topic / Learning Outcome</label>
                 <input id="module-topic" name="topic" list="subtopics-list" value="{{ old('topic') }}" maxlength="120" placeholder="e.g. Comfort infants and toddlers">
                 <datalist id="subtopics-list"></datalist>
+            </div>
+
+            <div class="lms-field lms-field-wide" data-submodule-builder>
+                <label>Submodules / Competency Outcomes</label>
+                <p class="mb-2 text-xs text-slate-500">Client presets automatically load every official outcome. For a custom assessed module, enter each outcome the trainer will evaluate separately.</p>
+                <div class="space-y-2" data-submodule-list>
+                    @foreach(old('submodule_titles', ['']) as $submoduleTitle)
+                        <input name="submodule_titles[]" value="{{ $submoduleTitle }}" maxlength="255" class="form-field" placeholder="Submodule or competency outcome">
+                    @endforeach
+                </div>
+                <button type="button" class="secondary-action mt-2 text-xs" data-add-submodule>Add custom submodule</button>
+                @error('submodule_titles')<p class="lms-field-error">{{ $message }}</p>@enderror
             </div>
 
             <div class="lms-field">
@@ -220,7 +242,7 @@
                 <label class="lms-check">
                     <input type="hidden" name="is_published" value="0">
                     <input type="checkbox" name="is_published" value="1" @checked(old('is_published', true))>
-                    <span>Make this the active batch module. The previous active delivery closes only to future enrollees.</span>
+                    <span data-module-publication-copy>Make this the active batch module. The previous active delivery closes only to future enrollees.</span>
                 </label>
             </div>
             <div class="lms-form-actions lms-field-wide">
@@ -253,13 +275,26 @@
                 <label for="quick-quiz-module" class="font-bold text-amber-950">Parent Learning Module</label>
                 <select id="quick-quiz-module" name="training_module_id" class="form-field border-amber-300" required>
                     <option value="">-- Choose target learning module --</option>
-                    @foreach($modules as $mod)
+                    @foreach($modules->filter->requiresEvaluation() as $mod)
                         <option value="{{ $mod->id }}">
                             {{ $mod->module_code ? '['.$mod->module_code.'] ' : '' }}{{ $mod->title }} ({{ $mod->categoryLabel() }})
                         </option>
                     @endforeach
                 </select>
                 <small class="text-xs text-stone-500">Every assessment belongs to a specific learning module.</small>
+            </div>
+
+            <div class="lms-field lms-field-wide">
+                <label for="quick-quiz-submodule" class="font-bold text-amber-950">Competency Submodule</label>
+                <select id="quick-quiz-submodule" name="training_submodule_id" class="form-field border-amber-300" required>
+                    <option value="">-- Choose the outcome this quiz evaluates --</option>
+                    @foreach($modules->filter->requiresEvaluation() as $mod)
+                        @foreach($mod->submodules as $submodule)
+                            <option value="{{ $submodule->id }}" data-parent-module="{{ $mod->id }}">{{ $mod->title }} — {{ $submodule->title }}</option>
+                        @endforeach
+                    @endforeach
+                </select>
+                <small class="text-xs text-stone-500">New assessments are tracked against one submodule. Existing legacy quizzes remain module-wide.</small>
             </div>
 
             <div class="lms-field lms-field-wide">
@@ -382,16 +417,21 @@
                     <footer class="lms-card-footer">
                         <a href="{{ route('trainer.modules.show', $module) }}" class="primary-action text-xs">Open Module Hub</a>
                         <div class="lms-card-actions">
-                            <button type="button" class="secondary-action text-xs" data-dashboard-dialog-open="quiz-creator-dialog" data-quiz-module-id="{{ $module->id }}">Add quiz</button>
+                            @if($module->requiresEvaluation())
+                                <button type="button" class="secondary-action text-xs" data-dashboard-dialog-open="quiz-creator-dialog" data-quiz-module-id="{{ $module->id }}">Add quiz</button>
+                            @else
+                                <span class="text-[11px] font-semibold text-sky-700">Material only</span>
+                            @endif
                             <details class="lms-action-menu">
                                 <summary class="secondary-action text-xs">More</summary>
                                 <div class="lms-action-menu-popover">
                                     @if($module->delivery_status !== 'closed')
-                                    <form method="POST" action="{{ route('trainer.modules.update', $module) }}" data-confirm="{{ $module->delivery_status === 'active' ? 'Close this delivery to future enrollees?' : 'Publish this as the current active module?' }}">
+                                    <form method="POST" action="{{ route('trainer.modules.update', $module) }}" data-confirm="{{ $module->isSupplemental() ? ($module->is_published ? 'Remove this supplemental module from the class?' : 'Make this supplemental module available to everyone in the assigned class?') : ($module->delivery_status === 'active' ? 'Close this delivery to future enrollees?' : 'Publish this as the current active module?') }}">
                                         @csrf
                                         @method('PATCH')
                                         <input type="hidden" name="module_code" value="{{ $module->module_code }}">
                                         <input type="hidden" name="competency_category" value="{{ $module->competency_category }}">
+                                        <input type="hidden" name="completion_mode" value="{{ $module->completion_mode ?? 'assessed' }}">
                                         <input type="hidden" name="title" value="{{ $module->title }}">
                                         <input type="hidden" name="description" value="{{ $module->description }}">
                                         <input type="hidden" name="topic" value="{{ $module->topic }}">
@@ -403,7 +443,7 @@
                                         <input type="hidden" name="available_at" value="{{ $module->available_at?->format('Y-m-d\TH:i') }}">
                                         <input type="hidden" name="due_at" value="{{ $module->due_at?->format('Y-m-d\TH:i') }}">
                                         <input type="hidden" name="is_published" value="{{ $module->is_published ? 0 : 1 }}">
-                                        <button>{{ $module->delivery_status === 'active' ? 'Close to new enrollees' : 'Publish as active' }}</button>
+                                        <button>{{ $module->isSupplemental() ? ($module->is_published ? 'Remove from class' : 'Make available to class') : ($module->delivery_status === 'active' ? 'Close to new enrollees' : 'Publish as active') }}</button>
                                     </form>
                                     @endif
                                     <form method="POST" action="{{ route('trainer.modules.destroy', $module) }}" data-confirm="Delete '{{ $module->title }}' and its recorded learner progress?">
@@ -561,6 +601,57 @@
         const topicInput = document.getElementById('module-topic');
         const hoursInput = document.getElementById('module-hours');
         const datalist = document.getElementById('subtopics-list');
+        const submoduleList = document.querySelector('[data-submodule-list]');
+        const addSubmoduleButton = document.querySelector('[data-add-submodule]');
+        const publicationCopy = document.querySelector('[data-module-publication-copy]');
+
+        const renderSubmodules = (outcomes, locked = false) => {
+            if (!submoduleList) return;
+            submoduleList.innerHTML = '';
+            const titles = outcomes.length ? outcomes : [''];
+            titles.forEach((outcome) => {
+                const input = document.createElement('input');
+                input.name = 'submodule_titles[]';
+                input.value = outcome;
+                input.maxLength = 255;
+                input.className = 'form-field';
+                input.placeholder = 'Submodule or competency outcome';
+                input.readOnly = locked;
+                submoduleList.appendChild(input);
+            });
+        };
+
+        const applyCategoryBehavior = () => {
+            const custom = categorySelect?.value === 'custom';
+            if (publicationCopy) {
+                publicationCopy.textContent = custom
+                    ? 'Make this supplemental module available to everyone in the assigned class. It will not replace the active module.'
+                    : 'Make this the active batch module. The previous active delivery closes only to future enrollees.';
+            }
+            const traineeAudience = document.querySelector('#module-creator-dialog input[name="audience_type"][value="trainee"]');
+            if (traineeAudience) {
+                traineeAudience.disabled = custom;
+                if (custom) {
+                    const batchAudience = document.querySelector('#module-creator-dialog input[name="audience_type"][value="batch"]');
+                    if (batchAudience) batchAudience.checked = true;
+                }
+            }
+        };
+
+        addSubmoduleButton?.addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.name = 'submodule_titles[]';
+            input.maxLength = 255;
+            input.className = 'form-field';
+            input.placeholder = 'Submodule or competency outcome';
+            submoduleList?.appendChild(input);
+        });
+        categorySelect?.addEventListener('change', () => {
+            applyCategoryBehavior();
+            if (categorySelect.value === 'custom' && submoduleList?.querySelector('input[readonly]')) {
+                renderSubmodules([], false);
+            }
+        });
 
         if (presetSelect) {
             presetSelect.addEventListener('change', () => {
@@ -591,11 +682,28 @@
                     });
                 }
 
+                renderSubmodules(outcomes, true);
+
                 if (topicInput && outcomes.length > 0 && !topicInput.value) {
                     topicInput.value = outcomes[0];
                 }
             });
         }
+        applyCategoryBehavior();
+
+        const quickQuizModule = document.getElementById('quick-quiz-module');
+        const quickQuizSubmodule = document.getElementById('quick-quiz-submodule');
+        const filterQuickSubmodules = () => {
+            if (!quickQuizSubmodule) return;
+            const moduleId = quickQuizModule?.value || '';
+            Array.from(quickQuizSubmodule.options).forEach((option, index) => {
+                if (index === 0) return;
+                option.hidden = option.dataset.parentModule !== moduleId;
+            });
+            if (quickQuizSubmodule.selectedOptions[0]?.hidden) quickQuizSubmodule.value = '';
+        };
+        quickQuizModule?.addEventListener('change', filterQuickSubmodules);
+        filterQuickSubmodules();
 
         // Filter Sub-Tabs Switching (All / Modules / Assessments)
         const filterButtons = document.querySelectorAll('[data-classwork-tab]');
@@ -644,6 +752,7 @@
         document.querySelectorAll('[data-quiz-module-id]').forEach(button => {
             button.addEventListener('click', () => {
                 if (quizModuleSelect) quizModuleSelect.value = button.dataset.quizModuleId || '';
+                filterQuickSubmodules();
             });
         });
     });

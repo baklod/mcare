@@ -4,10 +4,6 @@ namespace Tests\Feature\Lms;
 
 use App\Models\EnrollmentApplication;
 use App\Models\Quiz;
-use App\Models\TrainerAnnouncement;
-use App\Models\TrainingBatch;
-use App\Models\TrainingModule;
-use App\Models\User;
 use App\Notifications\LmsAnnouncementPublished;
 use App\Notifications\LmsModulePublished;
 use App\Notifications\LmsQuizPublished;
@@ -80,6 +76,10 @@ class TrainerNotificationAndQuizVisibilityTest extends TestCase
         $trainer = $this->lmsUser('trainer');
         $batch = $this->lmsBatch();
         ['user' => $student] = $this->lmsTrainee($batch);
+        ['user' => $graduate, 'application' => $graduateApplication] = $this->lmsTrainee($batch);
+        $graduateApplication->update([
+            'learning_status' => EnrollmentApplication::LEARNING_GRADUATED,
+        ]);
         $module = $this->lmsModule($trainer, $batch);
 
         $quiz = Quiz::create([
@@ -103,12 +103,14 @@ class TrainerNotificationAndQuizVisibilityTest extends TestCase
 
         $this->actingAs($trainer)
             ->patch(route('trainer.quizzes.publication', $quiz), ['is_published' => '1'])
-            ->assertRedirect(route('trainer.modules.show', $module).'#assessments');
+            ->assertRedirect(route('trainer.modules.show', ['module' => $module, 'tab' => 'assessments']).'#assessments');
 
         Notification::assertSentTo($student, LmsQuizPublished::class, function ($notification) use ($student) {
             return $notification->via($student) === ['database', 'mail']
                 && $notification->queue === 'mail';
         });
+        Notification::assertNotSentTo($graduate, LmsQuizPublished::class);
+        $this->assertSame([], (new LmsQuizPublished($quiz->fresh()))->via($graduate));
     }
 
     public function test_repeating_an_already_published_quiz_request_does_not_notify_twice(): void

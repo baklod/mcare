@@ -11,11 +11,14 @@ use App\Models\TraineeCompetencyRecord;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
 use App\Models\User;
+use App\Notifications\LmsQuizPublished;
 use App\Notifications\TrainerModuleAssignedByAdmin;
 use App\Rules\TrainingModuleFileType;
 use App\Services\CompletionEligibilityService;
+use App\Services\ModuleSubmoduleService;
 use App\Services\RollingModuleReleaseService;
 use App\Services\TraineeRosterCsv;
+use App\Services\TrainingModuleDeletionService;
 use App\Support\CaregivingNcIiCatalog;
 use App\Support\TrainingModuleFiles;
 use Illuminate\Http\RedirectResponse;
@@ -122,8 +125,7 @@ class AdminLearningSystemController extends Controller
         EnrollmentApplication $enrollmentApplication,
         CompletionEligibilityService $eligibility,
         RollingModuleReleaseService $releases,
-    ): RedirectResponse
-    {
+    ): RedirectResponse {
         abort_unless(
             $enrollmentApplication->status === EnrollmentApplication::STATUS_APPROVED,
             422,
@@ -149,6 +151,7 @@ class AdminLearningSystemController extends Controller
                 $requiredUnits = CompetencyUnit::query()
                     ->with('outcomes')
                     ->where('program_code', CaregivingNcIiCatalog::PROGRAM_CODE)
+                    ->where('is_required', true)
                     ->get();
 
                 foreach ($requiredUnits as $unit) {
@@ -213,6 +216,9 @@ class AdminLearningSystemController extends Controller
                 if ($user->role === 'alumni') {
                     $user->update(['role' => 'trainee']);
                 }
+                $user->notifications()
+                    ->where('type', LmsQuizPublished::class)
+                    ->delete();
                 $user->alumniProfile()->firstOrCreate([], ['is_available_for_duty' => false]);
             } elseif ($user && $previousStatus === EnrollmentApplication::LEARNING_GRADUATED
                 && $validated['learning_status'] !== EnrollmentApplication::LEARNING_GRADUATED) {
@@ -236,10 +242,12 @@ class AdminLearningSystemController extends Controller
             'career_hub_unlocked' => $validated['learning_status'] === EnrollmentApplication::LEARNING_GRADUATED,
         ]);
 
-        return back()->with('saved', "{$enrollmentApplication->first_name} {$enrollmentApplication->last_name} is now {$enrollmentApplication->learningStatusLabel()}.");
+        return redirect()
+            ->route('admin.learning.trainees')
+            ->with('saved', "{$enrollmentApplication->first_name} {$enrollmentApplication->last_name} is now {$enrollmentApplication->learningStatusLabel()}.");
     }
 
-    public function modules(Request $request): View
+    public function modules(Request $request, TrainingModuleDeletionService $deletion): View
     {
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
@@ -265,21 +273,31 @@ class AdminLearningSystemController extends Controller
                 ->orWhereHas('trainer', fn ($trainer) => $trainer->where('name', 'like', "%{$search}%")));
         }
 
+        $modules = $query->paginate(15)->withQueryString();
+        $moduleImpacts = $modules->getCollection()->mapWithKeys(
+            fn (TrainingModule $module): array => [$module->id => $deletion->impact($module)],
+        );
+
         return view('admin.learning.modules', [
             'batches' => $this->batches(),
             'trainers' => User::query()->where('role', 'trainer')->orderBy('name')->get(),
             'filters' => $filters,
-            'modules' => $query->paginate(15)->withQueryString(),
-            'catalogUnits' => \App\Support\CaregivingNcIiCatalog::units(),
-            'coreUnits' => \App\Support\CaregivingNcIiCatalog::coreUnits(),
+            'modules' => $modules,
+            'moduleImpacts' => $moduleImpacts,
+            'catalogUnits' => CaregivingNcIiCatalog::units(),
+            'coreUnits' => CaregivingNcIiCatalog::coreUnits(),
         ]);
     }
 
     public function storeModule(
         Request $request,
         RollingModuleReleaseService $releases,
-    ): RedirectResponse
-    {
+        ModuleSubmoduleService $submodules,
+    ): RedirectResponse {
+        $request->merge([
+            'completion_mode' => $request->input('completion_mode', TrainingModule::COMPLETION_ASSESSED),
+        ]);
+
         $validated = $request->validate([
             'trainer_id' => [
                 'required',
@@ -289,6 +307,15 @@ class AdminLearningSystemController extends Controller
             'training_batch_id' => ['required', 'integer', 'exists:training_batches,id'],
             'module_code' => ['nullable', 'string', 'max:50'],
             'competency_category' => ['nullable', 'string', Rule::in(['core', 'common', 'basic', 'custom'])],
+            'submodule_titles' => ['nullable', 'array', 'max:30'],
+            'submodule_titles.*' => ['nullable', 'string', 'max:255'],
+            'completion_mode' => [
+                'required',
+                Rule::in([
+                    TrainingModule::COMPLETION_ASSESSED,
+                    TrainingModule::COMPLETION_MATERIAL_ONLY,
+                ]),
+            ],
             'title' => ['required', 'string', 'max:160'],
             'topic' => ['nullable', 'string', 'max:120'],
             'estimated_hours' => ['nullable', 'integer', 'min:1', 'max:500'],
@@ -334,16 +361,24 @@ class AdminLearningSystemController extends Controller
                 );
             }
 
-            $module = DB::transaction(fn (): TrainingModule => TrainingModule::create([
-                ...collect($validated)->except(['module_file', 'supplementary_files'])->all(),
-                'file_path' => $path,
-                'original_file_name' => $file->getClientOriginalName(),
-                'mime_type' => $file->getMimeType(),
-                'file_size' => $file->getSize() ?: 0,
-                'supplementary_files' => $supplementaryList,
-                'is_published' => $request->boolean('is_published'),
-                'published_at' => $request->boolean('is_published') ? now() : null,
-            ]));
+            $module = DB::transaction(function () use ($validated, $path, $file, $supplementaryList, $request, $submodules): TrainingModule {
+                $module = TrainingModule::create([
+                    ...collect($validated)->except(['module_file', 'supplementary_files', 'submodule_titles'])->all(),
+                    'release_mode' => ($validated['competency_category'] ?? null) === TrainingModule::CATEGORY_CUSTOM
+                        ? TrainingModule::RELEASE_SUPPLEMENTAL
+                        : TrainingModule::RELEASE_ROLLING,
+                    'file_path' => $path,
+                    'original_file_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'file_size' => $file->getSize() ?: 0,
+                    'supplementary_files' => $supplementaryList,
+                    'is_published' => $request->boolean('is_published'),
+                    'published_at' => $request->boolean('is_published') ? now() : null,
+                ]);
+                $submodules->ensureStructure($module, $validated['submodule_titles'] ?? []);
+
+                return $module;
+            });
         } catch (\Throwable $exception) {
             if ($path) {
                 Storage::disk('local')->delete($path);
@@ -415,27 +450,30 @@ class AdminLearningSystemController extends Controller
         ]);
     }
 
-    public function destroyModule(Request $request, TrainingModule $module): RedirectResponse
-    {
-        if ($module->progressRecords()->exists()) {
-            return back()->withErrors([
-                'module' => 'This delivery has trainee assignments or evidence and cannot be deleted. Historical learning records must be preserved.',
-            ]);
+    public function destroyModule(
+        Request $request,
+        TrainingModule $module,
+        TrainingModuleDeletionService $deletion,
+    ): RedirectResponse {
+        if (strtoupper(trim((string) $request->input('confirmation'))) !== 'DELETE') {
+            return redirect()
+                ->route('admin.learning.modules')
+                ->withErrors(['module' => 'Type DELETE to confirm permanent module deletion.']);
         }
 
-        $title = $module->title;
-        $path = $module->file_path;
-        $supplementary = $module->supplementaryList();
-        AdminActivityLog::record($request->user(), 'admin.module.removed', $module, [
-            'title' => $title,
-            'trainer_id' => $module->trainer_id,
-        ]);
+        try {
+            $summary = $deletion->delete($module, $request->user());
+        } catch (ValidationException $exception) {
+            return redirect()
+                ->route('admin.learning.modules')
+                ->withErrors($exception->errors());
+        }
 
-        $module->delete();
-        Storage::disk('local')->delete($path);
-        TrainingModuleFiles::deleteSupplementaryFiles($supplementary);
+        $counts = $summary['counts'];
 
-        return back()->with('saved', "Module {$title} was removed.");
+        return redirect()
+            ->route('admin.learning.modules')
+            ->with('saved', "Module {$summary['title']} was permanently deleted, including {$counts['parent_progress_records']} parent progress record(s), {$counts['submodule_progress_records']} submodule progress record(s), {$counts['quizzes']} quiz(zes), and {$counts['quiz_attempts']} attempt(s).");
     }
 
     public function certificates(Request $request): View

@@ -72,6 +72,21 @@
                     <small class="text-xs text-slate-500">Every assessment belongs to one learning module.</small>
                     @error('training_module_id')<p class="lms-field-error">{{ $message }}</p>@enderror
                 </div>
+                <div class="lms-field lms-field-wide">
+                    <label for="quiz-submodule">Competency Submodule</label>
+                    <select id="quiz-submodule" name="training_submodule_id" class="form-field">
+                        <option value="">Legacy module-wide assessment</option>
+                        @foreach(($modules ?? []) as $mod)
+                            @foreach($mod->submodules as $submodule)
+                                <option value="{{ $submodule->id }}" data-parent-module="{{ $mod->id }}" @selected((string) old('training_submodule_id', $quiz?->training_submodule_id) === (string) $submodule->id)>
+                                    {{ $mod->title }} — {{ $submodule->title }}
+                                </option>
+                            @endforeach
+                        @endforeach
+                    </select>
+                    <small class="text-xs text-slate-500">Choose the exact outcome trainees will mark done. The module-wide option is retained only for historical quizzes.</small>
+                    @error('training_submodule_id')<p class="lms-field-error">{{ $message }}</p>@enderror
+                </div>
             </div>
         </section>
 
@@ -112,11 +127,6 @@
                 <div class="lms-field"><label for="quiz-attempt-limit">Allowed attempts</label><input id="quiz-attempt-limit" type="number" name="attempt_limit" value="{{ old('attempt_limit', $quiz?->attempt_limit ?? 1) }}" min="1" max="5"></div>
                 <div class="lms-field"><label for="quiz-passing-score">Passing score (%)</label><input id="quiz-passing-score" type="number" name="passing_score_percent" value="{{ old('passing_score_percent', $quiz?->passing_score_percent ?? 75) }}" min="1" max="100"></div>
                 <div class="lms-form-options">
-                    <label class="lms-check">
-                        <input type="hidden" name="requires_time_in" value="0">
-                        <input type="checkbox" name="requires_time_in" value="1" @checked(old('requires_time_in', $quiz?->requires_time_in ?? false))>
-                        <span><strong>Require Activity Time-In (Asynchronous Session Attendance)</strong> &mdash; Trainees can check-in before the deadline without needing to finish the activity first.</span>
-                    </label>
                     <label class="lms-check">
                         <input type="hidden" name="is_published" value="0">
                         <input type="checkbox" name="is_published" value="1" @checked(old('is_published', $quiz?->is_published ?? false))>

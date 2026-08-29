@@ -86,9 +86,20 @@ class GoogleAuthController extends Controller
 
         $user = User::where('email', $email)->first();
 
+        if (! $user) {
+            AdminActivityLog::record(null, 'account.login.google.rejected', null, [
+                'reason' => 'enrollment_required',
+            ]);
+
+            return redirect()
+                ->route('landing')
+                ->with('auth_error', 'No MCARE enrollment is registered for that Google email. Complete enrollment first, then return and use the same email to connect Google.')
+                ->with('enrollment_required', true);
+        }
+
         // Staff accounts must complete password and challenge verification.
         // Applicant OAuth must not become a privileged-session bypass.
-        if ($user && in_array($user->role, ['admin', 'trainer'], true)) {
+        if (in_array($user->role, ['admin', 'trainer'], true)) {
             AdminActivityLog::record($user, 'account.login.google.rejected', $user, [
                 'role' => $user->role,
                 'reason' => 'staff_password_required',
@@ -99,28 +110,44 @@ class GoogleAuthController extends Controller
                 ->with('auth_error', 'Staff accounts must use email and password on the MCARE sign-in page.');
         }
 
-        $displayName = trim((string) ($googleUser->getName() ?: $googleUser->getNickname() ?: 'MCARE Applicant'));
+        $googleId = trim((string) $googleUser->getId());
+        if ($googleId === '') {
+            AdminActivityLog::record($user, 'account.login.google.rejected', $user, [
+                'role' => $user->role,
+                'reason' => 'provider_identity_unavailable',
+            ]);
 
-        if ($user) {
-            $user->forceFill([
-                'name' => $displayName,
-                'google_id' => $googleUser->getId(),
-                'avatar_url' => $googleUser->getAvatar(),
-                'email_verified_at' => now(),
-            ])->save();
-        } else {
-            $user = new User;
-            $user->forceFill([
-                'name' => $displayName,
-                'email' => $email,
-                'google_id' => $googleUser->getId(),
-                'avatar_url' => $googleUser->getAvatar(),
-                'role' => 'applicant',
-                'applicant_status' => 'oauth_verified',
-                'email_verified_at' => now(),
-                'password' => Str::password(40),
-            ])->save();
+            return redirect()
+                ->route('landing')
+                ->with('auth_error', 'Google did not provide a usable account identity. Please choose another Google account or use email and password.');
         }
+
+        $googleIdOwner = User::query()
+            ->where('google_id', $googleId)
+            ->whereKeyNot($user->getKey())
+            ->first();
+        $identityChanged = filled($user->google_id) && ! hash_equals((string) $user->google_id, $googleId);
+
+        if ($googleIdOwner || $identityChanged) {
+            AdminActivityLog::record($user, 'account.login.google.rejected', $user, [
+                'role' => $user->role,
+                'reason' => $googleIdOwner ? 'provider_identity_already_linked' : 'provider_identity_mismatch',
+            ]);
+
+            return redirect()
+                ->route('landing')
+                ->with('auth_error', 'This MCARE account is already connected to a different Google identity. Use email and password or contact the administrator before changing the connection.');
+        }
+
+        $displayName = trim((string) ($googleUser->getName() ?: $googleUser->getNickname() ?: $user->name));
+
+        // Enrollment and admin-reviewed names remain authoritative. Google is
+        // used only to verify and connect the already-registered identity.
+        $user->forceFill([
+            'google_id' => $googleId,
+            'avatar_url' => $googleUser->getAvatar(),
+            'email_verified_at' => $user->email_verified_at ?: now(),
+        ])->save();
 
         $application = $user->enrollmentApplication()->latest()->first();
         $historicalClaim = $user->historicalAlumniClaim()->first();

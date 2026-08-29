@@ -2,9 +2,13 @@
 
 namespace Tests\Feature\Lms;
 
+use App\Models\CompetencyUnit;
+use App\Models\ModuleProgress;
 use App\Models\Quiz;
 use App\Models\QuizAttempt;
 use App\Models\QuizQuestion;
+use App\Models\TraineeCompetencyRecord;
+use App\Models\TrainingModule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesLmsTestData;
 use Tests\TestCase;
@@ -32,7 +36,7 @@ class QuizAuthoringTest extends TestCase
             ->post(route('trainer.quizzes.store'), $this->quizPayload($batch->id, [
                 'training_module_id' => $module->id,
             ]))
-            ->assertRedirect(route('trainer.modules.show', $module).'#assessments')
+            ->assertRedirect(route('trainer.modules.show', ['module' => $module, 'tab' => 'assessments']).'#assessments')
             ->assertSessionHas('saved');
 
         $quiz = Quiz::query()->where('title', 'Infection control check')->firstOrFail();
@@ -53,11 +57,11 @@ class QuizAuthoringTest extends TestCase
                 'title' => 'Updated infection control check',
                 'passing_score_percent' => 80,
             ]))
-            ->assertRedirect(route('trainer.modules.show', $module).'#assessments');
+            ->assertRedirect(route('trainer.modules.show', ['module' => $module, 'tab' => 'assessments']).'#assessments');
 
         $this->actingAs($trainer)
             ->patch(route('trainer.quizzes.publication', $quiz), ['is_published' => '1'])
-            ->assertRedirect(route('trainer.modules.show', $module).'#assessments');
+            ->assertRedirect(route('trainer.modules.show', ['module' => $module, 'tab' => 'assessments']).'#assessments');
 
         $quiz->refresh();
         $this->assertTrue($quiz->is_published);
@@ -71,7 +75,7 @@ class QuizAuthoringTest extends TestCase
 
         $this->actingAs($trainer)
             ->delete(route('trainer.quizzes.destroy', $quiz))
-            ->assertRedirect(route('trainer.modules.show', $module).'#assessments');
+            ->assertRedirect(route('trainer.modules.show', ['module' => $module, 'tab' => 'assessments']).'#assessments');
 
         $this->assertDatabaseMissing('quizzes', ['id' => $quiz->id]);
         $this->assertDatabaseMissing('quiz_questions', ['quiz_id' => $quiz->id]);
@@ -216,7 +220,7 @@ class QuizAuthoringTest extends TestCase
 
         $this->actingAs($trainer)
             ->patch(route('trainer.quizzes.update', $quiz), $payload)
-            ->assertRedirect(route('trainer.modules.show', $module).'#assessments')
+            ->assertRedirect(route('trainer.modules.show', ['module' => $module, 'tab' => 'assessments']).'#assessments')
             ->assertSessionHas('saved');
 
         $quiz->refresh();
@@ -225,9 +229,9 @@ class QuizAuthoringTest extends TestCase
         $this->assertEquals(75.0, (float) $quiz->passing_score_percent);
 
         $this->actingAs($trainer)
-            ->from(route('trainer.modules.show', $module).'#assessments')
+            ->from(route('trainer.modules.show', ['module' => $module, 'tab' => 'assessments']).'#assessments')
             ->delete(route('trainer.quizzes.destroy', $quiz))
-            ->assertRedirect(route('trainer.modules.show', $module).'#assessments')
+            ->assertRedirect(route('trainer.modules.show', ['module' => $module, 'tab' => 'assessments']).'#assessments')
             ->assertSessionHasErrors('quiz');
 
         $this->assertDatabaseHas('quizzes', ['id' => $quiz->id]);
@@ -236,7 +240,7 @@ class QuizAuthoringTest extends TestCase
 
     private function quizPayload(int $batchId, array $overrides = []): array
     {
-        return array_merge([
+        $payload = array_merge([
             'training_batch_id' => $batchId,
             'title' => 'Infection control check',
             'instructions' => 'Choose the safest answer for each item.',
@@ -264,6 +268,15 @@ class QuizAuthoringTest extends TestCase
                 ],
             ],
         ], $overrides);
+
+        if (filled($payload['training_module_id'] ?? null)
+            && ! array_key_exists('training_submodule_id', $payload)) {
+            $payload['training_submodule_id'] = $this->lmsSubmodule(
+                TrainingModule::query()->findOrFail($payload['training_module_id'])
+            )->id;
+        }
+
+        return $payload;
     }
 
     public function test_trainer_can_create_quiz_with_file_upload_and_enumeration_questions(): void
@@ -293,7 +306,7 @@ class QuizAuthoringTest extends TestCase
 
         $this->actingAs($trainer)
             ->post(route('trainer.quizzes.store'), $payload)
-            ->assertRedirect(route('trainer.modules.show', $module).'#assessments')
+            ->assertRedirect(route('trainer.modules.show', ['module' => $module, 'tab' => 'assessments']).'#assessments')
             ->assertSessionHas('saved');
 
         $quiz = Quiz::query()->where('title', 'Practical Activity Assessment')->firstOrFail();
@@ -302,7 +315,7 @@ class QuizAuthoringTest extends TestCase
         $this->assertSame('enumeration', $quiz->questions[1]->type);
     }
 
-    public function test_evaluating_module_atomically_updates_competency_unit_outcomes_and_tor_grade(): void
+    public function test_evaluating_module_updates_competency_outcomes_without_overwriting_the_separate_overall_grade(): void
     {
         $trainer = $this->lmsUser('trainer');
         $batch = $this->lmsBatch();
@@ -310,45 +323,50 @@ class QuizAuthoringTest extends TestCase
         $module = $this->lmsModule($trainer, $batch, [
             'module_code' => '500311105',
             'title' => 'Participate in Workplace Communication',
-        ]);
+        ])->fresh(['submodules']);
 
-        $unit = \App\Models\CompetencyUnit::where('title', 'Participate in Workplace Communication')->firstOrFail();
+        $unit = CompetencyUnit::where('title', 'Participate in Workplace Communication')->firstOrFail();
 
-        \App\Models\ModuleProgress::updateOrCreate([
-            'enrollment_application_id' => $trainee->id,
-            'training_module_id' => $module->id,
-        ], [
-            'sequence_number' => 1,
-            'status' => \App\Models\ModuleProgress::STATUS_AWAITING_EVALUATION,
-            'progress_percent' => 100,
-            'submitted_at' => now(),
-        ]);
+        $this->lmsPassedAssessment($trainer, $module, $trainee, 90);
 
-        $this->actingAs($trainer)
-            ->post(route('trainer.modules.evaluate', $module), [
-                'enrollment_application_id' => $trainee->id,
-                'quiz_score' => 90,
-                'practical_rating' => 'competent',
-                'competency_outcome' => 'competent',
-                'evaluation_remarks' => 'Demonstrated clear communication techniques.',
-            ])
-            ->assertRedirect(route('trainer.modules.show', $module))
-            ->assertSessionHas('saved');
+        foreach ($module->submodules as $submodule) {
+            $this->actingAs($trainee->user)
+                ->patch(route('trainee.modules.submodules.progress', [$module, $submodule]), ['action' => 'submit'])
+                ->assertSessionHasNoErrors();
 
-        $record = \App\Models\TraineeCompetencyRecord::query()
+            $this->actingAs($trainer)
+                ->post(route('trainer.modules.evaluate', $module), [
+                    'training_submodule_id' => $submodule->id,
+                    'enrollment_application_id' => $trainee->id,
+                    'practical_rating' => 'competent',
+                    'competency_outcome' => 'competent',
+                    'evaluation_remarks' => 'Demonstrated clear communication techniques.',
+                ])
+                ->assertRedirect(route('trainer.modules.show', ['module' => $module, 'tab' => 'evaluations']).'#evaluations')
+                ->assertSessionHas('saved');
+        }
+
+        $record = TraineeCompetencyRecord::query()
             ->where('enrollment_application_id', $trainee->id)
             ->where('competency_unit_id', $unit->id)
             ->firstOrFail();
 
         $this->assertSame('competent', $record->status);
-        $this->assertEquals(90.00, (float) $record->percentage_score);
-        $this->assertEquals(1.75, (float) $record->tor_grade);
+        $this->assertNull($record->percentage_score);
+        $this->assertNull($record->tor_grade);
         $this->assertCount(3, $record->outcomeResults);
         $this->assertTrue($record->outcomeResults->every(fn ($res) => $res->status === 'competent'));
     }
 
     private function quiz(int $trainerId, int $batchId, array $overrides = []): Quiz
     {
+        if (filled($overrides['training_module_id'] ?? null)
+            && ! array_key_exists('training_submodule_id', $overrides)) {
+            $overrides['training_submodule_id'] = $this->lmsSubmodule(
+                TrainingModule::query()->findOrFail($overrides['training_module_id'])
+            )->id;
+        }
+
         return Quiz::create(array_merge([
             'trainer_id' => $trainerId,
             'training_batch_id' => $batchId,

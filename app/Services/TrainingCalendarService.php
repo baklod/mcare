@@ -131,7 +131,7 @@ class TrainingCalendarService
             'batch' => $batchLabel,
             'is_active_batch' => (bool) $batch->is_active,
             // Batch notes are administrative and must not leak into learner calendars.
-            'title' => 'Caregiving NC II ('.$period.')',
+            'title' => ($batch->program?->name ?? 'Training session').' ('.$period.')',
             'calendar_title' => $batchLabel.' · '.$period,
             'updated_at' => $batch->updated_at,
         ]);

@@ -22,8 +22,10 @@
     <div class="space-y-4">
         @forelse($records as $record)
             @php
-                $cotc = $record->officialDocuments->firstWhere('type', 'cotc');
-                $tor = $record->officialDocuments->firstWhere('type', 'tor');
+                $cotcType = \App\Models\OfficialDocument::TYPE_COTC;
+                $torType = \App\Models\OfficialDocument::TYPE_TOR;
+                $cotc = $record->officialDocuments->first(fn ($document) => $document->type === $cotcType);
+                $tor = $record->officialDocuments->first(fn ($document) => $document->type === $torType);
                 $eligibility = $record->completion_eligibility;
             @endphp
             <article class="dashboard-panel">
@@ -43,9 +45,11 @@
                         <div class="flex items-start justify-between gap-3"><div><p class="font-bold text-slate-900">Certificate of Training Completion</p><p class="mt-1 text-xs text-slate-500">Trainee receives one download after release.</p></div>@if($cotc)<span class="dashboard-pill bg-slate-100 text-slate-700 ring-slate-200">{{ str($cotc->status)->headline() }}</span>@endif</div>
                         <div class="mt-4 flex flex-wrap gap-2">
                             @if(!$cotc)
-                                <form method="POST" action="{{ route('admin.learning.documents.generate', [$record, 'cotc']) }}">@csrf<button class="primary-action" @disabled(!$eligibility['eligible'])>Generate COTC</button></form>
+                                <form method="POST" action="{{ route('admin.learning.documents.generate', [$record, $cotcType]) }}">@csrf<button class="primary-action" @disabled(!$eligibility['eligible'])>Generate COTC</button></form>
+                            @elseif($cotc->status === 'queued')
+                                <form method="POST" action="{{ route('admin.learning.documents.generate', [$record, $cotcType]) }}">@csrf<button class="primary-action">Generate COTC now</button></form>
                             @elseif($cotc->status === 'generated')
-                                <a class="secondary-action" href="{{ route('admin.learning.documents.download', $cotc) }}">Review PDF</a>
+                                <a class="secondary-action" href="{{ route('admin.learning.documents.preview', $cotc) }}">Review PDF</a>
                                 <form method="POST" action="{{ route('admin.learning.documents.release', $cotc) }}">@csrf @method('PATCH')<button class="primary-action">Release to trainee</button></form>
                             @elseif(in_array($cotc->status, ['released', 'downloaded']))
                                 <a class="secondary-action" href="{{ route('admin.learning.documents.download', $cotc) }}">Admin copy</a>
@@ -62,8 +66,11 @@
                         <div class="flex items-start justify-between gap-3"><div><p class="font-bold text-slate-900">Official Transcript of Record</p><p class="mt-1 text-xs text-slate-500">Admin-only generation and download.</p></div>@if($tor)<span class="dashboard-pill bg-slate-100 text-slate-700 ring-slate-200">{{ str($tor->status)->headline() }}</span>@endif</div>
                         <div class="mt-4 flex flex-wrap gap-2">
                             @if(!$tor)
-                                <form method="POST" action="{{ route('admin.learning.documents.generate', [$record, 'tor']) }}">@csrf<button class="primary-action" @disabled(!$eligibility['eligible'])>Generate TOR</button></form>
+                                <form method="POST" action="{{ route('admin.learning.documents.generate', [$record, $torType]) }}">@csrf<button class="primary-action" @disabled(!$eligibility['eligible'])>Generate TOR</button></form>
+                            @elseif($tor->status === 'queued')
+                                <form method="POST" action="{{ route('admin.learning.documents.generate', [$record, $torType]) }}">@csrf<button class="primary-action">Generate TOR now</button></form>
                             @elseif(in_array($tor->status, ['generated', 'released', 'downloaded']))
+                                <a class="secondary-action" href="{{ route('admin.learning.documents.preview', $tor) }}">Preview TOR</a>
                                 <a class="primary-action" href="{{ route('admin.learning.documents.download', $tor) }}">Download TOR</a>
                                 <button type="button" data-dashboard-dialog-open="reissue-tor-{{ $record->id }}" class="secondary-action">Reissue</button>
                             @elseif($tor->status === 'failed')
@@ -76,7 +83,7 @@
                 </div>
             </article>
 
-            @foreach(['cotc' => 'COTC', 'tor' => 'TOR'] as $type => $typeLabel)
+            @foreach([$cotcType => 'COTC', $torType => 'TOR'] as $type => $typeLabel)
                 <dialog id="reissue-{{ $type }}-{{ $record->id }}" data-dashboard-dialog class="m-auto w-[min(94vw,34rem)] rounded-xl border border-slate-200 bg-white p-0 shadow-2xl backdrop:bg-slate-950/45">
                     <div class="flex items-start justify-between border-b border-slate-200 px-6 py-4"><div><h2 class="text-xl font-bold text-slate-950">Reissue {{ $typeLabel }}</h2><p class="mt-1 text-xs text-slate-500">The current version will be revoked and retained in the audit history.</p></div><button type="button" data-dashboard-dialog-close class="secondary-action" aria-label="Close">Close</button></div>
                     <form method="POST" action="{{ route('admin.learning.documents.reissue', [$record, $type]) }}" class="space-y-4 p-6">@csrf<label class="form-label" for="reason-{{ $type }}-{{ $record->id }}">Reason for reissue</label><textarea id="reason-{{ $type }}-{{ $record->id }}" class="form-field min-h-28" name="reason" minlength="10" maxlength="1000" required></textarea><div class="flex justify-end gap-2"><button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button><button class="primary-action">Queue new version</button></div></form>

@@ -58,6 +58,7 @@ class AdminEnrollmentReviewTest extends TestCase
             'school_name' => 'MCARE High School',
             'year_graduated' => 2020,
             'status' => EnrollmentApplication::STATUS_PROFILE_SUBMITTED,
+            'review_released_at' => now(),
         ]);
 
         $this->actingAs($admin)
@@ -123,6 +124,7 @@ class AdminEnrollmentReviewTest extends TestCase
             'signature_name' => 'Maria Reyes Santos',
             'date_accomplished' => '2026-07-12',
             'status' => EnrollmentApplication::STATUS_PROFILE_SUBMITTED,
+            'review_released_at' => now(),
         ]);
 
         $preview = $this->actingAs($admin)->get(route('admin.enrollments.tesda-form', [
@@ -165,6 +167,7 @@ class AdminEnrollmentReviewTest extends TestCase
             'school_name' => 'Private College',
             'year_graduated' => 2022,
             'status' => EnrollmentApplication::STATUS_PROFILE_SUBMITTED,
+            'review_released_at' => now(),
         ]);
 
         $this->actingAs($applicant)
@@ -198,6 +201,7 @@ class AdminEnrollmentReviewTest extends TestCase
             'year_graduated' => 2022,
             'birth_certificate_path' => 'enrollment-documents/1/birth.pdf',
             'status' => EnrollmentApplication::STATUS_PROFILE_SUBMITTED,
+            'review_released_at' => now(),
         ]);
 
         $this->actingAs($admin)

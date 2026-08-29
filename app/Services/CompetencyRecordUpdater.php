@@ -90,6 +90,9 @@ class CompetencyRecordUpdater
             $record->outcomeResults()->updateOrCreate(
                 ['competency_outcome_id' => $outcome->id],
                 [
+                    // Manual trainer records are shared unit/outcome records,
+                    // not attributable to one learning module.
+                    'training_module_id' => null,
                     'status' => $status,
                     'assessed_by_id' => $status === TraineeCompetencyRecord::STATUS_NOT_ASSESSED
                         ? null

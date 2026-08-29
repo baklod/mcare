@@ -77,44 +77,6 @@
         </main>
 
         <aside class="lms-detail-sidebar">
-            @if($quiz->requires_time_in)
-                <section class="lms-side-card" style="border-top: 3px solid #7c3aed; margin-bottom: 16px;">
-                    <h2 style="color: #581c87; font-size: 15px; font-weight: 700; margin-bottom: 8px;">
-                        Activity Attendance
-                    </h2>
-
-                    @if($attendance)
-                        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 12px; margin-top: 6px;">
-                            <div style="color: #166534; font-weight: 700; font-size: 13px;">
-                                &#10003; Recorded as Present
-                            </div>
-                            <p style="font-size: 11px; color: #15803d; margin: 4px 0 0;">
-                                Timed in on {{ $attendance->timed_in_at?->format('M d, Y g:i A') ?? 'Confirmed' }}
-                            </p>
-                        </div>
-                    @elseif($canTimeIn)
-                        <p style="font-size: 12px; color: #64748b; margin-top: 4px; line-height: 1.4;">
-                            This session requires an attendance check-in. You can time-in now before starting or completing the activity.
-                        </p>
-                        <form method="POST" action="{{ route('trainee.quizzes.time-in', $quiz) }}" style="margin-top: 10px;">
-                            @csrf
-                            <button type="submit" class="primary-action lms-full-action" style="background: #7c3aed; border-color: #7c3aed;">
-                                Record Time-In
-                            </button>
-                        </form>
-                    @else
-                        <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 12px; margin-top: 6px;">
-                            <div style="color: #991b1b; font-weight: 700; font-size: 13px;">
-                                Time-In Closed / Missed
-                            </div>
-                            <p style="font-size: 11px; color: #b91c1c; margin: 4px 0 0;">
-                                The deadline for this activity has passed.
-                            </p>
-                        </div>
-                    @endif
-                </section>
-            @endif
-
             <section class="lms-side-card">
                 <h2>Quiz summary</h2>
                 <dl class="lms-summary-list">

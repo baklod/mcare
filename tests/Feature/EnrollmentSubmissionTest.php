@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
+use App\Models\TrainingProgram;
 use App\Models\User;
 use App\Notifications\EnrollmentSubmittedNotification;
 use App\Notifications\QueuedVerifyEmail;
@@ -24,10 +25,12 @@ class EnrollmentSubmissionTest extends TestCase
         Notification::fake();
         Storage::fake('local');
 
-        TrainingBatch::create([
+        $batch = TrainingBatch::create([
+            'training_program_id' => TrainingProgram::query()->value('id'),
             'name' => 'Batch 1',
             'year' => 2026,
             'is_active' => true,
+            'show_on_enrollment_page' => true,
             'enrollment_starts_at' => now()->subDay(),
             'enrollment_ends_at' => now()->addWeek(),
         ]);
@@ -35,6 +38,7 @@ class EnrollmentSubmissionTest extends TestCase
         $signature = 'data:image/png;base64,'.base64_encode('fake-signature-bytes');
 
         $response = $this->post(route('enrollment.store'), [
+            'training_batch_id' => $batch->id,
             'email' => 'applicant@gmail.com',
             'password' => 'Password123',
             'password_confirmation' => 'Password123',
@@ -112,15 +116,61 @@ class EnrollmentSubmissionTest extends TestCase
         );
     }
 
+    public function test_mobile_async_submission_reports_real_progress_and_returns_payment_handoff_json(): void
+    {
+        Notification::fake();
+        Storage::fake('local');
+
+        $batch = TrainingBatch::create([
+            'training_program_id' => TrainingProgram::query()->value('id'),
+            'name' => 'Mobile Enrollment Batch',
+            'year' => 2026,
+            'is_active' => true,
+            'show_on_enrollment_page' => true,
+            'enrollment_starts_at' => now()->subDay(),
+            'enrollment_ends_at' => now()->addWeek(),
+        ]);
+
+        $this->get(route('enrollment.create', ['batch' => $batch->id]))
+            ->assertOk()
+            ->assertSee('id="enrollment-upload-progress"', false)
+            ->assertSee('new XMLHttpRequest()', false)
+            ->assertSee("request.upload.addEventListener('progress'", false)
+            ->assertSee('No upload progress was received for one minute.', false)
+            ->assertDontSee('Still working (', false);
+
+        $response = $this->post(route('enrollment.store'), $this->validEnrollmentPayload([
+            'training_batch_id' => $batch->id,
+            'email' => 'mobile.applicant@gmail.com',
+        ]), [
+            'Accept' => 'application/json',
+            'X-Requested-With' => 'XMLHttpRequest',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('redirect', route('payment.show'))
+            ->assertJsonPath('message', 'Caregiving NC II enrollment registration saved. Choose your payment method to continue.');
+
+        $this->assertGuest();
+        $this->assertDatabaseHas('enrollment_applications', [
+            'email' => 'mobile.applicant@gmail.com',
+            'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+        ]);
+        $this->get(route('payment.show'))->assertOk();
+    }
+
     public function test_google_applicant_submits_without_password_and_receives_confirmation(): void
     {
         Notification::fake();
         Storage::fake('local');
 
-        TrainingBatch::create([
+        $batch = TrainingBatch::create([
+            'training_program_id' => TrainingProgram::query()->value('id'),
             'name' => 'Batch 1',
             'year' => 2026,
             'is_active' => true,
+            'show_on_enrollment_page' => true,
             'enrollment_starts_at' => now()->subDay(),
             'enrollment_ends_at' => now()->addWeek(),
         ]);
@@ -133,6 +183,7 @@ class EnrollmentSubmissionTest extends TestCase
         ]);
         $originalPassword = $user->password;
         $payload = $this->validEnrollmentPayload([
+            'training_batch_id' => $batch->id,
             // The authenticated account email wins over a tampered form value.
             'email' => 'different.account@gmail.com',
         ]);
@@ -285,10 +336,53 @@ class EnrollmentSubmissionTest extends TestCase
         );
     }
 
+    public function test_selected_program_and_fees_are_snapshotted_from_the_published_batch(): void
+    {
+        Notification::fake();
+        Storage::fake('local');
+
+        $program = TrainingProgram::create([
+            'name' => 'Caregiving NC III',
+            'code' => 'CAREGIVING-NC-III',
+            'total_program_fee' => 30000,
+            'downpayment_amount' => 3500,
+            'is_active' => true,
+        ]);
+        $batch = TrainingBatch::create([
+            'training_program_id' => $program->id,
+            'name' => 'NC III Batch Alpha',
+            'year' => 2026,
+            'is_active' => true,
+            'show_on_enrollment_page' => true,
+            'enrollment_starts_at' => now()->subDay(),
+            'enrollment_ends_at' => now()->addMonth(),
+            'am_days' => 'MWF',
+            'pm_days' => 'TTH',
+        ]);
+
+        $this->post(route('enrollment.store'), $this->validEnrollmentPayload([
+            'training_batch_id' => $batch->id,
+            'email' => 'nc3.applicant@gmail.com',
+        ]))->assertRedirect(route('payment.show'));
+
+        $application = EnrollmentApplication::query()
+            ->where('email', 'nc3.applicant@gmail.com')
+            ->firstOrFail();
+
+        $this->assertSame('Caregiving NC III', $application->program);
+        $this->assertSame($program->id, $application->training_program_id);
+        $this->assertSame($batch->id, $application->training_batch_id);
+        $this->assertSame(30000.0, (float) $application->total_program_fee);
+        $this->assertSame(3500.0, (float) $application->downpayment_amount);
+        $this->assertSame(3500.0, (float) $application->payment_amount);
+        $this->assertNull($application->review_released_at);
+    }
+
     /** @return array<string, mixed> */
     private function validEnrollmentPayload(array $overrides = []): array
     {
         return array_merge([
+            'training_batch_id' => TrainingBatch::query()->value('id'),
             'email' => 'applicant@gmail.com',
             'password' => 'Password123',
             'password_confirmation' => 'Password123',

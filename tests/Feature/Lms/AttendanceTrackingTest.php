@@ -128,7 +128,7 @@ class AttendanceTrackingTest extends TestCase
         $trainerCsvResponse->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
     }
 
-    public function test_trainee_can_record_activity_time_in_without_taking_or_submitting_quiz(): void
+    public function test_quizzes_do_not_offer_or_record_automatic_attendance_time_in(): void
     {
         $trainer = $this->lmsUser('trainer');
         $batch = $this->lmsBatch(['trainer_id' => $trainer->id]);
@@ -140,7 +140,6 @@ class AttendanceTrackingTest extends TestCase
             'training_batch_id' => $batch->id,
             'training_module_id' => $module->id,
             'title' => 'Self-Paced Patient Care Activity',
-            'requires_time_in' => true,
             'is_published' => true,
             'published_at' => now()->subHour(),
             'available_at' => now()->subHour(),
@@ -153,60 +152,16 @@ class AttendanceTrackingTest extends TestCase
         $this->actingAs($user)
             ->get(route('trainee.quizzes.show', $quiz))
             ->assertOk()
-            ->assertSee('Activity Attendance')
-            ->assertSee('Record Time-In');
-
-        $response = $this->actingAs($user)
-            ->post(route('trainee.quizzes.time-in', $quiz));
-
-        $response->assertRedirect(route('trainee.quizzes.show', $quiz));
-        $response->assertSessionHas('status');
-
-        $this->assertDatabaseHas('trainee_attendances', [
-            'training_batch_id' => $batch->id,
-            'enrollment_application_id' => $trainee->id,
-            'quiz_id' => $quiz->id,
-            'status' => 'present',
-            'check_in_type' => 'activity_time_in',
-        ]);
+            ->assertDontSee('Activity Attendance')
+            ->assertDontSee('Record Time-In');
 
         $this->actingAs($user)
-            ->get(route('trainee.quizzes.show', $quiz))
-            ->assertOk()
-            ->assertSee('Recorded as Present');
-    }
-
-    public function test_trainee_cannot_time_in_if_activity_deadline_has_passed(): void
-    {
-        $trainer = $this->lmsUser('trainer');
-        $batch = $this->lmsBatch(['trainer_id' => $trainer->id]);
-        ['user' => $user, 'application' => $trainee] = $this->lmsTrainee($batch);
-        $module = $this->lmsModule($trainer, $batch);
-
-        $expiredQuiz = Quiz::create([
-            'trainer_id' => $trainer->id,
-            'training_batch_id' => $batch->id,
-            'training_module_id' => $module->id,
-            'title' => 'Expired Activity Session',
-            'requires_time_in' => true,
-            'is_published' => true,
-            'published_at' => now()->subDays(5),
-            'available_at' => now()->subDays(5),
-            'due_at' => now()->subDay(),
-            'time_limit_minutes' => 45,
-            'attempt_limit' => 1,
-            'passing_score_percent' => 75,
-        ]);
-
-        $response = $this->actingAs($user)
-            ->post(route('trainee.quizzes.time-in', $expiredQuiz));
-
-        $response->assertRedirect(route('trainee.quizzes.show', $expiredQuiz));
-        $response->assertSessionHas('error');
+            ->post("/trainee/quizzes/{$quiz->id}/time-in")
+            ->assertNotFound();
 
         $this->assertDatabaseMissing('trainee_attendances', [
             'enrollment_application_id' => $trainee->id,
-            'quiz_id' => $expiredQuiz->id,
+            'quiz_id' => $quiz->id,
         ]);
     }
 }

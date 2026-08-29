@@ -20,8 +20,8 @@ use App\Services\CompetencyWorkbookExporter;
 use App\Services\OfficialDocumentManager;
 use App\Support\CaregivingNcIiCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use OpenSpout\Reader\XLSX\Reader;
 use Tests\TestCase;
 use ZipArchive;
@@ -99,9 +99,16 @@ class TrainingRecordsTest extends TestCase
             ->evaluate($application->fresh('batch'))['eligible']);
     }
 
-    public function test_admin_can_queue_documents_only_after_completion(): void
+    public function test_admin_immediately_generates_only_the_requested_document_type_after_completion(): void
     {
-        Queue::fake();
+        Storage::fake('local');
+        $this->app->bind(OfficialDocumentRenderer::class, fn () => new class implements OfficialDocumentRenderer
+        {
+            public function render(OfficialDocument $document): string
+            {
+                return '%PDF-1.4 generated '.$document->type.' '.$document->document_number;
+            }
+        });
         $admin = User::factory()->create(['role' => 'admin']);
         $trainer = User::factory()->create(['role' => 'trainer']);
         $trainee = User::factory()->create(['role' => 'trainee']);
@@ -116,10 +123,283 @@ class TrainingRecordsTest extends TestCase
         $this->assertDatabaseHas('official_documents', [
             'enrollment_application_id' => $application->id,
             'type' => OfficialDocument::TYPE_COTC,
-            'status' => OfficialDocument::STATUS_QUEUED,
+            'status' => OfficialDocument::STATUS_GENERATED,
             'version' => 1,
         ]);
-        Queue::assertPushed(GenerateOfficialDocument::class);
+
+        $cotc = OfficialDocument::query()->sole();
+        $this->assertSame(OfficialDocument::TYPE_COTC, $cotc->type);
+        $this->assertStringContainsString('/cotc/', $cotc->file_path);
+        $this->assertStringContainsString('generated cotc', Storage::disk('local')->get($cotc->file_path));
+        $this->assertDatabaseMissing('official_documents', [
+            'enrollment_application_id' => $application->id,
+            'type' => OfficialDocument::TYPE_TOR,
+        ]);
+    }
+
+    public function test_admin_tor_request_uses_the_tor_type_template_and_download_path(): void
+    {
+        Storage::fake('local');
+        $this->app->bind(OfficialDocumentRenderer::class, fn () => new class implements OfficialDocumentRenderer
+        {
+            public function render(OfficialDocument $document): string
+            {
+                return '%PDF-1.4 '.$document->type.' transcript content';
+            }
+        });
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainer = User::factory()->create(['role' => 'trainer']);
+        $application = $this->approvedApplication(User::factory()->create(['role' => 'trainee']), completed: true);
+        $this->completeCompetencies($application, $trainer);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.certificates'))
+            ->assertOk()
+            ->assertSee(route('admin.learning.documents.generate', [$application, OfficialDocument::TYPE_TOR]), false)
+            ->assertSee('Generate TOR');
+
+        $this->actingAs($admin)
+            ->post(route('admin.learning.documents.generate', [$application, OfficialDocument::TYPE_TOR]))
+            ->assertRedirect()
+            ->assertSessionHas('saved');
+
+        $tor = OfficialDocument::query()->where('type', OfficialDocument::TYPE_TOR)->sole();
+        $this->assertSame(OfficialDocument::TYPE_TOR, $tor->type);
+        $this->assertSame(OfficialDocument::STATUS_GENERATED, $tor->status);
+        $this->assertStringContainsString('/tor/', $tor->file_path);
+        $this->assertStringContainsString('tor transcript content', Storage::disk('local')->get($tor->file_path));
+
+        $preview = $this->actingAs($admin)
+            ->get(route('admin.learning.documents.preview', $tor))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf')
+            ->assertHeader('Content-Disposition', 'inline; filename='.$tor->document_number.'.pdf');
+        $this->assertSame(Storage::disk('local')->get($tor->file_path), $preview->streamedContent());
+
+        $download = $this->actingAs($admin)
+            ->get(route('admin.learning.documents.download', $tor))
+            ->assertOk()
+            ->assertDownload($tor->document_number.'.pdf');
+        $this->assertSame(Storage::disk('local')->get($tor->file_path), $download->streamedContent());
+    }
+
+    public function test_cotc_and_tor_records_are_not_reused_for_each_other(): void
+    {
+        Storage::fake('local');
+        $this->app->bind(OfficialDocumentRenderer::class, fn () => new class implements OfficialDocumentRenderer
+        {
+            public function render(OfficialDocument $document): string
+            {
+                return '%PDF-1.4 rendered '.$document->type;
+            }
+        });
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainer = User::factory()->create(['role' => 'trainer']);
+        $application = $this->approvedApplication(User::factory()->create(['role' => 'trainee']), completed: true);
+        $this->completeCompetencies($application, $trainer);
+
+        $this->actingAs($admin)
+            ->post(route('admin.learning.documents.generate', [$application, OfficialDocument::TYPE_COTC]))
+            ->assertRedirect();
+        $cotc = OfficialDocument::query()->where('type', OfficialDocument::TYPE_COTC)->sole();
+
+        $this->actingAs($admin)
+            ->post(route('admin.learning.documents.generate', [$application, OfficialDocument::TYPE_TOR]))
+            ->assertRedirect();
+        $tor = OfficialDocument::query()->where('type', OfficialDocument::TYPE_TOR)->sole();
+
+        $this->actingAs($admin)
+            ->post(route('admin.learning.documents.generate', [$application, OfficialDocument::TYPE_COTC]))
+            ->assertRedirect();
+
+        $this->assertDatabaseCount('official_documents', 2);
+        $this->assertSame($cotc->id, OfficialDocument::query()->where('type', OfficialDocument::TYPE_COTC)->sole()->id);
+        $this->assertSame($tor->id, OfficialDocument::query()->where('type', OfficialDocument::TYPE_TOR)->sole()->id);
+        $this->assertStringContainsString('/cotc/', $cotc->file_path);
+        $this->assertStringContainsString('/tor/', $tor->file_path);
+        $this->assertStringContainsString('rendered cotc', Storage::disk('local')->get($cotc->file_path));
+        $this->assertStringContainsString('rendered tor', Storage::disk('local')->get($tor->file_path));
+    }
+
+    public function test_legacy_queued_tor_recovery_runs_the_tor_generation_path(): void
+    {
+        Storage::fake('local');
+        $this->app->bind(OfficialDocumentRenderer::class, fn () => new class implements OfficialDocumentRenderer
+        {
+            public function render(OfficialDocument $document): string
+            {
+                return '%PDF-1.4 queued recovery '.$document->type;
+            }
+        });
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainer = User::factory()->create(['role' => 'trainer']);
+        $application = $this->approvedApplication(User::factory()->create(['role' => 'trainee']), completed: true);
+        $this->completeCompetencies($application, $trainer);
+        $tor = OfficialDocument::create([
+            'enrollment_application_id' => $application->id,
+            'training_batch_id' => $application->training_batch_id,
+            'type' => OfficialDocument::TYPE_TOR,
+            'version' => 1,
+            'document_number' => 'MCARE-TOR-2026-00001-V1',
+            'status' => OfficialDocument::STATUS_QUEUED,
+            'storage_disk' => 'local',
+            'generated_by_id' => $admin->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.certificates'))
+            ->assertOk()
+            ->assertSee('Generate TOR now');
+
+        $this->actingAs($admin)
+            ->post(route('admin.learning.documents.generate', [$application, OfficialDocument::TYPE_TOR]))
+            ->assertRedirect()
+            ->assertSessionHas('saved');
+
+        $tor->refresh();
+        $this->assertSame(OfficialDocument::STATUS_GENERATED, $tor->status);
+        $this->assertStringContainsString('/tor/', $tor->file_path);
+        $this->assertStringContainsString('queued recovery tor', Storage::disk('local')->get($tor->file_path));
+        $this->assertDatabaseCount('official_documents', 1);
+    }
+
+    public function test_queued_official_document_job_preserves_the_stored_tor_type(): void
+    {
+        Storage::fake('local');
+        $this->app->bind(OfficialDocumentRenderer::class, fn () => new class implements OfficialDocumentRenderer
+        {
+            public function render(OfficialDocument $document): string
+            {
+                return '%PDF-1.4 queued job '.$document->type;
+            }
+        });
+        $admin = User::factory()->create(['role' => 'admin']);
+        $application = $this->approvedApplication(User::factory()->create(['role' => 'trainee']), completed: true);
+        $tor = OfficialDocument::create([
+            'enrollment_application_id' => $application->id,
+            'training_batch_id' => $application->training_batch_id,
+            'type' => OfficialDocument::TYPE_TOR,
+            'version' => 1,
+            'document_number' => 'MCARE-TOR-2026-00001-V1',
+            'status' => OfficialDocument::STATUS_QUEUED,
+            'storage_disk' => 'local',
+            'generated_by_id' => $admin->id,
+        ]);
+
+        (new GenerateOfficialDocument($tor->id))->handle(app(OfficialDocumentManager::class));
+
+        $tor->refresh();
+        $this->assertSame(OfficialDocument::TYPE_TOR, $tor->type);
+        $this->assertSame(OfficialDocument::STATUS_GENERATED, $tor->status);
+        $this->assertStringContainsString('/tor/', $tor->file_path);
+        $this->assertStringContainsString('queued job tor', Storage::disk('local')->get($tor->file_path));
+    }
+
+    public function test_invalid_stored_document_type_is_rejected_instead_of_defaulting_to_cotc(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $application = $this->approvedApplication(User::factory()->create(['role' => 'trainee']));
+        $document = OfficialDocument::create([
+            'enrollment_application_id' => $application->id,
+            'training_batch_id' => $application->training_batch_id,
+            'type' => 'TOR',
+            'version' => 1,
+            'document_number' => 'MCARE-TOR-2026-00001-V1',
+            'status' => OfficialDocument::STATUS_QUEUED,
+            'storage_disk' => 'local',
+            'generated_by_id' => $admin->id,
+        ]);
+
+        try {
+            app(OfficialDocumentManager::class)->generateNow($document);
+            $this->fail('An unsupported stored document type should not be generated.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('type', $exception->errors());
+        }
+
+        $this->assertSame(OfficialDocument::STATUS_QUEUED, $document->refresh()->status);
+        $this->assertNull($document->file_path);
+    }
+
+    public function test_official_document_templates_remain_distinct(): void
+    {
+        $application = $this->approvedApplication(User::factory()->create(['role' => 'trainee']), completed: true);
+        $tor = OfficialDocument::make([
+            'type' => OfficialDocument::TYPE_TOR,
+            'version' => 1,
+            'document_number' => 'MCARE-TOR-2026-00001-V1',
+        ]);
+        $cotc = OfficialDocument::make([
+            'type' => OfficialDocument::TYPE_COTC,
+            'version' => 1,
+            'document_number' => 'MCARE-COTC-2026-00001-V1',
+            'generated_at' => now(),
+        ]);
+        $application->load(['batch', 'competencyRecords.unit']);
+        $organization = config('official_documents.organization');
+
+        $torHtml = view('documents.pdf.tor', [
+            'document' => $tor,
+            'application' => $application,
+            'organization' => $organization,
+            'logoDataUri' => 'data:image/png;base64,AAAA',
+            'cotcTemplateDataUri' => null,
+        ])->render();
+        $cotcHtml = view('documents.pdf.cotc', [
+            'document' => $cotc,
+            'application' => $application,
+            'organization' => $organization,
+            'logoDataUri' => 'data:image/png;base64,AAAA',
+            'cotcTemplateDataUri' => 'data:image/png;base64,AAAA',
+        ])->render();
+
+        $this->assertSame('documents.pdf.tor', OfficialDocument::templateViewForType(OfficialDocument::TYPE_TOR));
+        $this->assertSame('documents.pdf.cotc', OfficialDocument::templateViewForType(OfficialDocument::TYPE_COTC));
+        $this->assertStringContainsString('OFFICIAL TRANSCRIPT OF RECORD', $torHtml);
+        $this->assertStringNotContainsString('OFFICIAL TRANSCRIPT OF RECORD', $cotcHtml);
+        $this->assertStringContainsString('background-image: url(\'data:image/png;base64,AAAA\')', $cotcHtml);
+        $this->assertStringNotContainsString('background-image: url(\'data:image/png;base64,AAAA\')', $torHtml);
+    }
+
+    public function test_admin_can_generate_an_existing_document_left_in_the_old_queue(): void
+    {
+        Storage::fake('local');
+        $this->app->bind(OfficialDocumentRenderer::class, fn () => new class implements OfficialDocumentRenderer
+        {
+            public function render(OfficialDocument $document): string
+            {
+                return '%PDF-1.4 recovered '.$document->type;
+            }
+        });
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainer = User::factory()->create(['role' => 'trainer']);
+        $application = $this->approvedApplication(User::factory()->create(['role' => 'trainee']), completed: true);
+        $this->completeCompetencies($application, $trainer);
+        $document = OfficialDocument::create([
+            'enrollment_application_id' => $application->id,
+            'training_batch_id' => $application->training_batch_id,
+            'type' => OfficialDocument::TYPE_COTC,
+            'version' => 1,
+            'document_number' => 'MCARE-COTC-2026-00001-V1',
+            'status' => OfficialDocument::STATUS_QUEUED,
+            'storage_disk' => 'local',
+            'generated_by_id' => $admin->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.certificates'))
+            ->assertOk()
+            ->assertSee('Generate COTC now');
+
+        $this->actingAs($admin)
+            ->post(route('admin.learning.documents.generate', [$application, 'cotc']))
+            ->assertRedirect()
+            ->assertSessionHas('saved');
+
+        $this->assertSame(OfficialDocument::STATUS_GENERATED, $document->refresh()->status);
+        $this->assertStringContainsString('/cotc/', $document->file_path);
+        Storage::disk('local')->assertExists($document->file_path);
+        $this->assertDatabaseCount('official_documents', 1);
     }
 
     public function test_trainer_can_open_batch_progress_and_achievement_charts(): void

@@ -207,6 +207,7 @@ class AdminPaymentTransactionsTest extends TestCase
             'total_paid_amount' => 2000.00,
             'payment_status' => EnrollmentApplication::PAYMENT_PARTIALLY_PAID,
             'payment_verified_at' => now(),
+            'review_released_at' => now(),
         ])->save();
 
         $this->actingAs($admin)
@@ -430,6 +431,7 @@ class AdminPaymentTransactionsTest extends TestCase
             ],
             'documents_reviewed_at' => now(),
             'status' => EnrollmentApplication::STATUS_APPROVED,
+            'review_released_at' => now(),
             'total_program_fee' => 22000.00,
             'downpayment_amount' => 2000.00,
             'total_paid_amount' => 0.00,

@@ -142,7 +142,7 @@ class PayMongoCheckoutService
             'data' => [
                 'attributes' => [
                     'line_items' => [[
-                        'name' => 'MCARE Caregiving NC II downpayment',
+                        'name' => 'MCARE '.($application->program ?: 'training program').' downpayment',
                         'description' => 'Enrollment downpayment for Mission Care Training Center',
                         'amount' => $attempt->amount_minor,
                         'currency' => $attempt->currency,

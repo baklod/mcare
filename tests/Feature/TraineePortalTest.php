@@ -9,10 +9,12 @@ use App\Models\User;
 use App\Services\RollingModuleReleaseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Tests\Concerns\CreatesLmsTestData;
 use Tests\TestCase;
 
 class TraineePortalTest extends TestCase
 {
+    use CreatesLmsTestData;
     use RefreshDatabase;
 
     public function test_guest_is_redirected_to_trainee_login(): void
@@ -116,7 +118,9 @@ class TraineePortalTest extends TestCase
             ->assertOk()
             ->assertSee('Welcome back')
             ->assertSee('Infection Control')
-            ->assertSee('MWF | 8:00 AM - 12:00 PM');
+            ->assertSee('MWF | 8:00 AM - 12:00 PM')
+            ->assertSee('href="'.route('trainee.payments').'"', false)
+            ->assertDontSee('href="'.route('payment.show').'"', false);
     }
 
     public function test_trainee_sidebar_destinations_are_separate_pages(): void
@@ -195,6 +199,8 @@ class TraineePortalTest extends TestCase
             'published_at' => now(),
         ]);
         app(RollingModuleReleaseService::class)->activate($module);
+        $this->lmsPassedAssessment($trainer, $module, $application);
+        $submodule = $module->fresh()->submodules()->firstOrFail();
 
         $this->actingAs($trainee)
             ->get(route('trainee.modules.show', $module))
@@ -218,8 +224,8 @@ class TraineePortalTest extends TestCase
             ->assertHeader('X-Frame-Options', 'SAMEORIGIN');
 
         $this->actingAs($trainee)
-            ->patch(route('trainee.modules.progress', $module), ['action' => 'complete'])
-            ->assertRedirect(route('trainee.modules.index'));
+            ->patch(route('trainee.modules.submodules.progress', [$module, $submodule]), ['action' => 'submit'])
+            ->assertRedirect(route('trainee.modules.show', $module).'#submodules');
 
         $this->assertDatabaseHas('module_progress', [
             'enrollment_application_id' => $application->id,
@@ -229,7 +235,7 @@ class TraineePortalTest extends TestCase
         ]);
         $this->assertDatabaseHas('admin_activity_logs', [
             'user_id' => $trainee->id,
-            'action' => 'trainee.module.progress.updated',
+            'action' => 'trainee.submodule.progress.updated',
         ]);
 
         $this->actingAs($trainee)
@@ -304,6 +310,7 @@ class TraineePortalTest extends TestCase
             'payment_status' => EnrollmentApplication::PAYMENT_PARTIALLY_PAID,
             'payment_method' => 'onsite',
             'payment_verified_at' => now(),
+            'review_released_at' => now(),
         ]);
     }
 }

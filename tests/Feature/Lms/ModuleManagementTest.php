@@ -2,7 +2,11 @@
 
 namespace Tests\Feature\Lms;
 
+use App\Models\CompetencyUnit;
 use App\Models\ModuleProgress;
+use App\Models\Quiz;
+use App\Models\TraineeCompetencyRecord;
+use App\Models\TrainingModule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -205,7 +209,7 @@ class ModuleManagementTest extends TestCase
             'title' => 'Provide Care and Support to Infants and Toddlers',
         ]);
 
-        $module = \App\Models\TrainingModule::where('module_code', 'HCS323301')->firstOrFail();
+        $module = TrainingModule::where('module_code', 'HCS323301')->firstOrFail();
         $this->assertCount(2, $module->supplementaryList());
     }
 
@@ -214,9 +218,11 @@ class ModuleManagementTest extends TestCase
         $trainer = $this->lmsUser('trainer');
         $batch = $this->lmsBatch();
         $module = $this->lmsModule($trainer, $batch, ['module_code' => 'HCS323301']);
+        $submodule = $this->lmsSubmodule($module);
 
         $response = $this->actingAs($trainer)
             ->post(route('trainer.modules.quizzes.store', $module), [
+                'training_submodule_id' => $submodule->id,
                 'title' => 'Infant Care Mastery Assessment',
                 'instructions' => 'Complete all 10 questions.',
                 'time_limit_minutes' => 25,
@@ -224,8 +230,9 @@ class ModuleManagementTest extends TestCase
                 'is_published' => 1,
             ]);
 
-        $quiz = \App\Models\Quiz::where('title', 'Infant Care Mastery Assessment')->firstOrFail();
+        $quiz = Quiz::where('title', 'Infant Care Mastery Assessment')->firstOrFail();
         $this->assertSame($module->id, $quiz->training_module_id);
+        $this->assertSame($submodule->id, $quiz->training_submodule_id);
         $this->assertFalse($quiz->is_published);
         $this->assertNull($quiz->published_at);
         $response->assertRedirect(route('trainer.quizzes.edit', $quiz));
@@ -238,29 +245,32 @@ class ModuleManagementTest extends TestCase
         ['user' => $trainee, 'application' => $application] = $this->lmsTrainee($batch);
 
         // Ensure competency unit exists for TOR sync
-        \App\Models\CompetencyUnit::firstOrCreate(
+        CompetencyUnit::firstOrCreate(
             ['code' => 'HCS323301'],
             ['title' => 'Provide care and support to infants/toddlers', 'category' => 'core', 'nominal_hours' => 40, 'position' => 1]
         );
 
         $module = $this->lmsModule($trainer, $batch, ['module_code' => 'HCS323301']);
+        $this->lmsPassedAssessment($trainer, $module, $application, 92.5);
 
-        $this->actingAs($trainee)
-            ->patch(route('trainee.modules.progress', $module), [
-                'action' => 'submit',
-            ])
-            ->assertSessionHasNoErrors();
+        foreach ($module->submodules()->get() as $submodule) {
+            $this->actingAs($trainee)
+                ->patch(route('trainee.modules.submodules.progress', [$module, $submodule]), [
+                    'action' => 'submit',
+                ])
+                ->assertSessionHasNoErrors();
 
-        $response = $this->actingAs($trainer)
-            ->post(route('trainer.modules.evaluate', $module), [
-                'enrollment_application_id' => $application->id,
-                'quiz_score' => 92.5,
-                'practical_rating' => 'competent',
-                'competency_outcome' => 'competent',
-                'evaluation_remarks' => 'Excellent demonstration of sterile diaper changing and infant feeding.',
-            ]);
+            $response = $this->actingAs($trainer)
+                ->post(route('trainer.modules.evaluate', $module), [
+                    'training_submodule_id' => $submodule->id,
+                    'enrollment_application_id' => $application->id,
+                    'practical_rating' => 'competent',
+                    'competency_outcome' => 'competent',
+                    'evaluation_remarks' => 'Excellent demonstration of sterile diaper changing and infant feeding.',
+                ]);
+        }
 
-        $response->assertRedirect(route('trainer.modules.show', $module));
+        $response->assertRedirect(route('trainer.modules.show', ['module' => $module, 'tab' => 'evaluations']).'#evaluations');
 
         $progress = ModuleProgress::where('enrollment_application_id', $application->id)
             ->where('training_module_id', $module->id)
@@ -275,7 +285,7 @@ class ModuleManagementTest extends TestCase
         // Check TOR record auto-synced
         $this->assertDatabaseHas('trainee_competency_records', [
             'enrollment_application_id' => $application->id,
-            'status' => \App\Models\TraineeCompetencyRecord::STATUS_COMPETENT,
+            'status' => TraineeCompetencyRecord::STATUS_COMPETENT,
         ]);
     }
 
@@ -368,22 +378,26 @@ class ModuleManagementTest extends TestCase
         $module = $this->lmsModule($trainer, $batch, [
             'target_enrollment_application_id' => $assigned->id,
         ]);
+        $submodule = $this->lmsSubmodule($module);
+        $this->lmsPassedAssessment($trainer, $module, $assigned);
 
         $this->actingAs($trainer)
             ->post(route('trainer.modules.evaluate', $module), [
+                'training_submodule_id' => $submodule->id,
                 'enrollment_application_id' => $other->id,
                 'competency_outcome' => ModuleProgress::OUTCOME_COMPETENT,
             ])
             ->assertSessionHasErrors('enrollment_application_id');
 
         $this->actingAs($assignedUser)
-            ->patch(route('trainee.modules.progress', $module), [
+            ->patch(route('trainee.modules.submodules.progress', [$module, $submodule]), [
                 'action' => 'submit',
             ])
             ->assertSessionHasNoErrors();
 
         $this->actingAs($trainer)
             ->post(route('trainer.modules.evaluate', $module), [
+                'training_submodule_id' => $submodule->id,
                 'enrollment_application_id' => $assigned->id,
                 'competency_outcome' => ModuleProgress::OUTCOME_COMPETENT,
             ])
@@ -391,6 +405,7 @@ class ModuleManagementTest extends TestCase
 
         $this->actingAs($trainer)
             ->post(route('trainer.modules.evaluate', $module), [
+                'training_submodule_id' => $submodule->id,
                 'enrollment_application_id' => $assigned->id,
                 'competency_outcome' => ModuleProgress::OUTCOME_NOT_YET_COMPETENT,
             ])

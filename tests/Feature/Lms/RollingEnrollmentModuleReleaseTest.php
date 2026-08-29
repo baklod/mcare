@@ -49,13 +49,16 @@ class RollingEnrollmentModuleReleaseTest extends TestCase
             'module_code' => 'CORE-001',
             'title' => 'Previously Released Core Module',
         ]);
+        $firstSubmodule = $this->lmsSubmodule($firstModule);
+        $this->lmsPassedAssessment($trainer, $firstModule, $existingApplication);
 
         $this->actingAs($existingUser)
-            ->patch(route('trainee.modules.progress', $firstModule), ['action' => 'submit'])
+            ->patch(route('trainee.modules.submodules.progress', [$firstModule, $firstSubmodule]), ['action' => 'submit'])
             ->assertSessionHasNoErrors();
 
         $this->actingAs($trainer)
             ->post(route('trainer.modules.evaluate', $firstModule), [
+                'training_submodule_id' => $firstSubmodule->id,
                 'enrollment_application_id' => $existingApplication->id,
                 'competency_outcome' => ModuleProgress::OUTCOME_COMPETENT,
             ])
@@ -96,7 +99,7 @@ class RollingEnrollmentModuleReleaseTest extends TestCase
             ->assertOk();
     }
 
-    public function test_next_module_unlocks_only_after_mark_as_done_and_competent_validation(): void
+    public function test_new_module_stays_visible_when_previous_module_needs_remediation(): void
     {
         $trainer = $this->lmsUser('trainer');
         $batch = $this->lmsBatch(['is_continuous_enrollment' => true]);
@@ -105,6 +108,8 @@ class RollingEnrollmentModuleReleaseTest extends TestCase
             'module_code' => 'CORE-001',
             'title' => 'First Assigned Module',
         ]);
+        $firstSubmodule = $this->lmsSubmodule($firstModule);
+        $this->lmsPassedAssessment($trainer, $firstModule, $application);
         $nextModule = $this->lmsModule($trainer, $batch, [
             'module_code' => 'CORE-002',
             'title' => 'Locked Next Module',
@@ -114,31 +119,34 @@ class RollingEnrollmentModuleReleaseTest extends TestCase
             ->where('enrollment_application_id', $application->id)
             ->where('training_module_id', $nextModule->id)
             ->firstOrFail();
-        $this->assertSame(ModuleProgress::STATUS_LOCKED, $nextProgress->status);
-        $this->assertNull($nextProgress->unlocked_at);
+        $this->assertSame(ModuleProgress::STATUS_NOT_STARTED, $nextProgress->status);
+        $this->assertNotNull($nextProgress->unlocked_at);
         $this->actingAs($trainee)
             ->get(route('trainee.modules.show', $nextModule))
-            ->assertNotFound();
+            ->assertOk();
+        $nextProgress->refresh();
+        $this->assertSame(ModuleProgress::STATUS_IN_PROGRESS, $nextProgress->status);
 
         $this->actingAs($trainee)
             ->get(route('trainee.modules.show', $firstModule))
             ->assertOk()
-            ->assertSee('data-module-progress-form', false)
+            ->assertSee('Mark Submodule as Done')
             ->assertSee('target="_self"', false);
 
         $this->actingAs($trainee)
-            ->patch(route('trainee.modules.progress', $firstModule), ['action' => 'submit'])
-            ->assertRedirect(route('trainee.modules.index'))
+            ->patch(route('trainee.modules.submodules.progress', [$firstModule, $firstSubmodule]), ['action' => 'submit'])
+            ->assertRedirect(route('trainee.modules.show', $firstModule).'#submodules')
             ->assertSessionHasNoErrors();
 
         $this->assertSame(
             ModuleProgress::STATUS_AWAITING_EVALUATION,
             $this->progressFor($application->id, $firstModule->id)->status,
         );
-        $this->assertSame(ModuleProgress::STATUS_LOCKED, $nextProgress->fresh()->status);
+        $this->assertSame(ModuleProgress::STATUS_IN_PROGRESS, $nextProgress->fresh()->status);
 
         $this->actingAs($trainer)
             ->post(route('trainer.modules.evaluate', $firstModule), [
+                'training_submodule_id' => $firstSubmodule->id,
                 'enrollment_application_id' => $application->id,
                 'competency_outcome' => ModuleProgress::OUTCOME_NOT_YET_COMPETENT,
             ])
@@ -149,30 +157,19 @@ class RollingEnrollmentModuleReleaseTest extends TestCase
             $this->progressFor($application->id, $firstModule->id)->status,
         );
         $this->assertNull($this->progressFor($application->id, $firstModule->id)->submitted_at);
-        $this->assertSame(ModuleProgress::STATUS_LOCKED, $nextProgress->fresh()->status);
-
-        $this->actingAs($trainer)
-            ->post(route('trainer.modules.evaluate', $firstModule), [
-                'enrollment_application_id' => $application->id,
-                'competency_outcome' => ModuleProgress::OUTCOME_COMPETENT,
-            ])
-            ->assertSessionHasErrors('competency_outcome');
-        $this->assertSame(ModuleProgress::STATUS_LOCKED, $nextProgress->fresh()->status);
-
-        $this->actingAs($trainee)
-            ->patch(route('trainee.modules.progress', $firstModule), ['action' => 'submit'])
-            ->assertRedirect(route('trainee.modules.index'))
-            ->assertSessionHasNoErrors();
-        $this->actingAs($trainer)
-            ->post(route('trainer.modules.evaluate', $firstModule), [
-                'enrollment_application_id' => $application->id,
-                'competency_outcome' => ModuleProgress::OUTCOME_COMPETENT,
-            ])
-            ->assertSessionHasNoErrors();
-
         $nextProgress->refresh();
-        $this->assertSame(ModuleProgress::STATUS_NOT_STARTED, $nextProgress->status);
+        $this->assertSame(ModuleProgress::STATUS_IN_PROGRESS, $nextProgress->status);
         $this->assertNotNull($nextProgress->unlocked_at);
+
+        $visibleModuleIds = TrainingModule::query()
+            ->availableTo($application)
+            ->pluck('id');
+
+        $this->assertTrue($visibleModuleIds->contains($firstModule->id));
+        $this->assertTrue($visibleModuleIds->contains($nextModule->id));
+        $this->actingAs($trainee)
+            ->get(route('trainee.modules.show', $firstModule))
+            ->assertOk();
         $this->actingAs($trainee)
             ->get(route('trainee.modules.show', $nextModule))
             ->assertOk();
@@ -184,10 +181,12 @@ class RollingEnrollmentModuleReleaseTest extends TestCase
         $batch = $this->lmsBatch();
         ['user' => $trainee, 'application' => $application] = $this->lmsTrainee($batch);
         $module = $this->lmsModule($trainer, $batch);
+        $submodule = $this->lmsSubmodule($module);
         $quiz = Quiz::create([
             'trainer_id' => $trainer->id,
             'training_batch_id' => $batch->id,
             'training_module_id' => $module->id,
+            'training_submodule_id' => $submodule->id,
             'title' => 'Required Module Check',
             'instructions' => 'Pass before marking the module as done.',
             'is_published' => true,
@@ -197,7 +196,7 @@ class RollingEnrollmentModuleReleaseTest extends TestCase
         ]);
 
         $this->actingAs($trainee)
-            ->patch(route('trainee.modules.progress', $module), ['action' => 'submit'])
+            ->patch(route('trainee.modules.submodules.progress', [$module, $submodule]), ['action' => 'submit'])
             ->assertSessionHasErrors('action');
 
         QuizAttempt::create([
@@ -215,8 +214,8 @@ class RollingEnrollmentModuleReleaseTest extends TestCase
         ]);
 
         $this->actingAs($trainee)
-            ->patch(route('trainee.modules.progress', $module), ['action' => 'submit'])
-            ->assertRedirect(route('trainee.modules.index'))
+            ->patch(route('trainee.modules.submodules.progress', [$module, $submodule]), ['action' => 'submit'])
+            ->assertRedirect(route('trainee.modules.show', $module).'#submodules')
             ->assertSessionHasNoErrors();
 
         $progress = $this->progressFor($application->id, $module->id);

@@ -5,11 +5,12 @@
         $batch = $editingBatch;
         $formAction = $batch ? route('admin.schedules.update', $batch) : route('admin.schedules.store');
         $batchFormHasErrors = collect([
-            'name', 'year', 'is_active', 'is_continuous_enrollment', 'enrollment_starts_at', 'enrollment_ends_at',
+            'training_program_id', 'name', 'year', 'is_active', 'show_on_enrollment_page', 'is_continuous_enrollment', 'enrollment_starts_at', 'enrollment_ends_at',
             'training_starts_at', 'training_ends_at', 'am_days', 'am_start_time',
             'am_end_time', 'am_room', 'pm_days', 'pm_start_time', 'pm_end_time',
             'pm_room', 'trainer_id', 'notes',
         ])->contains(fn (string $field): bool => $errors->has($field));
+        $programErrorId = (string) old('program_id', '');
     @endphp
 
     <div class="space-y-6">
@@ -25,6 +26,80 @@
                 Create batch
             </button>
         </header>
+
+        <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 class="font-display text-lg font-bold text-slate-900">Training program catalog</h2>
+                    <p class="mt-1 text-xs leading-5 text-slate-500">Programs provide the public name, fee, and required downpayment used by their batches.</p>
+                </div>
+                <span class="w-fit rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700">{{ $programs->count() }} configured</span>
+            </div>
+
+            @if ($errors->program->any())
+                <div class="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-800">
+                    <p class="font-bold">Please correct the program details:</p>
+                    <ul class="mt-2 list-disc space-y-1 pl-5">
+                        @foreach ($errors->program->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                <form method="POST" action="{{ route('admin.training-programs.store') }}" class="rounded-xl border border-purple-100 bg-purple-50/50 p-4" data-single-action>
+                    @csrf
+                    <input type="hidden" name="program_id" value="">
+                    <p class="text-xs font-black uppercase tracking-wide text-purple-700">Add a program</p>
+                    <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                        <div>
+                            <label for="new-program-name" class="mb-1 block text-xs font-semibold text-slate-700">Program name</label>
+                            <input id="new-program-name" name="program_name" value="{{ $programErrorId === '' ? old('program_name') : '' }}" required placeholder="Caregiving NC III" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label for="new-program-code" class="mb-1 block text-xs font-semibold text-slate-700">Program code</label>
+                            <input id="new-program-code" name="program_code" value="{{ $programErrorId === '' ? old('program_code') : '' }}" required placeholder="CAREGIVING-NC-III" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm uppercase">
+                        </div>
+                        <div>
+                            <label for="new-program-fee" class="mb-1 block text-xs font-semibold text-slate-700">Total fee</label>
+                            <input id="new-program-fee" name="program_total_fee" type="number" min="1" step="0.01" value="{{ $programErrorId === '' ? old('program_total_fee', '22000.00') : '22000.00' }}" required class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label for="new-program-downpayment" class="mb-1 block text-xs font-semibold text-slate-700">Required downpayment</label>
+                            <input id="new-program-downpayment" name="program_downpayment" type="number" min="1" step="0.01" value="{{ $programErrorId === '' ? old('program_downpayment', '2000.00') : '2000.00' }}" required class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+                        </div>
+                    </div>
+                    <textarea name="program_description" rows="2" placeholder="Short public description (optional)" class="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">{{ $programErrorId === '' ? old('program_description') : '' }}</textarea>
+                    <div class="mt-3 flex items-center justify-between gap-3">
+                        <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-700"><input type="checkbox" name="program_is_active" value="1" @checked($programErrorId === '' ? old('program_is_active', true) : true) class="rounded border-slate-300 text-purple-600"> Active program</label>
+                        <button type="submit" class="rounded-lg bg-purple-700 px-4 py-2 text-xs font-bold text-white hover:bg-purple-800">Add program</button>
+                    </div>
+                </form>
+
+                <div class="max-h-80 space-y-3 overflow-y-auto pr-1">
+                    @foreach ($programs as $program)
+                        @php($useProgramOld = $programErrorId === (string) $program->id)
+                        <form method="POST" action="{{ route('admin.training-programs.update', $program) }}" class="rounded-xl border border-slate-200 p-4" data-single-action>
+                            @csrf
+                            @method('PATCH')
+                            <input type="hidden" name="program_id" value="{{ $program->id }}">
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <input name="program_name" value="{{ $useProgramOld ? old('program_name') : $program->name }}" required class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900" aria-label="Program name">
+                                <input name="program_code" value="{{ $useProgramOld ? old('program_code') : $program->code }}" required class="rounded-lg border border-slate-200 px-3 py-2 text-sm uppercase" aria-label="Program code">
+                                <input name="program_total_fee" type="number" min="1" step="0.01" value="{{ $useProgramOld ? old('program_total_fee') : $program->total_program_fee }}" required class="rounded-lg border border-slate-200 px-3 py-2 text-sm" aria-label="Total program fee">
+                                <input name="program_downpayment" type="number" min="1" step="0.01" value="{{ $useProgramOld ? old('program_downpayment') : $program->downpayment_amount }}" required class="rounded-lg border border-slate-200 px-3 py-2 text-sm" aria-label="Required downpayment">
+                            </div>
+                            <textarea name="program_description" rows="2" class="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" aria-label="Program description">{{ $useProgramOld ? old('program_description') : $program->description }}</textarea>
+                            <div class="mt-3 flex items-center justify-between gap-3">
+                                <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-700"><input type="checkbox" name="program_is_active" value="1" @checked($useProgramOld ? old('program_is_active') : $program->is_active) class="rounded border-slate-300 text-purple-600"> Active</label>
+                                <div class="flex items-center gap-3"><span class="text-[11px] font-semibold text-slate-500">{{ $program->batches_count }} batches</span><button type="submit" class="rounded-lg border border-purple-200 px-3 py-1.5 text-xs font-bold text-purple-700 hover:bg-purple-50">Save</button></div>
+                            </div>
+                        </form>
+                    @endforeach
+                </div>
+            </div>
+        </section>
 
         <!-- Master Calendar Component -->
         <x-training-calendar
@@ -93,6 +168,16 @@
                     </label>
 
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div class="sm:col-span-2">
+                            <label for="training_program_id" class="mb-1 block text-xs font-semibold text-slate-700">Training program</label>
+                            <select id="training_program_id" name="training_program_id" required class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
+                                <option value="">Select a program</option>
+                                @foreach ($programs as $program)
+                                    <option value="{{ $program->id }}" @selected((string) old('training_program_id', $batch->training_program_id ?? '') === (string) $program->id)>{{ $program->name }}{{ $program->is_active ? '' : ' (inactive)' }}</option>
+                                @endforeach
+                            </select>
+                            @error('training_program_id') <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p> @enderror
+                        </div>
                         <div>
                             <label for="name" class="mb-1 block text-xs font-semibold text-slate-700">Batch name</label>
                             <input id="name" name="name" type="text" value="{{ old('name', $batch->name ?? 'Batch 1') }}" required class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900 transition focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
@@ -105,10 +190,14 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                         <label class="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs font-medium text-slate-700 cursor-pointer">
                             <input name="is_active" type="checkbox" value="1" @checked(old('is_active', $batch->is_active ?? false)) class="mt-0.5 h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500">
                             <span>Enable this batch for enrollment</span>
+                        </label>
+                        <label class="flex items-start gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium text-emerald-900 cursor-pointer">
+                            <input name="show_on_enrollment_page" type="checkbox" value="1" @checked(old('show_on_enrollment_page', $batch->show_on_enrollment_page ?? false)) class="mt-0.5 h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500">
+                            <span><strong class="block">Show on enrollment page</strong><span class="mt-1 block font-normal text-emerald-800">Public only while active and inside its enrollment window.</span></span>
                         </label>
                         <div>
                             <label for="trainer_id" class="mb-1 block text-xs font-semibold text-slate-700">Assigned trainer</label>
@@ -240,8 +329,10 @@
                             <div>
                                 <div class="flex flex-wrap items-center gap-2">
                                     <h3 class="text-lg font-bold text-slate-900">{{ $item->name }} {{ $item->year }}</h3>
+                                    <span class="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-700 ring-1 ring-indigo-100">{{ $item->program?->name ?? 'Program not assigned' }}</span>
                                     <span class="rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 {{ $item->acceptsEnrollment() ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-slate-100 text-slate-700 ring-slate-200' }}">{{ $item->enrollmentStateLabel() }}</span>
                                     <span class="rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-bold text-purple-700 ring-1 ring-purple-100">{{ $item->trainingStateLabel() }}</span>
+                                    <span class="rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 {{ $item->show_on_enrollment_page ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-amber-50 text-amber-700 ring-amber-100' }}">{{ $item->show_on_enrollment_page ? 'Shown publicly' : 'Hidden from enrollment' }}</span>
                                 </div>
                                 <p class="mt-1 text-xs text-slate-500">{{ $item->is_continuous_enrollment ? 'No enrollment deadline' : 'Enrollment ends '.$item->enrollment_ends_at?->format('M d, Y g:i A') }}</p>
                                 <p class="mt-1 text-xs font-semibold {{ $item->trainer ? 'text-violet-700' : 'text-amber-700' }}">

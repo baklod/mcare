@@ -12,6 +12,7 @@ use App\Models\Quiz;
 use App\Models\TrainerAnnouncement;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
+use App\Models\TrainingProgram;
 use App\Models\User;
 use App\Services\RollingModuleReleaseService;
 use Illuminate\Http\RedirectResponse;
@@ -23,6 +24,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\HeaderUtils;
@@ -34,9 +36,21 @@ class AdminAccountController extends Controller
     {
         $roleFilter = $request->query('role', 'all');
         $search = trim((string) $request->query('search', ''));
+        $visibleOperationalAccounts = function ($accounts): void {
+            $accounts->whereIn('role', ['trainer', 'trainee'])
+                ->orWhere(function ($applicants): void {
+                    $applicants->where('role', 'applicant')
+                        ->where(function ($eligible): void {
+                            $eligible
+                                ->whereHas('enrollmentApplication', fn ($application) => $application->releasedForReview())
+                                ->orWhereHas('historicalAlumniClaim');
+                        });
+                });
+        };
 
         $query = User::query()
             ->whereIn('role', ['trainer', 'trainee', 'applicant'])
+            ->where($visibleOperationalAccounts)
             ->with(['enrollmentApplication.batch', 'roles', 'alumniProfile'])
             ->when($roleFilter !== 'all' && in_array($roleFilter, ['trainer', 'trainee', 'applicant', 'alumni'], true), function ($q) use ($roleFilter) {
                 if ($roleFilter === 'alumni') {
@@ -70,7 +84,7 @@ class AdminAccountController extends Controller
         $accounts = $query->paginate(20)->withQueryString();
 
         $counts = [
-            'all' => User::query()->whereIn('role', ['trainer', 'trainee', 'applicant'])->count(),
+            'all' => User::query()->where($visibleOperationalAccounts)->count(),
             'trainer' => User::query()->where('role', 'trainer')->count(),
             'trainee' => User::query()
                 ->where('role', 'trainee')
@@ -78,14 +92,22 @@ class AdminAccountController extends Controller
                     ->where('status', EnrollmentApplication::STATUS_APPROVED)
                     ->where('learning_status', EnrollmentApplication::LEARNING_GRADUATED))
                 ->count(),
-            'applicant' => User::query()->where('role', 'applicant')->count(),
+            'applicant' => User::query()
+                ->where('role', 'applicant')
+                ->where(function ($eligible): void {
+                    $eligible
+                        ->whereHas('enrollmentApplication', fn ($application) => $application->releasedForReview())
+                        ->orWhereHas('historicalAlumniClaim');
+                })
+                ->count(),
             'alumni' => User::query()->whereHas('enrollmentApplication', fn ($application) => $application
                 ->where('status', EnrollmentApplication::STATUS_APPROVED)
                 ->where('learning_status', EnrollmentApplication::LEARNING_GRADUATED))->count(),
         ];
 
         return view('admin.accounts', [
-            'batches' => TrainingBatch::query()->orderByDesc('year')->orderBy('name')->get(),
+            'batches' => TrainingBatch::query()->with('program')->orderByDesc('year')->orderBy('name')->get(),
+            'defaultProgram' => TrainingProgram::query()->active()->oldest('id')->first(),
             'accounts' => $accounts,
             'roleFilter' => $roleFilter,
             'search' => $search,
@@ -197,17 +219,40 @@ class AdminAccountController extends Controller
             'signature_onsite' => ['accepted'],
             'privacy_consent_onsite' => ['accepted'],
             'onsite_payment_received' => ['accepted'],
-            'onsite_payment_amount' => ['required', 'numeric', 'min:2000', 'max:22000'],
+            'onsite_payment_amount' => ['required', 'numeric', 'min:0.01', 'max:1000000'],
             'onsite_or_number' => ['required', 'string', 'max:100', Rule::unique('payment_transactions', 'or_number')],
             'onsite_verification_notes' => ['required', 'string', 'max:1000'],
         ], [
             '*.regex' => 'Use letters, spaces, periods, apostrophes, or hyphens only for names and a valid phone format for contact number.',
             'email.unique' => 'This email is already connected to an MCARE account or enrollment.',
             '*.accepted' => 'Confirm every onsite requirement, consent, and payment item before activating the trainee.',
-            'onsite_payment_amount.min' => 'At least the required PHP 2,000 enrollment downpayment must be verified.',
         ]);
 
-        [$trainee, $application] = DB::transaction(function () use ($request, $validated) {
+        $batch = TrainingBatch::query()->with('program')->findOrFail($validated['training_batch_id']);
+        $program = $batch->program ?? TrainingProgram::query()->active()->oldest('id')->first();
+
+        if (! $program || ! $program->is_active) {
+            throw ValidationException::withMessages([
+                'training_batch_id' => 'Assign this batch to an active training program before assisted intake.',
+            ])->errorBag('trainee');
+        }
+
+        $programFee = (float) $program->total_program_fee;
+        $requiredDownpayment = (float) $program->downpayment_amount;
+        $verifiedAmount = (float) $validated['onsite_payment_amount'];
+
+        if ($verifiedAmount < $requiredDownpayment || $verifiedAmount > $programFee) {
+            throw ValidationException::withMessages([
+                'onsite_payment_amount' => sprintf(
+                    'Enter a verified amount from PHP %s to PHP %s for %s.',
+                    number_format($requiredDownpayment, 2),
+                    number_format($programFee, 2),
+                    $program->name,
+                ),
+            ])->errorBag('trainee');
+        }
+
+        [$trainee, $application] = DB::transaction(function () use ($request, $validated, $program, $programFee, $requiredDownpayment, $verifiedAmount) {
             $trainee = User::create([
                 'name' => trim("{$validated['first_name']} {$validated['middle_name']} {$validated['last_name']}"),
                 'email' => $validated['email'],
@@ -225,7 +270,8 @@ class AdminAccountController extends Controller
                     'onsite_payment_amount', 'onsite_or_number', 'onsite_verification_notes',
                 ])->all(),
                 'user_id' => $trainee->id,
-                'program' => 'Caregiving NC II',
+                'training_program_id' => $program->id,
+                'program' => $program->name,
                 'intake_channel' => 'admin_assisted',
                 'is_historical_record' => false,
                 'status' => EnrollmentApplication::STATUS_APPROVED,
@@ -248,13 +294,13 @@ class AdminAccountController extends Controller
                 'onsite_requirements_verified_by_id' => $request->user()->id,
                 'onsite_requirements_notes' => $validated['onsite_verification_notes'],
                 'payment_method' => 'onsite',
-                'total_program_fee' => 22000,
-                'downpayment_amount' => 2000,
-                'total_paid_amount' => $validated['onsite_payment_amount'],
-                'payment_status' => (float) $validated['onsite_payment_amount'] >= 22000
+                'total_program_fee' => $programFee,
+                'downpayment_amount' => $requiredDownpayment,
+                'total_paid_amount' => $verifiedAmount,
+                'payment_status' => $verifiedAmount >= $programFee
                     ? EnrollmentApplication::PAYMENT_PAID
                     : EnrollmentApplication::PAYMENT_PARTIALLY_PAID,
-                'payment_amount' => $validated['onsite_payment_amount'],
+                'payment_amount' => $verifiedAmount,
                 'payment_currency' => 'PHP',
                 'payment_reference' => $validated['onsite_or_number'],
                 'payment_receipt_number' => $validated['onsite_or_number'],
@@ -262,6 +308,7 @@ class AdminAccountController extends Controller
                 'payment_verified_at' => now(),
                 'payment_verified_by_id' => $request->user()->id,
                 'payment_verification_notes' => $validated['onsite_verification_notes'],
+                'review_released_at' => now(),
                 'reviewed_at' => now(),
                 'learning_started_at' => now(),
                 'reviewed_by_id' => $request->user()->id,
@@ -272,11 +319,11 @@ class AdminAccountController extends Controller
                 'enrollment_application_id' => $application->id,
                 'user_id' => $trainee->id,
                 'recorded_by_admin_id' => $request->user()->id,
-                'transaction_type' => (float) $validated['onsite_payment_amount'] >= 22000
+                'transaction_type' => $verifiedAmount >= $programFee
                     ? PaymentTransaction::TYPE_FULL_PAYMENT
                     : PaymentTransaction::TYPE_DOWNPAYMENT,
                 'payment_channel' => PaymentTransaction::CHANNEL_ONSITE,
-                'amount' => $validated['onsite_payment_amount'],
+                'amount' => $verifiedAmount,
                 'or_number' => $validated['onsite_or_number'],
                 'status' => PaymentTransaction::STATUS_VERIFIED,
                 'paid_at' => now(),

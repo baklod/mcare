@@ -8,7 +8,7 @@
         \App\Models\TraineeCompetencyRecord::STATUS_IN_PROGRESS => 'IP',
         default => '',
     };
-    $categoryLabels = ['basic' => 'Basic Competencies', 'common' => 'Common Competencies', 'core' => 'Core Competencies'];
+    $categoryLabels = ['basic' => 'Basic Competencies', 'common' => 'Common Competencies', 'core' => 'Core Competencies', 'custom' => 'Institutional / Custom Competencies'];
 @endphp
 
 <style>

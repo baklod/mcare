@@ -34,8 +34,8 @@ class EnrollmentSubmittedNotification extends Notification implements ShouldQueu
     public function toDatabase(object $notifiable): array
     {
         return [
-            'title' => 'Enrollment application received',
-            'message' => 'Your Caregiving NC II enrollment was saved. Continue to payment and watch for review updates.',
+            'title' => 'Enrollment registration saved',
+            'message' => 'Your '.($this->application->program ?: 'training program').' enrollment was saved. Continue to payment; Admin Review begins after the required payment is verified.',
             'url' => route('payment.show'),
             'icon' => 'clipboard-check',
             'enrollment_application_id' => $this->application->id,
@@ -48,10 +48,10 @@ class EnrollmentSubmittedNotification extends Notification implements ShouldQueu
         $this->application->loadMissing('batch');
 
         $mail = (new MailMessage)
-            ->subject('MCARE enrollment application received')
+            ->subject('MCARE enrollment registration saved')
             ->greeting('Hello '.$notifiable->name.',')
-            ->line('We received your Caregiving NC II enrollment application.')
-            ->line('Current status: '.$this->application->statusLabel().'.');
+            ->line('We saved your '.($this->application->program ?: 'training program').' enrollment registration.')
+            ->line('Next step: complete the required enrollment payment. Your application will be released to MCARE administration for document and account review only after payment is verified.');
 
         if ($this->application->batch) {
             $mail->line('Training batch: '.$this->application->batch->name.' '.$this->application->batch->year.'.');
@@ -59,7 +59,7 @@ class EnrollmentSubmittedNotification extends Notification implements ShouldQueu
 
         return $mail
             ->action('Open MCARE', route('login'))
-            ->line('Keep this email for your records. MCARE will notify you when the application status changes.')
+            ->line('Keep this email for your records. MCARE will notify you after payment verification and again when the application status changes.')
             ->salutation('MCARE Training Center Administration');
     }
 }

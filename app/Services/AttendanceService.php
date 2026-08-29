@@ -3,12 +3,10 @@
 namespace App\Services;
 
 use App\Models\EnrollmentApplication;
-use App\Models\Quiz;
 use App\Models\TraineeAttendance;
 use App\Models\TrainingBatch;
 use App\Models\User;
 use Carbon\Carbon;
-use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AttendanceService
@@ -71,44 +69,6 @@ class AttendanceService
     }
 
     /**
-     * Record a trainee's self time-in for an asynchronous quiz/activity.
-     */
-    public function recordActivityTimeIn(
-        Quiz $quiz,
-        EnrollmentApplication $application,
-        Request $request
-    ): TraineeAttendance {
-        if (! $quiz->isTimeInAllowed()) {
-            throw new \DomainException('Time-in is currently not allowed or the deadline has passed.');
-        }
-
-        $isBatchMember = $quiz->training_batch_id && (int) $application->training_batch_id === (int) $quiz->training_batch_id;
-        $isTargetMember = (int) $quiz->target_enrollment_application_id === (int) $application->id;
-
-        if (! $isBatchMember && ! $isTargetMember) {
-            throw new \DomainException('You are not assigned to this activity.');
-        }
-
-        return TraineeAttendance::updateOrCreate(
-            [
-                'training_batch_id' => $application->training_batch_id,
-                'enrollment_application_id' => $application->id,
-                'attendance_date' => now()->toDateString(),
-                'quiz_id' => $quiz->id,
-            ],
-            [
-                'status' => TraineeAttendance::STATUS_PRESENT,
-                'check_in_type' => TraineeAttendance::TYPE_ACTIVITY_TIME_IN,
-                'timed_in_at' => now(),
-                'ip_address' => $request->ip(),
-                'user_agent' => str($request->userAgent() ?? '')->limit(500)->toString(),
-                'recorded_by_id' => $application->user_id,
-                'notes' => 'Self time-in for activity: '.$quiz->title,
-            ]
-        );
-    }
-
-    /**
      * Compute attendance summary statistics for a batch.
      *
      * @return array{
@@ -140,7 +100,9 @@ class AttendanceService
         $totalRates = 0;
 
         foreach ($trainees as $trainee) {
-            $attendances = $trainee->attendances->where('training_batch_id', $batch->id);
+            $attendances = $trainee->attendances
+                ->where('training_batch_id', $batch->id)
+                ->filter(fn (TraineeAttendance $attendance): bool => $attendance->quiz_id === null);
             $present = $attendances->where('status', TraineeAttendance::STATUS_PRESENT)->count();
             $late = $attendances->where('status', TraineeAttendance::STATUS_LATE)->count();
             $absent = $attendances->where('status', TraineeAttendance::STATUS_ABSENT)->count();
@@ -155,7 +117,7 @@ class AttendanceService
 
             $dateStatusMap = [];
             foreach ($distinctDates as $dateStr) {
-                $att = $attendances->first(fn ($a) => (is_string($a->attendance_date) ? $a->attendance_date : $a->attendance_date?->toDateString()) === $dateStr && ! $a->quiz_id);
+                $att = $attendances->first(fn ($a) => (is_string($a->attendance_date) ? $a->attendance_date : $a->attendance_date?->toDateString()) === $dateStr);
                 $dateStatusMap[$dateStr] = $att?->status ?? '-';
             }
 

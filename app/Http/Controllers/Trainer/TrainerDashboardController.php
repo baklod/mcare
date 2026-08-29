@@ -8,12 +8,16 @@ use App\Models\EnrollmentApplication;
 use App\Models\Quiz;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
+use App\Models\TrainingSubmodule;
+use App\Models\TrainingSubmoduleProgress;
 use App\Models\User;
 use App\Notifications\LmsModulePublished;
 use App\Rules\TrainingModuleFileType;
 use App\Services\ClassroomComments;
-use App\Support\TrainingModuleFiles;
+use App\Services\ModuleAssessmentService;
+use App\Services\ModuleSubmoduleService;
 use App\Services\TrainingCalendarService;
+use App\Support\TrainingModuleFiles;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
@@ -270,8 +274,9 @@ class TrainerDashboardController extends Controller
         Request $request,
         TrainingModule $module,
         ClassroomComments $comments,
-    ): View
-    {
+        ModuleAssessmentService $assessments,
+        ModuleSubmoduleService $submodules,
+    ): View {
         abort_unless($module->trainer_id === $request->user()->id, 403);
 
         AdminActivityLog::record($request->user(), 'trainer.module.preview.opened', $module, [
@@ -287,13 +292,35 @@ class TrainerDashboardController extends Controller
             : collect();
         $progressRecords = $module->progressRecords()->with(['application', 'evaluator'])->get();
         $progressByApp = $progressRecords->keyBy('enrollment_application_id');
-        $quizzes = $module->quizzes()->with(['questions', 'attempts.application'])->get();
+        $moduleSubmodules = $submodules->ensureStructure($module);
+        $submoduleProgressByApp = TrainingSubmoduleProgress::query()
+            ->with(['submodule', 'evaluator'])
+            ->whereIn('enrollment_application_id', $trainees->pluck('id'))
+            ->whereIn('training_submodule_id', $moduleSubmodules->pluck('id'))
+            ->get()
+            ->groupBy('enrollment_application_id')
+            ->map(fn ($progress) => $progress->keyBy('training_submodule_id'));
+        $quizzes = $module->quizzes()->with(['questions', 'attempts.application', 'trainingSubmodule'])->get();
+        $assessmentSummaryByApp = $trainees->mapWithKeys(fn (EnrollmentApplication $trainee) => [
+            $trainee->id => $assessments->summary($module, $trainee),
+        ]);
+        $submoduleAssessmentSummaryByApp = $trainees->mapWithKeys(function (EnrollmentApplication $trainee) use ($moduleSubmodules, $module, $assessments): array {
+            return [$trainee->id => $moduleSubmodules->mapWithKeys(
+                fn (TrainingSubmodule $submodule): array => [
+                    $submodule->id => $assessments->summary($module, $trainee, $submodule),
+                ]
+            )];
+        });
 
         return view('trainer.modules.show', [
-            'module' => $module->load(['batch', 'targetTrainee']),
+            'module' => $module->load(['batch', 'targetTrainee', 'competencyUnit']),
+            'submodules' => $moduleSubmodules,
+            'submoduleProgressByApp' => $submoduleProgressByApp,
             'trainees' => $trainees,
             'progressByApp' => $progressByApp,
             'quizzes' => $quizzes,
+            'assessmentSummaryByApp' => $assessmentSummaryByApp,
+            'submoduleAssessmentSummaryByApp' => $submoduleAssessmentSummaryByApp,
             'classroomComments' => $comments->visibleFor($request->user(), $module),
             'privateCommentRecipients' => $comments->privateRecipients($request->user(), $module),
         ]);

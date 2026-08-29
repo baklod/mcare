@@ -14,6 +14,8 @@ use Illuminate\Validation\ValidationException;
 
 class RollingModuleReleaseService
 {
+    public function __construct(private readonly ModuleSubmoduleService $submodules) {}
+
     /**
      * Make a delivery current and snapshot its audience. A batch activation
      * closes the previous batch delivery for future enrollees, but its
@@ -21,6 +23,11 @@ class RollingModuleReleaseService
      */
     public function activate(TrainingModule $module): Collection
     {
+        if ($module->release_mode === TrainingModule::RELEASE_SUPPLEMENTAL
+            || $module->competency_category === TrainingModule::CATEGORY_CUSTOM) {
+            return $this->publishSupplemental($module);
+        }
+
         $unlockedUserIds = DB::transaction(function () use ($module): Collection {
             $lockedModule = TrainingModule::query()->lockForUpdate()->findOrFail($module->id);
 
@@ -84,8 +91,54 @@ class RollingModuleReleaseService
                     ->get();
 
             return $applications
-                ->map(fn (EnrollmentApplication $application) => $this->assignLocked($application, $lockedModule))
+                ->map(fn (EnrollmentApplication $application) => $this->assignAvailable($application, $lockedModule))
                 ->filter(fn (ModuleProgress $progress): bool => $progress->isAccessible())
+                ->map(fn (ModuleProgress $progress): ?int => $progress->application?->user_id)
+                ->filter()
+                ->unique()
+                ->values();
+        }, 3);
+
+        $this->notifyUnlocked($module->fresh(['trainer']), $unlockedUserIds);
+
+        return $unlockedUserIds;
+    }
+
+    /** Publish a batch-wide custom module without replacing the rolling module. */
+    public function publishSupplemental(TrainingModule $module): Collection
+    {
+        $unlockedUserIds = DB::transaction(function () use ($module): Collection {
+            $lockedModule = TrainingModule::query()->lockForUpdate()->findOrFail($module->id);
+
+            if (! $lockedModule->is_published || ! $lockedModule->training_batch_id) {
+                throw ValidationException::withMessages([
+                    'module' => 'A supplemental module must be published to the trainer\'s assigned batch.',
+                ]);
+            }
+
+            $lockedModule->forceFill([
+                'release_mode' => TrainingModule::RELEASE_SUPPLEMENTAL,
+                'delivery_status' => TrainingModule::DELIVERY_AVAILABLE,
+                'activated_at' => $lockedModule->activated_at ?: now(),
+                'closed_at' => null,
+                'target_enrollment_application_id' => null,
+            ])->save();
+            $this->submodules->ensureStructure($lockedModule);
+
+            $applications = EnrollmentApplication::query()
+                ->where('training_batch_id', $lockedModule->training_batch_id)
+                ->where('status', EnrollmentApplication::STATUS_APPROVED)
+                ->where('is_historical_record', false)
+                ->where(function ($query): void {
+                    $query->whereNull('learning_status')
+                        ->orWhere('learning_status', EnrollmentApplication::LEARNING_ACTIVE);
+                })
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            return $applications
+                ->map(fn (EnrollmentApplication $application) => $this->assignAvailable($application, $lockedModule))
                 ->map(fn (ModuleProgress $progress): ?int => $progress->application?->user_id)
                 ->filter()
                 ->unique()
@@ -103,7 +156,10 @@ class RollingModuleReleaseService
         DB::transaction(function () use ($module): void {
             $lockedModule = TrainingModule::query()->lockForUpdate()->findOrFail($module->id);
 
-            if ($lockedModule->delivery_status !== TrainingModule::DELIVERY_ACTIVE) {
+            if (! in_array($lockedModule->delivery_status, [
+                TrainingModule::DELIVERY_ACTIVE,
+                TrainingModule::DELIVERY_AVAILABLE,
+            ], true)) {
                 return;
             }
 
@@ -137,7 +193,10 @@ class RollingModuleReleaseService
 
             $modules = TrainingModule::query()
                 ->where('is_published', true)
-                ->where('delivery_status', TrainingModule::DELIVERY_ACTIVE)
+                ->whereIn('delivery_status', [
+                    TrainingModule::DELIVERY_ACTIVE,
+                    TrainingModule::DELIVERY_AVAILABLE,
+                ])
                 ->where(function ($query) use ($lockedApplication): void {
                     $query->where(function ($batch) use ($lockedApplication): void {
                         $batch->whereNull('target_enrollment_application_id')
@@ -150,7 +209,7 @@ class RollingModuleReleaseService
                 ->get();
 
             return $modules->map(function (TrainingModule $module) use ($lockedApplication): ModuleProgress {
-                return $this->assignLocked($lockedApplication, $module);
+                return $this->assignAvailable($lockedApplication, $module);
             });
         }, 3);
 
@@ -166,27 +225,13 @@ class RollingModuleReleaseService
         return $assigned;
     }
 
-    /** Unlock exactly one next assignment after trainer validation. */
+    /** Recover one legacy locked assignment left by the former competency gate. */
     public function unlockNext(EnrollmentApplication $application): ?ModuleProgress
     {
         $next = DB::transaction(function () use ($application): ?ModuleProgress {
             $lockedApplication = EnrollmentApplication::query()
                 ->lockForUpdate()
                 ->findOrFail($application->id);
-
-            $blocking = ModuleProgress::query()
-                ->where('enrollment_application_id', $lockedApplication->id)
-                ->where('status', '!=', ModuleProgress::STATUS_LOCKED)
-                ->where(function ($query): void {
-                    $query->where('status', '!=', ModuleProgress::STATUS_COMPLETED)
-                        ->orWhere('competency_outcome', '!=', ModuleProgress::OUTCOME_COMPETENT)
-                        ->orWhereNull('competency_outcome');
-                })
-                ->exists();
-
-            if ($blocking) {
-                return null;
-            }
 
             $next = ModuleProgress::query()
                 ->where('enrollment_application_id', $lockedApplication->id)
@@ -218,7 +263,7 @@ class RollingModuleReleaseService
         return $next;
     }
 
-    private function assignLocked(
+    private function assignAvailable(
         EnrollmentApplication $application,
         TrainingModule $module,
     ): ModuleProgress {
@@ -231,13 +276,16 @@ class RollingModuleReleaseService
         if ($existing) {
             $existing->loadMissing('application');
 
-            if ($existing->status === ModuleProgress::STATUS_LOCKED
-                && ! $this->hasBlockingAssignment($application, $existing->id)) {
+            if ($existing->status === ModuleProgress::STATUS_LOCKED || ! $existing->unlocked_at) {
                 $existing->forceFill([
-                    'status' => ModuleProgress::STATUS_NOT_STARTED,
-                    'unlocked_at' => now(),
+                    'status' => $existing->status === ModuleProgress::STATUS_LOCKED
+                        ? ModuleProgress::STATUS_NOT_STARTED
+                        : $existing->status,
+                    'unlocked_at' => $existing->unlocked_at ?: now(),
                 ])->save();
             }
+
+            $this->submodules->assignProgress($existing);
 
             return $existing;
         }
@@ -246,35 +294,20 @@ class RollingModuleReleaseService
             ->where('enrollment_application_id', $application->id)
             ->lockForUpdate()
             ->max('sequence_number')) + 1;
-        $isLocked = $this->hasBlockingAssignment($application);
 
         $progress = ModuleProgress::create([
             'enrollment_application_id' => $application->id,
             'training_module_id' => $module->id,
             'sequence_number' => $sequence,
-            'status' => $isLocked ? ModuleProgress::STATUS_LOCKED : ModuleProgress::STATUS_NOT_STARTED,
+            'status' => ModuleProgress::STATUS_NOT_STARTED,
             'progress_percent' => 0,
             'assigned_at' => now(),
-            'unlocked_at' => $isLocked ? null : now(),
+            'unlocked_at' => now(),
         ]);
         $progress->setRelation('application', $application);
+        $this->submodules->assignProgress($progress);
 
         return $progress;
-    }
-
-    private function hasBlockingAssignment(
-        EnrollmentApplication $application,
-        ?int $exceptProgressId = null,
-    ): bool {
-        return ModuleProgress::query()
-            ->where('enrollment_application_id', $application->id)
-            ->when($exceptProgressId, fn ($query) => $query->whereKeyNot($exceptProgressId))
-            ->where(function ($query): void {
-                $query->where('status', '!=', ModuleProgress::STATUS_COMPLETED)
-                    ->orWhere('competency_outcome', '!=', ModuleProgress::OUTCOME_COMPETENT)
-                    ->orWhereNull('competency_outcome');
-            })
-            ->exists();
     }
 
     private function notifyUnlocked(TrainingModule $module, Collection $userIds): void

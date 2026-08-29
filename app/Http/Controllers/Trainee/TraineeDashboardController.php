@@ -12,10 +12,15 @@ use App\Models\OfficialDocument;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentTransaction;
 use App\Models\Quiz;
+use App\Models\QuizAttempt;
 use App\Models\TrainerAnnouncement;
 use App\Models\TrainingModule;
+use App\Models\TrainingSubmodule;
+use App\Models\TrainingSubmoduleProgress;
 use App\Services\ClassroomComments;
 use App\Services\CompletionEligibilityService;
+use App\Services\ModuleAssessmentService;
+use App\Services\ModuleSubmoduleService;
 use App\Services\TrainingCalendarService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -488,9 +493,10 @@ class TraineeDashboardController extends Controller
             ->whereIn('training_module_id', $modules->pluck('id'))
             ->get()
             ->keyBy('training_module_id');
-        $progressPercent = $modules->isEmpty()
+        $assessedModules = $modules->filter->requiresEvaluation();
+        $progressPercent = $assessedModules->isEmpty()
             ? 0
-            : (int) round($modules->sum(fn ($module) => $progressByModule->get($module->id)?->progress_percent ?? 0) / $modules->count());
+            : (int) round($assessedModules->sum(fn ($module) => $progressByModule->get($module->id)?->progress_percent ?? 0) / $assessedModules->count());
         if ($isGraduate && $view === 'trainee.dashboard') {
             // Graduates keep the trainee shell and account, but receive the Career Hub home content.
             $view = 'trainee.graduate-dashboard';
@@ -538,17 +544,31 @@ class TraineeDashboardController extends Controller
         Request $request,
         TrainingModule $module,
         ClassroomComments $comments,
-    ): View
-    {
+        ModuleAssessmentService $assessments,
+        ModuleSubmoduleService $submodules,
+    ): View {
         $application = $this->approvedApplicationFor($request);
         $this->authorizeModule($application, $module);
 
         // Opening the protected viewer is a server-side progress event and does not depend on JavaScript.
         $progress = $this->touchModuleProgress($application, $module);
+        $submodules->assignProgress($progress);
         $progress->load('evaluator');
+        $moduleSubmodules = $module->submodules()->with('quizzes')->get();
+        $submoduleProgressById = TrainingSubmoduleProgress::query()
+            ->where('enrollment_application_id', $application->id)
+            ->whereIn('training_submodule_id', $moduleSubmodules->pluck('id'))
+            ->get()
+            ->keyBy('training_submodule_id');
+        $submoduleAssessmentSummaries = $moduleSubmodules->mapWithKeys(
+            fn (TrainingSubmodule $submodule): array => [
+                $submodule->id => $assessments->summary($module, $application, $submodule),
+            ]
+        );
 
-        $quizzes = $module->quizzes()->released()->get();
-        $quizAttempts = \App\Models\QuizAttempt::query()
+        $assessmentSummary = $assessments->summary($module, $application);
+        $quizzes = $assessmentSummary['quizzes'];
+        $quizAttempts = QuizAttempt::query()
             ->where('enrollment_application_id', $application->id)
             ->whereIn('quiz_id', $quizzes->pluck('id'))
             ->latest()
@@ -566,6 +586,10 @@ class TraineeDashboardController extends Controller
             'progress' => $progress,
             'quizzes' => $quizzes,
             'quizAttempts' => $quizAttempts,
+            'assessmentSummary' => $assessmentSummary,
+            'submodules' => $moduleSubmodules,
+            'submoduleProgressById' => $submoduleProgressById,
+            'submoduleAssessmentSummaries' => $submoduleAssessmentSummaries,
             'classroomComments' => $comments->visibleFor($request->user(), $module),
             'privateCommentRecipients' => $comments->privateRecipients($request->user(), $module),
         ]);
@@ -634,11 +658,19 @@ class TraineeDashboardController extends Controller
         return $this->moduleFileResponse($module, HeaderUtils::DISPOSITION_ATTACHMENT);
     }
 
-    public function updateProgress(Request $request, TrainingModule $module): RedirectResponse
-    {
+    public function updateProgress(
+        Request $request,
+        TrainingModule $module,
+        ModuleAssessmentService $assessments,
+    ): RedirectResponse {
         $application = $this->approvedApplicationFor($request);
         $this->authorizeModule($application, $module);
         $validated = $request->validate(['action' => ['required', 'in:submit,complete,reopen']]);
+        if ($module->submodules()->where('is_required', true)->exists()) {
+            throw ValidationException::withMessages([
+                'action' => 'Complete and submit each required submodule. The main module result is calculated automatically.',
+            ]);
+        }
         $submitting = in_array($validated['action'], ['submit', 'complete'], true);
         $progress = ModuleProgress::query()->where([
             'enrollment_application_id' => $application->id,
@@ -652,19 +684,26 @@ class TraineeDashboardController extends Controller
         }
 
         if ($submitting) {
-            $requiredQuizIds = $module->quizzes()->released()->pluck('id');
-            $passedQuizIds = \App\Models\QuizAttempt::query()
-                ->where('enrollment_application_id', $application->id)
-                ->whereIn('quiz_id', $requiredQuizIds)
-                ->where('status', \App\Models\QuizAttempt::STATUS_GRADED)
-                ->where('passed', true)
-                ->distinct()
-                ->pluck('quiz_id');
-
-            if ($passedQuizIds->count() !== $requiredQuizIds->count()) {
+            if (! $module->requiresEvaluation()) {
                 throw ValidationException::withMessages([
-                    'action' => 'Pass every available module quiz before submitting this lesson for trainer evaluation.',
+                    'action' => 'This is a learning-material-only module. It has no Mark as Done or trainer evaluation requirement.',
                 ]);
+            }
+
+            $summary = $assessments->summary($module, $application);
+
+            if ($summary['required_count'] === 0) {
+                throw ValidationException::withMessages([
+                    'action' => 'This assessed module has no published classwork yet. Wait for the trainer to publish a quiz or activity before using Mark as Done.',
+                ]);
+            }
+
+            if (! $summary['all_passed']) {
+                $message = $summary['ready_for_remediation_evaluation']
+                    ? 'All attempts are used and one or more assessments were not passed. Your trainer can now record a remediation evaluation; Mark as Done is unavailable.'
+                    : 'Pass every published quiz or activity before submitting this module for trainer evaluation.';
+
+                throw ValidationException::withMessages(['action' => $message]);
             }
         }
 
@@ -691,6 +730,78 @@ class TraineeDashboardController extends Controller
         return $redirect->with('saved', $submitting
             ? 'Module submitted. Your trainer must validate the competency before the next module unlocks.'
             : 'Module returned to in progress.');
+    }
+
+    public function updateSubmoduleProgress(
+        Request $request,
+        TrainingModule $module,
+        TrainingSubmodule $submodule,
+        ModuleAssessmentService $assessments,
+        ModuleSubmoduleService $submodules,
+    ): RedirectResponse {
+        $application = $this->approvedApplicationFor($request);
+        $this->authorizeModule($application, $module);
+        abort_unless((int) $submodule->training_module_id === (int) $module->id, 404);
+        $validated = $request->validate(['action' => ['required', Rule::in(['submit', 'reopen'])]]);
+
+        if (! $module->requiresEvaluation()) {
+            throw ValidationException::withMessages([
+                'action' => 'Learning-material-only modules do not require competency submissions.',
+            ]);
+        }
+
+        $parent = ModuleProgress::query()->where([
+            'enrollment_application_id' => $application->id,
+            'training_module_id' => $module->id,
+        ])->firstOrFail();
+        $submodules->assignProgress($parent);
+        $progress = TrainingSubmoduleProgress::query()->where([
+            'enrollment_application_id' => $application->id,
+            'training_submodule_id' => $submodule->id,
+        ])->firstOrFail();
+
+        if ($progress->isTrainerValidated()) {
+            throw ValidationException::withMessages([
+                'action' => 'A trainer-validated submodule cannot be returned to in progress.',
+            ]);
+        }
+
+        $submitting = $validated['action'] === 'submit';
+        if ($submitting) {
+            $summary = $assessments->summary($module, $application, $submodule);
+            if ($summary['required_count'] > 0 && ! $summary['all_passed']) {
+                $message = $summary['ready_for_remediation_evaluation']
+                    ? 'All attempts are used. Your trainer can now record a remediation evaluation for this submodule.'
+                    : 'Pass every quiz or activity assigned to this submodule before marking it done.';
+                throw ValidationException::withMessages(['action' => $message]);
+            }
+        }
+
+        DB::transaction(function () use ($progress, $submitting, $application, $module, $submodules): void {
+            $progress->forceFill([
+                'status' => $submitting
+                    ? TrainingSubmoduleProgress::STATUS_AWAITING_EVALUATION
+                    : TrainingSubmoduleProgress::STATUS_IN_PROGRESS,
+                'progress_percent' => $submitting ? 95 : 10,
+                'first_opened_at' => $progress->first_opened_at ?: now(),
+                'last_viewed_at' => now(),
+                'submitted_at' => $submitting ? now() : null,
+                'completed_at' => null,
+            ])->save();
+            $submodules->recalculateParent($application, $module);
+        }, 3);
+
+        AdminActivityLog::record($request->user(), 'trainee.submodule.progress.updated', $progress, [
+            'module_id' => $module->id,
+            'submodule_id' => $submodule->id,
+            'status' => $progress->status,
+        ]);
+
+        return redirect()
+            ->to(route('trainee.modules.show', $module).'#submodules')
+            ->with('saved', $submitting
+                ? "{$submodule->title} submitted for trainer evaluation."
+                : "{$submodule->title} returned to in progress.");
     }
 
     public function securityEvent(Request $request, TrainingModule $module): Response
@@ -730,7 +841,12 @@ class TraineeDashboardController extends Controller
         abort_unless($progress, 404);
 
         if (! $allowEvaluated) {
-            abort_if($progress->isTrainerValidated(), 403, 'Learning files and downloads are closed for evaluated and completed modules.');
+            abort_if(
+                $progress->isTrainerValidated()
+                    || $progress->status === ModuleProgress::STATUS_AWAITING_EVALUATION,
+                403,
+                'Learning files and downloads are closed while a module is submitted or completed.'
+            );
         }
     }
 

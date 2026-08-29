@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
 use App\Models\TrainingBatch;
+use App\Models\TrainingProgram;
 use App\Models\User;
 use App\Services\TrainingCalendarService;
 use Illuminate\Http\RedirectResponse;
@@ -12,7 +13,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class BatchScheduleController extends Controller
@@ -26,8 +26,7 @@ class BatchScheduleController extends Controller
         Request $request,
         TrainingBatch $trainingBatch,
         TrainingCalendarService $calendarService,
-    ): View
-    {
+    ): View {
         return $this->scheduleView($request, $calendarService, $trainingBatch);
     }
 
@@ -39,8 +38,10 @@ class BatchScheduleController extends Controller
 
         AdminActivityLog::record($request->user(), 'batch.created', $batch, [
             'name' => $batch->name,
+            'training_program_id' => $batch->training_program_id,
             'year' => $batch->year,
             'active' => $batch->is_active,
+            'public' => $batch->show_on_enrollment_page,
             'trainer_id' => $batch->trainer_id,
             'enrollment_ends_at' => $batch->enrollment_ends_at?->toDateTimeString(),
         ]);
@@ -55,10 +56,12 @@ class BatchScheduleController extends Controller
         $validated = $this->validated($request, $trainingBatch);
 
         $before = $trainingBatch->only([
+            'training_program_id',
             'name',
             'year',
             'trainer_id',
             'is_active',
+            'show_on_enrollment_page',
             'enrollment_starts_at',
             'enrollment_ends_at',
             'training_starts_at',
@@ -136,6 +139,16 @@ class BatchScheduleController extends Controller
     {
         $safeText = ['not_regex:/[<>"\'`;{}|\\\\]/u'];
 
+        // Existing integrations created batches before programs were explicit.
+        // Use the batch's program (or the oldest active default) only when the
+        // request omits it; the current admin UI always submits an explicit choice.
+        if (! $request->filled('training_program_id')) {
+            $request->merge([
+                'training_program_id' => $batch?->training_program_id
+                    ?: TrainingProgram::query()->active()->oldest('id')->value('id'),
+            ]);
+        }
+
         // Normalize time inputs by trimming seconds if present (e.g. "08:00:00" -> "08:00")
         foreach (['am_start_time', 'am_end_time', 'pm_start_time', 'pm_end_time'] as $timeField) {
             if ($request->filled($timeField)) {
@@ -148,12 +161,14 @@ class BatchScheduleController extends Controller
         }
 
         $validated = $request->validate([
+            'training_program_id' => ['required', 'integer', 'exists:training_programs,id'],
             'name' => [
                 'required',
                 'string',
                 'max:120',
                 ...$safeText,
                 Rule::unique('training_batches', 'name')
+                    ->where('training_program_id', $request->integer('training_program_id'))
                     ->where('year', $request->integer('year'))
                     ->ignore($batch?->id),
             ],
@@ -164,6 +179,7 @@ class BatchScheduleController extends Controller
                 Rule::exists('users', 'id')->where(fn ($query) => $query->where('role', 'trainer')),
             ],
             'is_active' => ['nullable', 'boolean'],
+            'show_on_enrollment_page' => ['nullable', 'boolean'],
             'is_continuous_enrollment' => ['nullable', 'boolean'],
             'enrollment_starts_at' => ['nullable', 'date'],
             // A new batch must open a future enrollment window. Existing
@@ -187,7 +203,7 @@ class BatchScheduleController extends Controller
             'pm_days' => ['required', 'string', 'max:50', ...$safeText],
             'notes' => ['nullable', 'string', 'max:1000', ...$safeText],
         ], [
-            'name.unique' => 'A batch with this name and year already exists.',
+            'name.unique' => 'A batch with this name and year already exists for the selected program.',
             'not_regex' => 'This field contains characters that are not allowed for security reasons.',
             'enrollment_ends_at.after' => 'Enrollment deadline must be a future date and time.',
             'training_ends_at.after_or_equal' => 'Training end must be on or later than the training start date.',
@@ -197,6 +213,7 @@ class BatchScheduleController extends Controller
         ]);
 
         $validated['is_active'] = $request->boolean('is_active');
+        $validated['show_on_enrollment_page'] = $request->boolean('show_on_enrollment_page');
         $validated['is_continuous_enrollment'] = $request->boolean('is_continuous_enrollment');
         if ($validated['is_continuous_enrollment']) {
             $validated['enrollment_ends_at'] = null;
@@ -222,6 +239,7 @@ class BatchScheduleController extends Controller
             ? Carbon::createFromFormat('Y-m', $validated['month'])->startOfMonth()
             : $defaultMonth;
         $calendarBatches = TrainingBatch::query()
+            ->with('program')
             ->orderByDesc('is_active')
             ->orderByDesc('year')
             ->orderBy('name')
@@ -230,7 +248,7 @@ class BatchScheduleController extends Controller
 
         return view('admin.schedules.index', [
             'batches' => TrainingBatch::query()
-                ->with('trainer')
+                ->with(['trainer', 'program'])
                 ->withCount([
                     'applications',
                     'modules',
@@ -244,6 +262,11 @@ class BatchScheduleController extends Controller
                 ->orderBy('name')
                 ->paginate(10)
                 ->withQueryString(),
+            'programs' => TrainingProgram::query()
+                ->withCount('batches')
+                ->orderByDesc('is_active')
+                ->orderBy('name')
+                ->get(),
             'trainers' => User::query()
                 ->where('role', 'trainer')
                 ->orderBy('name')

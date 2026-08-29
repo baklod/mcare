@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -44,6 +45,7 @@ class EnrollmentApplication extends Model
         'user_id',
         'email',
         'program',
+        'training_program_id',
         'intake_channel',
         'is_historical_record',
         'training_batch_id',
@@ -93,6 +95,7 @@ class EnrollmentApplication extends Model
         'onsite_requirements_notes',
         'date_accomplished',
         'status',
+        'review_released_at',
         'learning_status',
         'learning_status_notes',
         'learning_status_changed_at',
@@ -127,6 +130,7 @@ class EnrollmentApplication extends Model
             'date_accomplished' => 'date',
             'privacy_consent' => 'boolean',
             'is_historical_record' => 'boolean',
+            'review_released_at' => 'datetime',
             'total_program_fee' => 'decimal:2',
             'downpayment_amount' => 'decimal:2',
             'total_paid_amount' => 'decimal:2',
@@ -236,6 +240,16 @@ class EnrollmentApplication extends Model
         return $this->isDownpaymentSatisfied() && $this->payment_verified_at !== null;
     }
 
+    public function isReleasedForReview(): bool
+    {
+        return $this->review_released_at !== null;
+    }
+
+    public function scopeReleasedForReview(Builder $query): Builder
+    {
+        return $query->whereNotNull('review_released_at');
+    }
+
     public function recalculatePaymentStatus(): void
     {
         $totalPaid = (float) $this->paymentTransactions()
@@ -300,6 +314,11 @@ class EnrollmentApplication extends Model
     public function batch(): BelongsTo
     {
         return $this->belongsTo(TrainingBatch::class, 'training_batch_id');
+    }
+
+    public function trainingProgram(): BelongsTo
+    {
+        return $this->belongsTo(TrainingProgram::class, 'training_program_id');
     }
 
     public function moduleProgress(): HasMany

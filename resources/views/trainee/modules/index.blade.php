@@ -49,6 +49,7 @@
                             $progressValue = (int) ($moduleProgress?->progress_percent ?? 0);
                             $isCompetent = $moduleProgress?->competency_outcome === 'competent';
                             $isCompleted = $moduleProgress?->status === 'completed' || $isCompetent;
+                            $isMaterialOnly = !$module->requiresEvaluation();
                             $suppCount = count($module->supplementaryList());
                             $quizCount = $module->quizzes()->where('is_published', true)->count();
                         @endphp
@@ -68,8 +69,8 @@
                                             </a>
                                         </h3>
                                     </div>
-                                    <span class="lms-status-chip {{ $isCompetent ? 'is-green' : ($moduleProgress ? 'is-amber' : 'is-neutral') }}">
-                                        {{ $isCompetent ? 'Competent (Passed)' : ($moduleProgress ? str($moduleProgress->status)->headline() : 'Not started') }}
+                                    <span class="lms-status-chip {{ $isCompleted ? 'is-green' : ($isMaterialOnly ? 'is-purple' : ($moduleProgress ? 'is-amber' : 'is-neutral')) }}">
+                                        {{ $isCompleted ? '✓ Completed — '.($module->module_code ?: $module->title) : ($isMaterialOnly ? 'Learning Material' : ($moduleProgress ? $moduleProgress->workflowStatusLabel() : 'Not started')) }}
                                     </span>
                                 </div>
 
@@ -98,8 +99,8 @@
                                     <span style="width: {{ $progressValue }}%"></span>
                                 </div>
                             </div>
-                            <a href="{{ route('trainee.modules.show', $module) }}" class="primary-action text-xs py-2 px-4 shrink-0">
-                                Open Module
+                            <a href="{{ route('trainee.modules.show', $module) }}" class="{{ $isCompleted ? 'secondary-action' : 'primary-action' }} text-xs py-2 px-4 shrink-0">
+                                {{ $isCompleted ? 'View Completion' : 'Open Module' }}
                             </a>
                         </article>
                     @endforeach
