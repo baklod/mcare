@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\TraineeUserProfile;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -43,6 +44,8 @@ class EnrollmentApplication extends Model
 
     protected $fillable = [
         'user_id',
+        'enrollment_number',
+        'admission_application_id',
         'email',
         'program',
         'training_program_id',
@@ -123,6 +126,72 @@ class EnrollmentApplication extends Model
         'reviewed_by_id',
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (EnrollmentApplication $application): void {
+            if (blank($application->enrollment_number)) {
+                $application->enrollment_number = self::generateNumber();
+            }
+        });
+
+        static::saved(function (EnrollmentApplication $application): void {
+            if (! $application->user_id) {
+                return;
+            }
+
+            $user = $application->relationLoaded('user')
+                ? $application->user
+                : $application->user()->first();
+
+            if ($user) {
+                TraineeUserProfile::sync($user, $application);
+            }
+        });
+    }
+
+    public static function generateNumber(): string
+    {
+        $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+        do {
+            $suffix = '';
+            for ($i = 0; $i < 6; $i++) {
+                $suffix .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+            }
+
+            $number = 'MCE-'.now()->year.'-'.$suffix;
+        } while (self::query()->where('enrollment_number', $number)->exists());
+
+        return $number;
+    }
+
+    public static function normalizeNumber(?string $value): string
+    {
+        $compact = self::compactLookupKey($value);
+
+        if (preg_match('/^MCE(\d{4})([A-Z0-9]{6})$/', $compact, $matches) === 1) {
+            return 'MCE-'.$matches[1].'-'.$matches[2];
+        }
+
+        return strtoupper(trim((string) $value));
+    }
+
+    public static function compactLookupKey(?string $value): string
+    {
+        return strtoupper((string) preg_replace('/[^A-Za-z0-9]/', '', (string) $value));
+    }
+
+    public static function findByNumber(?string $value): ?self
+    {
+        $number = self::normalizeNumber($value);
+
+        if ($number === '') {
+            return null;
+        }
+
+        return self::query()->where('enrollment_number', $number)->first();
+    }
+
     protected function casts(): array
     {
         return [
@@ -189,6 +258,38 @@ class EnrollmentApplication extends Model
     {
         return self::learningStatuses()[$this->learning_status]
             ?? str($this->learning_status)->headline()->toString();
+    }
+
+    public function accountDeletionTitle(): string
+    {
+        return $this->is_historical_record
+            ? 'Delete verified alumni record?'
+            : 'Delete this trainee?';
+    }
+
+    public function accountDeletionMessage(): string
+    {
+        $name = trim($this->first_name.' '.$this->last_name) ?: 'this trainee';
+
+        if ($this->is_historical_record) {
+            return $name.' was added through a verified historical alumni claim, not a regular enrollment.';
+        }
+
+        return "Permanently delete {$name}? Their account, enrollment, payment records, uploaded documents, and learning history will be removed. This cannot be undone.";
+    }
+
+    public function accountDeletionDetail(): ?string
+    {
+        if (! $this->is_historical_record) {
+            return null;
+        }
+
+        return 'Deleting permanently removes their alumni account, verified training record, approved alumni claim, uploaded certificate or TOR evidence, and Career Hub access. This cannot be undone.';
+    }
+
+    public function accountDeletionAction(): string
+    {
+        return $this->is_historical_record ? 'Delete alumni record' : 'Delete trainee';
     }
 
     public static function paymentStatuses(): array
@@ -277,13 +378,69 @@ class EnrollmentApplication extends Model
 
     public function hasActiveOnsiteReceipt(): bool
     {
-        return filled($this->payment_receipt_number)
-            && (! $this->payment_receipt_expires_at || $this->payment_receipt_expires_at->isFuture());
+        if ($this->payment_method !== 'onsite') {
+            return false;
+        }
+
+        if (blank($this->payment_reference) && blank($this->payment_receipt_number)) {
+            return false;
+        }
+
+        return ! $this->payment_receipt_expires_at || $this->payment_receipt_expires_at->isFuture();
+    }
+
+    public function canViewPaymentSlip(): bool
+    {
+        if ($this->payment_method === 'onsite') {
+            return filled($this->payment_reference) || filled($this->payment_receipt_number);
+        }
+
+        return $this->hasEnrollmentPaymentClearance();
+    }
+
+    public function paymongoPaymentId(): ?string
+    {
+        $fromMeta = data_get($this->payment_meta, 'paymongo_payment_id');
+        if (filled($fromMeta)) {
+            return (string) $fromMeta;
+        }
+
+        if (! $this->relationLoaded('paymentTransactions')) {
+            return null;
+        }
+
+        return $this->paymentTransactions->first(
+            fn (PaymentTransaction $transaction): bool => $transaction->payment_channel === PaymentTransaction::CHANNEL_ONLINE
+                && filled($transaction->reference_number)
+        )?->reference_number;
+    }
+
+    public function latestPaymentReference(): ?string
+    {
+        if ($this->payment_method === 'online') {
+            return $this->paymongoPaymentId()
+                ?: $this->payment_reference
+                ?: $this->paymongo_checkout_reference;
+        }
+
+        $pendingTicket = $this->relationLoaded('paymentTransactions')
+            ? $this->paymentTransactions->first(fn (PaymentTransaction $transaction): bool => $transaction->isOnsiteTicket())
+            : null;
+
+        return $this->payment_reference
+            ?: $pendingTicket?->reference_number
+            ?: $pendingTicket?->ticket_number
+            ?: $this->payment_receipt_number;
     }
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function admissionApplication(): BelongsTo
+    {
+        return $this->belongsTo(AdmissionApplication::class);
     }
 
     public function reviewer(): BelongsTo

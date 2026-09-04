@@ -1,0 +1,561 @@
+/* Official TESDA portal skin for admin, trainer, and trainee dashboards.
+ * Keeps the purple palette while using a government-style, low-radius layout. */
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) {
+    --admin-ink: #1e1b24;
+    --admin-muted: #5c5668;
+    --admin-line: #c9c3d4;
+    --admin-paper: #f3f2f6;
+    --admin-panel: #ffffff;
+    --admin-purple: #6b21a8;
+    --admin-purple-deep: #4c1d95;
+    --admin-radius: 2px;
+    --lms-radius: 2px;
+    --lms-shadow: none;
+    background: var(--admin-paper);
+    color: var(--admin-ink);
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) h1,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) h2,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) h3,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .font-display,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-header-title,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-section-title,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-brand-title,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-hero h1,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-stat-value {
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .font-black,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .font-extrabold,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .font-display {
+    font-weight: 700;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-layout {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh;
+    background: var(--admin-paper);
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-sidebar {
+    background: #fbfafc;
+    border-right-color: var(--admin-line);
+    box-shadow: none;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-brand,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-nav-link,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-account-summary,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-account-action,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-sidebar-collapse,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-search,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .primary-action,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .secondary-action,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-pill,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .admin-module-action,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-context-link,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-account-menu,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .trainer-day-session,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .trainer-day-state {
+    border-radius: var(--admin-radius);
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-nav-link {
+    min-height: 2.5rem;
+    height: auto;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-left: 3px solid transparent;
+    font-weight: 600;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-nav-link.is-active,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-nav-link[aria-current="page"] {
+    background: #f3e8ff;
+    color: var(--admin-purple-deep);
+    box-shadow: none;
+    --tw-ring-shadow: 0 0 #0000;
+    border-left-color: var(--admin-purple);
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .admin-masthead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1.25rem;
+    flex-shrink: 0;
+    min-height: 2.25rem;
+    padding: 0.4rem 1.5rem;
+    background: var(--admin-purple-deep);
+    color: #f5f3ff;
+    border-bottom: 1px solid #3b0764;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .admin-masthead-kicker,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .admin-masthead-aside {
+    margin: 0;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .admin-masthead-kicker {
+    font-family: Georgia, "Times New Roman", ui-serif, serif;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .admin-masthead-aside {
+    color: #ddd6fe;
+    letter-spacing: 0.1em;
+}
+
+@media (max-width: 767px) {
+    .universal-dashboard[data-dashboard-role="trainee"] .admin-masthead {
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.05rem;
+        min-height: 0;
+        padding: 0.18rem 0.7rem;
+    }
+
+    .universal-dashboard[data-dashboard-role="trainee"] .admin-masthead-kicker,
+    .universal-dashboard[data-dashboard-role="trainee"] .admin-masthead-aside {
+        width: 100%;
+        text-align: center;
+        font-size: 0.5625rem;
+        letter-spacing: 0.04em;
+        line-height: 1.15;
+    }
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-topbar {
+    border-bottom: 1px solid var(--admin-line);
+    background: #fff;
+    box-shadow: none;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-topbar-inner {
+    min-height: 4.25rem;
+    padding-top: 0.65rem;
+    padding-bottom: 0.65rem;
+}
+
+.universal-dashboard[data-dashboard-role="trainer"] .dashboard-search {
+    display: flex;
+    position: relative;
+    min-width: 0;
+    overflow: visible;
+}
+
+.universal-dashboard[data-dashboard-role="trainer"] .dashboard-topbar,
+.universal-dashboard[data-dashboard-role="trainer"] .dashboard-topbar-inner {
+    overflow: visible;
+}
+
+.universal-dashboard[data-dashboard-role="trainer"] .trainer-search-suggest {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 50;
+    max-height: 24rem;
+    overflow-y: auto;
+    border: 1px solid var(--admin-line);
+    background: var(--admin-panel);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+}
+
+.universal-dashboard[data-dashboard-role="trainer"] .trainer-search-suggest[hidden] {
+    display: none;
+}
+
+.universal-dashboard[data-dashboard-role="trainer"] .trainer-search-suggest-group + .trainer-search-suggest-group {
+    border-top: 1px solid var(--admin-line);
+}
+
+.universal-dashboard[data-dashboard-role="trainer"] .trainer-search-suggest-label {
+    padding: 0.55rem 0.85rem 0.2rem;
+    color: var(--admin-muted);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.universal-dashboard[data-dashboard-role="trainer"] .trainer-search-suggest a {
+    display: block;
+    padding: 0.55rem 0.85rem;
+    color: var(--admin-ink);
+    text-decoration: none;
+}
+
+.universal-dashboard[data-dashboard-role="trainer"] .trainer-search-suggest a:hover,
+.universal-dashboard[data-dashboard-role="trainer"] .trainer-search-suggest a:focus-visible {
+    background: #f3e8ff;
+}
+
+.universal-dashboard[data-dashboard-role="trainer"] .trainer-search-suggest strong {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 700;
+}
+
+.universal-dashboard[data-dashboard-role="trainer"] .trainer-search-suggest small {
+    display: block;
+    margin-top: 0.1rem;
+    color: var(--admin-muted);
+    font-size: 0.75rem;
+}
+
+.universal-dashboard[data-dashboard-role="trainer"] .trainer-search-suggest-empty {
+    padding: 0.85rem;
+    color: var(--admin-muted);
+    font-size: 0.8125rem;
+}
+
+@media (max-width: 767px) {
+    .universal-dashboard[data-dashboard-role="trainer"] .dashboard-topbar-inner {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "start account"
+            "search search";
+        gap: 8px;
+    }
+
+    .universal-dashboard[data-dashboard-role="trainer"] .dashboard-topbar-start {
+        grid-area: start;
+    }
+
+    .universal-dashboard[data-dashboard-role="trainer"] .dashboard-search {
+        grid-area: search;
+        display: flex;
+    }
+
+    .universal-dashboard[data-dashboard-role="trainer"] .dashboard-topbar-account {
+        grid-area: account;
+    }
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-header-kicker {
+    font-weight: 700;
+    letter-spacing: 0.14em;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-header-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-search {
+    border-color: #a8a3b5;
+    border-radius: var(--admin-radius);
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-main {
+    flex: 1 1 auto;
+    background: var(--admin-paper);
+}
+
+.universal-dashboard:is([data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-main > .lms-page,
+.universal-dashboard:is([data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-main > .max-w-7xl,
+.universal-dashboard:is([data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-main > .max-w-6xl,
+.universal-dashboard:is([data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-main > .mx-auto {
+    width: 100%;
+    max-width: none;
+    margin-inline: 0;
+}
+
+.universal-dashboard:is([data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-main .dashboard-panel,
+.universal-dashboard:is([data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-main .dashboard-table-wrap,
+.universal-dashboard:is([data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-main .lms-results-panel {
+    width: 100%;
+    max-width: none;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-main :is(.rounded-xl, .rounded-2xl, .rounded-3xl, .rounded-lg) {
+    border-radius: var(--admin-radius) !important;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-main .rounded-full:not(.user-avatar):not(.dashboard-account-avatar):not(.user-avatar-fallback):not(.animate-spin):not(.mcare-spinner) {
+    border-radius: var(--admin-radius) !important;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-card,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-panel,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-stat,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-hero,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-table-wrap {
+    border-radius: var(--admin-radius);
+    border-color: var(--admin-line);
+    box-shadow: none;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-card:hover,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-stat:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: var(--admin-line);
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-hero {
+    border-top: 4px solid var(--admin-purple);
+    padding: 1.25rem 1.5rem;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-hero h1,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-main .text-4xl {
+    font-size: 1.5rem;
+    line-height: 1.25;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-main .text-3xl {
+    font-size: 1.375rem;
+    line-height: 1.3;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-section-title {
+    font-size: 1.25rem;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-section-kicker {
+    letter-spacing: 0.14em;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .primary-action,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .secondary-action {
+    border-radius: var(--admin-radius);
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    box-shadow: none;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .primary-action:hover,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .secondary-action:hover {
+    transform: none;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) input:not([type="checkbox"]):not([type="radio"]),
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) select,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) textarea {
+    border-radius: var(--admin-radius);
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) thead {
+    background: #efeaf7;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) thead th {
+    border-bottom: 2px solid var(--admin-purple);
+    color: var(--admin-purple-deep);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) tbody td {
+    border-color: #e4e0ea;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .admin-colophon {
+    flex-shrink: 0;
+    margin-top: auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.35rem 1.5rem;
+    padding: 0.55rem 1.5rem 0.7rem;
+    border-top: 1px solid var(--admin-line);
+    background: #eceaf1;
+    color: var(--admin-muted);
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .admin-colophon p {
+    margin: 0;
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .lms-confirm-card,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .lms-class-header,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .lms-class-banner,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-toast {
+    border-radius: var(--admin-radius);
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .lms-confirm-actions > *,
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .lms-danger-action {
+    border-radius: 0;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) {
+    --admin-ink: #eef2ff;
+    --admin-muted: #c4b5fd;
+    --admin-line: #334155;
+    --admin-paper: #080c14;
+    --admin-panel: #111827;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .admin-masthead {
+    background: #2e1065;
+    border-bottom-color: #1e1b4b;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .admin-colophon {
+    background: #0d1322;
+    color: #94a3b8;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-sidebar,
+html[data-dashboard-theme="dark"] .universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) thead {
+    background: #111827;
+}
+
+.universal-dashboard #record-onsite-payment-dialog {
+    width: min(96vw, 72rem);
+    max-width: 72rem;
+    max-height: 92vh;
+    overflow: auto;
+}
+
+.universal-dashboard #record-onsite-payment-dialog .record-onsite-layout {
+    display: grid;
+    grid-template-columns: minmax(18rem, 0.9fr) minmax(24rem, 1.2fr);
+    align-items: stretch;
+    gap: 1.25rem;
+}
+
+.universal-dashboard #record-onsite-payment-dialog .record-enrollee-panel {
+    display: flex;
+    min-height: 16.5rem;
+    flex-direction: column;
+}
+
+@media (max-width: 860px) {
+    .universal-dashboard #record-onsite-payment-dialog .record-onsite-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.universal-dashboard .career-form-dialog {
+    width: min(96vw, 72rem);
+    max-width: 72rem;
+    max-height: 92vh;
+    overflow: hidden;
+}
+
+.universal-dashboard .career-form-dialog[open] {
+    display: flex;
+    flex-direction: column;
+}
+
+.universal-dashboard .career-form-dialog > form {
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.universal-dashboard .career-form-dialog .career-form-layout {
+    display: grid;
+    grid-template-columns: minmax(22rem, 1.15fr) minmax(20rem, 0.85fr);
+    align-items: stretch;
+    gap: 1.25rem;
+}
+
+@media (max-width: 860px) {
+    .universal-dashboard .career-form-dialog .career-form-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.universal-dashboard:is([data-dashboard-role="trainer"]) .dashboard-main > [data-quiz-builder].lms-page,
+.universal-dashboard:is([data-dashboard-role="trainer"]) .dashboard-main > .lms-quiz-editor-followup {
+    width: 100%;
+    max-width: 72rem;
+    margin-inline: auto;
+}
+
+.universal-dashboard:is([data-dashboard-role="trainer"]) .lms-quiz-editor-followup {
+    --lms-radius: 0;
+}
+
+.universal-dashboard:is([data-dashboard-role="trainer"]) .lms-quiz-editor-followup .lms-comments-panel {
+    border-radius: 0;
+}
+
+.universal-dashboard:is([data-dashboard-role="trainer"]) [data-quiz-builder] {
+    --lms-radius: 0;
+    --admin-radius: 0;
+}
+
+.universal-dashboard:is([data-dashboard-role="trainer"]) [data-quiz-builder] .lms-class-header,
+.universal-dashboard:is([data-dashboard-role="trainer"]) [data-quiz-builder] .lms-builder-section,
+.universal-dashboard:is([data-dashboard-role="trainer"]) [data-quiz-builder] .lms-quiz-overview,
+.universal-dashboard:is([data-dashboard-role="trainer"]) [data-quiz-builder] .lms-sticky-submit,
+.universal-dashboard:is([data-dashboard-role="trainer"]) [data-quiz-builder] .lms-question-card,
+.universal-dashboard:is([data-dashboard-role="trainer"]) [data-quiz-builder] .lms-choice-card,
+.universal-dashboard:is([data-dashboard-role="trainer"]) [data-quiz-builder] .lms-add-question,
+.universal-dashboard:is([data-dashboard-role="trainer"]) [data-quiz-builder] .lms-comments-panel {
+    border-radius: 0;
+}
+
+.universal-dashboard:is([data-dashboard-role="trainer"]) [data-quiz-builder] .lms-class-header {
+    align-items: center;
+}
+
+.universal-dashboard:is([data-dashboard-role="trainer"]) [data-quiz-builder] .lms-sticky-submit {
+    position: static;
+    bottom: auto;
+    box-shadow: none;
+}
+
+.universal-dashboard:is([data-dashboard-role="trainer"]) [data-quiz-builder] .lms-field :is(input, textarea, select),
+.universal-dashboard:is([data-dashboard-role="trainer"]) [data-quiz-builder] .lms-choice-card select,
+.universal-dashboard:is([data-dashboard-role="trainer"]) [data-quiz-builder] .lms-option-row input,
+.universal-dashboard:is([data-dashboard-role="trainer"]) [data-quiz-builder] .primary-action,
+.universal-dashboard:is([data-dashboard-role="trainer"]) [data-quiz-builder] .secondary-action,
+.universal-dashboard:is([data-dashboard-role="trainer"]) [data-quiz-builder] .lms-text-action,
+.universal-dashboard:is([data-dashboard-role="trainer"]) [data-quiz-builder] .lms-option-remove {
+    border-radius: 0 !important;
+}
+
+.universal-dashboard:is([data-dashboard-role="trainee"]) .dashboard-main > .lms-quiz-taking-page {
+    width: 100%;
+    max-width: 48rem;
+    margin-inline: auto;
+}
+
+.universal-dashboard:is([data-dashboard-role="trainee"]) .lms-quiz-taking-page {
+    --lms-radius: 0;
+    --admin-radius: 0;
+}
+
+.universal-dashboard:is([data-dashboard-role="trainee"]) .lms-quiz-taking-page .lms-take-question,
+.universal-dashboard:is([data-dashboard-role="trainee"]) .lms-quiz-taking-page .lms-sticky-submit,
+.universal-dashboard:is([data-dashboard-role="trainee"]) .lms-quiz-taking-page .lms-question-jump a,
+.universal-dashboard:is([data-dashboard-role="trainee"]) .lms-quiz-taking-page .lms-activity-upload,
+.universal-dashboard:is([data-dashboard-role="trainee"]) .lms-quiz-taking-page .lms-take-written-answer,
+.universal-dashboard:is([data-dashboard-role="trainee"]) .lms-quiz-taking-page .lms-answer-option,
+.universal-dashboard:is([data-dashboard-role="trainee"]) .lms-quiz-taking-page .primary-action,
+.universal-dashboard:is([data-dashboard-role="trainee"]) .lms-quiz-taking-page .secondary-action {
+    border-radius: 0 !important;
+}

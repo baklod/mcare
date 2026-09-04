@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\PayMongoCheckoutException;
+use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentTransaction;
 use App\Services\EnrollmentPaymentLifecycle;
+use App\Services\OfficialReceiptNumberGenerator;
 use App\Services\PayMongoCheckoutService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -37,38 +39,80 @@ class EnrollmentPaymentController extends Controller
         }
 
         $this->expireStaleReceipt($application);
+        $this->expireOppositeModeAttempts($application);
         $application->refresh()->load('batch');
+
+        try {
+            $this->confirmOnlinePaymentFromPayMongo($application);
+            $application->refresh()->load('batch');
+        } catch (PayMongoCheckoutException $exception) {
+            Log::warning('PayMongo checkout confirmation failed.', [
+                'application_id' => $application->getKey(),
+                'retryable' => $exception->retryable,
+                'response_status' => $exception->responseStatus,
+            ]);
+        }
 
         if ($paymentLifecycle->handleVerifiedPayment($application)) {
             return redirect()->route('payment.complete');
         }
-        $activeAttempt = $application->paymentAttempts()
-            ->where('provider', 'paymongo')
-            ->where('status', PaymentAttempt::STATUS_PENDING)
-            ->where('livemode', $this->payMongo->isLiveMode())
-            ->latest()
-            ->first();
-        $paymongoModeConflict = $application->paymentAttempts()
-            ->where('provider', 'paymongo')
-            ->whereIn('status', [
-                PaymentAttempt::STATUS_CREATING,
-                PaymentAttempt::STATUS_PENDING,
-            ])
-            ->where('livemode', '!=', $this->payMongo->isLiveMode())
-            ->exists();
 
-        return view('enrollment.payment', [
+        return view('enrollment.payment', $this->paymentPageData($application));
+    }
+
+    public function payments(Request $request): View
+    {
+        $submittedNumber = (string) $request->input('enrollment_number', $request->query('enrollment_number', ''));
+        $lookedUp = $request->isMethod('post') || $request->filled('enrollment_number');
+        $application = $lookedUp ? EnrollmentApplication::findByNumber($submittedNumber) : null;
+
+        if (
+            $application
+            && $request->user()
+            && (int) $application->user_id !== (int) $request->user()->id
+            && ! $request->user()->hasRole('admin')
+        ) {
+            $application = null;
+        }
+
+        if ($application) {
+            $request->session()->put('enrollment.payment_application_id', $application->id);
+            $this->expireStaleReceipt($application);
+            $this->expireOppositeModeAttempts($application);
+            $application->refresh()->load(['batch.program']);
+
+            try {
+                $this->confirmOnlinePaymentFromPayMongo($application);
+                $application->refresh()->load(['batch.program']);
+            } catch (PayMongoCheckoutException $exception) {
+                Log::warning('PayMongo checkout confirmation failed.', [
+                    'application_id' => $application->getKey(),
+                    'retryable' => $exception->retryable,
+                    'response_status' => $exception->responseStatus,
+                ]);
+            }
+        }
+
+        $paymentCleared = $application?->hasEnrollmentPaymentClearance() ?? false;
+
+        return view('enrollment.payments', array_merge([
+            'lookedUp' => $lookedUp,
+            'submittedNumber' => $submittedNumber,
             'application' => $application,
-            'paymongoConfigured' => $this->payMongo->secretConfigured(),
-            'paymongoWebhookConfigured' => $this->payMongo->webhookConfigured(),
-            'paymongoReady' => $this->payMongo->ready(),
-            'paymongoLiveMode' => $this->payMongo->isLiveMode(),
-            'paymongoMethods' => $this->payMongo->enabledMethods(),
-            'paymongoModeConflict' => $paymongoModeConflict,
-            'activeCheckoutUrl' => $activeAttempt
-                && $this->payMongo->isTrustedCheckoutUrl($activeAttempt->checkout_url)
-                    ? $activeAttempt->checkout_url
-                    : null,
+            'paymentCleared' => $paymentCleared,
+        ], $application && ! $paymentCleared
+            ? $this->paymentPageData($application)
+            : $this->emptyPaymentPageData()));
+    }
+
+    public function lookup(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'enrollment_number' => ['required', 'string', 'max:40'],
+        ]);
+
+        return redirect()->route('payments.show', [
+            'enrollment_number' => EnrollmentApplication::normalizeNumber($validated['enrollment_number']),
         ]);
     }
 
@@ -85,6 +129,7 @@ class EnrollmentPaymentController extends Controller
         }
 
         $this->expireStaleReceipt($application);
+        $this->expireOppositeModeAttempts($application);
         $application->refresh();
 
         if ($paymentLifecycle->handleVerifiedPayment($application)) {
@@ -98,7 +143,32 @@ class EnrollmentPaymentController extends Controller
                 ->with('payment_notice', 'Your payment is already confirmed.');
         }
 
+        if ($application->payment_status === EnrollmentApplication::PAYMENT_ONSITE_PENDING) {
+            return redirect()
+                ->route('payment.receipt')
+                ->with('payment_notice', 'Pay on site is already selected. Use the receipt when you pay at MCARE.');
+        }
+
         if ($validated['payment_method'] === 'onsite') {
+            try {
+                $this->confirmOnlinePaymentFromPayMongo($application);
+            } catch (PayMongoCheckoutException $exception) {
+                Log::warning('PayMongo confirmation skipped while switching to pay on site.', [
+                    'application_id' => $application->getKey(),
+                    'retryable' => $exception->retryable,
+                    'response_status' => $exception->responseStatus,
+                ]);
+            }
+
+            $application->refresh();
+
+            if ($paymentLifecycle->handleVerifiedPayment($application)) {
+                return redirect()->route('payment.complete');
+            }
+
+            $this->expireUnpaidOnlineAttempts($application);
+            $application->refresh();
+
             if (! $this->prepareOnsitePayment($application)) {
                 $application->refresh();
 
@@ -115,16 +185,19 @@ class EnrollmentPaymentController extends Controller
                     ]);
             }
 
+            $application->refresh();
+            $paymentLifecycle->sendOfficialReceipt($application, allowPending: true);
+
             return redirect()
                 ->route('payment.receipt')
-                ->with('payment_notice', 'Pay-on-site receipt created. Bring this reference to MCARE before it expires.');
+                ->with('payment_notice', 'Pay-on-site receipt created. Bring this official receipt and reference to MCARE before it expires.');
         }
 
         if (! $this->payMongo->ready()) {
             return redirect()
                 ->route('payment.show')
                 ->withErrors([
-                    'payment' => 'Online payment is temporarily unavailable while secure payment verification is being configured. You may choose Pay on site or try again later.',
+                    'payment' => 'Online payment is temporarily unavailable. Add a valid PayMongo secret key or choose Pay on site.',
                 ]);
         }
 
@@ -162,14 +235,31 @@ class EnrollmentPaymentController extends Controller
             return redirect()->route('enrollment.create');
         }
 
+        try {
+            $this->confirmOnlinePaymentFromPayMongo($application);
+        } catch (PayMongoCheckoutException $exception) {
+            Log::warning('PayMongo checkout confirmation failed.', [
+                'application_id' => $application->getKey(),
+                'retryable' => $exception->retryable,
+                'response_status' => $exception->responseStatus,
+            ]);
+
+            return redirect()
+                ->route('payment.show')
+                ->withErrors([
+                    'payment' => 'PayMongo could not confirm the checkout yet. No payment was recorded as paid. Open checkout again or try this return link in a moment.',
+                ]);
+        }
+
         $application->refresh();
 
         if ($paymentLifecycle->handleVerifiedPayment($application)) {
             return redirect()->route('payment.complete');
         }
+
         $notice = $application->payment_status === EnrollmentApplication::PAYMENT_PAID
             ? 'Payment confirmed. Your MCARE payment record is now updated.'
-            : 'PayMongo returned you safely to MCARE. Confirmation is still pending and will update only after the signed gateway notification arrives.';
+            : 'You returned from PayMongo. The checkout is not marked paid yet, so you can open it again or choose Pay on site later.';
 
         return redirect()
             ->route('payment.show')
@@ -241,6 +331,12 @@ class EnrollmentPaymentController extends Controller
         if ($application->status === EnrollmentApplication::STATUS_APPROVED) {
             $request->session()->forget('enrollment.awaiting_approval');
 
+            if ($request->user()?->role === 'trainee') {
+                return redirect()
+                    ->route('trainee.payments')
+                    ->with('payment_notice', 'Your official payment slip is ready to view and print.');
+            }
+
             return redirect()
                 ->route('landing')
                 ->with('account_approved', 'Your payment and MCARE account are approved. You can now log in.');
@@ -257,21 +353,27 @@ class EnrollmentPaymentController extends Controller
     {
         $application = $this->applicationFor($request);
 
-        if (! $application || ! $application->payment_receipt_number) {
+        if (! $application || ! $application->canViewPaymentSlip()) {
             return redirect()
-                ->route('payment.show')
+                ->route($this->receiptReturnRoute($request))
                 ->with('payment_notice', 'Choose Pay on site first to generate a receipt.');
         }
 
         $this->expireStaleReceipt($application);
+        $application->refresh();
 
-        if ($paymentLifecycle->handleVerifiedPayment($application->refresh())) {
+        if (
+            $this->shouldFinishEnrollmentAfterVerifiedReceipt($request, $application)
+            && $paymentLifecycle->handleVerifiedPayment($application)
+        ) {
             return redirect()->route('payment.complete');
         }
 
         return view('enrollment.receipt', [
-            'application' => $application->refresh()->load('batch'),
+            'application' => $application->refresh()->load(['batch', 'paymentTransactions']),
             'downloadMode' => false,
+            'receiptReturnUrl' => $this->receiptReturnUrl($request),
+            'receiptReturnLabel' => $this->receiptReturnLabel($request),
         ]);
     }
 
@@ -279,19 +381,21 @@ class EnrollmentPaymentController extends Controller
     {
         $application = $this->applicationFor($request);
 
-        if (! $application || ! $application->payment_receipt_number) {
-            return redirect()->route('payment.show');
+        if (! $application || ! $application->canViewPaymentSlip()) {
+            return redirect()->route($this->receiptReturnRoute($request));
         }
 
         $this->expireStaleReceipt($application);
-        $application->refresh()->load('batch');
+        $application->refresh()->load(['batch', 'paymentTransactions']);
 
         $html = view('enrollment.receipt', [
             'application' => $application,
             'downloadMode' => true,
+            'receiptReturnUrl' => $this->receiptReturnUrl($request),
+            'receiptReturnLabel' => $this->receiptReturnLabel($request),
         ])->render();
 
-        $filename = 'mcare-receipt-'.$application->payment_receipt_number.'.html';
+        $filename = 'mcare-receipt-'.($application->payment_reference ?: $application->payment_receipt_number ?: 'slip').'.html';
 
         return response($html, 200, [
             'Content-Type' => 'text/html; charset=UTF-8',
@@ -301,17 +405,98 @@ class EnrollmentPaymentController extends Controller
 
     private function applicationFor(Request $request): ?EnrollmentApplication
     {
+        $sessionId = $request->session()->get('enrollment.payment_application_id');
+        $fromSession = is_numeric($sessionId)
+            ? EnrollmentApplication::query()->whereKey((int) $sessionId)->first()
+            : null;
+
+        if ($fromSession && ! $request->user()) {
+            return $fromSession;
+        }
+
+        if ($fromSession && $request->user() && (int) $fromSession->user_id === (int) $request->user()->id) {
+            return $fromSession;
+        }
+
         if ($request->user()) {
             return EnrollmentApplication::where('user_id', $request->user()->id)
                 ->latest()
                 ->first();
         }
 
-        $applicationId = $request->session()->get('enrollment.payment_application_id');
+        return null;
+    }
 
-        return is_numeric($applicationId)
-            ? EnrollmentApplication::query()->whereKey((int) $applicationId)->first()
-            : null;
+    private function shouldFinishEnrollmentAfterVerifiedReceipt(Request $request, EnrollmentApplication $application): bool
+    {
+        if ($application->status === EnrollmentApplication::STATUS_APPROVED) {
+            return false;
+        }
+
+        return ! in_array($request->user()?->role, ['trainee', 'trainer', 'admin', 'alumni'], true);
+    }
+
+    private function receiptReturnRoute(Request $request): string
+    {
+        return $request->user()?->role === 'trainee' ? 'trainee.payments' : 'payment.show';
+    }
+
+    private function receiptReturnUrl(Request $request): string
+    {
+        return route($this->receiptReturnRoute($request));
+    }
+
+    private function receiptReturnLabel(Request $request): string
+    {
+        return $request->user()?->role === 'trainee' ? 'Back to payments' : 'Back to payment';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function paymentPageData(EnrollmentApplication $application): array
+    {
+        $activeAttempt = $application->paymentAttempts()
+            ->where('provider', 'paymongo')
+            ->where('status', PaymentAttempt::STATUS_PENDING)
+            ->where('livemode', $this->payMongo->isLiveMode())
+            ->latest()
+            ->first();
+
+        return [
+            'application' => $application,
+            'paymongoConfigured' => $this->payMongo->secretConfigured(),
+            'paymongoReady' => $this->payMongo->ready(),
+            'paymongoLiveMode' => $this->payMongo->isLiveMode(),
+            'paymongoMethods' => $this->payMongo->enabledMethods(),
+            'paymongoModeConflict' => $application->paymentAttempts()
+                ->where('provider', 'paymongo')
+                ->whereIn('status', [
+                    PaymentAttempt::STATUS_CREATING,
+                    PaymentAttempt::STATUS_PENDING,
+                ])
+                ->where('livemode', '!=', $this->payMongo->isLiveMode())
+                ->exists(),
+            'activeCheckoutUrl' => $activeAttempt
+                && $this->payMongo->isTrustedCheckoutUrl($activeAttempt->checkout_url)
+                    ? $activeAttempt->checkout_url
+                    : null,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emptyPaymentPageData(): array
+    {
+        return [
+            'paymongoConfigured' => false,
+            'paymongoReady' => false,
+            'paymongoLiveMode' => false,
+            'paymongoMethods' => [],
+            'paymongoModeConflict' => false,
+            'activeCheckoutUrl' => null,
+        ];
     }
 
     private function prepareOnsitePayment(EnrollmentApplication $application): bool
@@ -327,27 +512,9 @@ class EnrollmentPaymentController extends Controller
                 return false;
             }
 
-            /*
-             * Never clear gateway identifiers while PayMongo can still accept
-             * money for an immutable attempt. This also covers an expired app
-             * row whose provider Checkout Session remains pending.
-             */
-            $activeOnlineAttempt = PaymentAttempt::query()
-                ->where('enrollment_application_id', $lockedApplication->getKey())
-                ->where('provider', 'paymongo')
-                ->whereIn('status', [
-                    PaymentAttempt::STATUS_CREATING,
-                    PaymentAttempt::STATUS_PENDING,
-                ])
-                ->lockForUpdate()
-                ->exists();
-
-            if ($activeOnlineAttempt) {
-                return false;
-            }
-
-            $ticketNumber = $lockedApplication->payment_receipt_number ?: $this->uniqueReference('MCR');
             $refNumber = $lockedApplication->payment_reference ?: $this->uniqueReference('MCARE-SITE');
+            $orNumber = $lockedApplication->payment_receipt_number
+                ?: app(OfficialReceiptNumberGenerator::class)->generate();
             $expiresAt = $lockedApplication->payment_receipt_expires_at ?: $this->defaultDeadlineFor($lockedApplication);
             $downpayment = round((float) ($lockedApplication->downpayment_amount ?: self::DEFAULT_DOWNPAYMENT), 2);
 
@@ -357,7 +524,7 @@ class EnrollmentPaymentController extends Controller
                 'payment_amount' => $downpayment,
                 'payment_currency' => 'PHP',
                 'payment_reference' => $refNumber,
-                'payment_receipt_number' => $ticketNumber,
+                'payment_receipt_number' => $orNumber,
                 'payment_receipt_expires_at' => $expiresAt,
                 'payment_selected_at' => $lockedApplication->payment_selected_at ?: now(),
                 'paymongo_checkout_reference' => null,
@@ -365,27 +532,36 @@ class EnrollmentPaymentController extends Controller
                 'payment_meta' => [
                     'channel' => 'on_site',
                     'issued_by' => 'MCARE Hub',
-                    'note' => 'Receipt is for on-site cashier verification only.',
+                    'note' => 'Bring the official receipt and reference number to the MCARE cashier for verification.',
                     'batch' => $lockedApplication->batch?->name,
                     'batch_deadline' => $lockedApplication->batch?->enrollment_ends_at?->toDateTimeString(),
                 ],
             ])->save();
 
-            PaymentTransaction::firstOrCreate(
+            $ticket = PaymentTransaction::firstOrCreate(
                 [
                     'enrollment_application_id' => $lockedApplication->id,
                     'payment_channel' => PaymentTransaction::CHANNEL_ONSITE,
                     'transaction_type' => PaymentTransaction::TYPE_DOWNPAYMENT,
-                    'ticket_number' => $ticketNumber,
+                    'ticket_number' => $refNumber,
                 ],
                 [
                     'user_id' => $lockedApplication->user_id,
+                    'reference_number' => $refNumber,
+                    'or_number' => $orNumber,
                     'amount' => $downpayment,
                     'status' => PaymentTransaction::STATUS_PENDING,
                     'paid_at' => now(),
                     'notes' => 'On-site downpayment order (₱'.number_format($downpayment, 2).') for cashier verification.',
                 ]
             );
+
+            if (blank($ticket->or_number) || blank($ticket->reference_number)) {
+                $ticket->forceFill([
+                    'reference_number' => $ticket->reference_number ?: $refNumber,
+                    'or_number' => $ticket->or_number ?: $orNumber,
+                ])->save();
+            }
 
             return true;
         }, 3);
@@ -418,13 +594,18 @@ class EnrollmentPaymentController extends Controller
                 ->lockForUpdate()
                 ->first();
 
-            if ($existing) {
-                if ($existing->livemode !== $this->payMongo->isLiveMode()) {
-                    throw new PayMongoCheckoutException(
-                        'An active PayMongo attempt belongs to a different mode.',
-                    );
-                }
+            if ($existing && $existing->livemode !== $this->payMongo->isLiveMode()) {
+                $existing->forceFill([
+                    'status' => PaymentAttempt::STATUS_EXPIRED,
+                    'expired_at' => now(),
+                    'meta' => array_merge($existing->meta ?? [], [
+                        'expired_reason' => 'paymongo_mode_changed',
+                    ]),
+                ])->save();
+                $existing = null;
+            }
 
+            if ($existing) {
                 if (! is_array(data_get($existing->meta, 'checkout_payload'))) {
                     $payload = $this->payMongo->buildCheckoutPayload($existing, $lockedApplication);
                     $existing->forceFill([
@@ -494,7 +675,7 @@ class EnrollmentPaymentController extends Controller
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                // A concurrent success/webhook always wins over this stale failure.
+                // A concurrent success always wins over this stale failure.
                 if (
                     $lockedAttempt->status === PaymentAttempt::STATUS_PENDING
                     && $this->payMongo->isTrustedCheckoutUrl($lockedAttempt->checkout_url)
@@ -565,7 +746,7 @@ class EnrollmentPaymentController extends Controller
             $lockedApplication->forceFill([
                 'payment_method' => 'online',
                 'payment_status' => EnrollmentApplication::PAYMENT_ONLINE_PENDING,
-                'payment_amount' => self::DEFAULT_DOWNPAYMENT,
+                'payment_amount' => $this->amountFromMinor($lockedAttempt->amount_minor),
                 'payment_currency' => 'PHP',
                 'payment_reference' => $lockedAttempt->merchant_reference,
                 'payment_receipt_number' => null,
@@ -593,6 +774,256 @@ class EnrollmentPaymentController extends Controller
         }, 3);
 
         return $stillPayable ? $checkout['checkout_url'] : null;
+    }
+
+    private function confirmOnlinePaymentFromPayMongo(EnrollmentApplication $application): void
+    {
+        $checkoutId = $application->paymongo_checkout_reference;
+
+        if (
+            $application->payment_status === EnrollmentApplication::PAYMENT_PAID
+            || $application->payment_method !== 'online'
+            || ! is_string($checkoutId)
+            || ! str_starts_with($checkoutId, 'cs_')
+        ) {
+            return;
+        }
+
+        $session = $this->payMongo->retrieveCheckout($checkoutId);
+        $payment = $session ? $this->payMongo->paidPaymentFrom($session['attributes']) : null;
+
+        if (! $session || ! $payment) {
+            return;
+        }
+
+        DB::transaction(function () use ($application, $session, $payment): void {
+            $lockedApplication = EnrollmentApplication::query()
+                ->whereKey($application->getKey())
+                ->lockForUpdate()
+                ->first();
+
+            if (
+                ! $lockedApplication
+                || $lockedApplication->payment_status === EnrollmentApplication::PAYMENT_PAID
+                || $lockedApplication->payment_method !== 'online'
+            ) {
+                return;
+            }
+
+            $attempt = PaymentAttempt::query()
+                ->where('enrollment_application_id', $lockedApplication->getKey())
+                ->where('provider', 'paymongo')
+                ->where('provider_checkout_id', $session['checkout_id'])
+                ->where('merchant_reference', $session['reference'])
+                ->lockForUpdate()
+                ->first();
+
+            if (
+                ! $attempt
+                || $attempt->livemode !== $session['livemode']
+                || $attempt->livemode !== $this->payMongo->isLiveMode()
+                || $payment['amount'] !== $attempt->amount_minor
+                || $payment['currency'] !== strtoupper($attempt->currency)
+                || $lockedApplication->payment_reference !== $attempt->merchant_reference
+                || $lockedApplication->paymongo_checkout_reference !== $attempt->provider_checkout_id
+                || strtoupper((string) $lockedApplication->payment_currency) !== strtoupper($attempt->currency)
+            ) {
+                return;
+            }
+
+            $metadataApplicationId = $session['metadata']['application_id'] ?? null;
+            if (
+                filled($metadataApplicationId)
+                && (string) $metadataApplicationId !== (string) $lockedApplication->getKey()
+            ) {
+                return;
+            }
+
+            $paidAt = now();
+            $amount = round($attempt->amount_minor / 100, 2);
+            $transactionType = $amount >= (float) ($lockedApplication->total_program_fee ?? 22000.00)
+                ? PaymentTransaction::TYPE_FULL_PAYMENT
+                : PaymentTransaction::TYPE_DOWNPAYMENT;
+
+            $attempt->forceFill([
+                'provider_payment_id' => $payment['id'],
+                'provider_payment_intent_id' => $payment['payment_intent_id'],
+                'status' => PaymentAttempt::STATUS_PAID,
+                'paid_at' => $paidAt,
+                'meta' => array_merge($attempt->meta ?? [], [
+                    'verified_at' => $paidAt->toIso8601String(),
+                    'verified_from' => 'payment.return',
+                ]),
+            ])->save();
+
+            $existingOnline = PaymentTransaction::query()
+                ->where('enrollment_application_id', $lockedApplication->id)
+                ->where('payment_channel', PaymentTransaction::CHANNEL_ONLINE)
+                ->where('reference_number', $payment['id'])
+                ->first();
+
+            $orNumber = $existingOnline?->or_number
+                ?: $lockedApplication->payment_receipt_number
+                ?: app(OfficialReceiptNumberGenerator::class)->generate();
+
+            PaymentTransaction::query()->updateOrCreate([
+                'enrollment_application_id' => $lockedApplication->id,
+                'payment_channel' => PaymentTransaction::CHANNEL_ONLINE,
+                'reference_number' => $payment['id'],
+            ], [
+                'user_id' => $lockedApplication->user_id,
+                'transaction_type' => $transactionType,
+                'amount' => $amount,
+                'or_number' => $orNumber,
+                'status' => PaymentTransaction::STATUS_VERIFIED,
+                'paid_at' => $paidAt,
+                'verified_at' => $paidAt,
+                'notes' => 'Verified from the PayMongo checkout session after the applicant returned to MCARE.',
+            ]);
+
+            $lockedApplication->forceFill([
+                'payment_amount' => $this->amountFromMinor($attempt->amount_minor),
+                'payment_verified_by_id' => null,
+                'payment_verified_at' => $paidAt,
+                'payment_verification_notes' => 'Verified from the PayMongo checkout session after the applicant returned to MCARE.',
+                'payment_receipt_number' => $orNumber,
+                'payment_meta' => array_merge($lockedApplication->payment_meta ?? [], [
+                    'gateway_verified' => true,
+                    'gateway' => 'paymongo',
+                    'paymongo_payment_id' => $payment['id'],
+                    'paymongo_payment_intent_id' => $payment['payment_intent_id'],
+                    'gateway_verified_at' => $paidAt->toIso8601String(),
+                ]),
+            ])->save();
+            $lockedApplication->recalculatePaymentStatus();
+
+            AdminActivityLog::record(null, 'payment.paymongo.verified', $lockedApplication, [
+                'checkout_id' => $session['checkout_id'],
+                'payment_reference' => $attempt->merchant_reference,
+                'amount_minor' => $attempt->amount_minor,
+                'currency' => $attempt->currency,
+                'livemode' => $attempt->livemode,
+            ]);
+        }, 3);
+    }
+
+    private function expireUnpaidOnlineAttempts(EnrollmentApplication $application): void
+    {
+        DB::transaction(function () use ($application): void {
+            $lockedApplication = EnrollmentApplication::query()
+                ->whereKey($application->getKey())
+                ->lockForUpdate()
+                ->first();
+
+            if (
+                ! $lockedApplication
+                || $lockedApplication->payment_status === EnrollmentApplication::PAYMENT_PAID
+            ) {
+                return;
+            }
+
+            $attempts = PaymentAttempt::query()
+                ->where('enrollment_application_id', $lockedApplication->getKey())
+                ->where('provider', 'paymongo')
+                ->whereIn('status', [
+                    PaymentAttempt::STATUS_CREATING,
+                    PaymentAttempt::STATUS_PENDING,
+                ])
+                ->lockForUpdate()
+                ->get();
+
+            $now = now();
+
+            foreach ($attempts as $attempt) {
+                $attempt->forceFill([
+                    'status' => PaymentAttempt::STATUS_EXPIRED,
+                    'expired_at' => $now,
+                    'meta' => array_merge($attempt->meta ?? [], [
+                        'expired_reason' => 'switched_to_onsite',
+                        'expired_at' => $now->toIso8601String(),
+                    ]),
+                ])->save();
+            }
+        }, 3);
+    }
+
+    /**
+     * An unpaid checkout from the other PayMongo mode cannot be confirmed
+     * with the current secret key, so it must not block a new checkout.
+     */
+    private function expireOppositeModeAttempts(EnrollmentApplication $application): void
+    {
+        DB::transaction(function () use ($application): void {
+            $lockedApplication = EnrollmentApplication::query()
+                ->whereKey($application->getKey())
+                ->lockForUpdate()
+                ->first();
+
+            if (
+                ! $lockedApplication
+                || $lockedApplication->payment_status === EnrollmentApplication::PAYMENT_PAID
+            ) {
+                return;
+            }
+
+            $currentLive = $this->payMongo->isLiveMode();
+            $mismatched = PaymentAttempt::query()
+                ->where('enrollment_application_id', $lockedApplication->getKey())
+                ->where('provider', 'paymongo')
+                ->whereIn('status', [
+                    PaymentAttempt::STATUS_CREATING,
+                    PaymentAttempt::STATUS_PENDING,
+                ])
+                ->where('livemode', '!=', $currentLive)
+                ->lockForUpdate()
+                ->get();
+
+            if ($mismatched->isEmpty()) {
+                return;
+            }
+
+            $now = now();
+            $expiredCheckoutIds = [];
+
+            foreach ($mismatched as $attempt) {
+                $attempt->forceFill([
+                    'status' => PaymentAttempt::STATUS_EXPIRED,
+                    'expired_at' => $now,
+                    'meta' => array_merge($attempt->meta ?? [], [
+                        'expired_reason' => 'paymongo_mode_changed',
+                        'expired_at' => $now->toIso8601String(),
+                    ]),
+                ])->save();
+
+                if (is_string($attempt->provider_checkout_id) && $attempt->provider_checkout_id !== '') {
+                    $expiredCheckoutIds[] = $attempt->provider_checkout_id;
+                }
+            }
+
+            $pointsAtExpired = filled($lockedApplication->paymongo_checkout_reference)
+                && in_array($lockedApplication->paymongo_checkout_reference, $expiredCheckoutIds, true);
+            $hasCurrentModeAttempt = PaymentAttempt::query()
+                ->where('enrollment_application_id', $lockedApplication->getKey())
+                ->where('provider', 'paymongo')
+                ->whereIn('status', [
+                    PaymentAttempt::STATUS_CREATING,
+                    PaymentAttempt::STATUS_PENDING,
+                ])
+                ->where('livemode', $currentLive)
+                ->exists();
+
+            if (! $pointsAtExpired && $hasCurrentModeAttempt) {
+                return;
+            }
+
+            $lockedApplication->forceFill([
+                'payment_status' => $lockedApplication->payment_status === EnrollmentApplication::PAYMENT_ONLINE_PENDING
+                    ? EnrollmentApplication::PAYMENT_NOT_SELECTED
+                    : $lockedApplication->payment_status,
+                'paymongo_checkout_reference' => $pointsAtExpired ? null : $lockedApplication->paymongo_checkout_reference,
+                'paymongo_checkout_url' => $pointsAtExpired ? null : $lockedApplication->paymongo_checkout_url,
+            ])->save();
+        }, 3);
     }
 
     private function expireStaleReceipt(EnrollmentApplication $application): void
@@ -632,9 +1063,16 @@ class EnrollmentPaymentController extends Controller
             || EnrollmentApplication::where('payment_receipt_number', $reference)->exists()
             || EnrollmentApplication::where('paymongo_checkout_reference', $reference)->exists()
             || PaymentAttempt::where('merchant_reference', $reference)->exists()
+            || PaymentTransaction::where('ticket_number', $reference)->exists()
+            || PaymentTransaction::where('reference_number', $reference)->exists()
         );
 
         return $reference;
+    }
+
+    private function amountFromMinor(int $amountMinor): string
+    {
+        return number_format($amountMinor / 100, 2, '.', '');
     }
 
     private function defaultDeadlineFor(EnrollmentApplication $application)

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AdminActivityLog;
+use App\Services\ProfilePhotoStore;
 use App\Support\AccountPortal;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,7 +28,7 @@ class AccountSettingsController extends Controller
             ],
             'trainer' => [
                 ['Teaching schedule', 'Your calendar follows the active batch schedule configured by the administrator.'],
-                ['Learning materials', 'Publish PDFs, images, and videos to a batch or a specific trainee.'],
+                ['Learning materials', 'Publish PDFs or images to a batch or a specific trainee.'],
                 ['Progress', 'Use trainee and report pages to review learner module activity.'],
             ],
             'trainee' => [
@@ -63,6 +64,28 @@ class AccountSettingsController extends Controller
         ]);
 
         return back()->with('saved', 'Your password has been changed successfully.');
+    }
+
+    public function updateAvatar(Request $request, ProfilePhotoStore $photos): RedirectResponse
+    {
+        $validated = $request->validate([
+            'avatar' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'extensions:jpg,jpeg,png,webp', 'max:5120'],
+        ], [
+            'avatar.required' => 'Choose a profile photo to upload.',
+            'avatar.image' => 'The profile photo must be a JPG, PNG, or WEBP image.',
+            'avatar.mimes' => 'The profile photo must be a JPG, PNG, or WEBP image.',
+            'avatar.max' => 'The profile photo must not exceed 5MB.',
+        ]);
+
+        $user = $request->user();
+        $photos->storeUploaded($user, $validated['avatar']);
+
+        AdminActivityLog::record($user, 'account.avatar.updated', $user, [
+            'role' => $user->role,
+            'profile_photo_path' => $user->profile_photo_path,
+        ]);
+
+        return back()->with('saved', 'Your profile photo has been updated.');
     }
 
     /**

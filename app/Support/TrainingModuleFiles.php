@@ -3,9 +3,9 @@
 namespace App\Support;
 
 use App\Models\TrainingModule;
+use App\Services\LearningPdfWatermark;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
-use ZipArchive;
 
 class TrainingModuleFiles
 {
@@ -20,12 +20,13 @@ class TrainingModuleFiles
     {
         return [
             'pdf',
-            'ppt', 'pptx',
-            'doc', 'docx',
             'jpg', 'jpeg', 'png', 'webp', 'gif',
-            'mp4', 'webm', 'mov',
-            'mp3', 'wav', 'm4a', 'ogg',
         ];
+    }
+
+    public static function humanLabel(): string
+    {
+        return 'PDF or image';
     }
 
     public static function acceptAttribute(): string
@@ -35,24 +36,23 @@ class TrainingModuleFiles
             ->implode(',');
     }
 
+    public static function mimesRule(): string
+    {
+        return 'mimes:'.implode(',', self::extensions());
+    }
+
     public static function validationError(UploadedFile $file): ?string
     {
         $extension = strtolower($file->getClientOriginalExtension());
         $mime = strtolower((string) $file->getMimeType());
 
         if (! in_array($extension, self::extensions(), true)) {
-            return 'Learning materials must use one of the supported PDF, Office, image, video, or audio formats.';
+            return 'The file must be a PDF or image.';
         }
 
         $allowedMimes = self::mimeMap()[$extension] ?? [];
         if (! in_array($mime, $allowedMimes, true)) {
             return "The file contents do not match the .{$extension} file type.";
-        }
-
-        if (in_array($extension, ['docx', 'pptx'], true)
-            && in_array($mime, ['application/zip', 'application/x-zip-compressed'], true)
-            && ! self::hasOpenXmlStructure($file, $extension)) {
-            return 'The uploaded Office file is not a valid DOCX or PPTX package.';
         }
 
         return null;
@@ -92,45 +92,12 @@ class TrainingModuleFiles
     {
         return [
             'pdf' => ['application/pdf'],
-            'ppt' => ['application/vnd.ms-powerpoint', 'application/mspowerpoint', 'application/powerpoint', 'application/cdfv2', 'application/x-ole-storage'],
-            'pptx' => ['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/zip', 'application/x-zip-compressed'],
-            'doc' => ['application/msword', 'application/cdfv2', 'application/x-ole-storage'],
-            'docx' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/zip', 'application/x-zip-compressed'],
             'jpg' => ['image/jpeg'],
             'jpeg' => ['image/jpeg'],
             'png' => ['image/png'],
             'webp' => ['image/webp'],
             'gif' => ['image/gif'],
-            'mp4' => ['video/mp4', 'application/mp4'],
-            'webm' => ['video/webm', 'audio/webm'],
-            'mov' => ['video/quicktime'],
-            'mp3' => ['audio/mpeg', 'audio/mp3'],
-            'wav' => ['audio/wav', 'audio/x-wav', 'audio/wave'],
-            'm4a' => ['audio/mp4', 'audio/x-m4a', 'video/mp4'],
-            'ogg' => ['audio/ogg', 'application/ogg'],
         ];
-    }
-
-    private static function hasOpenXmlStructure(UploadedFile $file, string $extension): bool
-    {
-        if (! class_exists(ZipArchive::class)) {
-            return false;
-        }
-
-        $archive = new ZipArchive;
-        if ($archive->open($file->getRealPath()) !== true) {
-            return false;
-        }
-
-        try {
-            $requiredDirectory = $extension === 'docx' ? 'word/' : 'ppt/';
-
-            return $archive->locateName('[Content_Types].xml') !== false
-                && collect(range(0, max(0, $archive->numFiles - 1)))
-                    ->contains(fn (int $index): bool => str_starts_with((string) $archive->getNameIndex($index), $requiredDirectory));
-        } finally {
-            $archive->close();
-        }
     }
 
     /**
@@ -149,12 +116,8 @@ class TrainingModuleFiles
                     continue;
                 }
 
-                $path = $file->store("training-modules/{$userId}/supplementary", 'local');
-                if ($path === false) {
-                    throw new \RuntimeException('A supplementary learning file could not be stored.');
-                }
-
-                $size = (int) ($file->getSize() ?: 0);
+                $path = self::storeLearningFile($file, "training-modules/{$userId}/supplementary");
+                $size = (int) Storage::disk('local')->size($path);
                 $stored[] = [
                     'file_path' => $path,
                     'original_name' => $file->getClientOriginalName(),
@@ -200,5 +163,21 @@ class TrainingModuleFiles
         $value = $bytes / (1024 ** $power);
 
         return round($value, $precision).' '.$units[$power];
+    }
+
+    public static function storeLearningFile(UploadedFile $file, string $directory): string
+    {
+        $path = $file->store($directory, 'local');
+        if ($path === false) {
+            throw new \RuntimeException('The learning file could not be stored.');
+        }
+
+        app(LearningPdfWatermark::class)->stampStoredFile(
+            $path,
+            $file->getClientOriginalName(),
+            $file->getMimeType(),
+        );
+
+        return $path;
     }
 }

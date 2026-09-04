@@ -32,5 +32,9 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="SEMAPHORE_API_KEY" value="testing-semaphore-key"/>
+        <env name="SEMAPHORE_SENDER_NAME" value="MCARE"/>
+        <env name="GROQ_API_KEY" value="testing-groq-key"/>
+        <env name="GROQ_MODEL" value="llama-3.3-70b-versatile"/>
     </php>
 </phpunit>

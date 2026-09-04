@@ -95,6 +95,42 @@ class TrainingCalendarService
             ->values();
     }
 
+    /**
+     * Human-readable compact code plus expanded weekdays, e.g. "MWF (Mon, Wed, Fri)".
+     */
+    public function patternSummary(?string $pattern): string
+    {
+        $code = strtoupper(trim((string) $pattern));
+        $labels = $this->weekdayLabels($pattern);
+
+        if ($code === '' || $labels === []) {
+            return 'Not set';
+        }
+
+        return $code.' ('.implode(', ', $labels).')';
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function weekdayLabels(?string $pattern): array
+    {
+        $names = [
+            1 => 'Mon',
+            2 => 'Tue',
+            3 => 'Wed',
+            4 => 'Thu',
+            5 => 'Fri',
+            6 => 'Sat',
+            7 => 'Sun',
+        ];
+
+        return array_values(array_map(
+            fn (int $day) => $names[$day],
+            $this->dayNumbers($pattern),
+        ));
+    }
+
     private function appendSession(Collection $sessions, TrainingBatch $batch, Carbon $date, string $period): void
     {
         $days = $period === 'AM' ? $batch->am_days : $batch->pm_days;
@@ -150,6 +186,20 @@ class TrainingCalendarService
             'FRI' => 5, 'FRIDAY' => 5, 'SAT' => 6, 'SATURDAY' => 6,
             'SUN' => 7, 'SUNDAY' => 7,
         ];
+        // TESDA batch setup uses compact codes: MWF for AM, TTH/TTF/TTS for PM.
+        // TTH and TTF both mean Tuesday/Thursday. TTS adds Saturday.
+        $compactCodes = [
+            'MWF' => [1, 3, 5],
+            'TTH' => [2, 4],
+            'TTF' => [2, 4],
+            'TT' => [2, 4],
+            'TTS' => [2, 4, 6],
+            'TTHS' => [2, 4, 6],
+        ];
+        if (isset($compactCodes[$pattern])) {
+            return $compactCodes[$pattern];
+        }
+
         $tokens = preg_split('/[\s,\/\-]+/', $pattern, -1, PREG_SPLIT_NO_EMPTY);
         $resolved = collect($tokens)->map(fn ($token) => $namedDays[$token] ?? null)->filter()->values();
 
@@ -157,8 +207,8 @@ class TrainingCalendarService
             return $resolved->unique()->all();
         }
 
-        // Compact admin patterns use MWF and TTS, where the two Ts mean
-        // Tuesday and Thursday. S remains Saturday and U represents Sunday.
+        // Letter-by-letter fallback: the two Ts mean Tuesday then Thursday.
+        // S remains Saturday and U represents Sunday.
         $days = [];
         $tSeen = 0;
         foreach (str_split($pattern) as $letter) {

@@ -14,6 +14,10 @@ class EnsureTwoFactorVerified
     {
         $user = $request->user();
 
+        if ($user?->hasRole('admin')) {
+            return $next($request);
+        }
+
         if ($user
             && app(EmailTwoFactorService::class)->enabledFor($user)
             && (int) $request->session()->get('admin.mfa.verified_user_id') !== (int) $user->getAuthIdentifier()) {

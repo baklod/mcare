@@ -2,162 +2,300 @@
 
 @section('content')
 @php
-    $catalogUnits = $catalogUnits ?? \App\Support\CaregivingNcIiCatalog::units();
+    $catalogUnits = $catalogUnits ?? collect();
+    $catalogOutcomes = $catalogOutcomes ?? collect();
+    $trainerCatalogUnits = $trainerCatalogUnits ?? $catalogUnits->where('is_selectable', true);
+    $editingPreset = $editingPreset ?? null;
+    $editingOutcome = $editingOutcome ?? null;
+    $catalogErrors = $errors->catalog ?? null;
+    $outcomeErrors = $errors->catalogOutcome ?? null;
+    $openPresetDialog = ($catalogErrors && $catalogErrors->any()) || $editingPreset;
+    $openOutcomeDialog = ($outcomeErrors && $outcomeErrors->any()) || $editingOutcome;
+    $presetOutcomesText = old('outcomes', $editingPreset?->outcomes?->pluck('title')->implode("\n") ?? '');
+    $selectableChecked = filter_var(old('is_selectable', $editingPreset?->is_selectable ?? true), FILTER_VALIDATE_BOOLEAN);
+    $torChecked = filter_var(old('is_tor_included', $editingPreset?->is_tor_included ?? false), FILTER_VALIDATE_BOOLEAN);
+    $outcomeRequiredChecked = filter_var(old('is_required', $editingOutcome?->is_required ?? true), FILTER_VALIDATE_BOOLEAN);
+    $activeTab = $activeTab ?? 'modules';
+    $isUnitsTab = $activeTab === 'units';
+    $isOutcomesTab = $activeTab === 'outcomes';
+    $selectedOutcomeUnitId = (string) old('competency_unit_id', $editingOutcome?->competency_unit_id ?? ($filters['unit_id'] ?? ''));
 @endphp
 <section class="space-y-6">
-    <header class="flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-            <p class="dashboard-section-kicker">Learning system - LMS Modules</p>
-            <h1 class="dashboard-section-title mt-2 text-3xl">Module management</h1>
-            <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Upload Caregiving NC II core modules on behalf of a trainer, assign them to specific batches, and manage learning codes and subtopics.</p>
-        </div>
-        <button type="button" class="primary-action" data-dashboard-dialog-open="admin-module-dialog"><x-dashboard-icon name="plus" class="h-4 w-4" />Add module</button>
+    <header class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <p class="max-w-3xl text-sm leading-6 text-slate-600">
+            @if ($isUnitsTab)
+                Add, edit, or delete Caregiving NC II competency units. Selectable units appear when trainers create classwork.
+            @elseif ($isOutcomesTab)
+                Add, edit, or delete learning outcomes for each unit. These titles become suggested submodules in classwork.
+            @else
+                Upload Caregiving NC II core modules on behalf of a trainer, assign them to specific batches, and manage learning codes and subtopics.
+            @endif
+        </p>
+        @if ($isUnitsTab)
+            <button type="button" class="primary-action" data-dashboard-dialog-open="admin-preset-dialog">Add unit</button>
+        @elseif ($isOutcomesTab)
+            <button type="button" class="primary-action" data-dashboard-dialog-open="admin-outcome-dialog">Add outcome</button>
+        @else
+            <button type="button" class="primary-action" data-dashboard-dialog-open="admin-module-dialog"><x-dashboard-icon name="plus" class="h-4 w-4" />Add module</button>
+        @endif
     </header>
 
-    <dialog id="admin-module-dialog" data-dashboard-dialog data-auto-open="{{ $errors->hasAny(['trainer_id', 'training_batch_id', 'module_code', 'competency_category', 'completion_mode', 'estimated_hours', 'title', 'description', 'module_file', 'supplementary_files', 'supplementary_files.*']) ? 'true' : 'false' }}" class="lms-workflow-dialog" aria-labelledby="admin-module-dialog-title">
-        <div class="lms-dialog-header">
-            <div><p class="lms-eyebrow">Admin LMS</p><h2 id="admin-module-dialog-title">Add a learning module</h2><p>Upload a protected module and assign its trainer and batch.</p></div>
-            <button type="button" data-dashboard-dialog-close class="lms-dialog-close" aria-label="Close module creator"><x-dashboard-icon name="xmark" /></button>
+    <nav class="lms-context-tabs" aria-label="LMS module sections">
+        <a href="{{ route('admin.learning.modules') }}" class="{{ $isUnitsTab || $isOutcomesTab ? '' : 'is-active' }}" @unless($isUnitsTab || $isOutcomesTab) aria-current="page" @endunless>Learning modules</a>
+        <a href="{{ route('admin.learning.modules', ['tab' => 'units']) }}" class="{{ $isUnitsTab ? 'is-active' : '' }}" @if($isUnitsTab) aria-current="page" @endif>Units</a>
+        <a href="{{ route('admin.learning.modules', ['tab' => 'outcomes']) }}" class="{{ $isOutcomesTab ? 'is-active' : '' }}" @if($isOutcomesTab) aria-current="page" @endif>Outcomes</a>
+    </nav>
+
+    @if ($isUnitsTab)
+    <section class="dashboard-table-wrap overflow-x-auto" aria-labelledby="catalog-units-title">
+        <div class="flex flex-col gap-2 border-b border-slate-200 px-4 py-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+                <h2 id="catalog-units-title" class="text-base font-bold text-slate-950">Competency units</h2>
+                <p class="mt-1 text-sm text-slate-600">Trainers pick selectable units when creating classwork. Units already used by a module or trainee record cannot be deleted.</p>
+            </div>
         </div>
-        <form method="POST" action="{{ route('admin.learning.modules.store') }}" enctype="multipart/form-data" class="grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-4" data-dashboard-dialog-form data-submit-label="Adding module...">
+        <table class="dashboard-table w-full min-w-[52rem]">
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Title</th>
+                    <th>Category</th>
+                    <th>Hours</th>
+                    <th>Trainer dropdown</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse ($catalogUnits as $unit)
+                    @php
+                        $unitInUse = ((int) ($unit->training_modules_count ?? 0) + (int) ($unit->trainee_records_count ?? 0)) > 0;
+                    @endphp
+                    <tr>
+                        <td class="font-mono text-xs font-bold">{{ $unit->code }}</td>
+                        <td>
+                            <p class="font-semibold text-slate-950">{{ $unit->title }}</p>
+                            <p class="mt-0.5 text-xs text-slate-500">{{ $unit->outcomes->count() }} {{ \Illuminate\Support\Str::plural('outcome', $unit->outcomes->count()) }}</p>
+                        </td>
+                        <td>{{ \App\Models\CompetencyUnit::categoryLabels()[$unit->category] ?? $unit->category }}</td>
+                        <td>{{ $unit->suggestedHours() }}</td>
+                        <td>{{ $unit->is_selectable ? 'Available' : 'Hidden' }}</td>
+                        <td>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <a href="{{ route('admin.learning.modules', ['tab' => 'outcomes', 'unit_id' => $unit->id]) }}" class="secondary-action !min-h-9 !px-3 text-xs">Outcomes</a>
+                                <a href="{{ route('admin.learning.modules', ['tab' => 'units', 'edit_unit' => $unit->id]) }}" class="secondary-action !min-h-9 !px-3 text-xs">Edit</a>
+                                <form method="POST" action="{{ route('admin.learning.modules.presets.destroy', $unit) }}" data-confirm="{{ $unitInUse ? 'This unit is in use and cannot be deleted.' : 'Delete unit '.$unit->code.' and its unused outcomes?' }}">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="secondary-action !min-h-9 !px-3 text-xs border-red-200 text-red-700 hover:border-red-300 hover:bg-red-50" @disabled($unitInUse)>Delete</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="6" class="py-6 text-sm text-slate-600">No competency units are stored yet. Add a unit to populate the trainer dropdown.</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </section>
+    @endif
+
+    @if ($isOutcomesTab)
+    <section class="dashboard-table-wrap overflow-x-auto" aria-labelledby="catalog-outcomes-title">
+        <div class="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+                <h2 id="catalog-outcomes-title" class="text-base font-bold text-slate-950">Competency outcomes</h2>
+                <p class="mt-1 text-sm text-slate-600">Each outcome belongs to a unit and can become a classwork submodule. Outcomes already used in classwork or trainee results cannot be deleted.</p>
+            </div>
+            <form method="GET" class="flex flex-wrap items-end gap-2">
+                <input type="hidden" name="tab" value="outcomes">
+                <div>
+                    <label class="mb-1 block text-[11px] font-bold uppercase text-slate-500" for="outcome-unit-filter">Unit</label>
+                    <select id="outcome-unit-filter" name="unit_id" class="form-field min-w-[16rem]" onchange="this.form.submit()">
+                        <option value="">All units</option>
+                        @foreach ($catalogUnits as $unit)
+                            <option value="{{ $unit->id }}" @selected((string) ($filters['unit_id'] ?? '') === (string) $unit->id)>{{ $unit->code }} — {{ $unit->title }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </form>
+        </div>
+        <table class="dashboard-table w-full min-w-[52rem]">
+            <thead>
+                <tr>
+                    <th>Unit</th>
+                    <th>Outcome</th>
+                    <th>Order</th>
+                    <th>Required</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse ($catalogOutcomes as $outcome)
+                    @php
+                        $outcomeInUse = ((int) ($outcome->trainee_results_count ?? 0) + (int) ($outcome->submodules_count ?? 0)) > 0;
+                    @endphp
+                    <tr>
+                        <td>
+                            <p class="font-mono text-xs font-bold">{{ $outcome->unit?->code }}</p>
+                            <p class="text-xs text-slate-500">{{ $outcome->unit?->title }}</p>
+                        </td>
+                        <td class="font-semibold text-slate-950">{{ $outcome->title }}</td>
+                        <td>{{ $outcome->sort_order }}</td>
+                        <td>{{ $outcome->is_required ? 'Yes' : 'No' }}</td>
+                        <td>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <a href="{{ route('admin.learning.modules', ['tab' => 'outcomes', 'unit_id' => $outcome->competency_unit_id, 'edit_outcome' => $outcome->id]) }}" class="secondary-action !min-h-9 !px-3 text-xs">Edit</a>
+                                <form method="POST" action="{{ route('admin.learning.modules.outcomes.destroy', $outcome) }}" data-confirm="{{ $outcomeInUse ? 'This outcome is in use and cannot be deleted.' : 'Delete this outcome?' }}">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="secondary-action !min-h-9 !px-3 text-xs border-red-200 text-red-700 hover:border-red-300 hover:bg-red-50" @disabled($outcomeInUse)>Delete</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="5" class="py-6 text-sm text-slate-600">No competency outcomes match this filter. Add an outcome or choose another unit.</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </section>
+    @endif
+
+    <dialog id="admin-preset-dialog" data-dashboard-dialog data-auto-open="{{ $openPresetDialog ? 'true' : 'false' }}" class="lms-workflow-dialog" aria-labelledby="admin-preset-dialog-title">
+        <div class="lms-dialog-header">
+            <div>
+                <p class="lms-eyebrow">Admin LMS catalog</p>
+                <h2 id="admin-preset-dialog-title">{{ $editingPreset ? 'Edit competency unit' : 'Add competency unit' }}</h2>
+                <p>These records are stored in competency units and shown to trainers when they create classwork.</p>
+            </div>
+            <button type="button" data-dashboard-dialog-close class="lms-dialog-close" aria-label="Close course preset editor"><x-dashboard-icon name="xmark" /></button>
+        </div>
+        <form
+            method="POST"
+            action="{{ $editingPreset ? route('admin.learning.modules.presets.update', $editingPreset) : route('admin.learning.modules.presets.store') }}"
+            class="lms-composer-form grid gap-4 md:grid-cols-2"
+            data-dashboard-dialog-form
+            data-submit-label="{{ $editingPreset ? 'Saving preset...' : 'Saving preset...' }}"
+        >
             @csrf
-
-            <!-- Preset Dropdown -->
-            <div class="md:col-span-2 xl:col-span-4">
-                <label class="mb-2 block text-xs font-bold uppercase text-purple-800">Caregiving NC II Course Module Preset</label>
-                <select id="admin-module-preset-select" class="form-field border-purple-300 focus:border-purple-600">
-                    <option value="">-- Choose from Caregiving NC II Core Modules or type custom --</option>
-                    <optgroup label="11 Core Competencies (TESDA TOR)">
-                        @foreach($catalogUnits as $unit)
-                            @if(($unit['category'] ?? '') === 'core')
-                                <option value="{{ $unit['code'] }}" data-code="{{ $unit['code'] }}" data-title="{{ $unit['title'] }}" data-category="{{ $unit['category'] }}" data-hours="{{ $unit['nominal_hours'] ?? '' }}" data-outcomes="{{ json_encode($unit['outcomes']) }}">
-                                    [{{ $unit['code'] }}] {{ $unit['title'] }}
-                                </option>
-                            @endif
-                        @endforeach
-                    </optgroup>
-                    <optgroup label="Common Competencies">
-                        @foreach($catalogUnits as $unit)
-                            @if(($unit['category'] ?? '') === 'common')
-                                <option value="{{ $unit['code'] }}" data-code="{{ $unit['code'] }}" data-title="{{ $unit['title'] }}" data-category="{{ $unit['category'] }}" data-hours="{{ $unit['nominal_hours'] ?? '' }}" data-outcomes="{{ json_encode($unit['outcomes']) }}">
-                                    [{{ $unit['code'] }}] {{ $unit['title'] }}
-                                </option>
-                            @endif
-                        @endforeach
-                    </optgroup>
-                    <optgroup label="Basic Competencies">
-                        @foreach($catalogUnits as $unit)
-                            @if(($unit['category'] ?? '') === 'basic')
-                                <option value="{{ $unit['code'] }}" data-code="{{ $unit['code'] }}" data-title="{{ $unit['title'] }}" data-category="{{ $unit['category'] }}" data-hours="{{ $unit['nominal_hours'] ?? '' }}" data-outcomes="{{ json_encode($unit['outcomes']) }}">
-                                    [{{ $unit['code'] }}] {{ $unit['title'] }}
-                                </option>
-                            @endif
-                        @endforeach
-                    </optgroup>
-                </select>
-                <small class="mt-1 block text-xs text-slate-500">Choosing a course module preset automatically fills the Module Code, Title, and suggested subtopics.</small>
-            </div>
-
+            @if ($editingPreset)
+                @method('PATCH')
+            @endif
             <div>
-                <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Trainer</label>
-                <select name="trainer_id" class="form-field" required>
-                    <option value="">Select trainer</option>
-                    @foreach($trainers as $trainer)
-                        <option value="{{ $trainer->id }}" @selected((int)old('trainer_id') === $trainer->id)>{{ $trainer->name }} · {{ $trainer->email }}</option>
+                <label class="mb-2 block text-xs font-bold uppercase text-slate-500" for="preset-category">Category</label>
+                <select id="preset-category" name="category" class="form-field" required>
+                    @foreach (\App\Models\CompetencyUnit::categoryLabels() as $value => $label)
+                        <option value="{{ $value }}" @selected(old('category', $editingPreset?->category) === $value)>{{ $label }}</option>
                     @endforeach
                 </select>
-                @error('trainer_id')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+                @error('category', 'catalog')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
             </div>
-
             <div>
-                <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Batch Assignment</label>
-                <select name="training_batch_id" class="form-field" required>
-                    <option value="">Select batch</option>
-                    @foreach($batches as $batch)
-                        <option value="{{ $batch->id }}" @selected((int)old('training_batch_id') === $batch->id)>{{ $batch->name }} {{ $batch->year }}</option>
-                    @endforeach
-                </select>
-                @error('training_batch_id')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+                <label class="mb-2 block text-xs font-bold uppercase text-slate-500" for="preset-code">Module code</label>
+                <input id="preset-code" name="code" value="{{ old('code', $editingPreset?->code) }}" class="form-field font-mono font-bold" maxlength="40" required placeholder="e.g. HCS323301">
+                @error('code', 'catalog')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
             </div>
-
-            <div>
-                <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Module Code</label>
-                <input id="admin-module-code" name="module_code" value="{{ old('module_code') }}" class="form-field font-mono font-bold" placeholder="e.g. HCS323301">
-                @error('module_code')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
-            </div>
-
-            <div>
-                <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Competency Category</label>
-                <select id="admin-module-category" name="competency_category" class="form-field">
-                    <option value="custom" @selected(old('competency_category', 'custom') === 'custom')>Institutional / Custom</option>
-                    <option value="core" @selected(old('competency_category') === 'core')>Core Competency</option>
-                    <option value="common" @selected(old('competency_category') === 'common')>Common Competency</option>
-                    <option value="basic" @selected(old('competency_category') === 'basic')>Basic Competency</option>
-                </select>
-                @error('competency_category')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
-            </div>
-
             <div class="md:col-span-2">
-                <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Module Requirement</label>
-                <select name="completion_mode" class="form-field" required>
-                    <option value="assessed" @selected(old('completion_mode', 'assessed') === 'assessed')>Assessed module — classwork and trainer evaluation required</option>
-                    <option value="material_only" @selected(old('completion_mode') === 'material_only')>Learning material only — no Mark as Done</option>
-                </select>
-                <p class="mt-1 text-xs text-slate-500">Material-only modules remain readable but do not create a competency completion requirement.</p>
-                @error('completion_mode')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+                <label class="mb-2 block text-xs font-bold uppercase text-slate-500" for="preset-title">Title</label>
+                <input id="preset-title" name="title" value="{{ old('title', $editingPreset?->title) }}" class="form-field" maxlength="255" required>
+                @error('title', 'catalog')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
             </div>
-
             <div>
-                <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Sub-topic / Learning Outcome</label>
-                <input id="admin-module-topic" name="topic" list="admin-subtopics-list" value="{{ old('topic') }}" class="form-field" placeholder="e.g. Comfort infants and toddlers">
-                <datalist id="admin-subtopics-list"></datalist>
-                @error('topic')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+                <label class="mb-2 block text-xs font-bold uppercase text-slate-500" for="preset-hours">Nominal hours</label>
+                <input id="preset-hours" name="estimated_hours" type="number" min="1" max="500" value="{{ old('estimated_hours', $editingPreset?->estimated_hours) }}" class="form-field" placeholder="e.g. 40">
+                @error('estimated_hours', 'catalog')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
             </div>
-
-            <div>
-                <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Nominal Hours</label>
-                <input id="admin-module-hours" name="estimated_hours" type="number" min="1" max="500" value="{{ old('estimated_hours') }}" class="form-field" placeholder="e.g. 40">
-                @error('estimated_hours')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+            <div class="flex flex-col justify-end gap-2 pb-1">
+                <label class="flex items-center gap-2 text-sm text-slate-700">
+                    <input type="hidden" name="is_selectable" value="0">
+                    <input type="checkbox" name="is_selectable" value="1" @checked($selectableChecked)>
+                    Show this preset in the trainer dropdown
+                </label>
+                <label class="flex items-center gap-2 text-sm text-slate-700">
+                    <input type="hidden" name="is_tor_included" value="0">
+                    <input type="checkbox" name="is_tor_included" value="1" @checked($torChecked)>
+                    Include on TESDA TOR
+                </label>
             </div>
-
-            <div class="md:col-span-2 xl:col-span-4">
-                <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Module Title</label>
-                <input id="admin-module-title" name="title" value="{{ old('title') }}" class="form-field" required placeholder="e.g. Provide Care and Support to Infants and Toddlers">
-                @error('title')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+            <div class="md:col-span-2">
+                <label class="mb-2 block text-xs font-bold uppercase text-slate-500" for="preset-outcomes">Subtopics / learning outcomes</label>
+                <textarea id="preset-outcomes" name="outcomes" rows="6" class="form-field" placeholder="One outcome per line">{{ $presetOutcomesText }}</textarea>
+                <p class="mt-1 text-xs text-slate-500">Each line becomes a suggested submodule when a trainer selects this preset.</p>
+                @error('outcomes', 'catalog')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
             </div>
-
-            <div class="md:col-span-2 xl:col-span-3">
-                <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Instructions & Description</label>
-                <textarea name="description" rows="3" class="form-field" required placeholder="Overview of the core module, competencies, and learning instructions.">{{ old('description') }}</textarea>
-                @error('description')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
-            </div>
-
-            <div>
-                <label class="mb-2 block text-xs font-bold uppercase text-slate-500">PDF, Office, image, video, or audio</label>
-                <input name="module_file" type="file" accept="{{ \App\Support\TrainingModuleFiles::acceptAttribute() }}" class="form-field" required>
-                @error('module_file')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
-            </div>
-
-            <div class="md:col-span-2 xl:col-span-4">
-                <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Supplementary Handouts (Optional)</label>
-                <input name="supplementary_files[]" type="file" multiple accept="{{ \App\Support\TrainingModuleFiles::acceptAttribute() }}" class="form-field">
-                <p class="mt-1 text-xs text-slate-500">Up to {{ \App\Support\TrainingModuleFiles::MAX_SUPPLEMENTARY_FILES }} files, {{ number_format(\App\Support\TrainingModuleFiles::MAX_SUPPLEMENTARY_UPLOAD_KB / 1024) }} MB each.</p>
-                @error('supplementary_files')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
-                @error('supplementary_files.*')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
-            </div>
-
-            <label class="flex items-center gap-3 text-sm font-semibold text-slate-700">
-                <input type="hidden" name="is_published" value="0">
-                <input name="is_published" type="checkbox" value="1" @checked(old('is_published', true))> Publish as the current active batch module
-            </label>
-
-            <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 md:col-span-2 md:flex-row md:justify-end xl:col-span-3">
+            <div class="md:col-span-2 flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:justify-end">
                 <button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button>
-                <button class="primary-action" data-action-button>Add module</button>
+                <button type="submit" class="primary-action">{{ $editingPreset ? 'Save unit' : 'Save unit' }}</button>
             </div>
         </form>
     </dialog>
 
+    <dialog id="admin-outcome-dialog" data-dashboard-dialog data-auto-open="{{ $openOutcomeDialog ? 'true' : 'false' }}" class="lms-workflow-dialog is-compact" aria-labelledby="admin-outcome-dialog-title">
+        <div class="lms-dialog-header">
+            <div>
+                <p class="lms-eyebrow">Admin LMS catalog</p>
+                <h2 id="admin-outcome-dialog-title">{{ $editingOutcome ? 'Edit competency outcome' : 'Add competency outcome' }}</h2>
+                <p>Each outcome belongs to one unit and can be used as a classwork submodule.</p>
+            </div>
+            <button type="button" data-dashboard-dialog-close class="lms-dialog-close" aria-label="Close outcome editor"><x-dashboard-icon name="xmark" /></button>
+        </div>
+        <form
+            method="POST"
+            action="{{ $editingOutcome ? route('admin.learning.modules.outcomes.update', $editingOutcome) : route('admin.learning.modules.outcomes.store') }}"
+            class="lms-composer-form grid gap-4"
+            data-dashboard-dialog-form
+            data-submit-label="Saving outcome..."
+        >
+            @csrf
+            @if ($editingOutcome)
+                @method('PATCH')
+            @endif
+            <div>
+                <label class="mb-2 block text-xs font-bold uppercase text-slate-500" for="outcome-unit">Competency unit</label>
+                <select id="outcome-unit" name="competency_unit_id" class="form-field" required>
+                    <option value="">Choose a unit</option>
+                    @foreach ($catalogUnits as $unit)
+                        <option value="{{ $unit->id }}" @selected((string) $selectedOutcomeUnitId === (string) $unit->id)>{{ $unit->code }} — {{ $unit->title }}</option>
+                    @endforeach
+                </select>
+                @error('competency_unit_id', 'catalogOutcome')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+            </div>
+            <div>
+                <label class="mb-2 block text-xs font-bold uppercase text-slate-500" for="outcome-title">Outcome title</label>
+                <input id="outcome-title" name="title" value="{{ old('title', $editingOutcome?->title) }}" class="form-field" maxlength="255" required>
+                @error('title', 'catalogOutcome')<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
+            </div>
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+                <input type="hidden" name="is_required" value="0">
+                <input type="checkbox" name="is_required" value="1" @checked($outcomeRequiredChecked)>
+                Required outcome
+            </label>
+            <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:justify-end">
+                <button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button>
+                <button type="submit" class="primary-action">Save outcome</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="admin-module-dialog" data-dashboard-dialog data-auto-open="{{ $errors->hasAny(['trainer_id', 'training_batch_id', 'module_code', 'competency_category', 'completion_mode', 'estimated_hours', 'title', 'description', 'module_file', 'supplementary_files', 'supplementary_files.*']) && ! old('_editing_module_id') ? 'true' : 'false' }}" class="lms-workflow-dialog" aria-labelledby="admin-module-dialog-title">
+        <div class="lms-dialog-header">
+            <div><p class="lms-eyebrow">Admin LMS</p><h2 id="admin-module-dialog-title">Add a learning module</h2><p>Upload a protected module and assign its trainer and batch.</p></div>
+            <button type="button" data-dashboard-dialog-close class="lms-dialog-close" aria-label="Close module creator"><x-dashboard-icon name="xmark" /></button>
+        </div>
+        @include('admin.learning.partials.module-composer-form', [
+            'prefix' => 'admin',
+            'errorBag' => 'default',
+            'trainers' => $trainers,
+            'batches' => $batches,
+            'trainerCatalogUnits' => $trainerCatalogUnits,
+        ])
+    </dialog>
+
+    @unless ($isUnitsTab || $isOutcomesTab)
     <form method="GET" data-auto-filter class="dashboard-panel grid gap-4 md:grid-cols-4">
         <div class="md:col-span-2">
             <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Search module, code, or trainer</label>
@@ -187,7 +325,7 @@
     </form>
 
     <div class="dashboard-table-wrap overflow-x-auto">
-        <table class="dashboard-table min-w-[64rem]">
+        <table class="dashboard-table w-full min-w-[64rem]">
             <thead>
                 <tr>
                     <th>Module</th>
@@ -235,6 +373,10 @@
                                     <x-dashboard-icon name="eye" class="h-4 w-4" />
                                     <span class="admin-module-action-tooltip" aria-hidden="true">Preview</span>
                                 </a>
+                                <button type="button" data-dashboard-dialog-open="edit-module-{{ $module->id }}" class="admin-module-action" aria-label="Edit module" title="Edit module">
+                                    <x-dashboard-icon name="pencil" class="h-4 w-4" />
+                                    <span class="admin-module-action-tooltip" aria-hidden="true">Edit</span>
+                                </button>
                                 <a href="{{ route('classroom-comments.index', ['type' => 'module', 'id' => $module->id]) }}" class="admin-module-action" aria-label="Open module comments" title="Open module comments">
                                     <x-dashboard-icon name="message-circle" class="h-4 w-4" />
                                     <span class="admin-module-action-tooltip" aria-hidden="true">Comments</span>
@@ -255,7 +397,25 @@
     </div>
 
     @foreach($modules as $module)
-        @php($impact = $moduleImpacts[$module->id] ?? [])
+        @php
+            $impact = $moduleImpacts[$module->id] ?? [];
+            $updateErrors = $errors->moduleUpdate ?? null;
+            $openEditDialog = $updateErrors && $updateErrors->any() && (int) old('_editing_module_id') === (int) $module->id;
+        @endphp
+        <dialog id="edit-module-{{ $module->id }}" data-dashboard-dialog data-auto-open="{{ $openEditDialog ? 'true' : 'false' }}" class="lms-workflow-dialog" aria-labelledby="edit-module-title-{{ $module->id }}">
+            <div class="lms-dialog-header">
+                <div><p class="lms-eyebrow">Admin LMS</p><h2 id="edit-module-title-{{ $module->id }}">Edit learning module</h2><p>Update this module’s assignment, details, or learning file.</p></div>
+                <button type="button" data-dashboard-dialog-close class="lms-dialog-close" aria-label="Close module editor"><x-dashboard-icon name="xmark" /></button>
+            </div>
+            @include('admin.learning.partials.module-composer-form', [
+                'prefix' => 'edit-'.$module->id,
+                'module' => $module,
+                'errorBag' => 'moduleUpdate',
+                'trainers' => $trainers,
+                'batches' => $batches,
+                'trainerCatalogUnits' => $trainerCatalogUnits,
+            ])
+        </dialog>
         <dialog id="delete-module-{{ $module->id }}" data-dashboard-dialog class="m-auto max-h-[92vh] w-[min(94vw,42rem)] overflow-y-auto rounded-xl border border-red-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/45" aria-labelledby="delete-module-title-{{ $module->id }}">
             <div class="border-b border-red-100 bg-red-50 px-6 py-5">
                 <div class="flex items-start justify-between gap-4">
@@ -302,19 +462,57 @@
             </div>
         </dialog>
     @endforeach
+    @endunless
 </section>
 
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        const presetSelect = document.getElementById('admin-module-preset-select');
-        const codeInput = document.getElementById('admin-module-code');
-        const titleInput = document.getElementById('admin-module-title');
-        const topicInput = document.getElementById('admin-module-topic');
-        const categoryInput = document.getElementById('admin-module-category');
-        const hoursInput = document.getElementById('admin-module-hours');
-        const datalist = document.getElementById('admin-subtopics-list');
+        document.querySelectorAll('[data-module-preset-form]').forEach((form) => {
+            const presetSelect = form.querySelector('[data-role="module-preset"]');
+            const codeInput = form.querySelector('[data-role="module-code"]');
+            const titleInput = form.querySelector('[data-role="module-title"]');
+            const topicInput = form.querySelector('[data-role="module-topic"]');
+            const categoryInput = form.querySelector('[data-role="module-category"]');
+            const hoursInput = form.querySelector('[data-role="module-hours"]');
+            const datalist = form.querySelector('[data-role="module-subtopics"]');
+            const submoduleList = form.querySelector('[data-role="module-submodule-list"]');
+            const addSubmoduleButton = form.querySelector('[data-role="module-add-submodule"]');
 
-        if (presetSelect) {
+            const renderSubmodules = (outcomes, locked = false) => {
+                if (!submoduleList) return;
+                submoduleList.innerHTML = '';
+                const titles = outcomes.length ? outcomes : [''];
+                titles.forEach((outcome) => {
+                    const input = document.createElement('input');
+                    input.name = 'submodule_titles[]';
+                    input.value = outcome;
+                    input.maxLength = 255;
+                    input.className = 'form-field';
+                    input.placeholder = 'Submodule or competency outcome';
+                    input.readOnly = locked;
+                    submoduleList.appendChild(input);
+                });
+            };
+
+            addSubmoduleButton?.addEventListener('click', () => {
+                const input = document.createElement('input');
+                input.name = 'submodule_titles[]';
+                input.maxLength = 255;
+                input.className = 'form-field';
+                input.placeholder = 'Submodule or competency outcome';
+                submoduleList?.appendChild(input);
+            });
+
+            categoryInput?.addEventListener('change', () => {
+                if (categoryInput.value === 'custom' && submoduleList?.querySelector('input[readonly]')) {
+                    renderSubmodules([], false);
+                }
+            });
+
+            if (!presetSelect) {
+                return;
+            }
+
             presetSelect.addEventListener('change', () => {
                 const selectedOption = presetSelect.selectedOptions[0];
                 if (!selectedOption || !selectedOption.value) return;
@@ -343,11 +541,13 @@
                     });
                 }
 
+                renderSubmodules(outcomes, true);
+
                 if (topicInput && outcomes.length > 0 && !topicInput.value) {
                     topicInput.value = outcomes[0];
                 }
             });
-        }
+        });
     });
 </script>
 @endsection

@@ -11,7 +11,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Throwable;
 
 class AdminSessionController extends Controller
 {
@@ -39,8 +38,8 @@ class AdminSessionController extends Controller
         // Normalize email consistently with the admin-login rate-limiter key.
         $credentials['email'] = Str::lower(trim($credentials['email']));
 
-        // Validate the password without creating an authenticated session.
-        // The privileged session is only created after the email code passes.
+        // Validate the password without creating an authenticated session
+        // until the account is confirmed to be an administrator.
         $user = User::query()->where('email', $credentials['email'])->first();
 
         if (! $user || ! Hash::check($credentials['password'], (string) $user->password)) {
@@ -65,40 +64,9 @@ class AdminSessionController extends Controller
                 ->onlyInput('email');
         }
 
-        $twoFactor = app(EmailTwoFactorService::class);
-
-        if ($user instanceof User && $twoFactor->enabledFor($user)) {
-            try {
-                $challenge = $twoFactor->issue($user);
-                $challenge['remember'] = $request->boolean('remember');
-                $request->session()->put('admin.mfa.pending', [
-                    'user_id' => $user->id,
-                    ...$challenge,
-                ]);
-
-                // Rotate the guest session before showing the challenge.
-                $request->session()->regenerate();
-
-                AdminActivityLog::record($user, 'admin.login.mfa.sent', $user);
-
-                return redirect()
-                    ->route('login')
-                    ->with('mfa_notice', 'A verification code was sent to your staff email address.');
-            } catch (Throwable $exception) {
-                report($exception);
-                $request->session()->forget('admin.mfa.pending');
-                Auth::logout();
-                $request->session()->invalidate();
-                $request->session()->regenerateToken();
-
-                return back()
-                    ->withErrors(['email' => 'We could not send a verification code. Please try again or contact an administrator.'])
-                    ->onlyInput('email');
-            }
-        }
-
         $request->session()->regenerate();
         Auth::login($user, $request->boolean('remember'));
+        $request->session()->put('admin.mfa.verified_user_id', $user->id);
         AdminActivityLog::record($user, 'admin.login.success', $user);
 
         // Begin every privileged session at the dashboard instead of replaying

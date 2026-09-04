@@ -68,7 +68,7 @@ class MobileDashboardApiController extends Controller
                     'name' => $user->name,
                     'email' => $user->email,
                     'role' => $user->role,
-                    'avatar_url' => $user->avatar_url,
+                    'avatar_url' => $user->profilePhotoUrl(),
                 ],
                 'application' => $application ? [
                     'id' => $application->id,

@@ -30,12 +30,12 @@ class EnrollmentLifecycleVisibilityTest extends TestCase
                 'program_downpayment' => '3500.00',
                 'program_is_active' => '1',
             ])
-            ->assertRedirect(route('admin.schedules.index'));
+            ->assertRedirect(route('admin.training-programs.index'));
 
         $program = TrainingProgram::query()->where('code', 'CAREGIVING-NC-III')->firstOrFail();
 
         $this->actingAs($admin)
-            ->post(route('admin.schedules.store'), [
+            ->post(route('admin.batches.store'), [
                 'training_program_id' => $program->id,
                 'name' => 'Advanced Batch Alpha',
                 'year' => 2026,
@@ -46,7 +46,7 @@ class EnrollmentLifecycleVisibilityTest extends TestCase
                 'am_days' => 'MWF',
                 'pm_days' => 'TTH',
             ])
-            ->assertRedirect(route('admin.schedules.index'));
+            ->assertRedirect(route('admin.batches.index'));
 
         $publishedBatch = TrainingBatch::query()->where('name', 'Advanced Batch Alpha')->firstOrFail();
 
@@ -62,7 +62,9 @@ class EnrollmentLifecycleVisibilityTest extends TestCase
             'pm_days' => 'TTH',
         ]);
 
-        $this->get(route('enrollment.create', ['batch' => $publishedBatch->id]))
+        $this->withSession([
+            'enrollment.admission_application_id' => $this->makeApprovedAdmission()->id,
+        ])->get(route('enrollment.create', ['batch' => $publishedBatch->id]))
             ->assertOk()
             ->assertSee('Available active batches')
             ->assertSee('Caregiving NC III')
@@ -70,6 +72,36 @@ class EnrollmentLifecycleVisibilityTest extends TestCase
             ->assertSee('Required downpayment: ₱3,500.00')
             ->assertSee('name="training_batch_id" value="'.$publishedBatch->id.'"', false)
             ->assertDontSee('Hidden Internal Batch');
+    }
+
+    public function test_flashed_old_batch_id_is_restored_on_the_enrollment_form(): void
+    {
+        $program = TrainingProgram::query()->firstOrFail();
+        $oldBatch = TrainingBatch::create([
+            'training_program_id' => $program->id,
+            'name' => 'Old Input Batch',
+            'year' => 2026,
+            'is_active' => true,
+            'show_on_enrollment_page' => true,
+            'enrollment_starts_at' => now()->subDay(),
+            'enrollment_ends_at' => now()->addMonth(),
+        ]);
+        TrainingBatch::create([
+            'training_program_id' => $program->id,
+            'name' => 'Other Published Batch',
+            'year' => 2026,
+            'is_active' => true,
+            'show_on_enrollment_page' => true,
+            'enrollment_starts_at' => now()->subDay(),
+            'enrollment_ends_at' => now()->addMonth(),
+        ]);
+
+        $this->withSession([
+            'enrollment.admission_application_id' => $this->makeApprovedAdmission()->id,
+            '_old_input' => ['training_batch_id' => $oldBatch->id],
+        ])->get(route('enrollment.create'))
+            ->assertOk()
+            ->assertSee('name="training_batch_id" value="'.$oldBatch->id.'"', false);
     }
 
     public function test_unpaid_registration_stays_in_payment_operations_but_out_of_admin_review_and_accounts(): void

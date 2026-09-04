@@ -13,12 +13,70 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\HeaderUtils;
 use Throwable;
 
 class HistoricalAlumniClaimController extends Controller
 {
+    public function index(Request $request): View
+    {
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $selectedStatus = trim((string) ($filters['status'] ?? ''));
+        $search = trim((string) ($filters['search'] ?? ''));
+        $statuses = HistoricalAlumniClaim::statuses();
+
+        $query = HistoricalAlumniClaim::query()
+            ->with(['user', 'reviewer', 'onsiteVerifier'])
+            ->latest();
+
+        if (array_key_exists($selectedStatus, $statuses)) {
+            $query->where('status', $selectedStatus);
+        }
+
+        if ($search !== '') {
+            $query->where(function ($builder) use ($search): void {
+                $builder
+                    ->where('first_name', 'like', '%'.$search.'%')
+                    ->orWhere('last_name', 'like', '%'.$search.'%')
+                    ->orWhere('contact_number', 'like', '%'.$search.'%')
+                    ->orWhere('certificate_number', 'like', '%'.$search.'%')
+                    ->orWhere('tor_reference', 'like', '%'.$search.'%')
+                    ->orWhere('historical_batch_name', 'like', '%'.$search.'%')
+                    ->orWhereHas('user', function ($users) use ($search): void {
+                        $users->where('name', 'like', '%'.$search.'%')
+                            ->orWhere('email', 'like', '%'.$search.'%');
+                    });
+            });
+        }
+
+        return view('admin.historical-alumni.index', [
+            'claims' => $query->paginate(20)->withQueryString(),
+            'search' => $search,
+            'selectedStatus' => $selectedStatus,
+            'statuses' => $statuses,
+            'counts' => HistoricalAlumniClaim::query()
+                ->selectRaw('status, count(*) as aggregate')
+                ->groupBy('status')
+                ->pluck('aggregate', 'status'),
+            'totalClaims' => HistoricalAlumniClaim::query()->count(),
+        ]);
+    }
+
+    public function show(HistoricalAlumniClaim $historicalAlumniClaim): View
+    {
+        $historicalAlumniClaim->load(['user', 'reviewer', 'onsiteVerifier']);
+
+        return view('admin.historical-alumni.show', [
+            'claim' => $historicalAlumniClaim,
+        ]);
+    }
+
     public function update(Request $request, HistoricalAlumniClaim $historicalAlumniClaim): RedirectResponse
     {
         $validated = $request->validateWithBag('historicalClaimReview', [
@@ -85,6 +143,7 @@ class HistoricalAlumniClaimController extends Controller
                         'barangay' => $claim->barangay,
                         'city' => $claim->city,
                         'province' => $claim->province,
+                        'region' => $claim->region,
                         'zip_code' => $claim->zip_code,
                         'educational_attainment' => $claim->educational_attainment,
                         'school_name' => $claim->school_name,
@@ -135,9 +194,11 @@ class HistoricalAlumniClaimController extends Controller
             report($exception);
         }
 
-        return back()->with('saved', $validated['decision'] === 'approve'
-            ? "Historical alumni access activated for {$claim->user->name}."
-            : "Historical alumni claim for {$claim->user->name} was returned for follow-up.");
+        return redirect()
+            ->route('admin.historical-alumni.show', $claim)
+            ->with('saved', $validated['decision'] === 'approve'
+                ? "Historical alumni access activated for {$claim->user->name}."
+                : "Historical alumni claim for {$claim->user->name} was returned for follow-up.");
     }
 
     public function evidence(Request $request, HistoricalAlumniClaim $historicalAlumniClaim): BinaryFileResponse

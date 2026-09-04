@@ -4,12 +4,11 @@ namespace App\Http\Controllers\Trainer;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
-use App\Models\CompetencyUnit;
 use App\Models\EnrollmentApplication;
 use App\Models\TraineeCompetencyRecord;
 use App\Models\TrainingBatch;
+use App\Services\CompetencyCatalogService;
 use App\Services\CompetencyRecordUpdater;
-use App\Support\CaregivingNcIiCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -32,6 +31,7 @@ class CompetencyRecordController extends Controller
         $this->assertBatchAccess($request, $requestedBatchId);
         $selectedBatchId = $requestedBatchId ?? $assignedBatch?->id;
         $units = $this->unitsForBatch($selectedBatchId);
+        $unitsByCategory = $this->catalog()->groupByCategory($units);
 
         $trainees = collect();
         $traineeLimitReached = false;
@@ -71,7 +71,7 @@ class CompetencyRecordController extends Controller
         return view('trainer.competencies.index', [
             'trainees' => $trainees,
             'traineeLimitReached' => $traineeLimitReached,
-            'unitsByCategory' => $units->groupBy('category'),
+            'unitsByCategory' => $unitsByCategory,
             'recordsByTrainee' => $recordsByTrainee,
             'statuses' => TraineeCompetencyRecord::statuses(),
             'filters' => array_merge($validated, ['batch_id' => $selectedBatchId]),
@@ -94,10 +94,11 @@ class CompetencyRecordController extends Controller
         $this->assertBatchAccess($request, (int) $enrollmentApplication->training_batch_id);
         $enrollmentApplication->load(['batch', 'user', 'competencyRecords.outcomeResults']);
 
+        $units = $this->unitsForBatch((int) $enrollmentApplication->training_batch_id);
+
         return view('trainer.competencies.edit', [
             'trainee' => $enrollmentApplication,
-            'unitsByCategory' => $this->unitsForBatch((int) $enrollmentApplication->training_batch_id)
-                ->groupBy('category'),
+            'unitsByCategory' => $this->catalog()->groupByCategory($units),
             'recordsByUnit' => $enrollmentApplication->competencyRecords->keyBy('competency_unit_id'),
             'statuses' => TraineeCompetencyRecord::statuses(),
         ]);
@@ -131,7 +132,7 @@ class CompetencyRecordController extends Controller
             'chart' => $chart,
             'schedule' => $validated['schedule'] ?? null,
             'trainees' => $trainees,
-            'unitsByCategory' => $units->groupBy('category'),
+            'unitsByCategory' => $this->catalog()->groupByCategory($units),
             'recordsByTrainee' => $recordsByTrainee,
         ]);
     }
@@ -154,18 +155,15 @@ class CompetencyRecordController extends Controller
             'records.*.outcomes.*' => ['required', Rule::in($statuses)],
         ]);
 
-        $units = CompetencyUnit::query()
-            ->with('outcomes')
-            ->where('program_code', CaregivingNcIiCatalog::PROGRAM_CODE)
-            ->whereIn('id', collect($validated['records'])->pluck('unit_id'))
-            ->where(function ($query) use ($enrollmentApplication): void {
-                $query->where('is_required', true)
-                    ->orWhereHas('trainingModules', fn ($modules) => $modules
-                        ->where('training_batch_id', $enrollmentApplication->training_batch_id)
-                        ->where('is_published', true));
-            })
-            ->get()
+        $deliveredUnits = $this->unitsForBatch((int) $enrollmentApplication->training_batch_id)
             ->keyBy('id');
+        $units = collect($validated['records'])
+            ->mapWithKeys(function (array $payload) use ($deliveredUnits): array {
+                $unitId = (int) $payload['unit_id'];
+                $unit = $deliveredUnits->get($unitId);
+
+                return $unit ? [$unitId => $unit] : [];
+            });
 
         if ($units->count() !== count($validated['records'])) {
             throw ValidationException::withMessages([
@@ -208,16 +206,8 @@ class CompetencyRecordController extends Controller
         ]);
         $this->assertBatchAccess($request, (int) $validated['batch_id']);
 
-        $unit = CompetencyUnit::query()
-            ->with('outcomes')
-            ->where('program_code', CaregivingNcIiCatalog::PROGRAM_CODE)
-            ->where(function ($query) use ($validated): void {
-                $query->where('is_required', true)
-                    ->orWhereHas('trainingModules', fn ($modules) => $modules
-                        ->where('training_batch_id', $validated['batch_id'])
-                        ->where('is_published', true));
-            })
-            ->find($validated['unit_id']);
+        $unit = $this->unitsForBatch((int) $validated['batch_id'])
+            ->firstWhere('id', (int) $validated['unit_id']);
 
         if (! $unit) {
             throw ValidationException::withMessages([
@@ -287,20 +277,12 @@ class CompetencyRecordController extends Controller
 
     private function unitsForBatch(?int $batchId)
     {
-        return CompetencyUnit::query()
-            ->with('outcomes')
-            ->where('program_code', CaregivingNcIiCatalog::PROGRAM_CODE)
-            ->where(function ($query) use ($batchId): void {
-                $query->where('is_required', true)
-                    ->when($batchId, fn ($nested, $id) => $nested->orWhereHas(
-                        'trainingModules',
-                        fn ($modules) => $modules
-                            ->where('training_batch_id', $id)
-                            ->where('is_published', true)
-                    ));
-            })
-            ->orderBy('sort_order')
-            ->get();
+        return $this->catalog()->unitsDeliveredForBatch($batchId);
+    }
+
+    private function catalog(): CompetencyCatalogService
+    {
+        return app(CompetencyCatalogService::class);
     }
 
     private function assertBatchAccess(Request $request, ?int $batchId): void

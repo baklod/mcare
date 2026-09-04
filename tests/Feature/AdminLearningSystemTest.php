@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Mail\StaffAccountCredentialsMail;
 use App\Models\AdminActivityLog;
+use App\Models\CompetencyOutcome;
 use App\Models\CompetencyUnit;
 use App\Models\EnrollmentApplication;
 use App\Models\ModuleProgress;
@@ -16,6 +18,8 @@ use App\Notifications\LmsQuizPublished;
 use App\Notifications\TrainerModuleAssignedByAdmin;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -82,6 +86,9 @@ class AdminLearningSystemTest extends TestCase
             ->assertSee('<dialog id="trainer-account-dialog"', false)
             ->assertSee('data-dashboard-dialog-open="trainee-account-dialog"', false)
             ->assertSee('<dialog id="trainee-account-dialog"', false)
+            ->assertDontSee('name="password"', false)
+            ->assertDontSee('id="trainer-password"', false)
+            ->assertDontSee('id="trainee-password"', false)
             ->assertSee('https://example.test/managed-trainee.jpg', false)
             ->assertSee($photoUrl, false);
 
@@ -98,12 +105,17 @@ class AdminLearningSystemTest extends TestCase
             ->get(route('admin.learning.alumni-jobs'))
             ->assertOk()
             ->assertSee('data-dashboard-dialog-open="career-opportunity-dialog"', false)
-            ->assertSee('<dialog id="career-opportunity-dialog"', false);
+            ->assertSee('<dialog id="career-opportunity-dialog"', false)
+            ->assertSee('career-form-layout', false);
 
         $this->actingAs($admin)
             ->get(route('admin.learning.modules'))
             ->assertOk()
             ->assertSee('Add a learning module')
+            ->assertSee('lms-composer-form', false)
+            ->assertSee('PDF or image')
+            ->assertSee('.pdf,.jpg,.jpeg,.png,.webp,.gif', false)
+            ->assertDontSee('Office, image, video, or audio')
             ->assertDontSee('Admin action');
     }
 
@@ -113,11 +125,13 @@ class AdminLearningSystemTest extends TestCase
 
         $this->actingAs($admin)
             ->post(route('admin.accounts.trainers.store'), [])
-            ->assertSessionHasErrors(['name', 'email', 'password'], null, 'trainer');
+            ->assertSessionHasErrors(['name', 'email'], null, 'trainer');
 
         $this->actingAs($admin)
             ->post(route('admin.learning.alumni-jobs.store'), [])
             ->assertSessionHasErrors([
+                'title',
+                'estimated_salary',
                 'estimated_start_date',
                 'patient_gender',
                 'mobility_status',
@@ -148,9 +162,17 @@ class AdminLearningSystemTest extends TestCase
                 'joined_to' => now()->addDay()->toDateString(),
             ]))
             ->assertOk()
-            ->assertSee('Trainee lifecycle records')
+            ->assertSee('Roster filters')
+            ->assertSee('Delete')
+            ->assertSee('View details')
+            ->assertSee($application->email);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.trainees.show', $application))
+            ->assertOk()
             ->assertSee('Pause')
             ->assertSee('Graduate')
+            ->assertSee('Delete')
             ->assertSee($application->email);
 
         $this->actingAs($admin)
@@ -166,13 +188,17 @@ class AdminLearningSystemTest extends TestCase
             'learning_status' => EnrollmentApplication::LEARNING_PAUSED,
             'learning_status_changed_by_id' => $admin->id,
         ]);
+        $this->assertDatabaseHas('users', [
+            'id' => $traineeUser->id,
+            'trainee_status' => EnrollmentApplication::LEARNING_PAUSED,
+        ]);
         $this->assertTrue(AdminActivityLog::query()
             ->where('action', 'trainee.learning-status.updated')
             ->where('subject_id', $application->id)
             ->exists());
 
         $this->actingAs($admin)
-            ->get(route('admin.learning.trainees', ['learning_status' => EnrollmentApplication::LEARNING_PAUSED]))
+            ->get(route('admin.learning.trainees.show', $application))
             ->assertOk()
             ->assertSee($application->email)
             ->assertSee('Resume');
@@ -194,6 +220,98 @@ class AdminLearningSystemTest extends TestCase
                 'learning_status' => EnrollmentApplication::LEARNING_GRADUATED,
             ])
             ->assertForbidden();
+    }
+
+    public function test_admin_can_delete_a_trainee_and_related_records_from_the_roster(): void
+    {
+        Storage::fake('local');
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainee = User::factory()->create([
+            'role' => 'trainee',
+            'name' => 'Lifecycle Trainee',
+            'email' => 'lifecycle.trainee@gmail.com',
+        ]);
+        $batch = TrainingBatch::create([
+            'name' => 'Batch Delete',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+        ]);
+        $application = $this->approvedApplication($trainee, $batch);
+        $photoPath = "enrollment-documents/{$trainee->id}/id-photo.png";
+        Storage::disk('local')->put($photoPath, 'id-photo');
+        $application->update(['id_photo_path' => $photoPath]);
+
+        $this->actingAs($admin)
+            ->from(route('admin.learning.trainees'))
+            ->delete(route('admin.learning.trainees.destroy', $application))
+            ->assertRedirect(route('admin.learning.trainees', ['tab' => 'current']))
+            ->assertSessionHas('saved');
+
+        $this->assertDatabaseMissing('users', ['id' => $trainee->id]);
+        $this->assertDatabaseMissing('enrollment_applications', ['id' => $application->id]);
+        $this->assertFalse(Storage::disk('local')->exists($photoPath));
+        $this->assertTrue(AdminActivityLog::query()
+            ->where('action', 'admin.account.deleted')
+            ->where('subject_id', $trainee->id)
+            ->exists());
+    }
+
+    public function test_non_admin_cannot_delete_a_trainee_from_the_roster(): void
+    {
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $batch = TrainingBatch::create([
+            'name' => 'Batch Delete Guard',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+        ]);
+        $application = $this->approvedApplication($trainee, $batch);
+
+        $this->actingAs($trainee)
+            ->delete(route('admin.learning.trainees.destroy', $application))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('users', ['id' => $trainee->id]);
+        $this->assertDatabaseHas('enrollment_applications', ['id' => $application->id]);
+    }
+
+    public function test_admin_can_delete_a_historical_alumni_trainee_after_the_alumni_claim_warning(): void
+    {
+        Storage::fake('local');
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $batch = TrainingBatch::create([
+            'name' => 'Historical Batch',
+            'year' => 2020,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->subYear(),
+        ]);
+        $application = $this->approvedApplication($trainee, $batch);
+        $application->update([
+            'is_historical_record' => true,
+            'intake_channel' => 'historical_alumni',
+            'learning_status' => EnrollmentApplication::LEARNING_GRADUATED,
+            'training_batch_id' => null,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.trainees', ['tab' => 'graduated']))
+            ->assertOk()
+            ->assertSee($trainee->email)
+            ->assertSee('Delete verified alumni record?')
+            ->assertSee('verified historical alumni claim')
+            ->assertSee('uploaded certificate or TOR evidence')
+            ->assertSee('Delete alumni record');
+
+        $this->actingAs($admin)
+            ->from(route('admin.learning.trainees', ['tab' => 'graduated']))
+            ->delete(route('admin.learning.trainees.destroy', $application))
+            ->assertRedirect(route('admin.learning.trainees', ['tab' => 'graduated']))
+            ->assertSessionHas('saved');
+
+        $this->assertDatabaseMissing('users', ['id' => $trainee->id]);
+        $this->assertDatabaseMissing('enrollment_applications', ['id' => $application->id]);
     }
 
     public function test_graduation_unlocks_career_hub_on_the_same_trainee_account_and_a_correction_locks_it_again(): void
@@ -222,12 +340,13 @@ class AdminLearningSystemTest extends TestCase
             ->patch(route('admin.learning.trainees.status', $application), [
                 'learning_status' => EnrollmentApplication::LEARNING_GRADUATED,
             ])
-            ->assertRedirect(route('admin.learning.trainees'))
+            ->assertRedirect(route('admin.learning.trainees.show', $application))
             ->assertSessionHas('saved');
 
         $this->assertDatabaseHas('users', [
             'id' => $trainee->id,
             'role' => 'trainee',
+            'trainee_status' => EnrollmentApplication::LEARNING_GRADUATED,
         ]);
         $this->assertDatabaseMissing('notifications', [
             'notifiable_id' => $trainee->id,
@@ -247,13 +366,14 @@ class AdminLearningSystemTest extends TestCase
         $this->assertDatabaseHas('users', [
             'id' => $trainee->id,
             'role' => 'trainee',
+            'trainee_status' => EnrollmentApplication::LEARNING_ACTIVE,
         ]);
         $this->actingAs($trainee->fresh())
             ->get(route('alumni.dashboard'))
             ->assertForbidden();
     }
 
-    public function test_admin_trainee_roster_shows_expandable_payment_module_and_assessment_summary(): void
+    public function test_admin_trainee_roster_opens_a_details_page_for_payment_module_and_assessment_summary(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $traineeUser = User::factory()->create(['role' => 'trainee']);
@@ -299,13 +419,56 @@ class AdminLearningSystemTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.learning.trainees'))
             ->assertOk()
+            ->assertSee('data-trainee-roster', false)
             ->assertSee('data-trainee-card', false)
-            ->assertDontSee('data-dashboard-sidebar-collapse', false)
+            ->assertSee('dashboard-table', false)
+            ->assertSee('Current trainees')
+            ->assertSee('Graduates')
+            ->assertSee('View details')
+            ->assertSee(route('admin.learning.trainees.show', $application, absolute: false), false)
+            ->assertSee('data-dashboard-sidebar-collapse', false)
             ->assertDontSee('data-dashboard-menu-open', false)
+            ->assertDontSee('data-trainee-row-toggle', false);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.trainees.show', $application))
+            ->assertOk()
+            ->assertSee('Back to roster')
             ->assertSee('Online payment')
             ->assertSee('1 of 1 published modules')
             ->assertSee('Ready for trainer assessment')
             ->assertSee('Assessment result: Not recorded yet');
+    }
+
+    public function test_admin_trainee_roster_lists_graduates_in_a_separate_table_tab(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $activeUser = User::factory()->create(['role' => 'trainee', 'email' => 'active.roster@example.test']);
+        $graduateUser = User::factory()->create(['role' => 'trainee', 'email' => 'graduate.roster@example.test']);
+        $batch = TrainingBatch::create([
+            'name' => 'Batch Tabs',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+        ]);
+        $active = $this->approvedApplication($activeUser, $batch);
+        $graduate = $this->approvedApplication($graduateUser, $batch);
+        $graduate->update(['learning_status' => EnrollmentApplication::LEARNING_GRADUATED]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.trainees'))
+            ->assertOk()
+            ->assertSee('lms-context-tabs', false)
+            ->assertSee('Current trainees')
+            ->assertSee($active->email)
+            ->assertDontSee($graduate->email);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.trainees', ['tab' => 'graduated']))
+            ->assertOk()
+            ->assertSee($graduate->email)
+            ->assertDontSee($active->email)
+            ->assertSee('aria-current="page"', false);
     }
 
     public function test_admin_can_add_and_remove_a_training_module(): void
@@ -337,7 +500,7 @@ class AdminLearningSystemTest extends TestCase
         $module = TrainingModule::query()->where('title', 'Provide Care and Support to Children')->firstOrFail();
         $this->assertEquals('HCS323302', $module->module_code);
         $this->assertEquals('Bathe and dress children', $module->topic);
-        Storage::disk('local')->assertExists($module->file_path);
+        $this->assertTrue(Storage::disk('local')->exists($module->file_path));
 
         $this->actingAs($trainer)
             ->get(route('trainer.resources'))
@@ -371,7 +534,109 @@ class AdminLearningSystemTest extends TestCase
             ->assertSessionHas('saved');
 
         $this->assertDatabaseMissing('training_modules', ['id' => $module->id]);
-        Storage::disk('local')->assertMissing($module->file_path);
+        $this->assertFalse(Storage::disk('local')->exists($module->file_path));
+    }
+
+    public function test_admin_module_composer_shows_and_saves_competency_outcomes_like_trainer_classwork(): void
+    {
+        Storage::fake('local');
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainer = User::factory()->create(['role' => 'trainer']);
+        $batch = TrainingBatch::create([
+            'name' => 'Outcome Composer Batch',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.modules'))
+            ->assertOk()
+            ->assertSee('Submodules / Competency Outcomes')
+            ->assertSee('name="submodule_titles[]"', false)
+            ->assertSee('data-role="module-submodule-list"', false)
+            ->assertSee('data-outcomes=', false);
+
+        $this->actingAs($admin)->post(route('admin.learning.modules.store'), [
+            'trainer_id' => $trainer->id,
+            'training_batch_id' => $batch->id,
+            'module_code' => 'MCARE-CUSTOM-OUTCOMES',
+            'competency_category' => 'custom',
+            'completion_mode' => 'assessed',
+            'title' => 'Custom assessed housekeeping',
+            'description' => 'Admin-created custom module with outcomes.',
+            'submodule_titles' => ['Prepare cleaning cart', 'Sanitize high-touch surfaces'],
+            'module_file' => UploadedFile::fake()->create('lesson.pdf', 100, 'application/pdf'),
+            'is_published' => '0',
+        ])->assertRedirect()->assertSessionHas('saved');
+
+        $module = TrainingModule::query()->where('title', 'Custom assessed housekeeping')->firstOrFail();
+        $this->assertEqualsCanonicalizing(
+            ['Prepare cleaning cart', 'Sanitize high-touch surfaces'],
+            $module->submodules()->orderBy('position')->pluck('title')->all(),
+        );
+    }
+
+    public function test_admin_can_edit_a_training_module_from_the_modules_table(): void
+    {
+        Notification::fake();
+        Storage::fake('local');
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainer = User::factory()->create(['role' => 'trainer']);
+        $nextTrainer = User::factory()->create(['role' => 'trainer']);
+        $batch = TrainingBatch::create([
+            'name' => 'Batch 12',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+        ]);
+
+        $this->actingAs($admin)->post(route('admin.learning.modules.store'), [
+            'trainer_id' => $trainer->id,
+            'training_batch_id' => $batch->id,
+            'module_code' => 'HCS323301',
+            'title' => 'Provide Care and Support to Infants and Toddlers',
+            'topic' => 'Original topic',
+            'description' => 'Original description.',
+            'module_file' => UploadedFile::fake()->create('lesson.pdf', 100, 'application/pdf'),
+            'is_published' => '1',
+        ])->assertRedirect()->assertSessionHas('saved');
+
+        $module = TrainingModule::query()->where('title', 'Provide Care and Support to Infants and Toddlers')->firstOrFail();
+        $originalPath = $module->file_path;
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.modules'))
+            ->assertOk()
+            ->assertSee('data-dashboard-dialog-open="edit-module-'.$module->id.'"', false)
+            ->assertSee('aria-label="Edit module"', false)
+            ->assertSee('id="edit-module-'.$module->id.'"', false);
+
+        $this->actingAs($admin)
+            ->from(route('admin.learning.modules'))
+            ->patch(route('admin.learning.modules.update', $module), [
+                '_editing_module_id' => $module->id,
+                'trainer_id' => $nextTrainer->id,
+                'training_batch_id' => $batch->id,
+                'module_code' => 'HCS323301',
+                'competency_category' => 'core',
+                'completion_mode' => TrainingModule::COMPLETION_ASSESSED,
+                'title' => 'Updated infant care module',
+                'topic' => 'Comfort infants and toddlers',
+                'description' => 'Updated by the administrator.',
+                'is_published' => '1',
+            ])
+            ->assertRedirect(route('admin.learning.modules'))
+            ->assertSessionHas('saved');
+
+        $module->refresh();
+        $this->assertSame('Updated infant care module', $module->title);
+        $this->assertSame('Comfort infants and toddlers', $module->topic);
+        $this->assertSame($nextTrainer->id, $module->trainer_id);
+        $this->assertSame($originalPath, $module->file_path);
+        $this->assertTrue(Storage::disk('local')->exists($module->file_path));
+
+        Notification::assertSentTo($nextTrainer, TrainerModuleAssignedByAdmin::class);
     }
 
     public function test_admin_can_create_trainer_and_approved_trainee_accounts(): void
@@ -384,11 +649,11 @@ class AdminLearningSystemTest extends TestCase
             'enrollment_ends_at' => now()->addMonth(),
         ]);
 
+        Mail::fake();
+
         $this->actingAs($admin)->post(route('admin.accounts.trainers.store'), [
             'name' => 'New Trainer',
             'email' => 'new.trainer@example.test',
-            'password' => 'Password123!',
-            'password_confirmation' => 'Password123!',
         ])->assertRedirect()->assertSessionHas('saved');
 
         $this->actingAs($admin)->post(route('admin.accounts.trainees.store'), [
@@ -396,8 +661,6 @@ class AdminLearningSystemTest extends TestCase
             'middle_name' => 'M',
             'last_name' => 'Trainee',
             'email' => 'new.trainee@example.test',
-            'password' => 'Password123!',
-            'password_confirmation' => 'Password123!',
             'training_batch_id' => $batch->id,
             'birth_date' => '2001-01-01',
             'gender' => 'Female',
@@ -424,7 +687,17 @@ class AdminLearningSystemTest extends TestCase
         ])->assertRedirect()->assertSessionHas('saved');
 
         $this->assertDatabaseHas('users', ['email' => 'new.trainer@example.test', 'role' => 'trainer']);
-        $this->assertDatabaseHas('users', ['email' => 'new.trainee@example.test', 'role' => 'trainee']);
+        $this->assertDatabaseHas('users', [
+            'email' => 'new.trainee@example.test',
+            'role' => 'trainee',
+            'first_name' => 'New',
+            'last_name' => 'Trainee',
+            'contact_email' => 'new.trainee@example.test',
+            'contact_number' => '09170001111',
+            'gender' => 'Female',
+            'city' => 'Iriga City',
+            'trainee_status' => EnrollmentApplication::LEARNING_ACTIVE,
+        ]);
         $this->assertDatabaseHas('enrollment_applications', [
             'email' => 'new.trainee@example.test',
             'training_batch_id' => $batch->id,
@@ -437,6 +710,21 @@ class AdminLearningSystemTest extends TestCase
             'or_number' => 'OR-ASSISTED-001',
             'status' => PaymentTransaction::STATUS_VERIFIED,
         ]);
+
+        $trainer = User::query()->where('email', 'new.trainer@example.test')->firstOrFail();
+        $trainee = User::query()->where('email', 'new.trainee@example.test')->firstOrFail();
+
+        Mail::assertSent(StaffAccountCredentialsMail::class, 2);
+        Mail::assertSent(StaffAccountCredentialsMail::class, function (StaffAccountCredentialsMail $mail) use ($trainer): bool {
+            return $mail->hasTo($trainer->email)
+                && $mail->user->is($trainer)
+                && Hash::check($mail->plainPassword, $trainer->password);
+        });
+        Mail::assertSent(StaffAccountCredentialsMail::class, function (StaffAccountCredentialsMail $mail) use ($trainee): bool {
+            return $mail->hasTo($trainee->email)
+                && $mail->user->is($trainee)
+                && Hash::check($mail->plainPassword, $trainee->password);
+        });
     }
 
     public function test_admin_can_export_the_filtered_trainee_roster_for_excel(): void
@@ -549,5 +837,199 @@ class AdminLearningSystemTest extends TestCase
                     'completed_at' => now(),
                 ]);
             });
+    }
+
+    public function test_admin_catalog_presets_are_stored_and_shown_to_trainers(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainer = User::factory()->create(['role' => 'trainer']);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.modules'))
+            ->assertOk()
+            ->assertSee('Units')
+            ->assertSee('Outcomes')
+            ->assertDontSee('id="catalog-units-title"', false)
+            ->assertDontSee('id="catalog-outcomes-title"', false);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.modules', ['tab' => 'presets']))
+            ->assertOk()
+            ->assertSee('Competency units')
+            ->assertSee('HCS323301')
+            ->assertSee('Provide Care and Support to Infants and Toddlers');
+
+        $this->actingAs($admin)
+            ->from(route('admin.learning.modules', ['tab' => 'units']))
+            ->post(route('admin.learning.modules.presets.store'), [
+                'category' => 'custom',
+                'code' => 'MCARE-HOUSEKEEPING',
+                'title' => 'Institutional Housekeeping Drill',
+                'estimated_hours' => 8,
+                'outcomes' => "Prepare cleaning cart\nSanitize high-touch surfaces",
+                'is_selectable' => '1',
+                'is_tor_included' => '0',
+            ])
+            ->assertRedirect(route('admin.learning.modules', ['tab' => 'units']))
+            ->assertSessionHas('saved');
+
+        $this->assertDatabaseHas('competency_units', [
+            'code' => 'MCARE-HOUSEKEEPING',
+            'title' => 'Institutional Housekeeping Drill',
+            'category' => 'custom',
+            'estimated_hours' => 8,
+            'is_selectable' => 1,
+        ]);
+
+        $unit = CompetencyUnit::query()->where('code', 'MCARE-HOUSEKEEPING')->firstOrFail();
+        $this->assertSame(
+            ['Prepare cleaning cart', 'Sanitize high-touch surfaces'],
+            $unit->outcomes()->orderBy('sort_order')->pluck('title')->all(),
+        );
+
+        $this->actingAs($trainer)
+            ->get(route('trainer.resources'))
+            ->assertOk()
+            ->assertSee('data-code="MCARE-HOUSEKEEPING"', false)
+            ->assertSee('Institutional Housekeeping Drill');
+
+        $this->actingAs($admin)
+            ->from(route('admin.learning.modules', ['tab' => 'units']))
+            ->patch(route('admin.learning.modules.presets.update', $unit), [
+                'category' => 'custom',
+                'code' => 'MCARE-HOUSEKEEPING',
+                'title' => 'Institutional Housekeeping Drill',
+                'estimated_hours' => 8,
+                'outcomes' => "Prepare cleaning cart\nSanitize high-touch surfaces",
+                'is_selectable' => '0',
+                'is_tor_included' => '0',
+            ])
+            ->assertRedirect(route('admin.learning.modules', ['tab' => 'units']))
+            ->assertSessionHas('saved');
+
+        $this->assertDatabaseHas('competency_units', [
+            'id' => $unit->id,
+            'is_selectable' => 0,
+        ]);
+
+        $this->actingAs($trainer)
+            ->get(route('trainer.resources'))
+            ->assertOk()
+            ->assertDontSee('data-code="MCARE-HOUSEKEEPING"', false);
+    }
+
+    public function test_admin_can_add_edit_and_delete_catalog_units_and_outcomes(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $unit = CompetencyUnit::query()->where('code', 'HCS323301')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.modules', ['tab' => 'outcomes', 'unit_id' => $unit->id]))
+            ->assertOk()
+            ->assertSee('Competency outcomes')
+            ->assertSee('Obtain and convey workplace information');
+
+        $this->actingAs($admin)
+            ->from(route('admin.learning.modules', ['tab' => 'outcomes', 'unit_id' => $unit->id]))
+            ->post(route('admin.learning.modules.outcomes.store'), [
+                'competency_unit_id' => $unit->id,
+                'title' => 'Document infant feeding records',
+                'is_required' => '1',
+            ])
+            ->assertRedirect(route('admin.learning.modules', ['tab' => 'outcomes', 'unit_id' => $unit->id]))
+            ->assertSessionHas('saved');
+
+        $outcome = CompetencyOutcome::query()
+            ->where('competency_unit_id', $unit->id)
+            ->where('title', 'Document infant feeding records')
+            ->firstOrFail();
+
+        $this->actingAs($admin)
+            ->from(route('admin.learning.modules', ['tab' => 'outcomes', 'edit_outcome' => $outcome->id]))
+            ->patch(route('admin.learning.modules.outcomes.update', $outcome), [
+                'competency_unit_id' => $unit->id,
+                'title' => 'Document infant feeding and rest records',
+                'is_required' => '0',
+            ])
+            ->assertRedirect(route('admin.learning.modules', ['tab' => 'outcomes', 'unit_id' => $unit->id]))
+            ->assertSessionHas('saved');
+
+        $this->assertDatabaseHas('competency_outcomes', [
+            'id' => $outcome->id,
+            'title' => 'Document infant feeding and rest records',
+            'is_required' => 0,
+        ]);
+
+        $this->actingAs($admin)
+            ->from(route('admin.learning.modules', ['tab' => 'outcomes', 'unit_id' => $unit->id]))
+            ->delete(route('admin.learning.modules.outcomes.destroy', $outcome))
+            ->assertRedirect(route('admin.learning.modules', ['tab' => 'outcomes', 'unit_id' => $unit->id]))
+            ->assertSessionHas('saved');
+
+        $this->assertDatabaseMissing('competency_outcomes', [
+            'id' => $outcome->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->from(route('admin.learning.modules', ['tab' => 'units']))
+            ->post(route('admin.learning.modules.presets.store'), [
+                'category' => 'custom',
+                'code' => 'MCARE-TEMP-UNIT',
+                'title' => 'Temporary catalog unit',
+                'estimated_hours' => 4,
+                'outcomes' => 'Temporary outcome',
+                'is_selectable' => '0',
+                'is_tor_included' => '0',
+            ])
+            ->assertRedirect(route('admin.learning.modules', ['tab' => 'units']));
+
+        $temporary = CompetencyUnit::query()->where('code', 'MCARE-TEMP-UNIT')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->from(route('admin.learning.modules', ['tab' => 'units']))
+            ->delete(route('admin.learning.modules.presets.destroy', $temporary))
+            ->assertRedirect(route('admin.learning.modules', ['tab' => 'units']))
+            ->assertSessionHas('saved');
+
+        $this->assertDatabaseMissing('competency_units', [
+            'id' => $temporary->id,
+        ]);
+    }
+
+    public function test_admin_cannot_delete_a_competency_unit_used_by_a_module(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainer = User::factory()->create(['role' => 'trainer']);
+        $batch = TrainingBatch::create([
+            'name' => 'Catalog Guard Batch',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+        ]);
+        $unit = CompetencyUnit::query()->where('code', 'HCS323301')->firstOrFail();
+
+        TrainingModule::create([
+            'trainer_id' => $trainer->id,
+            'training_batch_id' => $batch->id,
+            'competency_unit_id' => $unit->id,
+            'title' => 'Linked catalog module',
+            'description' => 'Used to block unit deletion.',
+            'file_path' => 'training-modules/catalog-guard.pdf',
+            'original_file_name' => 'catalog-guard.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size' => 1024,
+            'is_published' => false,
+        ]);
+
+        $this->actingAs($admin)
+            ->from(route('admin.learning.modules', ['tab' => 'units']))
+            ->delete(route('admin.learning.modules.presets.destroy', $unit))
+            ->assertRedirect(route('admin.learning.modules', ['tab' => 'units']))
+            ->assertSessionHasErrors('unit');
+
+        $this->assertDatabaseHas('competency_units', [
+            'id' => $unit->id,
+            'code' => 'HCS323301',
+        ]);
     }
 }

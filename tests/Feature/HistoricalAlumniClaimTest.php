@@ -19,6 +19,47 @@ class HistoricalAlumniClaimTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_claim_form_shows_password_strength_checks_and_educational_attainment_options(): void
+    {
+        $this->get(route('alumni.claim.create'))
+            ->assertOk()
+            ->assertSee('data-password-toggle="password"', false)
+            ->assertSee('data-password-toggle="password_confirmation"', false)
+            ->assertSee('At least 10 characters')
+            ->assertSee('Contains a number')
+            ->assertSee('Contains upper and lowercase letters')
+            ->assertSee('Contains a symbol')
+            ->assertSee('Passwords match')
+            ->assertSee('name="educational_attainment"', false)
+            ->assertSee('High School Graduate')
+            ->assertSee('College Graduate')
+            ->assertSee('Doctorate')
+            ->assertSee('id="privacy_consent"', false)
+            ->assertSee('data-claim-submit', false)
+            ->assertSee('aria-disabled="true"', false);
+    }
+
+    public function test_claim_rejects_a_weak_password_and_an_invalid_educational_attainment(): void
+    {
+        $this->from(route('alumni.claim.create'))
+            ->post(route('alumni.claim.store'), [
+                ...$this->claimPayload(),
+                'password' => 'short',
+                'password_confirmation' => 'short',
+                'educational_attainment' => 'Not a TESDA option',
+            ])
+            ->assertRedirect(route('alumni.claim.create'))
+            ->assertSessionHasErrors(['password', 'educational_attainment'], errorBag: 'alumniClaim');
+
+        $this->assertDatabaseMissing('users', ['email' => 'legacy.graduate@example.test']);
+    }
+
+    public function test_claim_success_page_requires_a_completed_submission(): void
+    {
+        $this->get(route('alumni.claim.received'))
+            ->assertRedirect(route('alumni.claim.create'));
+    }
+
     public function test_historical_graduate_can_submit_and_verify_email_but_cannot_sign_in_before_onsite_review(): void
     {
         Notification::fake();
@@ -28,8 +69,15 @@ class HistoricalAlumniClaimTest extends TestCase
             ...$this->claimPayload(),
             'evidence_document' => UploadedFile::fake()->create('cotc-page-1.pdf', 100, 'application/pdf'),
             'evidence_document_page_2' => UploadedFile::fake()->create('cotc-page-2.pdf', 100, 'application/pdf'),
-        ])->assertRedirect(route('alumni.claim.create'))
-            ->assertSessionHas('claim_submitted');
+        ])->assertRedirect(route('alumni.claim.received'))
+            ->assertSessionHas('claim_submitted')
+            ->assertSessionHas('claim_email', 'legacy.graduate@example.test');
+
+        $this->get(route('alumni.claim.received'))
+            ->assertOk()
+            ->assertSee('Claim received')
+            ->assertSee('legacy.graduate@example.test')
+            ->assertSee('A verification link was sent');
 
         $user = User::query()->where('email', 'legacy.graduate@example.test')->firstOrFail();
         $claim = $user->historicalAlumniClaim()->firstOrFail();
@@ -37,6 +85,8 @@ class HistoricalAlumniClaimTest extends TestCase
         $this->assertSame('applicant', $user->role);
         $this->assertFalse($user->hasVerifiedEmail());
         $this->assertSame(HistoricalAlumniClaim::STATUS_PENDING_EMAIL, $claim->status);
+        $this->assertSame('Bicol Region', $claim->region);
+        $this->assertSame('Camarines Sur', $claim->province);
         Storage::disk('local')->assertExists($claim->evidence_document_path);
         Storage::disk('local')->assertExists($claim->evidence_document_page_2_path);
         Notification::assertSentTo($user, QueuedVerifyEmail::class);
@@ -85,7 +135,7 @@ class HistoricalAlumniClaimTest extends TestCase
                 'archive_record_verified' => '1',
                 'admin_notes' => 'Original COTC 2018-114 and paper graduate registry entry were verified onsite.',
             ])
-            ->assertRedirect()
+            ->assertRedirect(route('admin.historical-alumni.show', $claim))
             ->assertSessionHas('saved');
 
         $application = EnrollmentApplication::query()->where('user_id', $user->id)->firstOrFail();
@@ -158,6 +208,48 @@ class HistoricalAlumniClaimTest extends TestCase
         $this->assertSame(HistoricalAlumniClaim::STATUS_PENDING_EMAIL, $claim->fresh()->status);
     }
 
+    public function test_admin_can_open_the_alumni_claims_pages(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $user = User::factory()->create([
+            'name' => 'Legacy Graduate',
+            'email' => 'legacy.review@example.test',
+            'role' => 'applicant',
+            'applicant_status' => 'historical_claim_pending_onsite',
+        ]);
+        $claim = $this->createClaim($user);
+
+        $this->actingAs($admin)
+            ->get(route('admin.historical-alumni.index'))
+            ->assertOk()
+            ->assertSee('Alumni claims')
+            ->assertSee('legacy.review@example.test')
+            ->assertSee('Batch 2018-A')
+            ->assertSee(route('admin.historical-alumni.show', $claim), false);
+
+        $this->actingAs($admin)
+            ->get(route('admin.historical-alumni.index', ['status' => HistoricalAlumniClaim::STATUS_PENDING_ONSITE]))
+            ->assertOk()
+            ->assertSee('legacy.review@example.test');
+
+        $this->actingAs($admin)
+            ->get(route('admin.historical-alumni.show', $claim))
+            ->assertOk()
+            ->assertSee('Legacy Graduate')
+            ->assertSee('Iriga City')
+            ->assertSee('COTC-2018-114')
+            ->assertSee('Verify and activate alumni');
+    }
+
+    public function test_non_admin_cannot_open_alumni_claims(): void
+    {
+        $trainee = User::factory()->create(['role' => 'trainee']);
+
+        $this->actingAs($trainee)
+            ->get(route('admin.historical-alumni.index'))
+            ->assertForbidden();
+    }
+
     private function claimPayload(): array
     {
         return [
@@ -174,6 +266,7 @@ class HistoricalAlumniClaimTest extends TestCase
             'barangay' => 'Central',
             'city' => 'Iriga City',
             'province' => 'Camarines Sur',
+            'region' => 'Bicol Region',
             'zip_code' => '4431',
             'educational_attainment' => 'High School Graduate',
             'school_name' => 'Iriga National High School',
@@ -202,6 +295,7 @@ class HistoricalAlumniClaimTest extends TestCase
             'barangay' => 'Central',
             'city' => 'Iriga City',
             'province' => 'Camarines Sur',
+            'region' => 'Bicol Region',
             'zip_code' => '4431',
             'educational_attainment' => 'High School Graduate',
             'school_name' => 'Iriga National High School',

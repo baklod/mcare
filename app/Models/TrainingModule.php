@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Str;
 
 class TrainingModule extends Model
 {
@@ -187,6 +188,21 @@ class TrainingModule extends Model
                 ->where('status', '!=', ModuleProgress::STATUS_LOCKED));
     }
 
+    public function scopeAssignedTo(Builder $query, EnrollmentApplication $application): Builder
+    {
+        if ($application->is_historical_record) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query
+            ->where('is_published', true)
+            ->where(fn (Builder $builder) => $builder
+                ->whereNull('available_at')
+                ->orWhere('available_at', '<=', now()))
+            ->whereHas('progressRecords', fn (Builder $progress) => $progress
+                ->where('enrollment_application_id', $application->id));
+    }
+
     public function deliveryStatusLabel(): string
     {
         return match ($this->delivery_status) {
@@ -195,6 +211,28 @@ class TrainingModule extends Model
             self::DELIVERY_CLOSED => 'Closed to new enrollees',
             default => 'Draft',
         };
+    }
+
+    public function learningAccessSummary(): string
+    {
+        if (! $this->is_published) {
+            return 'Draft — not available to trainees';
+        }
+
+        $unlocked = (int) ($this->unlocked_trainees_count ?? 0);
+        $batch = $this->relationLoaded('batch') && $this->batch
+            ? trim($this->batch->name.' '.$this->batch->year)
+            : null;
+
+        return implode(' · ', array_values(array_filter([
+            $this->deliveryStatusLabel(),
+            filled($batch) ? $batch : null,
+            $this->delivery_status === self::DELIVERY_CLOSED
+                ? null
+                : ($unlocked > 0
+                    ? $unlocked.' '.Str::plural('trainee', $unlocked).' unlocked'
+                    : 'waiting to unlock'),
+        ])));
     }
 
     public function previewKind(): string

@@ -420,18 +420,10 @@ class TrainingModuleController extends Controller
         $assessmentSummary = $assessments->summary($module, $application, $submodule);
 
         if ($validated['competency_outcome'] === ModuleProgress::OUTCOME_COMPETENT
-            && (! $childProgress->submitted_at
-                || ($assessmentSummary['required_count'] > 0 && ! $assessmentSummary['all_passed']))) {
+            && $assessmentSummary['required_count'] > 0
+            && ! $assessmentSummary['all_passed']) {
             throw ValidationException::withMessages([
-                'competency_outcome' => 'A Competent outcome requires this submodule\'s Mark as Done submission and any assigned classwork to be passed.',
-            ]);
-        }
-
-        if ($validated['competency_outcome'] === ModuleProgress::OUTCOME_NOT_YET_COMPETENT
-            && ! $childProgress->submitted_at
-            && ! $assessmentSummary['ready_for_remediation_evaluation']) {
-            throw ValidationException::withMessages([
-                'competency_outcome' => 'Record Not Yet Competent after the trainee submits this submodule or uses all attempts on its unresolved assessment.',
+                'competency_outcome' => 'A Competent outcome requires any assigned classwork for this submodule to be passed.',
             ]);
         }
 
@@ -450,10 +442,14 @@ class TrainingModuleController extends Controller
             ])->lockForUpdate()->firstOrFail();
 
             $isCompetent = $validated['competency_outcome'] === ModuleProgress::OUTCOME_COMPETENT;
+            $practicalRating = $validated['practical_rating'] ?? $progress->practical_rating;
+            if ($isCompetent && in_array($practicalRating, [null, '', ModuleProgress::RATING_PENDING], true)) {
+                $practicalRating = ModuleProgress::RATING_COMPETENT;
+            }
             $currentProgress = (int) ($progress->progress_percent ?: 50);
             $progress->fill([
                 'quiz_score' => $assessmentSummary['average_score'],
-                'practical_rating' => $validated['practical_rating'] ?? $progress->practical_rating,
+                'practical_rating' => $practicalRating,
                 'competency_outcome' => $validated['competency_outcome'],
                 'evaluation_remarks' => $validated['evaluation_remarks'] ?? null,
                 'evaluated_by_id' => $request->user()->id,
@@ -464,7 +460,7 @@ class TrainingModuleController extends Controller
                     default => TrainingSubmoduleProgress::STATUS_IN_PROGRESS,
                 },
                 'progress_percent' => $isCompetent ? 100 : min($currentProgress, 99),
-                'submitted_at' => $isCompetent ? $progress->submitted_at : null,
+                'submitted_at' => $isCompetent ? ($progress->submitted_at ?: now()) : null,
                 'completed_at' => $isCompetent ? ($progress->completed_at ?: now()) : null,
             ])->save();
 
@@ -480,13 +476,7 @@ class TrainingModuleController extends Controller
             return $progress;
         }, 3);
 
-        $parentProgress = ModuleProgress::query()->where([
-            'enrollment_application_id' => $application->id,
-            'training_module_id' => $module->id,
-        ])->firstOrFail();
-        if ($parentProgress->isTrainerValidated()) {
-            $releases->unlockNext($application);
-        }
+        $releases->unlockNext($application);
 
         AdminActivityLog::record($request->user(), 'trainer.module.evaluated', $progress, [
             'module_id' => $module->id,

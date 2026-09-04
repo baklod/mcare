@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth bg-[#f4f5f9]">
+<html lang="en" class="scroll-smooth bg-[#f3f2f6]">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,20 +8,24 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="auth-page font-sans text-slate-900 antialiased selection:bg-purple-600 selection:text-white">
+    <x-public-official-header
+        masthead-aside="Caregiving NC II · Official sign-in"
+        nav-label="Account sign-in"
+        :secondary-href="route('landing')"
+        secondary-label="Public site"
+        :primary-href="route('applications.create')"
+        primary-label="Apply now"
+    />
     <div class="auth-page-layout">
         <main class="auth-shell" data-auth-layout>
             <section class="auth-showcase" aria-labelledby="auth-welcome-title" data-auth-dashboard-preview>
                 <div class="auth-showcase-copy">
-                    <a href="{{ route('landing') }}" class="auth-showcase-brand" aria-label="Go to the MCARE home page">
-                        <img src="{{ asset('assets/mcare-mark-cropped.png') }}" alt="MCARE" class="auth-showcase-logo">
-                    </a>
-
+                    <p class="auth-welcome-kicker">Official account access</p>
                     <h1 id="auth-welcome-title" class="auth-welcome-title">
-                        Welcome to <span>MCARE</span>
+                        TESDA-accredited <span>Caregiving NC II</span>
                     </h1>
                     <p class="auth-welcome-copy">
-                        Your all-in-one platform for training,<br class="hidden xl:block">
-                        learning and career development.
+                        Sign in to enrollment, training records, assessment administration, and graduate follow-through at Mission Care Training and Assessment Center.
                     </p>
                 </div>
 
@@ -36,16 +40,12 @@
 
             <section class="auth-panel" aria-label="MCARE account sign in">
                 <div class="auth-card" data-auth-form-card>
-                    <a href="{{ route('landing') }}" class="auth-mobile-brand" aria-label="Go to the MCARE home page">
-                        <img src="{{ asset('assets/mcare-mark-cropped.png') }}" alt="MCARE" class="auth-mobile-logo">
-                    </a>
-
                     @include('auth.partials.current-account', ['activeUser' => $activeUser])
 
                     <div class="auth-card-heading">
                         <h2>{{ $mfaPending ? 'Verify your sign-in' : 'Sign in to your account' }}</h2>
                         <p>
-                            {{ $mfaPending ? 'Enter the six-digit code sent to your staff email address.' : 'Access your MCARE dashboard' }}
+                            {{ $mfaPending ? 'Enter the six-digit code sent to your staff email address.' : 'Use your authorized MCARE account.' }}
                             @unless ($mfaPending)
                                 <span class="sr-only">One sign-in page for applicants, trainees, trainers, alumni, and administrators.</span>
                             @endunless
@@ -101,7 +101,7 @@
                             <a href="{{ route('login', ['cancel_mfa' => 1]) }}">Use a different account</a>
                         </div>
                     @else
-                        <form method="POST" action="{{ route('login.store') }}" class="auth-form">
+                        <form method="POST" action="{{ route('login.store') }}" class="auth-form" data-auth-login-form>
                             @csrf
                             <div class="auth-field-group">
                                 <label for="email">Email</label>
@@ -148,8 +148,8 @@
                                 <span>Remember me</span>
                             </label>
 
-                            <button type="submit" class="auth-primary-button">
-                                <span>Sign In</span>
+                            <button type="submit" class="auth-primary-button disabled:cursor-not-allowed disabled:opacity-80" data-login-submit>
+                                <span data-login-submit-label>Sign In</span>
                                 <x-dashboard-icon name="arrow-right" aria-hidden="true" />
                             </button>
                         </form>
@@ -171,7 +171,9 @@
                         <div class="auth-secondary-links">
                             <p>
                                 New applicant?
-                                <a href="{{ route('enrollment.create') }}">Start your enrollment application</a>
+                                <a href="{{ route('applications.create') }}">Submit an application</a>
+                                or
+                                <a href="{{ route('enrollment.create') }}">enroll with an approved number</a>
                             </p>
                             <p>
                                 Graduated before the MCARE website?
@@ -183,14 +185,37 @@
 
                 <p class="auth-security-note">
                     <x-dashboard-icon name="shield-halved" aria-hidden="true" />
-                    <span>Your data is secure with MCARE</span>
+                    <span>Official institutional records. Use is limited to authorized MCARE accounts.</span>
                 </p>
             </section>
         </main>
-
-        <footer class="auth-footer">
-            &copy; {{ date('Y') }} Mission Care Training and Assessment Center Inc.
-        </footer>
     </div>
+
+    <x-public-official-footer note="Official sign-in for applicants, trainees, trainers, alumni, and administrators." />
+
+    <script>
+        (() => {
+            const form = document.querySelector('[data-auth-login-form]');
+            const submit = form?.querySelector('[data-login-submit]');
+            const label = form?.querySelector('[data-login-submit-label]');
+            const defaultLabel = label?.textContent || 'Sign In';
+
+            const resetSubmit = () => {
+                if (!submit || !label) return;
+                submit.disabled = false;
+                submit.removeAttribute('aria-busy');
+                label.textContent = defaultLabel;
+            };
+
+            form?.addEventListener('submit', () => {
+                if (!submit || !label) return;
+                submit.disabled = true;
+                submit.setAttribute('aria-busy', 'true');
+                label.textContent = 'signing in';
+            });
+
+            window.addEventListener('pageshow', resetSubmit);
+        })();
+    </script>
 </body>
 </html>

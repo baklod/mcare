@@ -29,16 +29,30 @@ return [
             ?: rtrim((string) env('APP_URL', 'http://localhost'), '/').'/auth/google/callback',
     ],
 
+    'psgc' => [
+        'base_url' => env('PSGC_API_URL', 'https://psgc.gitlab.io/api'),
+        'timeout' => (int) env('PSGC_API_TIMEOUT', 5),
+    ],
+
+    'semaphore' => [
+        'key' => env('SEMAPHORE_API_KEY'),
+        'sender' => env('SEMAPHORE_SENDER_NAME'),
+    ],
+
+    'groq' => [
+        'key' => env('GROQ_API_KEY'),
+        'model' => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
+        'timeout' => (int) env('GROQ_TIMEOUT', 30),
+    ],
+
     'paymongo' => [
         'public_key' => env('PAYMONGO_PUBLIC_KEY'),
         'secret_key' => env('PAYMONGO_SECRET_KEY'),
-        'webhook_secret' => env('PAYMONGO_WEBHOOK_SECRET'),
         'live_mode' => (bool) env('PAYMONGO_LIVE_MODE', false),
         'payment_methods' => array_values(array_filter(array_map(
             static fn (string $method): string => trim($method),
             explode(',', (string) env('PAYMONGO_PAYMENT_METHODS', 'gcash,card,qrph')),
         ))),
-        'webhook_tolerance' => (int) env('PAYMONGO_WEBHOOK_TOLERANCE', 300),
     ],
 
     'two_factor' => [

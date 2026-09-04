@@ -55,11 +55,12 @@ class ModuleWorkflowTest extends TestCase
             ->get(route('trainee.modules.show', $assessed))
             ->assertOk()
             ->assertSee('Required Submodules')
-            ->assertSee('Mark Submodule as Done')
+            ->assertSee('face-to-face')
+            ->assertDontSee('Mark Submodule as Done')
             ->assertDontSee('data-module-progress-form', false);
     }
 
-    public function test_submitted_module_hides_the_pdf_and_shows_evaluation_notice_with_module_only_score(): void
+    public function test_completed_module_keeps_the_pdf_behind_a_show_hide_toggle(): void
     {
         Storage::fake('local');
         $trainer = $this->lmsUser('trainer');
@@ -75,20 +76,39 @@ class ModuleWorkflowTest extends TestCase
 
         $this->actingAs($user)
             ->patch(route('trainee.modules.submodules.progress', [$module, $submodule]), ['action' => 'submit'])
+            ->assertSessionHasErrors('action');
+
+        $this->actingAs($user)
+            ->get(route('trainee.modules.show', $module))
+            ->assertOk()
+            ->assertSee('Your trainer records this grade after the face-to-face session.')
+            ->assertSee('data-pdf-canvas-viewer', false)
+            ->assertDontSee('Mark Submodule as Done');
+
+        $this->actingAs($trainer)
+            ->post(route('trainer.modules.evaluate', $module), [
+                'training_submodule_id' => $submodule->id,
+                'enrollment_application_id' => $application->id,
+                'practical_rating' => ModuleProgress::RATING_COMPETENT,
+                'competency_outcome' => ModuleProgress::OUTCOME_COMPETENT,
+            ])
             ->assertSessionHasNoErrors();
 
         $this->actingAs($user)
             ->get(route('trainee.modules.show', $module))
             ->assertOk()
-            ->assertSee('Submitted for Trainer Evaluation')
+            ->assertSee('Competency unit evaluated and completed.')
+            ->assertSee('Show lesson document')
+            ->assertSee('data-pdf-canvas-viewer', false)
+            ->assertSee('data-lesson-document-toggle', false)
             ->assertSee('Quiz & Activity Average (This Module)', false)
             ->assertSee('88.0%')
             ->assertSee('Separate from the official overall course grade.')
-            ->assertDontSee('data-pdf-canvas-viewer', false);
+            ->assertDontSee('The lesson document and downloads are closed');
 
         $this->actingAs($user)
             ->get(route('trainee.modules.content', $module))
-            ->assertForbidden();
+            ->assertOk();
     }
 
     public function test_trainer_can_record_remediation_after_all_failed_attempts_without_opening_pdf_panel(): void
@@ -109,7 +129,7 @@ class ModuleWorkflowTest extends TestCase
             ->assertOk()
             ->assertSee('Attempts are exhausted')
             ->assertSee('65.0%')
-            ->assertSee('Competent unlocks after submission and passed assigned classwork.')
+            ->assertSee('Competent unlocks after assigned classwork is passed.')
             ->assertDontSee('Primary Lesson Material')
             ->assertDontSee('caregiving-remediation.pdf');
 
@@ -156,15 +176,6 @@ class ModuleWorkflowTest extends TestCase
             $this->gradedAttempt($firstQuiz, $application->id, 1, 90, true);
         }
 
-        foreach ([
-            [$pendingUser, $pendingApplication],
-            [$completedUser, $completedApplication],
-        ] as [$user, $application]) {
-            $this->actingAs($user)
-                ->patch(route('trainee.modules.submodules.progress', [$module, $submodule]), ['action' => 'submit'])
-                ->assertSessionHasNoErrors();
-        }
-
         $this->actingAs($trainer)
             ->post(route('trainer.modules.evaluate', $module), [
                 'training_submodule_id' => $submodule->id,
@@ -199,7 +210,7 @@ class ModuleWorkflowTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $pendingProgress = $this->progress($pendingApplication->id, $module->id);
-        $this->assertSame(ModuleProgress::STATUS_IN_PROGRESS, $pendingProgress->status);
+        $this->assertNotSame(ModuleProgress::STATUS_COMPLETED, $pendingProgress->status);
         $this->assertNull($pendingProgress->submitted_at);
 
         $completedProgress = $this->progress($completedApplication->id, $module->id);

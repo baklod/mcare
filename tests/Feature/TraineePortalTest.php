@@ -119,6 +119,10 @@ class TraineePortalTest extends TestCase
             ->assertSee('Welcome back')
             ->assertSee('Infection Control')
             ->assertSee('MWF | 8:00 AM - 12:00 PM')
+            ->assertSee('TESDA-Accredited Training and Assessment Center')
+            ->assertSee('data-dashboard-sidebar-collapse', false)
+            ->assertSee('id="trainee-dashboard-sidebar"', false)
+            ->assertDontSee('dashboard-gradient', false)
             ->assertSee('href="'.route('trainee.payments').'"', false)
             ->assertDontSee('href="'.route('payment.show').'"', false);
     }
@@ -208,13 +212,16 @@ class TraineePortalTest extends TestCase
             ->assertSee('Protected learning viewer')
             ->assertSee('data-protected-module-viewer', false)
             ->assertSee('data-pdf-canvas-viewer', false)
+            ->assertSee('data-pdf-canvas', false)
+            ->assertSee('data-pdf-scroll-sizer', false)
+            ->assertDontSee('block max-w-full bg-white', false)
             ->assertSee(route('trainee.modules.security-event', $module), false);
 
         $this->assertDatabaseHas('module_progress', [
             'enrollment_application_id' => $application->id,
             'training_module_id' => $module->id,
             'status' => 'in_progress',
-            'progress_percent' => 10,
+            'progress_percent' => 0,
         ]);
 
         $this->actingAs($trainee)
@@ -225,17 +232,13 @@ class TraineePortalTest extends TestCase
 
         $this->actingAs($trainee)
             ->patch(route('trainee.modules.submodules.progress', [$module, $submodule]), ['action' => 'submit'])
-            ->assertRedirect(route('trainee.modules.show', $module).'#submodules');
+            ->assertSessionHasErrors('action');
 
         $this->assertDatabaseHas('module_progress', [
             'enrollment_application_id' => $application->id,
             'training_module_id' => $module->id,
-            'status' => 'awaiting_evaluation',
-            'progress_percent' => 95,
-        ]);
-        $this->assertDatabaseHas('admin_activity_logs', [
-            'user_id' => $trainee->id,
-            'action' => 'trainee.submodule.progress.updated',
+            'status' => 'in_progress',
+            'progress_percent' => 0,
         ]);
 
         $this->actingAs($trainee)

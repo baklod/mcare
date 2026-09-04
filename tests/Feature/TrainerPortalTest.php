@@ -221,7 +221,7 @@ class TrainerPortalTest extends TestCase
         ]);
     }
 
-    public function test_trainer_can_upload_image_and_video_learning_materials(): void
+    public function test_trainer_can_upload_image_and_pdf_learning_materials(): void
     {
         Storage::fake('local');
         $trainer = User::factory()->create(['role' => 'trainer']);
@@ -235,7 +235,7 @@ class TrainerPortalTest extends TestCase
         ]);
         $files = [
             ['title' => 'Positioning Diagram', 'file' => UploadedFile::fake()->create('positioning.png', 128, 'image/png')],
-            ['title' => 'Transfer Demonstration', 'file' => UploadedFile::fake()->create('transfer.mp4', 512, 'video/mp4')],
+            ['title' => 'Transfer Guide', 'file' => UploadedFile::fake()->create('transfer.pdf', 512, 'application/pdf')],
         ];
 
         foreach ($files as $material) {
@@ -251,7 +251,54 @@ class TrainerPortalTest extends TestCase
         }
 
         $this->assertDatabaseHas('training_modules', ['title' => 'Positioning Diagram']);
-        $this->assertDatabaseHas('training_modules', ['title' => 'Transfer Demonstration']);
+        $this->assertDatabaseHas('training_modules', ['title' => 'Transfer Guide']);
+    }
+
+    public function test_trainer_cannot_upload_video_learning_materials(): void
+    {
+        Storage::fake('local');
+        $trainer = User::factory()->create(['role' => 'trainer']);
+        $batch = TrainingBatch::create([
+            'name' => 'Media Batch',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+            'am_days' => 'MWF',
+            'pm_days' => 'TTS',
+        ]);
+
+        $this->actingAs($trainer)
+            ->post(route('trainer.modules.store'), [
+                'title' => 'Transfer Demonstration',
+                'description' => 'Video is no longer accepted.',
+                'audience_type' => 'batch',
+                'training_batch_id' => $batch->id,
+                'module_file' => UploadedFile::fake()->create('transfer.mp4', 512, 'video/mp4'),
+            ])
+            ->assertSessionHasErrors('module_file');
+    }
+
+    public function test_trainer_save_feedback_uses_a_toast_instead_of_a_page_banner(): void
+    {
+        $trainer = User::factory()->create(['role' => 'trainer']);
+
+        $this->actingAs($trainer)
+            ->withSession(['saved' => 'Attendance recorded for 2 trainee(s) on Sep 04, 2026.'])
+            ->get(route('trainer.dashboard'))
+            ->assertOk()
+            ->assertSee('data-dashboard-toast', false)
+            ->assertSee('dashboard-toast-success', false)
+            ->assertSee('Attendance recorded for 2 trainee(s) on Sep 04, 2026.')
+            ->assertDontSee('mb-6 rounded-lg border border-emerald-200 bg-emerald-50', false);
+
+        $this->actingAs($trainer)
+            ->withSession(['error' => 'That attendance date cannot be saved.'])
+            ->get(route('trainer.dashboard'))
+            ->assertOk()
+            ->assertSee('data-dashboard-toast', false)
+            ->assertSee('dashboard-toast-error', false)
+            ->assertSee('That attendance date cannot be saved.')
+            ->assertDontSee('mb-6 rounded-lg border border-rose-200 bg-rose-50', false);
     }
 
     public function test_trainer_can_export_a_filtered_trainee_summary(): void

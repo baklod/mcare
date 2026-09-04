@@ -148,7 +148,7 @@
                                     <span>{{ $session['room'] }}</span>
                                 </p>
                                 @if ($editable)
-                                    <a href="{{ route('admin.schedules.edit', ['trainingBatch' => $session['batch_id'], 'month' => $month->format('Y-m'), 'date' => $dateKey]) }}" class="training-calendar-edit-link">Edit recurring schedule</a>
+                                    <a href="{{ route('admin.batches.edit', $session['batch_id']) }}" class="training-calendar-edit-link">Edit recurring schedule</a>
                                 @endif
                             </article>
                         @empty

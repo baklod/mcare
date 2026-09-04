@@ -24,6 +24,7 @@
     <aside class="dashboard-sidebar" data-dashboard-sidebar>
         <div class="flex min-h-11 items-center border-b border-slate-100 pb-3">
             <div class="dashboard-brand flex-1 min-w-0">
+                <img src="{{ asset('assets/images/logoicon.png') }}" alt="MCARE Hub" class="dashboard-brand-mark">
                 <span class="min-w-0"><span class="dashboard-brand-title">MCARE Hub</span><span class="dashboard-brand-subtitle">Alumni Portal</span></span>
             </div>
         </div>

@@ -140,9 +140,10 @@ class DatabaseSeeder extends Seeder
             'availability_updated_at' => now(),
         ]);
 
-        // Demo records follow the client's privacy-minimal caregiving duty format.
         foreach ([
             [
+                'title' => 'Live-in caregiver, Iriga City',
+                'estimated_salary' => '₱18,000 / month',
                 'estimated_start_date' => now()->addDays(14)->toDateString(),
                 'patient_gender' => CareerOpportunity::GENDER_FEMALE,
                 'mobility_status' => CareerOpportunity::MOBILITY_AMBULATORY,
@@ -151,6 +152,8 @@ class DatabaseSeeder extends Seeder
                 'condition_summary' => 'Needs mobility support during daily routines.',
             ],
             [
+                'title' => 'Bedside caregiver, Naga City',
+                'estimated_salary' => '₱20,000 / month',
                 'estimated_start_date' => now()->addDays(21)->toDateString(),
                 'patient_gender' => CareerOpportunity::GENDER_MALE,
                 'mobility_status' => CareerOpportunity::MOBILITY_BEDRIDDEN,
@@ -159,18 +162,15 @@ class DatabaseSeeder extends Seeder
                 'condition_summary' => 'Requires assistance with repositioning and comfort routines.',
             ],
         ] as $opportunity) {
-            $gender = CareerOpportunity::patientGenders()[$opportunity['patient_gender']];
-            $mobility = CareerOpportunity::mobilityStatuses()[$opportunity['mobility_status']];
-
             CareerOpportunity::updateOrCreate(
                 [
-                    'title' => "Caregiving Duty - {$gender}, {$mobility}",
+                    'title' => $opportunity['title'],
                     'employer' => 'MCARE-Coordinated Placement',
                 ],
                 [
                     ...$opportunity,
                     'created_by_id' => $seededUsers['admin']->id,
-                    'description' => 'Privacy-minimal duty posting managed through the MCARE Alumni Hub.',
+                    'description' => 'Privacy-minimal career posting managed through the MCARE Alumni Hub.',
                     'is_published' => true,
                     'published_at' => now(),
                 ]

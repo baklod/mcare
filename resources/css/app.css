@@ -1,6 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Nunito:wght@700;800;900&display=swap');
 @import "tailwindcss";
 @import "./universal_dashboard_design.css";
+@import "./admin_official.css";
+@import "./landing_official.css";
 
 @source "../views";
 @source "../js";
@@ -39,6 +41,24 @@
         place-items: center;
     }
 
+    @keyframes mcare-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .mcare-spinner {
+        display: inline-block;
+        width: 1.25rem;
+        height: 1.25rem;
+        flex-shrink: 0;
+        box-sizing: border-box;
+        border: 2px solid #e9d5ff;
+        border-top-color: #6b21a8;
+        border-radius: 9999px !important;
+        animation: mcare-spin 0.7s linear infinite;
+    }
+
     .user-avatar-image {
         position: absolute;
         inset: 0;
@@ -69,7 +89,7 @@
     }
 
     .competency-legend.is-empty {
-        @apply border-slate-200 bg-slate-50 text-slate-600;
+        @apply border-dashed border-violet-300 bg-violet-50 text-violet-800;
     }
 
     .competency-scroll-button {
@@ -176,6 +196,10 @@
         @apply mt-1 text-[10px] font-semibold leading-4 text-slate-600;
     }
 
+    .competency-evaluate-link {
+        @apply mt-2 inline-flex text-[11px] font-black uppercase tracking-wide text-violet-700 hover:text-violet-900;
+    }
+
     .competency-record-cell {
         width: 8.5rem;
         min-width: 8.5rem;
@@ -184,11 +208,15 @@
 
     .competency-record-cell > button {
         min-height: 3.5rem;
-        @apply relative flex w-full items-center justify-center gap-1 border border-slate-200 bg-slate-50 px-2 py-2 text-xs font-black text-slate-500 transition hover:border-violet-300 hover:bg-violet-50 focus:outline-none focus:ring-2 focus:ring-violet-300;
+        @apply relative flex w-full flex-col items-center justify-center gap-0.5 border border-slate-200 bg-slate-50 px-2 py-2 text-xs font-black text-slate-500 transition hover:border-violet-300 hover:bg-violet-50 focus:outline-none focus:ring-2 focus:ring-violet-300;
     }
 
     .competency-record-cell > button small {
         @apply text-[10px] font-bold opacity-70;
+    }
+
+    .competency-record-cell.is-not-assessed > button {
+        @apply border-dashed border-violet-300 bg-violet-50 text-violet-800;
     }
 
     .competency-record-cell.is-competent > button {
@@ -962,11 +990,11 @@
     }
 
     .primary-action {
-        @apply inline-flex items-center justify-center rounded-full bg-purple-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-70;
+        @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-full bg-purple-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-70;
     }
 
     .secondary-action {
-        @apply inline-flex items-center justify-center rounded-full border border-purple-200 bg-white px-5 py-3 text-sm font-bold text-purple-700 hover:bg-purple-50;
+        @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-purple-200 bg-white px-5 py-3 text-sm font-bold text-purple-700 hover:bg-purple-50;
     }
 
     [data-auto-dismiss] {
@@ -979,9 +1007,140 @@
         transform: translateY(-0.25rem);
     }
 
+    .dashboard-toast-region,
+    .dashboard-toast-region:popover-open {
+        position: fixed;
+        inset: auto 1rem auto auto;
+        top: 1rem;
+        right: 1rem;
+        left: auto;
+        bottom: auto;
+        z-index: 80;
+        display: flex;
+        width: min(24rem, calc(100vw - 2rem));
+        max-width: min(24rem, calc(100vw - 2rem));
+        height: fit-content;
+        max-height: none;
+        flex-direction: column;
+        gap: 0.75rem;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        overflow: visible;
+        color: inherit;
+    }
+
+    .dashboard-toast-region::backdrop {
+        display: none;
+        background: transparent;
+        pointer-events: none;
+    }
+
+    .dashboard-toast-icon svg,
+    .dashboard-toast-dismiss svg,
+    .dashboard-toast svg {
+        width: 1rem;
+        height: 1rem;
+        max-width: 1rem;
+        max-height: 1rem;
+    }
+
+    .dashboard-toast {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 0.85rem 0.9rem;
+        border: 1px solid;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+        animation: dashboard-toast-in 220ms ease;
+    }
+
+    .dashboard-toast-icon {
+        display: grid;
+        height: 1.5rem;
+        width: 1.5rem;
+        flex-shrink: 0;
+        place-items: center;
+    }
+
+    .dashboard-toast-body {
+        min-width: 0;
+        flex: 1;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        line-height: 1.45;
+    }
+
+    .dashboard-toast-body ul {
+        margin: 0;
+        padding-left: 1.1rem;
+    }
+
+    .dashboard-toast-body li + li {
+        margin-top: 0.25rem;
+    }
+
+    .dashboard-toast-dismiss {
+        display: grid;
+        height: 1.5rem;
+        width: 1.5rem;
+        flex-shrink: 0;
+        place-items: center;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        opacity: 0.7;
+        cursor: pointer;
+    }
+
+    .dashboard-toast-dismiss:hover,
+    .dashboard-toast-dismiss:focus-visible {
+        opacity: 1;
+    }
+
+    .dashboard-toast-success {
+        background: #ecfdf5;
+        border-color: #a7f3d0;
+        color: #065f46;
+    }
+
+    .dashboard-toast-error {
+        background: #fff1f2;
+        border-color: #fecdd3;
+        color: #9f1239;
+    }
+
+    .dashboard-toast-info {
+        background: #f5f3ff;
+        border-color: #ddd6fe;
+        color: #5b21b6;
+    }
+
+    .dashboard-toast[data-auto-dismiss].is-dismissing {
+        transform: translateX(0.75rem);
+    }
+
+    @keyframes dashboard-toast-in {
+        from {
+            opacity: 0;
+            transform: translateX(0.75rem);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
     @media (prefers-reduced-motion: reduce) {
         [data-auto-dismiss] {
             transition-duration: 0.01ms;
+        }
+
+        .dashboard-toast,
+        .dashboard-toast[data-auto-dismiss].is-dismissing {
+            animation: none;
+            transform: none;
         }
     }
 }

@@ -13,7 +13,11 @@
 @section('content')
 <section class="space-y-6">
     <header class="flex flex-col gap-3 border-b border-slate-200 pb-6 sm:flex-row sm:items-end sm:justify-between">
-        <div><p class="dashboard-section-kicker">Account updates</p><h1 class="mt-2 dashboard-section-title text-3xl">Notification center</h1><p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Review classroom, career, and system updates connected to this account.</p></div>
+        @unless (auth()->user()?->role === 'admin')
+            <div><p class="dashboard-section-kicker">Account updates</p><h1 class="mt-2 dashboard-section-title text-3xl">Notification center</h1><p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Review classroom, career, and system updates connected to this account.</p></div>
+        @else
+            <p class="max-w-2xl text-sm leading-6 text-slate-600">Review classroom, career, and system updates connected to this account.</p>
+        @endunless
         @if ($notifications->contains(fn ($notification) => $notification->read_at === null))
             <form method="POST" action="{{ route('notifications.read-all') }}"><input type="hidden" name="_token" value="{{ csrf_token() }}"><button type="submit" class="secondary-action inline-flex items-center justify-center gap-2"><x-dashboard-icon name="circle-check" class="h-4 w-4" />Mark all as read</button></form>
         @endif

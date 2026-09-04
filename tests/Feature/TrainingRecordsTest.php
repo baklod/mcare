@@ -47,6 +47,7 @@ class TrainingRecordsTest extends TestCase
         $trainee = User::factory()->create(['role' => 'trainee']);
         $application = $this->approvedApplication($trainee);
         $unit = CompetencyUnit::query()->with('outcomes')->orderBy('sort_order')->firstOrFail();
+        $this->publishUnitModule($application, $trainer, $unit);
 
         $payload = [
             'unit_id' => $unit->id,
@@ -427,12 +428,21 @@ class TrainingRecordsTest extends TestCase
         $trainer = User::factory()->create(['role' => 'trainer']);
         $trainee = User::factory()->create(['role' => 'trainee']);
         $application = $this->approvedApplication($trainee);
+        $published = CompetencyUnit::query()->where('code', 'HCS323301')->firstOrFail();
+        $hidden = CompetencyUnit::query()->where('code', 'HCS323302')->firstOrFail();
+        $this->publishUnitModule($application, $trainer, $published);
 
         $this->actingAs($trainer)
             ->get(route('trainer.competencies.index', ['batch_id' => $application->training_batch_id]))
             ->assertOk()
             ->assertSee('Batch grading board')
             ->assertSee('Bulk update')
+            ->assertSee('Core competencies')
+            ->assertSee('HCS323301')
+            ->assertDontSee('HCS323302')
+            ->assertDontSee($hidden->title)
+            ->assertSee('Evaluate')
+            ->assertSee('Evaluate record')
             ->assertSee('data-competency-cell', false)
             ->assertSee($application->last_name.', '.$application->first_name);
     }
@@ -496,8 +506,10 @@ class TrainingRecordsTest extends TestCase
             'email' => $secondUser->email,
             'first_name' => 'Second',
             'last_name' => 'Trainee',
+            'enrollment_number' => null,
         ])->save();
         $unit = CompetencyUnit::query()->with('outcomes')->orderBy('sort_order')->firstOrFail();
+        $this->publishUnitModule($firstApplication, $trainer, $unit);
 
         $this->actingAs($trainer)
             ->patch(route('trainer.competencies.bulk-update'), [
@@ -525,6 +537,7 @@ class TrainingRecordsTest extends TestCase
         $firstApplication = $this->approvedApplication(User::factory()->create(['role' => 'trainee']));
         $otherApplication = $this->approvedApplication(User::factory()->create(['role' => 'trainee']));
         $unit = CompetencyUnit::query()->orderBy('sort_order')->firstOrFail();
+        $this->publishUnitModule($firstApplication, $trainer, $unit);
 
         $this->actingAs($trainer)
             ->from(route('trainer.competencies.index', ['batch_id' => $firstApplication->training_batch_id]))
@@ -648,6 +661,28 @@ class TrainingRecordsTest extends TestCase
         ]);
     }
 
+    private function publishUnitModule(
+        EnrollmentApplication $application,
+        User $trainer,
+        CompetencyUnit $unit,
+    ): TrainingModule {
+        return TrainingModule::create([
+            'trainer_id' => $trainer->id,
+            'training_batch_id' => $application->training_batch_id,
+            'competency_unit_id' => $unit->id,
+            'module_code' => $unit->code,
+            'competency_category' => $unit->category ?: TrainingModule::CATEGORY_CORE,
+            'title' => $unit->title,
+            'description' => 'Published classwork for competency records.',
+            'file_path' => "training-modules/testing/{$unit->code}.pdf",
+            'original_file_name' => "{$unit->code}.pdf",
+            'is_published' => true,
+            'delivery_status' => TrainingModule::DELIVERY_ACTIVE,
+            'published_at' => now(),
+            'activated_at' => now(),
+        ]);
+    }
+
     private function completeCompetencies(EnrollmentApplication $application, User $trainer): void
     {
         CompetencyUnit::query()->with('outcomes')->each(function ($unit) use ($application, $trainer): void {
@@ -678,6 +713,7 @@ class TrainingRecordsTest extends TestCase
             $module = TrainingModule::create([
                 'trainer_id' => $trainer->id,
                 'training_batch_id' => $application->training_batch_id,
+                'competency_unit_id' => $unit->id,
                 'module_code' => $unit->code,
                 'competency_category' => TrainingModule::CATEGORY_CORE,
                 'title' => $unit->title,

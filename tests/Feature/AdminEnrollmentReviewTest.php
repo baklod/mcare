@@ -3,12 +3,16 @@
 namespace Tests\Feature;
 
 use App\Models\EnrollmentApplication;
+use App\Models\TrainingBatch;
 use App\Models\User;
 use App\Notifications\EnrollmentStatusUpdatedNotification;
+use App\Notifications\QueuedVerifyEmail;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 class AdminEnrollmentReviewTest extends TestCase
@@ -59,6 +63,7 @@ class AdminEnrollmentReviewTest extends TestCase
             'year_graduated' => 2020,
             'status' => EnrollmentApplication::STATUS_PROFILE_SUBMITTED,
             'review_released_at' => now(),
+            'documents_reviewed_at' => now(),
         ]);
 
         $this->actingAs($admin)
@@ -89,6 +94,95 @@ class AdminEnrollmentReviewTest extends TestCase
                 && in_array('database', $channels, true)
                 && in_array('mail', $channels, true),
         );
+        Notification::assertNotSentTo($applicant, QueuedVerifyEmail::class);
+    }
+
+    public function test_saving_a_decision_requires_document_review_first(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->create(['role' => 'applicant']);
+        $application = EnrollmentApplication::create([
+            'user_id' => $applicant->id,
+            'email' => $applicant->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => 'Maria',
+            'last_name' => 'Santos',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'street' => '123 Training Street',
+            'barangay' => 'Central',
+            'city' => 'Quezon City',
+            'province' => 'Metro Manila',
+            'zip_code' => '1100',
+            'educational_attainment' => 'High School Graduate',
+            'school_name' => 'MCARE High School',
+            'year_graduated' => 2020,
+            'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+            'review_released_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->from(route('admin.enrollments.show', $application))
+            ->patch(route('admin.enrollments.update', $application), [
+                'status' => EnrollmentApplication::STATUS_APPROVED,
+            ])
+            ->assertRedirect(route('admin.enrollments.show', $application))
+            ->assertSessionHasErrors([
+                'status' => 'Review the applicant documents first before saving a decision.',
+            ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.enrollments.show', $application))
+            ->assertOk()
+            ->assertSee('Review the applicant documents first before saving a decision.')
+            ->assertSee('Document review cannot be completed while required documents are pending.')
+            ->assertDontSee('popover="manual"', false);
+
+        $this->assertSame(EnrollmentApplication::STATUS_PRE_ENLISTMENT, $application->fresh()->status);
+        $this->assertSame('applicant', $applicant->fresh()->role);
+    }
+
+    public function test_review_page_starts_with_a_review_documents_action(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->create(['role' => 'applicant']);
+        $application = EnrollmentApplication::create([
+            'user_id' => $applicant->id,
+            'email' => $applicant->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => 'Maria',
+            'last_name' => 'Santos',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'street' => '123 Training Street',
+            'barangay' => 'Central',
+            'city' => 'Quezon City',
+            'province' => 'Metro Manila',
+            'zip_code' => '1100',
+            'educational_attainment' => 'High School Graduate',
+            'school_name' => 'MCARE High School',
+            'year_graduated' => 2020,
+            'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+            'review_released_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.enrollments.show', $application))
+            ->assertOk()
+            ->assertSee('Review documents')
+            ->assertSee(route('admin.enrollments.document-review', $application), false)
+            ->assertDontSee('>Done for review</button>', false);
+
+        $this->actingAs($admin)
+            ->get(route('admin.enrollments.document-review', $application))
+            ->assertOk()
+            ->assertSee('Review documents')
+            ->assertSee('Done for review')
+            ->assertSee('Back to application');
     }
 
     public function test_admin_can_preview_and_download_filled_tesda_registration_form(): void
@@ -207,7 +301,7 @@ class AdminEnrollmentReviewTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.enrollments.documents.show', [$application, 'birth-certificate']))
             ->assertOk()
-            ->assertSee('Applicant document preview');
+            ->assertSee('Back to document review');
 
         $this->actingAs($admin)
             ->get(route('admin.enrollments.documents.content', [$application, 'birth-certificate']))
@@ -225,16 +319,388 @@ class AdminEnrollmentReviewTest extends TestCase
                     'signature' => ['status' => 'unreviewed', 'note' => null],
                 ],
             ])
-            ->assertRedirect();
+            ->assertRedirect(route('admin.enrollments.document-review', $application))
+            ->assertSessionHasErrors('documents')
+            ->assertSessionHas('error', fn (string $message): bool => str_contains($message, 'Document review cannot be completed while required documents are pending'));
 
         $application->refresh();
         $this->assertSame('replace', $application->document_review['birth-certificate']['status']);
         $this->assertSame('Upload a clearer complete copy.', $application->document_review['birth-certificate']['note']);
-        $this->assertSame($admin->id, $application->documents_reviewed_by_id);
+        $this->assertNull($application->documents_reviewed_at);
+        $this->assertNull($application->documents_reviewed_by_id);
+
+        $this->actingAs($admin)
+            ->get(route('admin.enrollments.show', $application))
+            ->assertOk()
+            ->assertSee('Incomplete')
+            ->assertSee('pending')
+            ->assertDontSee('>Completed</span>', false);
 
         $this->actingAs($applicant)
             ->get(route('enrollment.create'))
             ->assertOk()
             ->assertSee('Upload a clearer complete copy.');
+    }
+
+    public function test_document_review_completes_only_when_every_required_document_is_accepted(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->create(['role' => 'applicant']);
+        $application = $this->approvalReadyApplication($applicant);
+        $application->forceFill([
+            'document_review' => null,
+            'documents_reviewed_at' => null,
+            'documents_reviewed_by_id' => null,
+            'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+        ])->save();
+
+        $this->actingAs($admin)
+            ->patch(route('admin.enrollments.documents.review', $application), [
+                'documents' => [
+                    'birth-certificate' => ['status' => 'accepted', 'note' => null],
+                    'education-document' => ['status' => 'accepted', 'note' => null],
+                    'good-moral-certificate' => ['status' => 'accepted', 'note' => null],
+                    'id-photo' => ['status' => 'accepted', 'note' => null],
+                    'signature' => ['status' => 'accepted', 'note' => null],
+                ],
+            ])
+            ->assertRedirect(route('admin.enrollments.show', $application))
+            ->assertSessionHas('saved', 'Document review completed. You can now save the enrollment decision.');
+
+        $application->refresh();
+        $this->assertNotNull($application->documents_reviewed_at);
+        $this->assertSame($admin->id, $application->documents_reviewed_by_id);
+
+        $this->actingAs($admin)
+            ->get(route('admin.enrollments.show', $application))
+            ->assertOk()
+            ->assertSee('Completed')
+            ->assertSee('All accepted');
+    }
+
+    public function test_show_page_does_not_mark_document_review_completed_when_documents_are_pending(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->create(['role' => 'applicant']);
+        $application = EnrollmentApplication::create([
+            'user_id' => $applicant->id,
+            'email' => $applicant->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => 'Maria',
+            'last_name' => 'Santos',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'street' => '123 Training Street',
+            'barangay' => 'Central',
+            'city' => 'Quezon City',
+            'province' => 'Metro Manila',
+            'zip_code' => '1100',
+            'educational_attainment' => 'High School Graduate',
+            'school_name' => 'MCARE High School',
+            'year_graduated' => 2020,
+            'birth_certificate_path' => 'enrollment-documents/test/birth-certificate.pdf',
+            'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+            'review_released_at' => now(),
+            'documents_reviewed_at' => now(),
+            'document_review' => [
+                'birth-certificate' => ['status' => 'accepted', 'note' => null],
+                'education-document' => ['status' => 'unreviewed', 'note' => null],
+                'good-moral-certificate' => ['status' => 'unreviewed', 'note' => null],
+                'id-photo' => ['status' => 'unreviewed', 'note' => null],
+                'signature' => ['status' => 'unreviewed', 'note' => null],
+            ],
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.enrollments.show', $application))
+            ->assertOk()
+            ->assertSee('Incomplete')
+            ->assertSee('4 pending')
+            ->assertSee('Document review stays incomplete while required documents are pending')
+            ->assertDontSee('All accepted');
+    }
+
+    public function test_saving_an_approved_decision_emails_a_verification_link_and_login_waits_for_it(): void
+    {
+        Notification::fake();
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->unverified()->create([
+            'role' => 'applicant',
+            'password' => 'Password123',
+        ]);
+        $application = $this->approvalReadyApplication($applicant);
+
+        $this->actingAs($admin)
+            ->patch(route('admin.enrollments.update', $application), [
+                'status' => EnrollmentApplication::STATUS_APPROVED,
+                'admin_notes' => 'Documents and payment verified.',
+            ])
+            ->assertRedirect(route('admin.enrollments.show', $application))
+            ->assertSessionHas('saved', fn (string $message): bool => str_contains($message, 'A verification link was emailed to '.$applicant->email));
+
+        $this->assertSame('trainee', $applicant->refresh()->role);
+        $this->assertFalse($applicant->hasVerifiedEmail());
+
+        Notification::assertSentTo($applicant, QueuedVerifyEmail::class);
+        Notification::assertSentTo(
+            $applicant,
+            EnrollmentStatusUpdatedNotification::class,
+            fn (EnrollmentStatusUpdatedNotification $notification): bool => $notification->toMail($applicant)->subject === 'Verify your email to open your approved MCARE account',
+        );
+
+        Auth::logout();
+        $this->post(route('login.store'), [
+            'email' => $applicant->email,
+            'password' => 'Password123',
+        ])
+            ->assertSessionHasErrors('email');
+        $this->assertGuest();
+
+        $verificationUrl = URL::temporarySignedRoute(
+            'verification.verify',
+            now()->addMinutes(30),
+            ['id' => $applicant->id, 'hash' => sha1($applicant->getEmailForVerification())],
+        );
+
+        $this->get($verificationUrl)
+            ->assertRedirect(route('login'))
+            ->assertSessionHas('verified');
+        $this->assertTrue($applicant->refresh()->hasVerifiedEmail());
+
+        $this->post(route('login.store'), [
+            'email' => $applicant->email,
+            'password' => 'Password123',
+        ])->assertRedirect(route('trainee.dashboard'));
+        $this->assertAuthenticatedAs($applicant);
+    }
+
+    public function test_admin_queue_shows_a_delete_action_for_each_enrollment(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->create(['role' => 'applicant']);
+        $application = EnrollmentApplication::create([
+            'user_id' => $applicant->id,
+            'email' => $applicant->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => 'Maria',
+            'last_name' => 'Santos',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'street' => '123 Training Street',
+            'barangay' => 'Central',
+            'city' => 'Quezon City',
+            'province' => 'Metro Manila',
+            'zip_code' => '1100',
+            'educational_attainment' => 'High School Graduate',
+            'school_name' => 'MCARE High School',
+            'year_graduated' => 2020,
+            'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+            'review_released_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.enrollments.index'))
+            ->assertOk()
+            ->assertSee('Delete')
+            ->assertSee(route('admin.enrollments.destroy', $application), false);
+
+        $this->actingAs($admin)
+            ->get(route('admin.enrollments.show', $application))
+            ->assertOk()
+            ->assertSee('Delete')
+            ->assertSee(route('admin.enrollments.destroy', $application), false);
+    }
+
+    public function test_admin_can_delete_an_enrollment_from_the_queue(): void
+    {
+        Storage::fake('local');
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->create([
+            'role' => 'applicant',
+            'email' => 'delete.enrollee@gmail.com',
+        ]);
+        $photoPath = 'enrollment-documents/test/id-photo.jpg';
+        Storage::disk('local')->put($photoPath, 'id-photo');
+
+        $application = EnrollmentApplication::create([
+            'user_id' => $applicant->id,
+            'email' => $applicant->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => 'Maria',
+            'last_name' => 'Santos',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'street' => '123 Training Street',
+            'barangay' => 'Central',
+            'city' => 'Quezon City',
+            'province' => 'Metro Manila',
+            'zip_code' => '1100',
+            'educational_attainment' => 'High School Graduate',
+            'school_name' => 'MCARE High School',
+            'year_graduated' => 2020,
+            'id_photo_path' => $photoPath,
+            'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+            'review_released_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->from(route('admin.enrollments.index'))
+            ->delete(route('admin.enrollments.destroy', $application))
+            ->assertRedirect(route('admin.enrollments.index'))
+            ->assertSessionHas('saved', 'Enrollment for Santos, Maria (delete.enrollee@gmail.com) and related records were permanently removed.');
+
+        $this->assertDatabaseMissing('enrollment_applications', ['id' => $application->id]);
+        $this->assertDatabaseMissing('users', ['id' => $applicant->id]);
+        $this->assertFalse(Storage::disk('local')->exists($photoPath));
+    }
+
+    public function test_admin_can_delete_a_historical_enrollment(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->create(['role' => 'alumni']);
+        $application = EnrollmentApplication::create([
+            'user_id' => $applicant->id,
+            'email' => $applicant->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => 'Maria',
+            'last_name' => 'Santos',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'street' => '123 Training Street',
+            'barangay' => 'Central',
+            'city' => 'Quezon City',
+            'province' => 'Metro Manila',
+            'zip_code' => '1100',
+            'educational_attainment' => 'High School Graduate',
+            'school_name' => 'MCARE High School',
+            'year_graduated' => 2020,
+            'status' => EnrollmentApplication::STATUS_APPROVED,
+            'is_historical_record' => true,
+            'review_released_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.enrollments.show', $application))
+            ->assertOk()
+            ->assertSee('Delete verified alumni record?')
+            ->assertSee('verified historical alumni claim');
+
+        $this->actingAs($admin)
+            ->from(route('admin.enrollments.index'))
+            ->delete(route('admin.enrollments.destroy', $application))
+            ->assertRedirect(route('admin.enrollments.index'))
+            ->assertSessionHas('saved');
+
+        $this->assertDatabaseMissing('enrollment_applications', ['id' => $application->id]);
+        $this->assertDatabaseMissing('users', ['id' => $applicant->id]);
+    }
+
+    public function test_non_admin_cannot_delete_an_enrollment(): void
+    {
+        $applicant = User::factory()->create(['role' => 'applicant']);
+        $application = EnrollmentApplication::create([
+            'user_id' => $applicant->id,
+            'email' => $applicant->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => 'Maria',
+            'last_name' => 'Santos',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'street' => '123 Training Street',
+            'barangay' => 'Central',
+            'city' => 'Quezon City',
+            'province' => 'Metro Manila',
+            'zip_code' => '1100',
+            'educational_attainment' => 'High School Graduate',
+            'school_name' => 'MCARE High School',
+            'year_graduated' => 2020,
+            'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+            'review_released_at' => now(),
+        ]);
+
+        $this->actingAs($applicant)
+            ->delete(route('admin.enrollments.destroy', $application))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('enrollment_applications', ['id' => $application->id]);
+    }
+
+    public function test_saving_a_denied_decision_emails_a_verification_link_when_the_enrollee_is_unverified(): void
+    {
+        Notification::fake();
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->unverified()->create(['role' => 'applicant']);
+        $application = $this->approvalReadyApplication($applicant);
+
+        $this->actingAs($admin)
+            ->patch(route('admin.enrollments.update', $application), [
+                'status' => EnrollmentApplication::STATUS_DENIED,
+                'admin_notes' => 'The submitted documents do not meet MCARE requirements.',
+            ])
+            ->assertRedirect(route('admin.enrollments.show', $application));
+
+        Notification::assertSentTo($applicant, QueuedVerifyEmail::class);
+    }
+
+    private function approvalReadyApplication(User $user): EnrollmentApplication
+    {
+        $batch = TrainingBatch::create([
+            'name' => 'Caregiving Batch Review',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+        ]);
+
+        return EnrollmentApplication::create([
+            'user_id' => $user->id,
+            'training_batch_id' => $batch->id,
+            'email' => $user->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => 'Maria',
+            'last_name' => 'Santos',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'street' => '123 Training Street',
+            'barangay' => 'Central',
+            'city' => 'Pili',
+            'province' => 'Camarines Sur',
+            'zip_code' => '4418',
+            'educational_attainment' => 'High School Graduate',
+            'school_name' => 'MCARE High School',
+            'year_graduated' => 2020,
+            'birth_certificate_path' => 'enrollment-documents/test/birth-certificate.pdf',
+            'education_document_path' => 'enrollment-documents/test/education-document.pdf',
+            'good_moral_certificate_path' => 'enrollment-documents/test/good-moral-certificate.pdf',
+            'id_photo_path' => 'enrollment-documents/test/id-photo.jpg',
+            'signature_path' => 'enrollment-documents/test/signature.png',
+            'document_review' => [
+                'birth-certificate' => ['status' => 'accepted', 'note' => null],
+                'education-document' => ['status' => 'accepted', 'note' => null],
+                'good-moral-certificate' => ['status' => 'accepted', 'note' => null],
+                'id-photo' => ['status' => 'accepted', 'note' => null],
+                'signature' => ['status' => 'accepted', 'note' => null],
+            ],
+            'documents_reviewed_at' => now(),
+            'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+            'total_program_fee' => 22000.00,
+            'downpayment_amount' => 2000.00,
+            'total_paid_amount' => 2000.00,
+            'payment_status' => EnrollmentApplication::PAYMENT_PARTIALLY_PAID,
+            'payment_method' => 'onsite',
+            'payment_verified_at' => now(),
+            'review_released_at' => now(),
+        ]);
     }
 }

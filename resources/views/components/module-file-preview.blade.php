@@ -37,9 +37,11 @@
                     <button type="button" class="rounded bg-slate-800 px-2.5 py-1.5 font-bold text-slate-200 hover:bg-slate-700" data-pdf-fit-width title="Fit the full page">Fit Page</button>
                 </div>
             </div>
-            <div class="relative flex min-h-0 flex-1 items-start justify-center overflow-auto p-3 sm:p-4" data-pdf-canvas-container>
-                <div class="relative inline-block shadow-2xl" data-pdf-page-wrapper>
-                    <canvas class="block max-w-full bg-white shadow-md" data-pdf-canvas></canvas>
+            <div class="relative min-h-0 flex-1 overflow-auto p-3 sm:p-4" data-pdf-canvas-container>
+                <div data-pdf-scroll-sizer>
+                    <div class="relative inline-block shadow-2xl" data-pdf-page-wrapper>
+                        <canvas class="block bg-white shadow-md" data-pdf-canvas></canvas>
+                    </div>
                 </div>
                 <div class="absolute inset-0 flex items-center justify-center bg-slate-950/85 text-white" data-pdf-loading>
                     <div class="flex items-center gap-3">

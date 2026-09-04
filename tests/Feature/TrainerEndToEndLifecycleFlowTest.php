@@ -2,13 +2,12 @@
 
 namespace Tests\Feature;
 
-use App\Models\CompetencyOutcome;
+use App\Mail\StaffAccountCredentialsMail;
 use App\Models\CompetencyUnit;
 use App\Models\EnrollmentApplication;
 use App\Models\Quiz;
 use App\Models\QuizAttempt;
 use App\Models\TraineeCompetencyRecord;
-use App\Models\TrainerAnnouncement;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
 use App\Models\User;
@@ -16,9 +15,9 @@ use App\Notifications\LmsAnnouncementPublished;
 use App\Notifications\LmsModulePublished;
 use App\Notifications\LmsQuizPublished;
 use App\Notifications\QueuedVerifyEmail;
-use App\Support\CaregivingNcIiCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -33,6 +32,7 @@ class TrainerEndToEndLifecycleFlowTest extends TestCase
     public function test_complete_trainer_lifecycle_from_creation_to_delivery_and_grading(): void
     {
         Notification::fake();
+        Mail::fake();
         Storage::fake('local');
 
         // Seeded Caregiving NC II Competency Units for grading test
@@ -44,13 +44,10 @@ class TrainerEndToEndLifecycleFlowTest extends TestCase
         // =========================================================================
         $admin = $this->lmsUser('admin');
         $trainerEmail = 'trainer.mcare@gmail.com';
-        $trainerPassword = 'TrainerPassword123!';
 
         $createTrainerResponse = $this->actingAs($admin)->post(route('admin.accounts.trainers.store'), [
             'name' => 'Prof. Eduardo Ramos',
             'email' => $trainerEmail,
-            'password' => $trainerPassword,
-            'password_confirmation' => $trainerPassword,
         ]);
 
         $createTrainerResponse->assertRedirect();
@@ -62,6 +59,18 @@ class TrainerEndToEndLifecycleFlowTest extends TestCase
 
         $trainer = User::where('email', $trainerEmail)->firstOrFail();
         $this->assertFalse($trainer->hasVerifiedEmail());
+
+        $trainerPassword = '';
+        Mail::assertSent(StaffAccountCredentialsMail::class, function (StaffAccountCredentialsMail $mail) use ($trainer, &$trainerPassword): bool {
+            if (! $mail->hasTo($trainer->email) || ! $mail->user->is($trainer)) {
+                return false;
+            }
+
+            $trainerPassword = $mail->plainPassword;
+
+            return filled($trainerPassword);
+        });
+        $this->assertNotSame('', $trainerPassword);
 
         // Verify that QueuedVerifyEmail notification was dispatched
         Notification::assertSentTo($trainer, QueuedVerifyEmail::class);
@@ -83,7 +92,7 @@ class TrainerEndToEndLifecycleFlowTest extends TestCase
         // =========================================================================
         // STEP 3: Admin creates a Batch and assigns the verified Trainer
         // =========================================================================
-        $createBatchResponse = $this->actingAs($admin)->post(route('admin.schedules.store'), [
+        $createBatchResponse = $this->actingAs($admin)->post(route('admin.batches.store'), [
             'name' => 'Caregiving NC II Batch Alpha',
             'year' => 2026,
             'trainer_id' => $trainer->id,
@@ -102,7 +111,7 @@ class TrainerEndToEndLifecycleFlowTest extends TestCase
             'pm_days' => 'TTS',
         ]);
 
-        $createBatchResponse->assertRedirect(route('admin.schedules.index'));
+        $createBatchResponse->assertRedirect(route('admin.batches.index'));
         $batch = TrainingBatch::where('name', 'Caregiving NC II Batch Alpha')->firstOrFail();
         $this->assertEquals($trainer->id, $batch->trainer_id);
         $this->assertTrue($batch->is_active);

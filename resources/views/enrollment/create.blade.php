@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth bg-white">
+<html lang="en" class="scroll-smooth bg-[#f3f2f6]">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $enrollmentBatch?->program?->name ?? 'Training Program' }} Enrollment | MCARE</title>
+    <x-site-favicon />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         /* Path: resources/views/enrollment/create.blade.php | Label: Phone-first enrollment density */
@@ -16,33 +17,14 @@
             .enrollment-logo {
                 width: 2.75rem;
                 height: 2.75rem;
-                border-radius: 1rem;
+                border-radius: 2px;
             }
 
             .enrollment-main {
                 padding: 1rem;
             }
 
-            .enrollment-hero-card,
-            .enrollment-status-card,
-            .enrollment-form-shell,
-            .enrollment-upload-card,
-            .enrollment-consent-card,
-            .enrollment-signature-card {
-                border-radius: 1.25rem;
-                box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
-            }
-
-            .enrollment-hero-card {
-                padding: 1.125rem;
-            }
-
-            .enrollment-status-card {
-                padding: 1rem;
-            }
-
-            .enrollment-form-shell {
-                margin-top: 1rem;
+            .enrollment-form-body {
                 padding: 1rem;
             }
 
@@ -73,26 +55,18 @@
             .enrollment-page input:not([type="checkbox"]):not([type="radio"]),
             .enrollment-page select {
                 min-height: 2.75rem;
-                border-radius: 1rem !important;
+                border-radius: 2px !important;
                 padding: 0.7rem 0.875rem;
                 font-size: 0.875rem;
             }
 
-            .enrollment-upload-card {
-                padding: 1rem;
+            .enrollment-page .enrollment-password-field input {
+                padding-right: 2.75rem;
             }
 
             .enrollment-upload-zone {
-                border-radius: 1rem;
+                border-radius: 2px;
                 padding: 1.25rem 0.875rem;
-            }
-
-            .enrollment-consent-card {
-                padding: 1rem;
-            }
-
-            .enrollment-signature-card {
-                padding: 1rem;
             }
 
             .enrollment-signature-switch {
@@ -111,7 +85,7 @@
 
         /* Path: resources/views/enrollment/create.blade.php | Label: Enrollment section jump menu */
         .enrollment-jump-target {
-            scroll-margin-top: 6rem;
+            scroll-margin-top: 12.25rem;
         }
 
         .enrollment-jump-panel {
@@ -128,177 +102,174 @@
         }
     </style>
 </head>
-<body class="enrollment-page min-h-screen bg-white font-sans text-slate-900 antialiased">
-    <div class="pointer-events-none fixed inset-x-0 top-0 -z-10 h-72 bg-gradient-to-b from-purple-100 via-purple-50/70 to-white"></div>
-    <div class="pointer-events-none fixed inset-x-0 bottom-0 -z-10 h-72 bg-gradient-to-t from-purple-100 via-purple-50/60 to-white"></div>
+<body class="enrollment-page min-h-screen bg-[#f3f2f6] font-sans text-slate-900 antialiased">
+    <div class="enrollment-page-glow pointer-events-none fixed inset-x-0 top-0 -z-10 h-72 bg-gradient-to-b from-purple-100 via-purple-50/70 to-white"></div>
+    <div class="enrollment-page-glow pointer-events-none fixed inset-x-0 bottom-0 -z-10 h-72 bg-gradient-to-t from-purple-100 via-purple-50/60 to-white"></div>
 
-    <div id="action-toast" class="fixed right-5 top-5 z-50 hidden max-w-sm rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-semibold leading-6 text-amber-800 shadow-xl shadow-amber-100">
+    <div id="action-toast" class="fixed right-5 top-5 z-50 hidden max-w-sm rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-semibold leading-6 text-amber-800">
         Too many actions. Please wait for the current request to finish.
     </div>
 
-    <header class="border-b border-purple-100 bg-white/90 backdrop-blur-xl">
-        <div class="enrollment-header-inner mx-auto flex max-w-7xl flex-col gap-5 px-6 py-5 sm:flex-row sm:items-center sm:justify-between lg:px-8">
-            <a href="{{ route('landing') }}" class="flex items-center gap-4">
-                <img src="{{ asset('assets/official-logo.png') }}" alt="Mission Care Training Center logo" class="enrollment-logo h-16 w-16 rounded-2xl object-contain">
-                <span>
-                    <span class="block text-sm font-bold text-slate-900 sm:text-base">Mission Care Training Center</span>
-                    <span class="block text-xs text-slate-500 sm:text-sm">MCARE Program Enrollment</span>
-                </span>
-            </a>
-            <a href="{{ route('landing') }}" class="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:border-purple-200 hover:text-purple-700 sm:h-auto sm:px-5 sm:py-2.5">
-                Back to landing
-            </a>
-        </div>
-    </header>
+    <x-public-official-header
+        masthead-aside="Caregiving NC II · Official enrollment"
+        nav-label="Enrollment"
+        :secondary-href="route('landing')"
+        secondary-label="Public site"
+        :primary-href="route('login')"
+        primary-label="Sign in"
+    />
 
-    <main class="enrollment-main mx-auto max-w-7xl px-6 py-10 lg:px-8 lg:py-14">
-        <section class="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[1fr_380px]">
-            <div class="enrollment-hero-card rounded-3xl border border-purple-100 bg-white p-7 shadow-xl shadow-purple-100/40 sm:p-10">
-                <div class="inline-flex items-center gap-2 rounded-full bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 ring-1 ring-purple-100 sm:px-4 sm:py-2 sm:text-sm">
-                    TESDA-DPA inspired learner profile
-                </div>
-                <h1 class="mt-5 max-w-4xl text-2xl font-bold leading-tight text-slate-900 sm:mt-7 sm:text-5xl">
+    <main class="enrollment-main mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
+        <article class="enrollment-sheet">
+            <header class="enrollment-intro">
+                <p class="enrollment-kicker">Official TESDA NC II applicant profile</p>
+                <h1>
                     {{ $enrollmentBatch?->program?->name ?? 'Choose Your Training Program' }} Enrollment
                 </h1>
-                <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600 sm:mt-5 sm:text-lg sm:leading-8">
-                    Choose an active batch published by MCARE, then complete the learner profile. After enrollment is saved, you may connect the same registered email to Google for easier sign-in.
-                </p>
-
-                <div class="mt-6 rounded-2xl border border-purple-100 bg-purple-50/60 p-4 sm:mt-8 sm:p-5" aria-labelledby="available-batches-title">
-                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <p class="text-xs font-black uppercase tracking-wide text-purple-700">Admin-published enrollment</p>
-                            <h2 id="available-batches-title" class="mt-1 text-lg font-black text-slate-950">Available active batches</h2>
-                        </div>
-                        <span class="w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-purple-700 ring-1 ring-purple-100">{{ $availableBatches->count() }} available</span>
-                    </div>
-
-                    @if ($application && $enrollmentBatch)
-                        <div class="mt-4 rounded-2xl border-2 border-purple-500 bg-white p-4 shadow-sm">
-                            <p class="text-xs font-black uppercase tracking-wide text-purple-700">Your saved batch</p>
-                            <p class="mt-1 text-base font-black text-slate-950">{{ $enrollmentBatch->program?->name ?? $application->program }}</p>
-                            <p class="mt-1 text-sm font-bold text-slate-700">{{ $enrollmentBatch->name }} {{ $enrollmentBatch->year }}</p>
-                        </div>
-                    @elseif ($availableBatches->isNotEmpty())
-                        <div class="mt-4 grid gap-3 sm:grid-cols-2">
-                            @foreach ($availableBatches as $availableBatch)
-                                @php
-                                    $isSelectedBatch = (int) optional($enrollmentBatch)->id === (int) $availableBatch->id;
-                                @endphp
-                                <a href="{{ route('enrollment.create', ['batch' => $availableBatch->id]).'#enrollment-form' }}" class="rounded-2xl border-2 p-4 text-left transition focus:outline-none focus:ring-4 focus:ring-purple-100 {{ $isSelectedBatch ? 'border-purple-500 bg-white shadow-md shadow-purple-100' : 'border-white bg-white/80 hover:border-purple-200 hover:bg-white' }}" @if($isSelectedBatch) aria-current="true" @endif>
-                                    <div class="flex items-start justify-between gap-3">
-                                        <div>
-                                            <p class="text-sm font-black text-slate-950">{{ $availableBatch->program?->name }}</p>
-                                            <p class="mt-1 text-xs font-bold text-slate-600">{{ $availableBatch->name }} {{ $availableBatch->year }}</p>
-                                        </div>
-                                        <span class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide {{ $isSelectedBatch ? 'bg-purple-600 text-white' : 'bg-emerald-50 text-emerald-700' }}">{{ $isSelectedBatch ? 'Selected' : 'Choose' }}</span>
-                                    </div>
-                                    <p class="mt-3 text-xs font-semibold leading-5 text-slate-500">AM: {{ $availableBatch->scheduleLabelFor('AM') }}</p>
-                                    <p class="text-xs font-semibold leading-5 text-slate-500">PM: {{ $availableBatch->scheduleLabelFor('PM') }}</p>
-                                    <p class="mt-2 text-xs font-black text-purple-700">Required downpayment: ₱{{ number_format((float) $availableBatch->program?->downpayment_amount, 2) }}</p>
-                                </a>
-                            @endforeach
-                        </div>
+                <p class="enrollment-lede">
+                    @if ($canCompleteEnrollment)
+                        Choose an active batch published by MCARE, then complete the official applicant profile. After the application is saved, you may use the same registered email with Google sign-in.
                     @else
-                        <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900">
-                            No active batch is currently published for enrollment. Please wait for MCARE to open and show the next batch.
-                        </div>
+                        Enter the approved application number from the applications page. The enrollment form opens only after MCARE approves that application.
                     @endif
-                </div>
-            </div>
-
-            <aside class="enrollment-status-card rounded-3xl border border-slate-100 bg-slate-50 p-7 shadow-sm">
-                <p class="text-sm font-bold uppercase text-purple-600">Application status</p>
-                <div class="mt-4 rounded-2xl bg-white p-4 shadow-sm sm:mt-5 sm:p-5">
-                    <p class="text-sm text-slate-500">Program</p>
-                    <p class="mt-1 text-lg font-bold text-slate-900 sm:text-xl">{{ $enrollmentBatch?->program?->name ?? 'Select an available batch' }}</p>
-                </div>
-                <div class="mt-3 rounded-2xl bg-white p-4 shadow-sm sm:mt-4 sm:p-5">
-                    <p class="text-sm text-slate-500">Current step</p>
-                    <p class="mt-1 text-lg font-bold text-slate-900 sm:text-xl">Learner profile</p>
-                </div>
-                <div class="mt-3 rounded-2xl bg-white p-4 shadow-sm sm:mt-4 sm:p-5">
-                    <p class="text-sm text-slate-500">Enrollment batch</p>
-                    <p class="mt-1 text-lg font-bold text-slate-900 sm:text-xl">
-                        {{ $enrollmentBatch ? $enrollmentBatch->name.' '.$enrollmentBatch->year : 'Not selected' }}
-                    </p>
-                    @if ($enrollmentBatch)
-                        <p class="mt-2 text-xs font-semibold text-purple-700">{{ $enrollmentBatch->enrollmentStateLabel() }} · {{ $enrollmentBatch->trainingStateLabel() }}</p>
-                    @endif
-                </div>
-                <p class="mt-4 text-sm leading-6 text-slate-500 sm:mt-5">
-                    After submission, continue to payment. The application becomes available to Admin Review only after the required payment is verified.
                 </p>
-            </aside>
-        </section>
+                <dl class="enrollment-status-row">
+                    <div>
+                        <dt>Program</dt>
+                        <dd>{{ $enrollmentBatch?->program?->name ?? ($unlockedAdmission?->program ?? 'Select an available batch') }}</dd>
+                    </div>
+                    <div>
+                        <dt>Current step</dt>
+                        <dd>{{ $canCompleteEnrollment ? 'Learner profile' : 'Application number' }}</dd>
+                    </div>
+                    <div>
+                        <dt>Enrollment batch</dt>
+                        <dd>
+                            {{ $enrollmentBatch ? $enrollmentBatch->name.' '.$enrollmentBatch->year : 'Not selected' }}
+                            @if ($enrollmentBatch)
+                                <span>{{ $enrollmentBatch->enrollmentStateLabel() }} · {{ $enrollmentBatch->trainingStateLabel() }}</span>
+                            @endif
+                        </dd>
+                    </div>
+                </dl>
+            </header>
 
-        <!-- Path: resources/views/enrollment/create.blade.php | Label: Sticky enrollment section jump menu -->
-        <section class="enrollment-jump-nav sticky top-0 z-40 mt-4 rounded-2xl border border-purple-100 bg-white/95 shadow-lg shadow-purple-100/50 backdrop-blur-xl">
-            <details id="enrollment-jump-details" class="group">
-                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-slate-800 marker:hidden">
-                    <span class="flex min-w-0 items-center gap-3">
-                        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-purple-600 text-white">
-                            <svg viewBox="0 0 24 24" fill="none" class="h-4 w-4" aria-hidden="true">
-                                <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                            </svg>
-                        </span>
+            @unless ($canCompleteEnrollment)
+                <section class="enrollment-form-body" aria-labelledby="application-number-title">
+                    @if ($errors->any())
+                        <p class="enrollment-notice enrollment-notice-error">{{ $errors->first('application_number') ?: 'Please review the application number.' }}</p>
+                    @endif
+                    <form method="POST" action="{{ route('enrollment.unlock') }}" class="space-y-5">
+                        @csrf
+                        <div class="enrollment-section-heading">
+                            <p>Required before enrollment</p>
+                            <h2 id="application-number-title">Enter your approved application number</h2>
+                            <p>Submit an application first. After an administrator approves it, enter the number here to open the enrollment form.</p>
+                        </div>
+                        <div>
+                            <label class="form-label" for="application_number">Application number</label>
+                            <input class="form-field" id="application_number" name="application_number" value="{{ old('application_number', request('application_number')) }}" placeholder="MCA-2026-XXXXXX" required>
+                            @error('application_number')<p class="form-error">{{ $message }}</p>@enderror
+                        </div>
+                        <div class="flex flex-wrap gap-3">
+                            <button type="submit" class="primary-action">Continue to enrollment</button>
+                            <a href="{{ route('applications.create') }}" class="secondary-action">I still need to apply</a>
+                            <a href="{{ route('applications.status') }}" class="secondary-action">Check application status</a>
+                        </div>
+                    </form>
+                </section>
+            @endunless
+
+            @if ($canCompleteEnrollment)
+            <section class="enrollment-batches" aria-labelledby="available-batches-title">
+                <div class="enrollment-section-heading">
+                    <p>Admin-published enrollment</p>
+                    <h2 id="available-batches-title">Available active batches</h2>
+                    <p>{{ $availableBatches->count() }} available. After submission, continue to payment. The application becomes available to Admin Review only after the required payment is verified.</p>
+                </div>
+
+                @if ($application && $enrollmentBatch)
+                    <div class="enrollment-batch-option is-selected">
+                        <p class="enrollment-kicker">Your saved batch</p>
+                        <p class="enrollment-batch-title">{{ $enrollmentBatch->program?->name ?? $application->program }}</p>
+                        <p class="enrollment-batch-meta">{{ $enrollmentBatch->name }} {{ $enrollmentBatch->year }}</p>
+                    </div>
+                @elseif ($availableBatches->isNotEmpty())
+                    <div class="enrollment-batch-list">
+                        @foreach ($availableBatches as $availableBatch)
+                            @php
+                                $isSelectedBatch = (int) optional($enrollmentBatch)->id === (int) $availableBatch->id;
+                            @endphp
+                            <a href="{{ route('enrollment.create', ['batch' => $availableBatch->id]).'#enrollment-form' }}" class="enrollment-batch-option{{ $isSelectedBatch ? ' is-selected' : '' }}" @if($isSelectedBatch) aria-current="true" @endif>
+                                <div class="enrollment-batch-option-top">
+                                    <div>
+                                        <p class="enrollment-batch-title">{{ $availableBatch->program?->name }}</p>
+                                        <p class="enrollment-batch-meta">{{ $availableBatch->name }} {{ $availableBatch->year }}</p>
+                                    </div>
+                                    <span class="enrollment-batch-flag">{{ $isSelectedBatch ? 'Selected' : 'Choose' }}</span>
+                                </div>
+                                <p class="enrollment-batch-meta">AM: {{ $availableBatch->scheduleLabelFor('AM') }}</p>
+                                <p class="enrollment-batch-meta">PM: {{ $availableBatch->scheduleLabelFor('PM') }}</p>
+                                <p class="enrollment-batch-fee">Required downpayment: ₱{{ number_format((float) $availableBatch->program?->downpayment_amount, 2) }}</p>
+                            </a>
+                        @endforeach
+                    </div>
+                @else
+                    <p class="enrollment-notice enrollment-notice-amber">No active batch is currently published for enrollment. Please wait for MCARE to open and show the next batch.</p>
+                @endif
+            </section>
+
+            <section class="enrollment-jump-nav sticky z-40" aria-label="Enrollment form sections">
+                <details id="enrollment-jump-details" class="group">
+                    <summary class="enrollment-jump-summary">
                         <span>
-                            <span class="block leading-5">Jump to section</span>
+                            <span class="block font-bold leading-5">Jump to section</span>
                             <span class="block text-xs font-semibold text-slate-500">Tap a part instead of scrolling the whole form.</span>
                         </span>
-                    </span>
-                    <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5 shrink-0 text-slate-400 transition group-open:rotate-180" aria-hidden="true">
-                        <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </summary>
-                <nav class="enrollment-jump-panel grid grid-cols-2 gap-2 border-t border-purple-100 p-3 text-sm sm:grid-cols-4" aria-label="Enrollment form sections">
-                    <a href="#enrollment-account" class="rounded-xl bg-purple-50 px-3 py-2 font-bold text-purple-700 hover:bg-purple-100">Account</a>
-                    <a href="#enrollment-profile" class="rounded-xl bg-slate-50 px-3 py-2 font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Profile</a>
-                    <a href="#enrollment-address" class="rounded-xl bg-slate-50 px-3 py-2 font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Address</a>
-                    <a href="#enrollment-personal" class="rounded-xl bg-slate-50 px-3 py-2 font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Personal</a>
-                    <a href="#enrollment-education" class="rounded-xl bg-slate-50 px-3 py-2 font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Education</a>
-                    <a href="#enrollment-classification" class="rounded-xl bg-slate-50 px-3 py-2 font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Classification</a>
-                    <a href="#enrollment-documents" class="rounded-xl bg-slate-50 px-3 py-2 font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Documents</a>
-                    <a href="#enrollment-signature" class="rounded-xl bg-slate-50 px-3 py-2 font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Signature</a>
-                    <a href="#enrollment-submit" class="col-span-2 rounded-xl bg-purple-600 px-3 py-2 text-center font-black text-white hover:bg-purple-700 sm:col-span-4">Submit</a>
-                </nav>
-            </details>
-        </section>
+                        <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5 shrink-0 text-slate-400 transition group-open:rotate-180" aria-hidden="true">
+                            <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </summary>
+                    <nav class="enrollment-jump-panel grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4" aria-label="Enrollment form sections">
+                        <a href="#enrollment-account">Account</a>
+                        <a href="#enrollment-profile">Profile</a>
+                        <a href="#enrollment-address">Address</a>
+                        <a href="#enrollment-personal">Personal</a>
+                        <a href="#enrollment-education">Education</a>
+                        <a href="#enrollment-classification">Classification</a>
+                        <a href="#enrollment-documents">Documents</a>
+                        <a href="#enrollment-signature">Signature</a>
+                        <a href="#enrollment-submit" class="enrollment-jump-submit">Submit</a>
+                    </nav>
+                </details>
+            </section>
 
-        <section class="enrollment-form-shell mt-8 rounded-3xl border border-slate-100 bg-white p-6 shadow-xl shadow-slate-200/60 sm:p-8">
+            <div class="enrollment-form-body">
             @if (! $application && ! $enrollmentBatch)
-                <div class="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-semibold leading-6 text-amber-800">
-                    Choose an active batch from the window above. Only batches that are active, inside their enrollment window, and explicitly shown by an administrator can be selected.
-                </div>
+                <p class="enrollment-notice enrollment-notice-amber">Choose an active batch from the window above. Only batches that are active, inside their enrollment window, and explicitly shown by an administrator can be selected.</p>
             @endif
             @if (session('saved'))
-                <div class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold leading-6 text-emerald-700" role="status" aria-live="polite" data-auto-dismiss="5000">
-                    {{ session('saved') }}
-                </div>
+                <p class="enrollment-notice enrollment-notice-ok" role="status" aria-live="polite" data-auto-dismiss="5000">{{ session('saved') }}</p>
             @endif
 
             @if (session('reapply_notice'))
-                <div class="mb-6 rounded-2xl border border-purple-200 bg-purple-50 px-5 py-4 text-sm font-semibold leading-6 text-purple-900" role="status" aria-live="polite">
-                    {{ session('reapply_notice') }}
-                </div>
+                <p class="enrollment-notice enrollment-notice-info" role="status" aria-live="polite">{{ session('reapply_notice') }}</p>
             @endif
 
             @if ($errors->any())
-                <div class="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold leading-6 text-red-700">
-                    Please review the highlighted fields and complete the required information.
-                </div>
+                <p class="enrollment-notice enrollment-notice-error">Please review the highlighted fields and complete the required information.</p>
             @endif
 
             @if ($application && ($application->admin_notes || $documentFeedback->isNotEmpty()))
-                <section class="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-950">
-                    <p class="text-sm font-black uppercase tracking-wide text-amber-700">Admin review feedback</p>
+                <section class="enrollment-notice enrollment-notice-amber">
+                    <p class="enrollment-kicker">Admin review feedback</p>
                     @if ($application->admin_notes)
                         <p class="mt-2 text-sm font-semibold leading-6">{{ $application->admin_notes }}</p>
                     @endif
                     <div class="mt-3 space-y-2">
                         @foreach ($documentFeedback as $key => $feedback)
-                            <div class="rounded-xl bg-white/70 px-4 py-3 text-sm">
-                                <span class="font-black">{{ $documentLabels[$key] ?? 'Enrollment document' }}:</span>
+                            <div>
+                                <span class="font-bold">{{ $documentLabels[$key] ?? 'Enrollment document' }}:</span>
                                 {{ data_get($feedback, 'status') === 'missing' ? 'Missing.' : 'Needs replacement.' }}
                                 {{ data_get($feedback, 'note') }}
                             </div>
@@ -308,8 +279,31 @@
                 </section>
             @endif
 
-            <form id="enrollment-form" method="POST" action="{{ route('enrollment.store') }}" enctype="multipart/form-data" class="enrollment-form space-y-10">
+            <form
+                id="enrollment-form"
+                method="POST"
+                action="{{ route('enrollment.store', absolute: false) }}"
+                enctype="multipart/form-data"
+                class="enrollment-form space-y-10"
+                data-payment-status-url="{{ route('payment.status', absolute: false) }}"
+                data-payment-url="{{ route('payment.show', absolute: false) }}"
+                data-signature-saved="{{ ($application->signature_path ?? false) ? '1' : '0' }}"
+                data-requires-batch="{{ (! $application && ! $enrollmentBatch) ? '1' : '0' }}"
+                data-server-errors="{{ json_encode(array_values($errors->keys())) }}"
+                data-address-regions-url="{{ route('enrollment.address.regions', absolute: false) }}"
+                data-address-provinces-url="{{ route('enrollment.address.provinces', absolute: false) }}"
+                data-address-cities-url="{{ route('enrollment.address.cities', absolute: false) }}"
+                data-address-barangays-url="{{ route('enrollment.address.barangays', absolute: false) }}"
+                data-address-region="{{ old('region', $application->region ?? '') }}"
+                data-address-province="{{ old('province', $application->province ?? '') }}"
+                data-address-city="{{ old('city', $application->city ?? '') }}"
+                data-address-barangay="{{ old('barangay', $application->barangay ?? '') }}"
+            >
                 @csrf
+                @if ($unlockedAdmission)
+                    <input type="hidden" name="application_number" value="{{ $unlockedAdmission->application_number }}">
+                    <p class="enrollment-notice enrollment-notice-ok">Approved application number {{ $unlockedAdmission->application_number }}. Complete the TESDA enrollment form below.</p>
+                @endif
                 <input type="hidden" name="training_batch_id" value="{{ $enrollmentBatch?->id }}">
                 @error('training_batch_id') <p class="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-bold leading-6 text-red-700">{{ $message }}</p> @enderror
 
@@ -331,13 +325,15 @@
                     <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-3">
                         <div class="md:col-span-2">
                             <label for="email" class="mb-2 block text-sm font-semibold text-slate-800">Email address</label>
-                            <input id="email" name="email" type="email" inputmode="email" autocomplete="section-applicant email" pattern="^[A-Za-z0-9._%+\-]+@gmail\.com$" value="{{ old('email', $application->email ?? $user?->email ?? '') }}" required @readonly($user) class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100 read-only:cursor-not-allowed read-only:bg-slate-100 read-only:text-slate-600">
+                            <input id="email" name="email" type="email" inputmode="email" autocomplete="section-applicant email" pattern="^[A-Za-z0-9._%+\-]+@gmail\.com$" value="{{ old('email', $application->email ?? $user?->email ?? $unlockedAdmission?->email ?? '') }}" required @readonly($user || $unlockedAdmission) class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100 read-only:cursor-not-allowed read-only:bg-slate-100 read-only:text-slate-600">
                             @if ($isGoogleApplicant)
                                 <p class="mt-2 text-xs font-semibold leading-5 text-emerald-700">Verified by Google and locked to this signed-in account.</p>
                             @elseif ($user)
                                 <p class="mt-2 text-xs leading-5 text-slate-500">This email is locked to your signed-in MCARE account.</p>
+                            @elseif ($unlockedAdmission)
+                                <p class="mt-2 text-xs leading-5 text-slate-500">This Gmail is locked to approved application {{ $unlockedAdmission->application_number }}.</p>
                             @else
-                                <p class="mt-2 text-xs leading-5 text-slate-500">Use a Gmail address only. MCARE will email a verification link before account sign-in is allowed.</p>
+                                <p class="mt-2 text-xs leading-5 text-slate-500">Use a Gmail address only. After MCARE saves your enrollment decision, a verification link will be emailed so you can sign in.</p>
                             @endif
                             @error('email') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
@@ -346,7 +342,7 @@
                             <select id="schedule_preference" name="schedule_preference" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                                 <option value="">Select</option>
                                 @foreach (['AM' => 'AM class', 'PM' => 'PM class', 'Weekend' => 'Weekend class'] as $value => $label)
-                                    <option value="{{ $value }}" @selected(old('schedule_preference', $application->schedule_preference ?? '') === $value)>{{ $label }}</option>
+                                    <option value="{{ $value }}" @selected(old('schedule_preference', $application->schedule_preference ?? $unlockedAdmission?->schedule_preference ?? '') === $value)>{{ $label }}</option>
                                 @endforeach
                             </select>
                             @error('schedule_preference') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
@@ -359,7 +355,12 @@
                         @else
                             <div>
                                 <label for="password" class="mb-2 block text-sm font-semibold text-slate-800">{{ $user ? 'New password (optional)' : 'Password' }}</label>
-                                <input id="password" name="password" type="password" autocomplete="new-password" @required(! $user) class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                                <div class="enrollment-password-field">
+                                    <input id="password" name="password" type="password" autocomplete="new-password" @required(! $user) class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 pr-12 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                                    <button type="button" class="enrollment-password-toggle" data-password-toggle="password" aria-label="Show password" title="Show password">
+                                        <x-dashboard-icon name="eye" class="h-4 w-4" />
+                                    </button>
+                                </div>
                                 <div class="mt-3 space-y-1.5 text-xs font-semibold">
                                     <p id="pw-length-check" class="flex items-center gap-2 text-slate-500"><span class="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[10px]"> </span> At least 10 characters</p>
                                     <p id="pw-letter-number-check" class="flex items-center gap-2 text-slate-500"><span class="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[10px]"> </span> Contains a number</p>
@@ -370,7 +371,12 @@
                             </div>
                             <div>
                                 <label for="password_confirmation" class="mb-2 block text-sm font-semibold text-slate-800">Confirm password</label>
-                                <input id="password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" @required(! $user) class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                                <div class="enrollment-password-field">
+                                    <input id="password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" @required(! $user) class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 pr-12 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                                    <button type="button" class="enrollment-password-toggle" data-password-toggle="password_confirmation" aria-label="Show password confirmation" title="Show password">
+                                        <x-dashboard-icon name="eye" class="h-4 w-4" />
+                                    </button>
+                                </div>
                                 <p id="pw-match-check" class="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-500"><span class="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[10px]"> </span> Passwords match</p>
                             </div>
                         @endif
@@ -385,17 +391,17 @@
                     <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-4">
                         <div>
                             <label for="last_name" class="mb-2 block text-sm font-semibold text-slate-800">Last name</label>
-                            <input id="last_name" name="last_name" type="text" autocomplete="section-applicant family-name" value="{{ old('last_name', $application->last_name ?? $googleIdentity['last_name']) }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="last_name" name="last_name" type="text" autocomplete="section-applicant family-name" value="{{ old('last_name', $application->last_name ?? $googleIdentity['last_name'] ?: ($unlockedAdmission?->last_name ?? '')) }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('last_name') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label for="first_name" class="mb-2 block text-sm font-semibold text-slate-800">First name</label>
-                            <input id="first_name" name="first_name" type="text" autocomplete="section-applicant given-name" value="{{ old('first_name', $application->first_name ?? $googleIdentity['first_name']) }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="first_name" name="first_name" type="text" autocomplete="section-applicant given-name" value="{{ old('first_name', $application->first_name ?? $googleIdentity['first_name'] ?: ($unlockedAdmission?->first_name ?? '')) }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('first_name') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label for="middle_name" class="mb-2 block text-sm font-semibold text-slate-800">Middle name</label>
-                            <input id="middle_name" name="middle_name" type="text" autocomplete="section-applicant additional-name" value="{{ old('middle_name', $application->middle_name ?? $googleIdentity['middle_name']) }}" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="middle_name" name="middle_name" type="text" autocomplete="section-applicant additional-name" value="{{ old('middle_name', $application->middle_name ?? $googleIdentity['middle_name'] ?: ($unlockedAdmission?->middle_name ?? '')) }}" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('middle_name') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
@@ -405,7 +411,7 @@
                         </div>
                         <div>
                             <label for="contact_number" class="mb-2 block text-sm font-semibold text-slate-800">Contact number</label>
-                            <input id="contact_number" name="contact_number" type="tel" inputmode="tel" autocomplete="section-applicant tel" value="{{ old('contact_number', $application->contact_number ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            <input id="contact_number" name="contact_number" type="tel" inputmode="tel" autocomplete="section-applicant tel" value="{{ old('contact_number', $application->contact_number ?? $unlockedAdmission?->contact_number ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('contact_number') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
@@ -420,8 +426,37 @@
                     <div class="enrollment-section-heading border-b border-slate-100 pb-5">
                         <p class="text-sm font-bold uppercase text-purple-600">Permanent mailing address</p>
                         <h2 class="mt-2 text-2xl font-bold text-slate-900">Address information</h2>
+                        <p class="mt-2 text-sm leading-6 text-slate-500">Choose region first. Province, city/municipality, and barangay then load from the official geographic list.</p>
                     </div>
                     <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-6">
+                        <div>
+                            <label for="region" class="mb-2 block text-sm font-semibold text-slate-800">Region</label>
+                            <select id="region" name="region" autocomplete="off" required data-address-field="region" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                                <option value="">Select region</option>
+                            </select>
+                            @error('region') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label for="province" class="mb-2 block text-sm font-semibold text-slate-800">Province</label>
+                            <select id="province" name="province" autocomplete="section-address address-level1" required data-address-field="province" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                                <option value="">Select region first</option>
+                            </select>
+                            @error('province') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label for="city" class="mb-2 block text-sm font-semibold text-slate-800">City/Municipality</label>
+                            <select id="city" name="city" autocomplete="section-address address-level2" required data-address-field="city" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                                <option value="">Select province first</option>
+                            </select>
+                            @error('city') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label for="barangay" class="mb-2 block text-sm font-semibold text-slate-800">Barangay</label>
+                            <select id="barangay" name="barangay" autocomplete="section-address address-level3" required data-address-field="barangay" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                                <option value="">Select city first</option>
+                            </select>
+                            @error('barangay') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
+                        </div>
                         <div class="md:col-span-2">
                             <label for="street" class="mb-2 block text-sm font-semibold text-slate-800">Number, street</label>
                             <input id="street" name="street" type="text" autocomplete="section-address address-line1" maxlength="100" value="{{ old('street', $application->street ?? '') }}" placeholder="e.g. 24 E. Corporal Street, Zone 1" required data-address-field="street" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-base outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
@@ -429,30 +464,11 @@
                             @error('street') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label for="barangay" class="mb-2 block text-sm font-semibold text-slate-800">Barangay</label>
-                            <input id="barangay" name="barangay" type="text" autocomplete="section-address address-level3" value="{{ old('barangay', $application->barangay ?? '') }}" required data-address-field="barangay" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
-                            @error('barangay') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
-                        </div>
-                        <div>
-                            <label for="city" class="mb-2 block text-sm font-semibold text-slate-800">City/Municipality</label>
-                            <input id="city" name="city" type="text" autocomplete="section-address address-level2" value="{{ old('city', $application->city ?? '') }}" required data-address-field="city" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
-                            @error('city') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
-                        </div>
-                        <div>
-                            <label for="province" class="mb-2 block text-sm font-semibold text-slate-800">Province</label>
-                            <input id="province" name="province" type="text" autocomplete="section-address address-level1" value="{{ old('province', $application->province ?? '') }}" required data-address-field="province" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
-                            @error('province') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
-                        </div>
-                        <div>
-                            <label for="region" class="mb-2 block text-sm font-semibold text-slate-800">Region</label>
-                            <input id="region" name="region" type="text" autocomplete="off" value="{{ old('region', $application->region ?? '') }}" required data-address-field="region" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
-                            @error('region') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
-                        </div>
-                        <div>
                             <label for="zip_code" class="mb-2 block text-sm font-semibold text-slate-800">ZIP code</label>
                             <input id="zip_code" name="zip_code" type="text" inputmode="numeric" autocomplete="section-address postal-code" value="{{ old('zip_code', $application->zip_code ?? '') }}" required data-address-field="zip_code" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('zip_code') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
+                        <p id="address-lookup-status" class="md:col-span-6 text-sm font-semibold text-slate-500" role="status" aria-live="polite" data-address-lookup-status></p>
                     </div>
                 </div>
 
@@ -507,6 +523,13 @@
                             <input id="birth_date" name="birth_date" type="date" autocomplete="section-applicant bday" value="{{ old('birth_date', optional($application?->birth_date)->format('Y-m-d')) }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('birth_date') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
+                        <div class="md:col-span-4">
+                            <label class="flex items-start gap-3 text-sm font-semibold leading-6 text-slate-700">
+                                <input id="use-permanent-address-as-birthplace" type="checkbox" value="1" data-copy-address-to-birthplace aria-controls="birthplace_city birthplace_province birthplace_region" class="mt-1 h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500">
+                                <span>Use my permanent address as my birthplace</span>
+                            </label>
+                            <p class="mt-2 text-xs leading-5 text-slate-500">Copies region, province, and city/municipality from Address information into the birthplace fields.</p>
+                        </div>
                         <div>
                             <label for="birthplace_city" class="mb-2 block text-sm font-semibold text-slate-800">Birthplace city</label>
                             <input id="birthplace_city" name="birthplace_city" type="text" value="{{ old('birthplace_city', $application->birthplace_city ?? '') }}" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
@@ -536,7 +559,7 @@
                             <select id="educational_attainment" name="educational_attainment" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                                 <option value="">Select</option>
                                 @foreach (['No Grade Completed', 'Elementary Undergraduate', 'Elementary Graduate', 'High School Undergraduate', 'High School Graduate', 'Junior High (K-12)', 'Senior High (K-12)', 'Post-Secondary/Technical Vocational Undergraduate', 'Post-Secondary/Technical Vocational Graduate', 'College Undergraduate', 'College Graduate', 'Masteral', 'Doctorate'] as $option)
-                                    <option value="{{ $option }}" @selected(old('educational_attainment', $application->educational_attainment ?? '') === $option)>{{ $option }}</option>
+                                    <option value="{{ $option }}" @selected(old('educational_attainment', $application->educational_attainment ?? $unlockedAdmission?->educational_attainment ?? '') === $option)>{{ $option }}</option>
                                 @endforeach
                             </select>
                             @error('educational_attainment') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
@@ -657,7 +680,7 @@
 
                     <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
                         @foreach ($uploadFields as $field => $details)
-                            <div class="enrollment-upload-card rounded-3xl border border-slate-100 bg-slate-50 p-5">
+                            <div class="enrollment-upload-card">
                                 <label for="{{ $field }}" class="block text-sm font-bold text-slate-900">{{ $details['label'] }}</label>
                                 <p class="mt-1 text-xs leading-5 text-slate-500">{{ $details['description'] }}</p>
                                 <div data-upload-zone class="enrollment-upload-zone relative mt-4 rounded-2xl border-2 border-dashed border-purple-200 bg-white px-5 py-7 text-center transition hover:border-purple-400 hover:bg-purple-50/50">
@@ -698,7 +721,7 @@
                     </div>
                 </div>
 
-                <div id="enrollment-signature" class="enrollment-consent-card enrollment-jump-target rounded-3xl border border-purple-100 bg-purple-50/70 p-6">
+                <div id="enrollment-signature" class="enrollment-consent-card enrollment-jump-target">
                     <div class="grid grid-cols-1 gap-5 md:grid-cols-3">
                         <div class="md:col-span-2">
                             <h2 class="text-2xl font-bold text-slate-900">Privacy consent and signature</h2>
@@ -706,7 +729,7 @@
                                 I attest that I have read and understood the TESDA privacy notice and consent to the processing of my personal information for training, scholarship, employment, survey, and related programs.
                             </p>
                             <label class="mt-5 flex items-start gap-3 text-sm font-semibold leading-6 text-slate-700">
-                                <input name="privacy_consent" type="checkbox" value="1" @checked(old('privacy_consent', $application->privacy_consent ?? false)) required class="mt-1 h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500">
+                                <input id="privacy_consent" name="privacy_consent" type="checkbox" value="1" @checked(old('privacy_consent', $application?->privacy_consent ?? false)) required class="mt-1 h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500">
                                 <span>I agree and certify that the information stated above is true and correct.</span>
                             </label>
                             @error('privacy_consent') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
@@ -719,7 +742,7 @@
                         </div>
                     </div>
 
-                    <div class="enrollment-signature-card mt-6 rounded-3xl border border-purple-100 bg-white p-5">
+                    <div class="enrollment-signature-card mt-6">
                         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <p class="text-sm font-bold uppercase text-purple-600">E-signature method</p>
@@ -738,8 +761,8 @@
                         </div>
 
                         <div id="draw-signature-panel" class="mt-5">
-                            <div class="rounded-2xl border-2 border-dashed border-purple-200 bg-slate-50 p-3">
-                                <canvas id="signature_canvas" width="900" height="260" class="block h-52 w-full touch-none rounded-xl border border-purple-100 bg-white" aria-label="Draw your signature"></canvas>
+                            <div class="enrollment-signature-pad">
+                                <canvas id="signature_canvas" width="900" height="260" class="block h-52 w-full touch-none border border-slate-200 bg-white" aria-label="Draw your signature"></canvas>
                             </div>
                             <input id="signature_data" name="signature_data" type="hidden" value="{{ old('signature_data') }}">
                             <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -786,58 +809,43 @@
                 <div id="enrollment-submit" class="enrollment-submit-row enrollment-jump-target border-t border-slate-100 pt-6">
                     <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <p class="text-sm leading-6 text-slate-500">Date accomplished will be recorded automatically when the form is submitted.</p>
-                        <button type="submit" data-default-label="{{ $application?->status === \App\Models\EnrollmentApplication::STATUS_DENIED ? 'Resubmit corrected enrollment' : 'Submit enrollment' }}" @disabled(! $application && ! $enrollmentBatch) class="inline-flex h-12 items-center justify-center rounded-full bg-purple-600 px-8 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:h-auto sm:py-4">
+                        <button type="submit" formaction="{{ route('enrollment.store', absolute: false) }}" formmethod="post" data-enrollment-submit data-default-label="{{ $application?->status === \App\Models\EnrollmentApplication::STATUS_DENIED ? 'Resubmit corrected enrollment' : 'Submit enrollment' }}" @disabled((! $application && ! $enrollmentBatch) || ! old('privacy_consent', $application?->privacy_consent ?? false)) class="inline-flex h-12 items-center justify-center rounded-full bg-purple-600 px-8 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:h-auto sm:py-4">
                             {{ $application?->status === \App\Models\EnrollmentApplication::STATUS_DENIED ? 'Resubmit corrected enrollment' : 'Submit enrollment' }}
                         </button>
                     </div>
 
                     <div id="enrollment-submit-progress" class="mt-4 hidden rounded-2xl border border-purple-200 bg-purple-50 p-4" role="status" aria-live="polite">
                         <div class="flex items-start gap-3">
-                            <span class="mt-0.5 inline-block h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-purple-200 border-t-purple-700" aria-hidden="true"></span>
+                            <span class="mcare-spinner mt-0.5" aria-hidden="true"></span>
                             <div class="min-w-0 flex-1">
-                                <p id="enrollment-submit-title" class="text-sm font-black text-purple-900">Uploading your enrollment securely...</p>
-                                <p id="enrollment-submit-detail" class="mt-1 text-xs font-semibold leading-5 text-purple-700">Keep this page open while the documents upload.</p>
-                                <div class="mt-3 h-2 overflow-hidden rounded-full bg-purple-100" role="progressbar" aria-label="Enrollment upload progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="enrollment-upload-progress">
-                                    <span id="enrollment-upload-progress-bar" class="block h-full w-0 rounded-full bg-purple-600 transition-[width] duration-300"></span>
-                                </div>
-                                <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
-                                    <p id="enrollment-upload-percent" class="text-xs font-black text-purple-800">Preparing upload…</p>
-                                    <button id="enrollment-upload-cancel" type="button" class="hidden rounded-full border border-purple-200 bg-white px-4 py-2 text-xs font-black text-purple-700 hover:border-purple-300 hover:text-purple-900">Cancel upload</button>
-                                </div>
+                                <p id="enrollment-submit-title" class="text-sm font-black text-purple-900">Submitting your enrollment…</p>
+                                <p id="enrollment-submit-detail" class="mt-1 text-xs font-semibold leading-5 text-purple-700">Keep this page open. The next screen opens when the application is saved.</p>
                             </div>
                         </div>
                     </div>
                 </div>
             </form>
-        </section>
+            </div>
+            @endif
+        </article>
     </main>
 
+    <x-public-official-footer note="Official enrollment for TESDA-accredited Caregiving NC II. Payment verification precedes administrative review." />
+
     <script>
-        const blockedCharacters = /[<>"'`;{}|\\]/;
+        const blockedCharacters = /[<>"`;{}|\\]/;
         const passwordInput = document.getElementById('password');
         const passwordConfirmationInput = document.getElementById('password_confirmation');
         const emailInput = document.getElementById('email');
-        const enrollmentForm = document.querySelector('form[action="{{ route('enrollment.store') }}"]');
+        const enrollmentForm = document.getElementById('enrollment-form');
         const actionToast = document.getElementById('action-toast');
         const enrollmentJumpDetails = document.getElementById('enrollment-jump-details');
-        const enrollmentSubmitButton = enrollmentForm?.querySelector('button[type="submit"]');
+        const enrollmentSubmitButton = enrollmentForm?.querySelector('[data-enrollment-submit]');
+        const privacyConsentInput = enrollmentForm?.querySelector('#privacy_consent');
         const enrollmentSubmitProgress = document.getElementById('enrollment-submit-progress');
-        const enrollmentSubmitTitle = document.getElementById('enrollment-submit-title');
-        const enrollmentSubmitDetail = document.getElementById('enrollment-submit-detail');
-        const enrollmentUploadProgress = document.getElementById('enrollment-upload-progress');
-        const enrollmentUploadProgressBar = document.getElementById('enrollment-upload-progress-bar');
-        const enrollmentUploadPercent = document.getElementById('enrollment-upload-percent');
-        const enrollmentUploadCancel = document.getElementById('enrollment-upload-cancel');
-        const enrollmentPaymentStatusUrl = @json(route('payment.status'));
-        const enrollmentPaymentUrl = @json(route('payment.show'));
-        const existingSignatureSaved = @json((bool) ($application->signature_path ?? false));
-        const serverErrorFields = @json($errors->keys());
+        const existingSignatureSaved = enrollmentForm?.dataset.signatureSaved === '1';
+        const serverErrorFields = JSON.parse(enrollmentForm?.dataset.serverErrors || '[]');
         let signatureDrawn = false;
-        let enrollmentSubmitStartedAt = null;
-        let enrollmentSubmitTimer = null;
-        let enrollmentUploadStallTimer = null;
-        let activeEnrollmentRequest = null;
-        let enrollmentAbortMessage = null;
 
         function showActionToast(message) {
             if (!actionToast) return;
@@ -914,9 +922,54 @@
             updatePasswordChecks();
         }
 
+        function attachBirthplaceAddressCopy() {
+            const form = document.getElementById('enrollment-form');
+            const checkbox = document.querySelector('[data-copy-address-to-birthplace]');
+            const mappings = [
+                ['city', 'birthplace_city'],
+                ['province', 'birthplace_province'],
+                ['region', 'birthplace_region'],
+            ].map(([sourceId, targetId]) => ({
+                source: document.getElementById(sourceId),
+                target: document.getElementById(targetId),
+            }));
+
+            if (!form || !checkbox || mappings.some(({ source, target }) => !source || !target)) {
+                return;
+            }
+
+            function selectedAddressValue(select) {
+                const option = select.options[select.selectedIndex];
+                return option && option.value ? option.value.trim() : '';
+            }
+
+            function syncFromPermanentAddress() {
+                if (!checkbox.checked) {
+                    return;
+                }
+
+                mappings.forEach(({ source, target }) => {
+                    target.value = selectedAddressValue(source);
+                    target.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+            }
+
+            function applyLockedState() {
+                mappings.forEach(({ target }) => {
+                    target.readOnly = checkbox.checked;
+                    target.classList.toggle('cursor-not-allowed', checkbox.checked);
+                });
+                syncFromPermanentAddress();
+            }
+
+            checkbox.addEventListener('change', applyLockedState);
+            mappings.forEach(({ source }) => source.addEventListener('change', syncFromPermanentAddress));
+            form.addEventListener('address-lookup-updated', syncFromPermanentAddress);
+        }
+
         function attachAddressAutofillGuard() {
             const street = document.getElementById('street');
-            const addressParts = ['barangay', 'city', 'province', 'region', 'zip_code']
+            const addressParts = ['region', 'province', 'city', 'barangay', 'zip_code']
                 .map((id) => document.getElementById(id))
                 .filter((field) => field);
 
@@ -1101,7 +1154,11 @@
                 context.stroke();
                 signatureDrawn = true;
                 signatureData.value = canvas.toDataURL('image/png');
-                if (status) status.textContent = 'Signature captured.';
+                if (status) {
+                    status.textContent = 'Signature captured.';
+                    status.classList.remove('text-red-600');
+                    status.classList.add('text-slate-500');
+                }
             }
 
             function stopDrawing() {
@@ -1154,262 +1211,52 @@
             syncSignatureMode();
         }
 
-        function setEnrollmentUploadProgress(percent, label = null) {
-            const normalized = Math.max(0, Math.min(100, Math.round(percent)));
-            if (enrollmentUploadProgressBar) enrollmentUploadProgressBar.style.width = `${normalized}%`;
-            enrollmentUploadProgress?.setAttribute('aria-valuenow', String(normalized));
-            if (enrollmentUploadPercent) enrollmentUploadPercent.textContent = label || `${normalized}% uploaded`;
+        function enrollmentSubmitIsReady() {
+            if (!enrollmentForm || enrollmentForm.dataset.submitted === 'true') {
+                return false;
+            }
+
+            if (enrollmentForm.dataset.requiresBatch === '1') {
+                return false;
+            }
+
+            return Boolean(privacyConsentInput?.checked);
         }
 
-        function clearEnrollmentUploadTimers() {
-            window.clearInterval(enrollmentSubmitTimer);
-            enrollmentSubmitTimer = null;
-            window.clearTimeout(enrollmentUploadStallTimer);
-            enrollmentUploadStallTimer = null;
+        function syncEnrollmentSubmitButton() {
+            if (!enrollmentSubmitButton || enrollmentForm?.dataset.submitted === 'true') {
+                return;
+            }
+
+            const ready = enrollmentSubmitIsReady();
+            enrollmentSubmitButton.disabled = !ready;
+            enrollmentSubmitButton.setAttribute('aria-disabled', ready ? 'false' : 'true');
         }
 
         function unlockEnrollmentSubmission() {
             if (!enrollmentForm) return;
 
             enrollmentForm.dataset.submitted = 'false';
-            activeEnrollmentRequest = null;
-            enrollmentAbortMessage = null;
-            clearEnrollmentUploadTimers();
-            enrollmentUploadCancel?.classList.add('hidden');
+            enrollmentSubmitProgress?.classList.add('hidden');
 
             if (enrollmentSubmitButton) {
-                enrollmentSubmitButton.disabled = @json(! $application && ! $enrollmentBatch);
                 enrollmentSubmitButton.classList.remove('cursor-not-allowed', 'opacity-70');
                 enrollmentSubmitButton.textContent = enrollmentSubmitButton.dataset.defaultLabel || 'Submit enrollment';
             }
+
+            syncEnrollmentSubmitButton();
         }
 
-        function focusEnrollmentError(fieldName) {
-            if (!fieldName) return;
-
-            const aliases = { signature_data: 'signature_canvas' };
-            const normalizedName = fieldName.split('.')[0];
-            const field = document.getElementById(aliases[normalizedName] || normalizedName);
+        function showFieldToast(field) {
             if (!(field instanceof HTMLElement)) return;
 
-            field.setAttribute('aria-invalid', 'true');
+            const label = field.labels?.[0]?.textContent?.trim()
+                || field.getAttribute('aria-label')
+                || 'the highlighted field';
+
+            showActionToast(`Please check ${label} before submitting.`);
             field.scrollIntoView({ behavior: 'smooth', block: 'center' });
             field.focus?.({ preventScroll: true });
-        }
-
-        async function enrollmentWasSavedDespiteConnectionFailure() {
-            if (!navigator.onLine) return false;
-
-            const controller = new AbortController();
-            const timeout = window.setTimeout(() => controller.abort(), 6000);
-
-            try {
-                const response = await fetch(enrollmentPaymentStatusUrl, {
-                    credentials: 'same-origin',
-                    headers: {
-                        Accept: 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                    cache: 'no-store',
-                    signal: controller.signal,
-                });
-
-                return response.ok;
-            } catch (error) {
-                return false;
-            } finally {
-                window.clearTimeout(timeout);
-            }
-        }
-
-        async function stopEnrollmentUpload(message, errors = {}, checkSavedApplication = false) {
-            clearEnrollmentUploadTimers();
-            enrollmentUploadCancel?.classList.add('hidden');
-
-            if (checkSavedApplication) {
-                if (enrollmentSubmitTitle) enrollmentSubmitTitle.textContent = 'Checking your application…';
-                if (enrollmentSubmitDetail) enrollmentSubmitDetail.textContent = 'The connection stopped. MCARE is checking whether the application was already saved.';
-
-                if (await enrollmentWasSavedDespiteConnectionFailure()) {
-                    if (enrollmentSubmitTitle) enrollmentSubmitTitle.textContent = 'Application saved';
-                    if (enrollmentSubmitDetail) enrollmentSubmitDetail.textContent = 'Opening the payment step now…';
-                    setEnrollmentUploadProgress(100, 'Upload complete');
-                    window.location.assign(enrollmentPaymentUrl);
-                    return;
-                }
-            }
-
-            unlockEnrollmentSubmission();
-            if (enrollmentSubmitTitle) enrollmentSubmitTitle.textContent = 'Upload stopped — safe to retry';
-            if (enrollmentSubmitDetail) enrollmentSubmitDetail.textContent = message;
-            if (enrollmentUploadPercent) enrollmentUploadPercent.textContent = 'Not submitted';
-            showActionToast(message);
-
-            const firstErrorField = Object.keys(errors || {})[0];
-            focusEnrollmentError(firstErrorField);
-        }
-
-        async function optimizeEnrollmentImage(file) {
-            if (!file?.type?.startsWith('image/') || file.size < 1024 * 1024) {
-                return { blob: file, name: file.name };
-            }
-
-            let imageSource = null;
-            let closeImage = () => {};
-
-            try {
-                if ('createImageBitmap' in window) {
-                    imageSource = await createImageBitmap(file, { imageOrientation: 'from-image' });
-                    closeImage = () => imageSource.close?.();
-                } else {
-                    const objectUrl = URL.createObjectURL(file);
-                    imageSource = await new Promise((resolve, reject) => {
-                        const image = new Image();
-                        image.onload = () => resolve(image);
-                        image.onerror = reject;
-                        image.src = objectUrl;
-                    });
-                    closeImage = () => URL.revokeObjectURL(objectUrl);
-                }
-
-                const sourceWidth = imageSource.width || imageSource.naturalWidth;
-                const sourceHeight = imageSource.height || imageSource.naturalHeight;
-                const scale = Math.min(1, 2200 / Math.max(sourceWidth, sourceHeight));
-                const canvas = document.createElement('canvas');
-                canvas.width = Math.max(1, Math.round(sourceWidth * scale));
-                canvas.height = Math.max(1, Math.round(sourceHeight * scale));
-                const context = canvas.getContext('2d');
-                if (!context) return { blob: file, name: file.name };
-
-                context.fillStyle = '#ffffff';
-                context.fillRect(0, 0, canvas.width, canvas.height);
-                context.drawImage(imageSource, 0, 0, canvas.width, canvas.height);
-
-                const compressed = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.86));
-                if (!compressed || compressed.size >= file.size) {
-                    return { blob: file, name: file.name };
-                }
-
-                const baseName = file.name.replace(/\.[^.]+$/, '') || 'document';
-
-                return { blob: compressed, name: `${baseName}.jpg` };
-            } catch (error) {
-                return { blob: file, name: file.name };
-            } finally {
-                closeImage();
-            }
-        }
-
-        async function prepareEnrollmentPayload() {
-            const payload = new FormData(enrollmentForm);
-            const fileInputs = [...enrollmentForm.querySelectorAll('input[type="file"]')];
-
-            for (const input of fileInputs) {
-                const file = input.files?.[0];
-                if (!file) continue;
-
-                const optimized = await optimizeEnrollmentImage(file);
-                if (optimized.blob !== file) {
-                    payload.set(input.name, optimized.blob, optimized.name);
-                }
-            }
-
-            const uploadBytes = [...payload.values()]
-                .reduce((total, value) => total + (value instanceof Blob ? value.size : 0), 0);
-
-            return { payload, uploadBytes };
-        }
-
-        function sendEnrollmentPayload(payload, uploadBytes) {
-            const request = new XMLHttpRequest();
-            let finished = false;
-
-            const failOnce = (message, errors = {}, checkSavedApplication = false) => {
-                if (finished) return;
-                finished = true;
-                activeEnrollmentRequest = null;
-                void stopEnrollmentUpload(message, errors, checkSavedApplication);
-            };
-
-            const armStallTimer = (milliseconds = 60000) => {
-                window.clearTimeout(enrollmentUploadStallTimer);
-                enrollmentUploadStallTimer = window.setTimeout(() => {
-                    enrollmentAbortMessage = 'No upload progress was received for one minute. Check the connection, then press Submit enrollment to retry.';
-                    request.abort();
-                }, milliseconds);
-            };
-
-            activeEnrollmentRequest = request;
-            enrollmentAbortMessage = null;
-            request.open(enrollmentForm.method || 'POST', enrollmentForm.action, true);
-            request.setRequestHeader('Accept', 'application/json');
-            request.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-            request.timeout = 8 * 60 * 1000;
-
-            request.upload.addEventListener('progress', (progressEvent) => {
-                armStallTimer();
-                const total = progressEvent.lengthComputable ? progressEvent.total : uploadBytes;
-                const percent = total > 0 ? (progressEvent.loaded / total) * 100 : 0;
-                const elapsedSeconds = Math.max(1, Math.round((Date.now() - enrollmentSubmitStartedAt) / 1000));
-
-                setEnrollmentUploadProgress(percent);
-                if (enrollmentSubmitTitle) enrollmentSubmitTitle.textContent = `Uploading documents — ${Math.round(percent)}%`;
-                if (enrollmentSubmitDetail) {
-                    enrollmentSubmitDetail.textContent = `${formatFileSize(progressEvent.loaded)} of ${formatFileSize(total)} sent in ${elapsedSeconds}s. Keep this page open.`;
-                }
-            });
-
-            request.upload.addEventListener('load', () => {
-                armStallTimer(90000);
-                setEnrollmentUploadProgress(100, 'Documents uploaded — saving application');
-                if (enrollmentSubmitTitle) enrollmentSubmitTitle.textContent = 'Documents uploaded securely';
-                if (enrollmentSubmitDetail) enrollmentSubmitDetail.textContent = 'MCARE is validating and saving the application. This normally takes only a few seconds.';
-            });
-
-            request.addEventListener('load', () => {
-                window.clearTimeout(enrollmentUploadStallTimer);
-                let response = {};
-                try {
-                    response = JSON.parse(request.responseText || '{}');
-                } catch (error) {
-                    response = {};
-                }
-
-                if (request.status >= 200 && request.status < 300 && response.redirect) {
-                    finished = true;
-                    activeEnrollmentRequest = null;
-                    if (enrollmentSubmitTitle) enrollmentSubmitTitle.textContent = 'Application saved';
-                    if (enrollmentSubmitDetail) enrollmentSubmitDetail.textContent = 'Opening the payment step now…';
-                    setEnrollmentUploadProgress(100, 'Upload complete');
-                    window.location.assign(response.redirect);
-                    return;
-                }
-
-                const errors = response.errors || {};
-                const firstMessage = Object.values(errors).flat()[0];
-                const fallback = request.status === 413
-                    ? 'The combined upload is too large. Use smaller document images and try again.'
-                    : request.status === 419
-                        ? 'Your session expired. Refresh this page before submitting again.'
-                        : request.status === 429
-                            ? 'Too many submission attempts were made. Wait one minute, then try again.'
-                            : response.message || 'MCARE could not save the application. Review the form and try again.';
-
-                failOnce(firstMessage || fallback, errors);
-            });
-
-            request.addEventListener('error', () => {
-                failOnce('The phone lost its connection to MCARE. Reconnect, then press Submit enrollment to retry.', {}, true);
-            });
-            request.addEventListener('timeout', () => {
-                failOnce('The upload exceeded eight minutes and was stopped. Use a stronger connection or smaller images, then retry.', {}, true);
-            });
-            request.addEventListener('abort', () => {
-                failOnce(enrollmentAbortMessage || 'The upload was cancelled. Your selected files remain on this page and are safe to retry.', {}, true);
-            });
-
-            armStallTimer();
-            request.send(payload);
         }
 
         function attachSubmitValidation() {
@@ -1419,24 +1266,31 @@
 
                 window.clearTimeout(window.mcareEnrollmentInvalidTimer);
                 window.mcareEnrollmentInvalidTimer = window.setTimeout(() => {
-                    const firstInvalid = enrollmentForm.querySelector(':invalid');
-                    if (!(firstInvalid instanceof HTMLElement)) return;
-
-                    const label = firstInvalid.labels?.[0]?.textContent?.trim()
-                        || firstInvalid.getAttribute('aria-label')
-                        || 'the highlighted field';
-
-                    showActionToast(`Please check ${label} before submitting.`);
-                    firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    firstInvalid.focus({ preventScroll: true });
+                    showFieldToast(enrollmentForm.querySelector(':invalid'));
                 }, 0);
             }, true);
 
-            enrollmentForm?.addEventListener('submit', async (event) => {
-                event.preventDefault();
+            privacyConsentInput?.addEventListener('change', syncEnrollmentSubmitButton);
+            syncEnrollmentSubmitButton();
 
+            enrollmentForm?.addEventListener('submit', (event) => {
                 if (enrollmentForm.dataset.submitted === 'true') {
-                    showActionToast('Too many actions. Please wait for the current request to finish.');
+                    event.preventDefault();
+                    return;
+                }
+
+                if (!privacyConsentInput?.checked) {
+                    event.preventDefault();
+                    syncEnrollmentSubmitButton();
+                    privacyConsentInput?.focus({ preventScroll: true });
+                    privacyConsentInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    showActionToast('Confirm that the information is true and correct before submitting.');
+                    return;
+                }
+
+                if (typeof enrollmentForm.reportValidity === 'function' && !enrollmentForm.reportValidity()) {
+                    event.preventDefault();
+                    showFieldToast(enrollmentForm.querySelector(':invalid'));
                     return;
                 }
 
@@ -1445,8 +1299,14 @@
                 const signatureUpload = document.getElementById('signature_upload');
 
                 if (signatureMode === 'draw' && !signatureDrawn && !existingSignatureSaved) {
+                    event.preventDefault();
                     const status = document.getElementById('signature_draw_status');
-                    if (status) status.textContent = 'Draw your signature before submitting.';
+                    if (status) {
+                        status.textContent = 'Draw your signature before submitting.';
+                        status.classList.remove('text-slate-500');
+                        status.classList.add('text-red-600');
+                    }
+                    showActionToast('Draw your signature before submitting.');
                     document.getElementById('signature_canvas')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     return;
                 }
@@ -1456,69 +1316,31 @@
                 }
 
                 if (signatureMode === 'upload' && !signatureUpload?.files?.length && !existingSignatureSaved) {
+                    event.preventDefault();
                     signatureUpload?.setCustomValidity('Upload a signature image or choose Draw Signature.');
                     signatureUpload?.reportValidity();
-                    return;
-                } else {
-                    signatureUpload?.setCustomValidity('');
-                }
-
-                if (!navigator.onLine) {
-                    showActionToast('Connect this phone to the internet before submitting.');
+                    showActionToast('Upload a signature image or choose Draw Signature.');
+                    document.getElementById('upload-signature-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     return;
                 }
 
+                signatureUpload?.setCustomValidity('');
                 enrollmentForm.dataset.submitted = 'true';
-                enrollmentSubmitStartedAt = Date.now();
                 enrollmentSubmitProgress?.classList.remove('hidden');
-                enrollmentUploadCancel?.classList.add('hidden');
-                setEnrollmentUploadProgress(0, 'Preparing phone photos…');
-                if (enrollmentSubmitTitle) enrollmentSubmitTitle.textContent = 'Preparing documents for upload';
-                if (enrollmentSubmitDetail) enrollmentSubmitDetail.textContent = 'Large phone photos are being reduced safely before upload.';
 
-                if (enrollmentSubmitButton) {
-                    enrollmentSubmitButton.disabled = true;
-                    enrollmentSubmitButton.classList.add('cursor-not-allowed', 'opacity-70');
-                    enrollmentSubmitButton.textContent = 'Preparing upload…';
-                }
-
-                try {
-                    const { payload, uploadBytes } = await prepareEnrollmentPayload();
-                    if (enrollmentSubmitButton) enrollmentSubmitButton.textContent = `Uploading ${formatFileSize(uploadBytes)}…`;
-                    if (enrollmentSubmitTitle) enrollmentSubmitTitle.textContent = 'Starting secure upload…';
-                    if (enrollmentSubmitDetail) enrollmentSubmitDetail.textContent = 'Connecting this phone to MCARE. Real upload progress will appear below.';
-                    enrollmentUploadCancel?.classList.remove('hidden');
-                    sendEnrollmentPayload(payload, uploadBytes);
-                } catch (error) {
-                    await stopEnrollmentUpload('This phone could not prepare the selected files. Choose smaller JPG, PNG, or PDF files and try again.');
-                }
+                // Disable after the browser has accepted the native POST.
+                // Disabling the button in this same tick can cancel submit on phones.
+                window.setTimeout(() => {
+                    if (enrollmentSubmitButton) {
+                        enrollmentSubmitButton.disabled = true;
+                        enrollmentSubmitButton.classList.add('cursor-not-allowed', 'opacity-70');
+                        enrollmentSubmitButton.textContent = 'Submitting…';
+                    }
+                }, 0);
             });
 
-            enrollmentUploadCancel?.addEventListener('click', () => {
-                if (!activeEnrollmentRequest) return;
-                enrollmentAbortMessage = 'The upload was cancelled. Your selected files remain on this page and are safe to retry.';
-                activeEnrollmentRequest.abort();
-            });
-
-            window.addEventListener('offline', () => {
-                if (enrollmentForm?.dataset.submitted !== 'true') return;
-
-                if (activeEnrollmentRequest) {
-                    enrollmentAbortMessage = 'The phone went offline. Reconnect, then press Submit enrollment to retry.';
-                    activeEnrollmentRequest.abort();
-                } else {
-                    void stopEnrollmentUpload('The phone went offline. Reconnect, then press Submit enrollment to retry.');
-                }
-            });
-
-            window.addEventListener('pageshow', () => {
-                if (!enrollmentForm) return;
-
-                activeEnrollmentRequest?.abort();
-                enrollmentSubmitStartedAt = null;
-                enrollmentSubmitProgress?.classList.add('hidden');
-                setEnrollmentUploadProgress(0, 'Preparing upload…');
-                unlockEnrollmentSubmission();
+            window.addEventListener('pageshow', (event) => {
+                if (event.persisted) unlockEnrollmentSubmission();
             });
         }
 
@@ -1552,6 +1374,7 @@
         }
 
         attachInputHardening();
+        attachBirthplaceAddressCopy();
         attachAddressAutofillGuard();
         attachUploadFeedback();
         attachSignaturePad();

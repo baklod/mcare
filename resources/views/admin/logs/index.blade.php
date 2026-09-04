@@ -4,9 +4,7 @@
     <section class="rounded-3xl border border-purple-100 bg-white p-7 shadow-xl shadow-purple-100/40 sm:p-8">
         <div class="flex flex-col gap-6">
             <div>
-                <p class="text-sm font-bold uppercase text-purple-600">Security</p>
-                <h1 class="mt-2 text-4xl font-bold leading-tight text-slate-900">Admin logs</h1>
-                <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-500">
+                <p class="max-w-3xl text-sm leading-6 text-slate-500">
                     Track login activity, review decisions, document downloads, and schedule changes for audit and anti-abuse review.
                 </p>
             </div>
@@ -69,9 +67,11 @@
                             <td class="px-6 py-5 text-sm text-slate-600">{{ $log->ip_address ?? 'Unknown' }}</td>
                             <td class="px-6 py-5 text-sm text-slate-600">
                                 @if ($log->meta)
-                                    <pre class="max-w-lg whitespace-pre-wrap rounded-2xl bg-slate-50 p-3 text-xs leading-5 text-slate-600">{{ json_encode($log->meta, JSON_PRETTY_PRINT) }}</pre>
+                                    <div class="max-w-lg rounded-2xl bg-slate-50 p-3">
+                                        @include('admin.logs.partials.meta-details', ['meta' => $log->meta])
+                                    </div>
                                 @else
-                                    No extra details
+                                    <span class="italic text-slate-400">No extra details</span>
                                 @endif
                             </td>
                         </tr>

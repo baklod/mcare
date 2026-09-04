@@ -49,7 +49,19 @@ class AttendanceTrackingTest extends TestCase
             'batch_id' => $batch->id,
             'date' => now()->toDateString(),
             'tab' => 'sheet',
-        ]));
+        ]))->assertSessionHas('status');
+
+        $this->actingAs($trainer)
+            ->get(route('trainer.attendance.index', [
+                'batch_id' => $batch->id,
+                'date' => now()->toDateString(),
+                'tab' => 'sheet',
+            ]))
+            ->assertOk()
+            ->assertSee('data-dashboard-toast', false)
+            ->assertSee('dashboard-toast-success', false)
+            ->assertSee('Attendance recorded for 2 trainee(s)')
+            ->assertDontSee('rounded-xl border border-emerald-200 bg-emerald-50/80', false);
 
         $this->assertDatabaseHas('trainee_attendances', [
             'training_batch_id' => $batch->id,

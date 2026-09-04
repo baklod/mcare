@@ -3,10 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\AdminActivityLog;
+use App\Models\AdmissionApplication;
 use App\Models\EnrollmentApplication;
+use App\Models\PaymentAttempt;
 use App\Models\TrainingBatch;
 use App\Models\User;
 use App\Notifications\EnrollmentSubmittedNotification;
+use App\Services\ProfilePhotoStore;
+use App\Support\TraineeUserProfile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -30,6 +34,8 @@ class EnrollmentController extends Controller
             $application = EnrollmentApplication::where('user_id', $request->user()->id)->latest()->first();
         }
 
+        $unlockedAdmission = $this->unlockedAdmission($request, $application);
+
         $availableBatches = TrainingBatch::query()
             ->publishedForEnrollment()
             ->with('program')
@@ -37,7 +43,7 @@ class EnrollmentController extends Controller
             ->orderBy('training_starts_at')
             ->orderBy('name')
             ->get();
-        $requestedBatchId = (int) ($request->session()->getOldInput('training_batch_id')
+        $requestedBatchId = (int) ($request->old('training_batch_id')
             ?: $request->query('batch', 0));
         $enrollmentBatch = $application?->batch?->loadMissing('program')
             ?: $availableBatches->firstWhere('id', $requestedBatchId);
@@ -58,7 +64,9 @@ class EnrollmentController extends Controller
         return view('enrollment.create', [
             'application' => $application,
             'availableBatches' => $availableBatches,
+            'canCompleteEnrollment' => $application !== null || $unlockedAdmission !== null,
             'enrollmentBatch' => $enrollmentBatch,
+            'unlockedAdmission' => $unlockedAdmission,
             'user' => $request->user(),
             'googleIdentity' => $this->googleIdentity($request),
             'isGoogleApplicant' => filled($request->user()?->google_id),
@@ -66,6 +74,51 @@ class EnrollmentController extends Controller
             'documentFeedback' => $documentFeedback,
             'draftUploads' => $request->session()->get('enrollment.draft_uploads', []),
         ]);
+    }
+
+    public function unlock(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'application_number' => ['required', 'string', 'max:40'],
+        ]);
+
+        $admission = AdmissionApplication::findByNumber($validated['application_number']);
+
+        if (! $admission) {
+            throw ValidationException::withMessages([
+                'application_number' => 'That application number was not found. Check the number from your confirmation email.',
+            ]);
+        }
+
+        if ($admission->isPending()) {
+            throw ValidationException::withMessages([
+                'application_number' => 'Application '.$admission->application_number.' is still waiting for admin review. Check status anytime with this number.',
+            ]);
+        }
+
+        if ($admission->isDenied()) {
+            $reason = filled($admission->admin_notes)
+                ? ' '.$admission->admin_notes
+                : '';
+
+            throw ValidationException::withMessages([
+                'application_number' => 'Application '.$admission->application_number.' was not approved.'.$reason,
+            ]);
+        }
+
+        if ($admission->enrollment()->exists() && $admission->enrollment?->user_id !== $request->user()?->id) {
+            throw ValidationException::withMessages([
+                'application_number' => 'This application number was already used to submit enrollment. Sign in with the same Gmail to continue.',
+            ]);
+        }
+
+        $request->session()->put('enrollment.admission_application_id', $admission->id);
+
+        return redirect()
+            ->route('enrollment.create', array_filter([
+                'batch' => $request->query('batch'),
+            ]))
+            ->with('saved', 'Application '.$admission->application_number.' is approved. Complete the enrollment form below.');
     }
 
     public function draftContent(Request $request, string $field): BinaryFileResponse
@@ -88,7 +141,7 @@ class EnrollmentController extends Controller
             ]);
     }
 
-    public function store(Request $request): RedirectResponse|JsonResponse
+    public function store(Request $request, ProfilePhotoStore $profilePhotos): RedirectResponse|JsonResponse
     {
         $request->merge(
             collect($request->all())
@@ -123,14 +176,19 @@ class EnrollmentController extends Controller
                 Password::min(10)->mixedCase()->letters()->numbers(),
             ];
 
-        $safeText = ["not_regex:/[<>\"'`;{}|\\\\]/u"];
-        $safeOptionalText = ['nullable', 'string', 'max:120', "not_regex:/[<>\"'`;{}|\\\\]/u"];
+        $safeText = ['not_regex:/[<>"`;{}|\\\\]/u'];
+        $safeOptionalText = ['nullable', 'string', 'max:120', 'not_regex:/[<>"`;{}|\\\\]/u'];
         $documentRules = ['file', 'mimes:pdf,jpg,jpeg,png', 'extensions:pdf,jpg,jpeg,png', 'max:5120'];
         $draftUploads = $request->session()->get('enrollment.draft_uploads', []);
         $hasDocument = fn (string $field, ?string $existingPath): bool => filled($existingPath)
             || filled(data_get($draftUploads, "{$field}.path"));
 
         $validator = Validator::make($request->all(), [
+            'application_number' => [
+                $currentApplication ? 'nullable' : 'required',
+                'string',
+                'max:40',
+            ],
             'training_batch_id' => [
                 $currentApplication ? 'nullable' : 'required',
                 'integer',
@@ -138,7 +196,7 @@ class EnrollmentController extends Controller
             ],
             'email' => [
                 'required',
-                'email:rfc,dns',
+                'email:rfc',
                 'max:255',
                 'ends_with:@gmail.com',
                 Rule::unique('users', 'email')->ignore($currentUser?->id),
@@ -197,13 +255,44 @@ class EnrollmentController extends Controller
             '*.mimes' => 'Accepted formats are PDF, JPG, JPEG, and PNG. ID photo and signature image must be JPG or PNG.',
             '*.max' => 'Each uploaded file must not exceed 5MB.',
             'training_batch_id.required' => 'Choose one of the active batches published by MCARE before submitting enrollment.',
+            'application_number.required' => 'Enter the approved application number issued after MCARE reviewed your application.',
         ]);
 
-        $validator->after(function ($validator) use ($currentApplication, $enrollmentBatch): void {
+        $validator->after(function ($validator) use ($currentApplication, $enrollmentBatch, $request): void {
             if (! $currentApplication && ! $enrollmentBatch) {
                 $validator->errors()->add(
                     'training_batch_id',
                     'That batch is hidden, inactive, closed, or no longer inside its enrollment window. Choose an available batch and try again.',
+                );
+            }
+
+            if ($currentApplication) {
+                return;
+            }
+
+            $admission = AdmissionApplication::findByNumber((string) $request->input('application_number'))
+                ?: AdmissionApplication::query()->find($request->session()->get('enrollment.admission_application_id'));
+
+            if (! $admission?->isApproved()) {
+                $validator->errors()->add(
+                    'application_number',
+                    'Enter an approved application number before submitting enrollment.',
+                );
+
+                return;
+            }
+
+            if (Str::lower($admission->email) !== Str::lower((string) $request->input('email'))) {
+                $validator->errors()->add(
+                    'email',
+                    'Use the same Gmail address from application '.$admission->application_number.'.',
+                );
+            }
+
+            if ($admission->enrollment()->exists()) {
+                $validator->errors()->add(
+                    'application_number',
+                    'This application number was already used to submit enrollment.',
                 );
             }
         });
@@ -212,15 +301,20 @@ class EnrollmentController extends Controller
             // Keep only files that passed their own validation in a private session draft.
             $this->preserveValidUploads($request, $validator->errors()->keys());
 
-            throw new ValidationException($validator);
+            // Address lookups are GET requests on the same session. Without an
+            // explicit return URL, a validation redirect can follow the last
+            // barangay JSON endpoint instead of the enrollment form.
+            throw (new ValidationException($validator))->redirectTo(route('enrollment.create'));
         }
 
         $validated = $validator->validated();
+        $admission = $currentApplication?->admissionApplication
+            ?: $this->approvedAdmissionForEnrollment($request, $validated['email'], $validated['application_number'] ?? null);
 
         $user = $currentUser ?? new User;
         $userData = [
+            ...TraineeUserProfile::attributesFrom($validated),
             'email' => $validated['email'],
-            'name' => trim($validated['first_name'].' '.$validated['last_name']),
             'role' => 'applicant',
             'applicant_status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
         ];
@@ -231,6 +325,9 @@ class EnrollmentController extends Controller
 
         $user->forceFill($userData)->save();
 
+        $receivedNewIdPhoto = $request->hasFile('id_photo')
+            || filled(data_get($request->session()->get('enrollment.draft_uploads'), 'id_photo.path'));
+
         $documentPaths = [
             'birth_certificate_path' => $this->storeUploadedDocument($request, 'birth_certificate', $user, $currentApplication?->birth_certificate_path),
             'education_document_path' => $this->storeUploadedDocument($request, 'education_document', $user, $currentApplication?->education_document_path),
@@ -240,10 +337,15 @@ class EnrollmentController extends Controller
             'signature_path' => $this->storeSignature($request, $user, $currentApplication?->signature_path),
         ];
 
+        if ($receivedNewIdPhoto && filled($documentPaths['id_photo_path'])) {
+            $profilePhotos->syncFromPrivateDisk($user, $documentPaths['id_photo_path']);
+        }
+
         $applicationData = collect($validated)
             ->except([
                 'password',
                 'password_confirmation',
+                'application_number',
                 'birth_certificate',
                 'education_document',
                 'good_moral_certificate',
@@ -253,6 +355,7 @@ class EnrollmentController extends Controller
             ])
             ->merge([
                 'user_id' => $user->id,
+                'admission_application_id' => $currentApplication?->admission_application_id ?: $admission?->id,
                 'program' => $currentApplication?->program ?: $enrollmentBatch?->program?->name,
                 'training_program_id' => $currentApplication?->training_program_id ?: $enrollmentBatch?->training_program_id,
                 'training_batch_id' => $currentApplication?->training_batch_id ?: $enrollmentBatch?->id,
@@ -276,8 +379,17 @@ class EnrollmentController extends Controller
             $applicationData,
         );
 
+        if (blank($application->enrollment_number)) {
+            $application->forceFill([
+                'enrollment_number' => EnrollmentApplication::generateNumber(),
+            ])->save();
+        }
+
+        $this->resetUnpaidPaymentChoice($application);
+
         $this->clearDraftUploads($request);
         $request->session()->forget('enrollment.google_identity');
+        $request->session()->forget('enrollment.admission_application_id');
 
         if ($currentApplication) {
             $review = $application->document_review ?? [];
@@ -313,20 +425,10 @@ class EnrollmentController extends Controller
         // Keep payment continuation private to this browser session. Creating
         // an applicant record must not silently sign the person into the
         // public account bar; explicit login remains the account boundary.
-        if (! $currentUser) {
-            $request->session()->put('enrollment.payment_application_id', $application->id);
-        }
-
-        if (! $currentUser && ! $user->hasVerifiedEmail()) {
-            try {
-                $user->sendEmailVerificationNotification();
-            } catch (Throwable $exception) {
-                report($exception);
-            }
-        }
+        $request->session()->put('enrollment.payment_application_id', $application->id);
 
         try {
-            $user->notify(new EnrollmentSubmittedNotification($application));
+            $user->notifyNow(new EnrollmentSubmittedNotification($application));
         } catch (Throwable $exception) {
             // SMTP delivery must not roll back a valid enrollment submission.
             report($exception);
@@ -348,6 +450,61 @@ class EnrollmentController extends Controller
         return redirect()
             ->route('payment.show')
             ->with('payment_notice', $paymentNotice);
+    }
+
+    private function unlockedAdmission(Request $request, ?EnrollmentApplication $application): ?AdmissionApplication
+    {
+        if ($application?->admissionApplication) {
+            return $application->admissionApplication;
+        }
+
+        $fromQuery = AdmissionApplication::findByNumber($request->query('application_number'));
+        if ($fromQuery?->isApproved() && ! $fromQuery->enrollment()->exists()) {
+            $request->session()->put('enrollment.admission_application_id', $fromQuery->id);
+
+            return $fromQuery;
+        }
+
+        $sessionId = $request->session()->get('enrollment.admission_application_id');
+        if (! is_numeric($sessionId)) {
+            return null;
+        }
+
+        $admission = AdmissionApplication::query()->find((int) $sessionId);
+
+        if (! $admission?->isApproved()) {
+            $request->session()->forget('enrollment.admission_application_id');
+
+            return null;
+        }
+
+        if ($admission->enrollment()->exists() && $admission->enrollment?->user_id !== $request->user()?->id) {
+            $request->session()->forget('enrollment.admission_application_id');
+
+            return null;
+        }
+
+        return $admission;
+    }
+
+    private function approvedAdmissionForEnrollment(Request $request, string $email, mixed $applicationNumber): ?AdmissionApplication
+    {
+        $admission = AdmissionApplication::findByNumber(is_string($applicationNumber) ? $applicationNumber : null)
+            ?: AdmissionApplication::query()->find($request->session()->get('enrollment.admission_application_id'));
+
+        if (! $admission?->isApproved()) {
+            return null;
+        }
+
+        if (Str::lower($admission->email) !== Str::lower($email)) {
+            return null;
+        }
+
+        if ($admission->enrollment()->exists()) {
+            return null;
+        }
+
+        return $admission;
     }
 
     /** @return array{email: string, first_name: string, middle_name: string, last_name: string, full_name: string, avatar_url: ?string} */
@@ -375,7 +532,7 @@ class EnrollmentController extends Controller
                 'middle_name' => trim((string) ($identity['middle_name'] ?? '')),
                 'last_name' => trim((string) ($identity['last_name'] ?? '')),
                 'full_name' => trim((string) ($identity['full_name'] ?? $user->name)),
-                'avatar_url' => $identity['avatar_url'] ?? $user->avatar_url,
+                'avatar_url' => $identity['avatar_url'] ?? $user->profilePhotoUrl(),
             ];
         }
 
@@ -389,7 +546,7 @@ class EnrollmentController extends Controller
             'middle_name' => implode(' ', $parts),
             'last_name' => $lastName,
             'full_name' => (string) $user->name,
-            'avatar_url' => $user->avatar_url,
+            'avatar_url' => $user->profilePhotoUrl(),
         ];
     }
 
@@ -505,6 +662,39 @@ class EnrollmentController extends Controller
 
         unset($drafts[$field]);
         $request->session()->put('enrollment.draft_uploads', $drafts);
+    }
+
+    private function resetUnpaidPaymentChoice(EnrollmentApplication $application): void
+    {
+        $application->refresh();
+
+        if ($application->hasEnrollmentPaymentClearance()) {
+            return;
+        }
+
+        PaymentAttempt::query()
+            ->where('enrollment_application_id', $application->getKey())
+            ->where('provider', 'paymongo')
+            ->whereIn('status', [
+                PaymentAttempt::STATUS_CREATING,
+                PaymentAttempt::STATUS_PENDING,
+            ])
+            ->update([
+                'status' => PaymentAttempt::STATUS_EXPIRED,
+                'expired_at' => now(),
+            ]);
+
+        $application->forceFill([
+            'payment_method' => null,
+            'payment_status' => EnrollmentApplication::PAYMENT_NOT_SELECTED,
+            'payment_reference' => null,
+            'payment_receipt_number' => null,
+            'payment_receipt_expires_at' => null,
+            'payment_selected_at' => null,
+            'paymongo_checkout_reference' => null,
+            'paymongo_checkout_url' => null,
+            'payment_meta' => null,
+        ])->save();
     }
 
     private function clearDraftUploads(Request $request): void

@@ -131,10 +131,6 @@ class SubmoduleWorkflowTest extends TestCase
             ->assertSessionHasErrors('action');
 
         foreach ($module->submodules as $index => $submodule) {
-            $this->actingAs($trainee)
-                ->patch(route('trainee.modules.submodules.progress', [$module, $submodule]), ['action' => 'submit'])
-                ->assertSessionHasNoErrors();
-
             $this->actingAs($trainer)
                 ->post(route('trainer.modules.evaluate', $module), [
                     'training_submodule_id' => $submodule->id,

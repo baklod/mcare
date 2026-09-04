@@ -2,9 +2,12 @@
 
 namespace App\Services;
 
+use App\Mail\PaymentReceiptMail;
 use App\Models\EnrollmentApplication;
+use App\Models\PaymentTransaction;
 use App\Notifications\PaymentVerifiedNotification;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 class EnrollmentPaymentLifecycle
@@ -69,7 +72,7 @@ class EnrollmentPaymentLifecycle
 
         if ($result['notify'] && $verifiedApplication->user) {
             try {
-                $verifiedApplication->user->notify(
+                $verifiedApplication->user->notifyNow(
                     new PaymentVerifiedNotification($verifiedApplication),
                 );
             } catch (Throwable $exception) {
@@ -77,6 +80,10 @@ class EnrollmentPaymentLifecycle
                 // or mail transport is temporarily unavailable.
                 report($exception);
             }
+        }
+
+        if ($result['cleared']) {
+            $this->sendOfficialReceipt($verifiedApplication);
         }
 
         if ($result['review_released']) {
@@ -97,5 +104,58 @@ class EnrollmentPaymentLifecycle
         }
 
         return $result['cleared'];
+    }
+
+    public function sendOfficialReceipt(EnrollmentApplication $application, bool $allowPending = false): void
+    {
+        $application->load(['user', 'paymentTransactions']);
+
+        $transaction = $application->paymentTransactions
+            ->where('status', PaymentTransaction::STATUS_VERIFIED)
+            ->sortByDesc(fn (PaymentTransaction $item): int => $item->verified_at?->getTimestamp() ?? $item->id)
+            ->first();
+
+        if (! $transaction && $allowPending) {
+            $transaction = $application->paymentTransactions
+                ->where('status', PaymentTransaction::STATUS_PENDING)
+                ->where('payment_channel', PaymentTransaction::CHANNEL_ONSITE)
+                ->sortByDesc(fn (PaymentTransaction $item): int => $item->id)
+                ->first();
+        }
+
+        if (! $transaction) {
+            return;
+        }
+
+        $emailedIds = array_map(
+            'intval',
+            data_get($application->payment_meta, 'receipt_emailed_transaction_ids', []) ?: [],
+        );
+
+        if (in_array((int) $transaction->id, $emailedIds, true)) {
+            return;
+        }
+
+        $email = $application->email ?: $application->user?->email;
+
+        if (blank($email)) {
+            return;
+        }
+
+        try {
+            Mail::to($email)->send(new PaymentReceiptMail($application, $transaction));
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return;
+        }
+
+        $emailedIds[] = (int) $transaction->id;
+
+        $application->forceFill([
+            'payment_meta' => array_merge($application->payment_meta ?? [], [
+                'receipt_emailed_transaction_ids' => array_values(array_unique($emailedIds)),
+            ]),
+        ])->save();
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Mail\PaymentReceiptMail;
 use App\Models\EnrollmentApplication;
 use App\Models\PaymentTransaction;
 use App\Models\TrainingBatch;
@@ -12,6 +13,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -27,10 +29,9 @@ class AdminPaymentTransactionsTest extends TestCase
         $batch = $this->batch();
         $application = $this->createApprovedApplication($trainee, $batch);
 
-        $this->actingAs($admin)
+        $response = $this->actingAs($admin)
             ->post(route('admin.payment-schedules.transactions.store', $application), [
                 'amount' => 2000.00,
-                'or_number' => 'OR-2026-001',
                 'transaction_type' => 'downpayment',
                 'paid_at' => now()->toDateString(),
                 'notes' => 'Received downpayment at registration desk.',
@@ -38,11 +39,14 @@ class AdminPaymentTransactionsTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('saved');
 
+        $transaction = PaymentTransaction::query()->where('enrollment_application_id', $application->id)->firstOrFail();
+        $this->assertStringStartsWith('MCARE-OR-', (string) $transaction->or_number);
+
         $this->assertDatabaseHas('payment_transactions', [
             'enrollment_application_id' => $application->id,
             'user_id' => $trainee->id,
             'amount' => 2000.00,
-            'or_number' => 'OR-2026-001',
+            'or_number' => $transaction->or_number,
             'transaction_type' => 'downpayment',
             'status' => 'verified',
         ]);
@@ -52,10 +56,304 @@ class AdminPaymentTransactionsTest extends TestCase
         $this->assertEquals(20000.00, $application->remainingBalance());
         $this->assertEquals('partially_paid', $application->payment_status);
         $this->assertTrue($application->isDownpaymentSatisfied());
+        $this->assertSame($transaction->or_number, $application->payment_receipt_number);
 
-        $adminNotice = 'On-site payment of ₱2,000.00 recorded for Juan Dela Cruz (OR #OR-2026-001).';
+        $adminNotice = 'On-site payment of ₱2,000.00 recorded for Juan Dela Cruz (OR #'.$transaction->or_number.').';
         $paymentPage = $this->actingAs($admin)->get(route('admin.payment-schedules.index'))->assertOk();
         $this->assertSame(1, substr_count($paymentPage->getContent(), $adminNotice));
+        $paymentPage
+            ->assertSee('data-lookup-input', false)
+            ->assertSee('Reference number', false)
+            ->assertDontSee('id="record-or-section"', false)
+            ->assertDontSee('id="record-enrollee-select"', false);
+    }
+
+    public function test_pay_on_site_and_paymongo_store_reference_numbers_on_the_admin_ledger(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $onsiteTrainee = User::factory()->create(['role' => 'trainee']);
+        $onsiteApplication = $this->createApprovedApplication($onsiteTrainee, $this->batch());
+        $onsiteApplication->forceFill([
+            'payment_method' => null,
+            'payment_status' => EnrollmentApplication::PAYMENT_NOT_SELECTED,
+            'payment_reference' => null,
+            'payment_receipt_number' => null,
+        ])->save();
+
+        $this->actingAs($onsiteTrainee)
+            ->post(route('payment.select'), ['payment_method' => 'onsite'])
+            ->assertRedirect(route('payment.receipt'));
+
+        $onsiteApplication->refresh();
+        $this->assertNotNull($onsiteApplication->payment_reference);
+        $this->assertStringStartsWith('MCARE-SITE-', $onsiteApplication->payment_reference);
+        $this->assertNotNull($onsiteApplication->payment_receipt_number);
+        $this->assertStringStartsWith('MCARE-OR-', $onsiteApplication->payment_receipt_number);
+        $this->assertDatabaseHas('payment_transactions', [
+            'enrollment_application_id' => $onsiteApplication->id,
+            'reference_number' => $onsiteApplication->payment_reference,
+            'ticket_number' => $onsiteApplication->payment_reference,
+            'or_number' => $onsiteApplication->payment_receipt_number,
+            'status' => PaymentTransaction::STATUS_PENDING,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.payment-schedules.index'))
+            ->assertOk()
+            ->assertSee($onsiteApplication->payment_reference)
+            ->assertSee('On-site reference', false);
+    }
+
+    public function test_admin_can_look_up_enrollee_from_official_receipt_ticket_or_enrollment_number(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $application = $this->createApprovedApplication($trainee, $this->batch());
+        $ticket = PaymentTransaction::create([
+            'enrollment_application_id' => $application->id,
+            'user_id' => $trainee->id,
+            'transaction_type' => PaymentTransaction::TYPE_DOWNPAYMENT,
+            'payment_channel' => PaymentTransaction::CHANNEL_ONSITE,
+            'amount' => 2000,
+            'ticket_number' => 'MCARE-OT-LOOKUP1',
+            'or_number' => 'OR-LOOKUP-PENDING',
+            'status' => PaymentTransaction::STATUS_PENDING,
+            'paid_at' => now(),
+        ]);
+        $application->forceFill([
+            'enrollment_number' => 'MCE-2026-LOOKUP',
+            'payment_receipt_number' => 'MCR-260903-LOOKUP',
+        ])->save();
+
+        $this->actingAs($admin)
+            ->getJson(route('admin.payment-schedules.lookup', ['q' => 'OR-LOOKUP-PENDING']))
+            ->assertOk()
+            ->assertJsonPath('found', true)
+            ->assertJsonPath('application_id', $application->id)
+            ->assertJsonPath('name', 'Dela Cruz, Juan')
+            ->assertJsonPath('email', $trainee->email)
+            ->assertJsonPath('matched_by', 'or_number')
+            ->assertJsonPath('reuse_or_number', true)
+            ->assertJsonPath('or_number', 'OR-LOOKUP-PENDING');
+
+        $this->actingAs($admin)
+            ->getJson(route('admin.payment-schedules.lookup', ['q' => 'MCARE-OT-LOOKUP1']))
+            ->assertOk()
+            ->assertJsonPath('found', true)
+            ->assertJsonPath('application_id', $application->id)
+            ->assertJsonPath('matched_by', 'ticket')
+            ->assertJsonPath('pending_ticket', $ticket->ticket_number);
+
+        $this->actingAs($admin)
+            ->getJson(route('admin.payment-schedules.lookup', ['q' => 'mce-2026-lookup']))
+            ->assertOk()
+            ->assertJsonPath('found', true)
+            ->assertJsonPath('application_id', $application->id)
+            ->assertJsonPath('matched_by', 'enrollment');
+
+        $this->actingAs($admin)
+            ->getJson(route('admin.payment-schedules.lookup', ['q' => 'OR-DOES-NOT-EXIST']))
+            ->assertOk()
+            ->assertJsonPath('found', false);
+    }
+
+    public function test_admin_can_look_up_enrollee_from_spaced_onsite_reference(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $application = $this->createApprovedApplication($trainee, $this->batch());
+        $application->forceFill([
+            'payment_reference' => 'MCARE-SITE-260903-KAGKTK1H',
+            'downpayment_amount' => 3500.00,
+        ])->save();
+
+        PaymentTransaction::create([
+            'enrollment_application_id' => $application->id,
+            'user_id' => $trainee->id,
+            'transaction_type' => PaymentTransaction::TYPE_DOWNPAYMENT,
+            'payment_channel' => PaymentTransaction::CHANNEL_ONSITE,
+            'amount' => 3500,
+            'ticket_number' => 'MCARE-SITE-260903-KAGKTK1H',
+            'reference_number' => 'MCARE-SITE-260903-KAGKTK1H',
+            'status' => PaymentTransaction::STATUS_PENDING,
+            'paid_at' => now(),
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->getJson(route('admin.payment-schedules.lookup', ['q' => 'MCARE SITE 260903 KAGKTK1H']))
+            ->assertOk()
+            ->assertJsonPath('found', true)
+            ->assertJsonPath('application_id', $application->id)
+            ->assertJsonPath('name', 'Dela Cruz, Juan')
+            ->assertJsonPath('email', $trainee->email)
+            ->assertJsonPath('matched_by', 'ticket');
+
+        $this->assertEquals(3500.0, (float) $response->json('downpayment_amount'));
+        $this->assertEquals(3500.0, (float) $response->json('suggested_amount'));
+    }
+
+    public function test_admin_can_look_up_enrollee_from_reference_suffix(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $application = $this->createApprovedApplication($trainee, $this->batch());
+        $application->forceFill([
+            'payment_reference' => 'MCARE-SITE-260903-KAGKTK1H',
+        ])->save();
+
+        PaymentTransaction::create([
+            'enrollment_application_id' => $application->id,
+            'user_id' => $trainee->id,
+            'transaction_type' => PaymentTransaction::TYPE_DOWNPAYMENT,
+            'payment_channel' => PaymentTransaction::CHANNEL_ONSITE,
+            'amount' => 2000,
+            'ticket_number' => 'MCARE-SITE-260903-KAGKTK1H',
+            'reference_number' => 'MCARE-SITE-260903-KAGKTK1H',
+            'status' => PaymentTransaction::STATUS_PENDING,
+            'paid_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson(route('admin.payment-schedules.lookup', ['q' => 'KAGKTK1H']))
+            ->assertOk()
+            ->assertJsonPath('found', true)
+            ->assertJsonPath('application_id', $application->id)
+            ->assertJsonPath('name', 'Dela Cruz, Juan')
+            ->assertJsonPath('matched_by', 'ticket');
+    }
+
+    public function test_admin_can_look_up_enrollee_from_paymongo_reference(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $application = $this->createApprovedApplication($trainee, $this->batch());
+        $application->forceFill([
+            'payment_method' => 'online',
+            'payment_status' => EnrollmentApplication::PAYMENT_PARTIALLY_PAID,
+            'payment_reference' => 'MCARE-ONLINE-260902-MXSCCNUG',
+            'payment_receipt_number' => 'pay_eXkzQnLXqVo874mxWDKwW1sY',
+            'total_paid_amount' => 2000,
+        ])->save();
+
+        PaymentTransaction::create([
+            'enrollment_application_id' => $application->id,
+            'user_id' => $trainee->id,
+            'transaction_type' => PaymentTransaction::TYPE_DOWNPAYMENT,
+            'payment_channel' => PaymentTransaction::CHANNEL_ONLINE,
+            'amount' => 2000,
+            'reference_number' => 'pay_eXkzQnLXqVo874mxWDKwW1sY',
+            'or_number' => 'pay_eXkzQnLXqVo874mxWDKwW1sY',
+            'status' => PaymentTransaction::STATUS_VERIFIED,
+            'paid_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson(route('admin.payment-schedules.lookup', ['q' => 'pay_eXkzQnLXqVo874mxWDKwW1sY']))
+            ->assertOk()
+            ->assertJsonPath('found', true)
+            ->assertJsonPath('application_id', $application->id)
+            ->assertJsonPath('matched_by', 'or_number');
+    }
+
+    public function test_record_onsite_modal_does_not_hardcode_downpayment_amounts(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->get(route('admin.payment-schedules.index'))
+            ->assertOk()
+            ->assertSee('id="record-lookup-button"', false)
+            ->assertSee('id="record-enrollee-name"', false)
+            ->assertSee('id="record-lookup-query"', false)
+            ->assertSee('record-onsite-layout', false)
+            ->assertSee('Reference number', false)
+            ->assertDontSee('id="record-or-section"', false)
+            ->assertSee('>Downpayment</option>', false)
+            ->assertDontSee('Downpayment (Initial', false)
+            ->assertDontSee('₱2,000 Downpayment', false)
+            ->assertDontSee('data-preset-amount="2000.00"', false)
+            ->assertDontSee('data-preset-amount="5000.00"', false)
+            ->assertDontSee('value="2000.00"', false);
+    }
+
+    public function test_recording_payment_against_a_pending_ticket_verifies_that_ticket(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $application = $this->createApprovedApplication($trainee, $this->batch());
+        $ticket = PaymentTransaction::create([
+            'enrollment_application_id' => $application->id,
+            'user_id' => $trainee->id,
+            'transaction_type' => PaymentTransaction::TYPE_DOWNPAYMENT,
+            'payment_channel' => PaymentTransaction::CHANNEL_ONSITE,
+            'amount' => 2000,
+            'ticket_number' => 'MCARE-OT-VERIFY1',
+            'status' => PaymentTransaction::STATUS_PENDING,
+        ]);
+
+        $application->forceFill([
+            'payment_reference' => 'MCARE-SITE-260903-EMAILTEST',
+        ])->save();
+
+        $this->actingAs($admin)
+            ->post(route('admin.payment-schedules.transactions.store', $application), [
+                'amount' => 2000.00,
+                'transaction_type' => 'downpayment',
+                'paid_at' => now()->toDateString(),
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('saved');
+
+        $this->assertDatabaseCount('payment_transactions', 1);
+        $ticket->refresh();
+        $this->assertSame(PaymentTransaction::STATUS_VERIFIED, $ticket->status);
+        $this->assertStringStartsWith('MCARE-OR-', (string) $ticket->or_number);
+        $this->assertSame('MCARE-SITE-260903-EMAILTEST', $ticket->reference_number);
+        $this->assertEquals(2000.00, (float) $application->refresh()->total_paid_amount);
+    }
+
+    public function test_onsite_payment_receipt_email_shows_reference_and_generated_or(): void
+    {
+        Mail::fake();
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $application = $this->createApprovedApplication($trainee, $this->batch());
+        $application->forceFill([
+            'payment_reference' => 'MCARE-SITE-260903-EMAILTEST',
+            'payment_method' => 'onsite',
+        ])->save();
+
+        PaymentTransaction::create([
+            'enrollment_application_id' => $application->id,
+            'user_id' => $trainee->id,
+            'transaction_type' => PaymentTransaction::TYPE_DOWNPAYMENT,
+            'payment_channel' => PaymentTransaction::CHANNEL_ONSITE,
+            'amount' => 2000,
+            'ticket_number' => 'MCARE-SITE-260903-EMAILTEST',
+            'reference_number' => 'MCARE-SITE-260903-EMAILTEST',
+            'status' => PaymentTransaction::STATUS_PENDING,
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('admin.payment-schedules.transactions.store', $application), [
+                'amount' => 2000.00,
+                'transaction_type' => 'downpayment',
+                'paid_at' => now()->toDateString(),
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('saved');
+
+        Mail::assertSent(PaymentReceiptMail::class, function (PaymentReceiptMail $mail) use ($trainee): bool {
+            $html = $mail->render();
+
+            return $mail->hasTo($trainee->email)
+                && str_contains($html, 'Official payment receipt')
+                && str_contains($html, 'Reference number')
+                && str_contains($html, 'Official Receipt (OR) #')
+                && str_contains($html, 'MCARE-SITE-260903-EMAILTEST')
+                && str_contains($html, 'MCARE-OR-')
+                && str_contains($html, 'On-site');
+        });
     }
 
     public function test_admin_recording_full_tuition_sets_status_to_paid(): void
@@ -69,7 +367,6 @@ class AdminPaymentTransactionsTest extends TestCase
         $this->actingAs($admin)
             ->post(route('admin.payment-schedules.transactions.store', $application), [
                 'amount' => 2000.00,
-                'or_number' => 'OR-2026-001',
                 'transaction_type' => 'downpayment',
                 'paid_at' => now()->toDateString(),
             ]);
@@ -78,7 +375,6 @@ class AdminPaymentTransactionsTest extends TestCase
         $this->actingAs($admin)
             ->post(route('admin.payment-schedules.transactions.store', $application), [
                 'amount' => 20000.00,
-                'or_number' => 'OR-2026-002',
                 'transaction_type' => 'balance_settlement',
                 'paid_at' => now()->toDateString(),
                 'notes' => 'Full balance completed.',
@@ -95,6 +391,7 @@ class AdminPaymentTransactionsTest extends TestCase
     public function test_verified_downpayment_moves_applicant_to_account_review_then_approval_unlocks_login(): void
     {
         Notification::fake();
+        Mail::fake();
         $admin = User::factory()->create(['role' => 'admin']);
         $applicant = User::factory()->create([
             'role' => 'applicant',
@@ -106,17 +403,20 @@ class AdminPaymentTransactionsTest extends TestCase
         $application = $this->createApprovedApplication($applicant, $this->batch());
         $application->forceFill([
             'status' => EnrollmentApplication::STATUS_PROFILE_SUBMITTED,
+            'payment_reference' => 'MCARE-SITE-260903-LIFECYCLE',
+            'payment_method' => 'onsite',
         ])->save();
 
         $this->actingAs($admin)
             ->post(route('admin.payment-schedules.transactions.store', $application), [
                 'amount' => 2000.00,
-                'or_number' => 'OR-LIFECYCLE-001',
                 'transaction_type' => 'downpayment',
                 'paid_at' => now()->toDateString(),
             ])
             ->assertRedirect()
             ->assertSessionHas('saved');
+
+        $transaction = PaymentTransaction::query()->where('enrollment_application_id', $application->id)->firstOrFail();
 
         $application->refresh();
         $this->assertSame(EnrollmentApplication::PAYMENT_PARTIALLY_PAID, $application->payment_status);
@@ -132,11 +432,19 @@ class AdminPaymentTransactionsTest extends TestCase
             $applicant,
             PaymentVerifiedNotification::class,
             fn (PaymentVerifiedNotification $notification, array $channels): bool => $notification instanceof ShouldQueue
-                && $notification->queue === 'mail'
-                && $notification->toMail($applicant)->subject === 'MCARE payment verified successfully'
                 && in_array('database', $channels, true)
-                && in_array('mail', $channels, true),
+                && ! in_array('mail', $channels, true),
         );
+
+        Mail::assertSent(PaymentReceiptMail::class, function (PaymentReceiptMail $mail) use ($applicant, $application, $transaction): bool {
+            $html = $mail->render();
+
+            return $mail->hasTo($applicant->email)
+                && $mail->application->is($application)
+                && str_contains($html, $transaction->or_number)
+                && str_contains($html, 'MCARE-SITE-260903-LIFECYCLE')
+                && str_contains($html, 'Official payment receipt');
+        });
 
         Auth::logout();
         $session = ['enrollment.payment_application_id' => $application->id];

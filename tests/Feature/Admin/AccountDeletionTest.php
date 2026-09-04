@@ -74,6 +74,7 @@ class AccountDeletionTest extends TestCase
     public function test_admin_can_delete_applicant_and_all_records_and_files_are_purged(): void
     {
         Storage::fake('local');
+        Storage::fake('public');
         $admin = $this->adminUser();
         $batch = $this->lmsBatch();
 
@@ -87,6 +88,11 @@ class AccountDeletionTest extends TestCase
             'name' => 'Juan Dela Cruz',
             'email' => 'juan.delacruz@gmail.com',
         ]);
+        $avatarPath = 'avatars/'.$applicantUser->id.'/face.jpg';
+        Storage::disk('public')->put($avatarPath, 'avatar-bytes');
+        $applicantUser->forceFill([
+            'profile_photo_path' => $avatarPath,
+        ])->save();
 
         $application = EnrollmentApplication::create([
             'user_id' => $applicantUser->id,
@@ -153,12 +159,14 @@ class AccountDeletionTest extends TestCase
         // Physical files must be deleted from storage
         $this->assertFalse(Storage::disk('local')->exists($photoPath));
         $this->assertFalse(Storage::disk('local')->exists($receiptPath));
+        $this->assertFalse(Storage::disk('public')->exists($avatarPath));
     }
 
     public function test_same_email_can_re_enroll_after_account_deletion(): void
     {
         Notification::fake();
         Storage::fake('local');
+        Storage::fake('public');
         $admin = $this->adminUser();
         $program = TrainingProgram::create([
             'name' => 'Caregiving NC II',
@@ -222,6 +230,7 @@ class AccountDeletionTest extends TestCase
         $signature = 'data:image/png;base64,'.base64_encode('fake-signature-bytes');
 
         $enrollmentResponse = $this->post(route('enrollment.store'), [
+            'application_number' => $this->makeApprovedAdmission(['email' => $testEmail])->application_number,
             'training_batch_id' => $batch->id,
             'email' => $testEmail,
             'password' => 'Password123',
@@ -259,6 +268,45 @@ class AccountDeletionTest extends TestCase
         $enrollmentResponse->assertRedirect(route('payment.show'));
         $this->assertDatabaseHas('users', ['email' => $testEmail]);
         $this->assertDatabaseHas('enrollment_applications', ['email' => $testEmail]);
+    }
+
+    public function test_verified_historical_alumni_accounts_can_be_deleted(): void
+    {
+        $admin = $this->adminUser();
+        $alumni = User::factory()->create([
+            'role' => 'alumni',
+            'name' => 'Historical Alumni',
+            'email' => 'historical.alumni@gmail.com',
+        ]);
+        EnrollmentApplication::create([
+            'user_id' => $alumni->id,
+            'email' => $alumni->email,
+            'first_name' => 'Historical',
+            'last_name' => 'Alumni',
+            'birth_date' => '1990-01-01',
+            'gender' => 'Male',
+            'contact_number' => '09170000002',
+            'schedule_preference' => 'AM',
+            'street' => 'Street 2',
+            'barangay' => 'Barangay 2',
+            'city' => 'Iriga City',
+            'province' => 'Camarines Sur',
+            'zip_code' => '4431',
+            'educational_attainment' => 'College Graduate',
+            'school_name' => 'University',
+            'year_graduated' => 2015,
+            'program' => 'Caregiving NC II',
+            'status' => EnrollmentApplication::STATUS_APPROVED,
+            'is_historical_record' => true,
+        ]);
+
+        $this->actingAs($admin)
+            ->from(route('admin.accounts.index'))
+            ->delete(route('admin.accounts.destroy', $alumni))
+            ->assertRedirect(route('admin.accounts.index'))
+            ->assertSessionHas('saved');
+
+        $this->assertDatabaseMissing('users', ['id' => $alumni->id]);
     }
 
     public function test_admin_cannot_delete_admin_account(): void

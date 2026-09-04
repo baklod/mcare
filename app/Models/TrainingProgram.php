@@ -43,4 +43,9 @@ class TrainingProgram extends Model
     {
         return $this->hasMany(EnrollmentApplication::class);
     }
+
+    public function admissionApplications(): HasMany
+    {
+        return $this->hasMany(AdmissionApplication::class);
+    }
 }

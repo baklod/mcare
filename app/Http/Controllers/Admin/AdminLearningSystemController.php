@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
+use App\Models\CompetencyOutcome;
 use App\Models\CompetencyUnit;
 use App\Models\EnrollmentApplication;
 use App\Models\ModuleProgress;
@@ -14,6 +15,8 @@ use App\Models\User;
 use App\Notifications\LmsQuizPublished;
 use App\Notifications\TrainerModuleAssignedByAdmin;
 use App\Rules\TrainingModuleFileType;
+use App\Services\AccountDeletionService;
+use App\Services\CompetencyCatalogService;
 use App\Services\CompletionEligibilityService;
 use App\Services\ModuleSubmoduleService;
 use App\Services\RollingModuleReleaseService;
@@ -37,58 +40,19 @@ class AdminLearningSystemController extends Controller
 {
     public function trainees(Request $request): View
     {
-        $filters = $request->validate([
-            'search' => ['nullable', 'string', 'max:100'],
-            'batch_id' => ['nullable', 'integer', 'exists:training_batches,id'],
-            'schedule' => ['nullable', Rule::in(['AM', 'PM'])],
-            'learning_status' => ['nullable', Rule::in(array_keys(EnrollmentApplication::learningStatuses()))],
-            'training_state' => ['nullable', Rule::in(['not_started', 'in_progress', 'completed'])],
-            'joined_from' => ['nullable', 'date'],
-            'joined_to' => ['nullable', 'date', 'after_or_equal:joined_from'],
-        ]);
+        $roster = $this->traineeRosterSelection($request);
+        $filters = $roster['form_filters'];
 
-        $query = $this->filteredTrainees($filters)->with(['batch', 'moduleProgress', 'user']);
+        $query = $this->filteredTrainees($roster['query_filters'], $roster['exclude_graduated'])
+            ->with(['batch', 'moduleProgress', 'user']);
         $trainees = $query->paginate(20)->withQueryString();
 
         // Build one compact dashboard summary per learner from already eager-loaded
         // payment, module, and batch data. Assessment results are deliberately not
         // invented here because the assessment-recording phase is not implemented yet.
-        $traineeSummaries = $trainees->getCollection()->mapWithKeys(function (EnrollmentApplication $trainee) {
-            // Use the exact same audience query as the trainee portal so an
-            // individual, batch, or future global module cannot drift between dashboards.
-            $availableModules = TrainingModule::query()
-                ->availableTo($trainee)
-                ->orderBy('position')
-                ->get();
-            $availableModuleIds = $availableModules->pluck('id');
-            $progress = $trainee->moduleProgress
-                ->whereIn('training_module_id', $availableModuleIds->all());
-            $completedModules = $progress
-                ->where('status', ModuleProgress::STATUS_COMPLETED)
-                ->count();
-            $inProgressModules = $progress
-                ->where('status', ModuleProgress::STATUS_IN_PROGRESS)
-                ->count();
-            $totalModules = $availableModules->count();
-            $progressPercent = $totalModules > 0
-                ? (int) round($availableModules->sum(function (TrainingModule $module) use ($progress) {
-                    return (int) ($progress->firstWhere('training_module_id', $module->id)?->progress_percent ?? 0);
-                }) / $totalModules)
-                : 0;
-            $lastActivity = $progress
-                ->filter(fn (ModuleProgress $record) => $record->last_viewed_at !== null)
-                ->sortByDesc('last_viewed_at')
-                ->first()?->last_viewed_at;
-
-            return [$trainee->id => [
-                'total_modules' => $totalModules,
-                'completed_modules' => $completedModules,
-                'in_progress_modules' => $inProgressModules,
-                'progress_percent' => $progressPercent,
-                'last_activity' => $lastActivity,
-                'assessment_ready' => $totalModules > 0 && $completedModules === $totalModules,
-            ]];
-        });
+        $traineeSummaries = $trainees->getCollection()->mapWithKeys(
+            fn (EnrollmentApplication $trainee): array => [$trainee->id => $this->summarizeTrainee($trainee)]
+        );
 
         return view('admin.learning.trainees-lifecycle', [
             'batches' => $this->batches(),
@@ -101,13 +65,35 @@ class AdminLearningSystemController extends Controller
                 ->pluck('aggregate', 'learning_status'),
             'trainees' => $trainees,
             'traineeSummaries' => $traineeSummaries,
+            'activeTab' => $roster['tab'],
+            'isGraduatedTab' => $roster['tab'] === 'graduated',
+        ]);
+    }
+
+    public function showTrainee(EnrollmentApplication $enrollmentApplication): View
+    {
+        abort_unless(
+            $enrollmentApplication->status === EnrollmentApplication::STATUS_APPROVED,
+            404
+        );
+
+        $enrollmentApplication->load(['batch', 'moduleProgress', 'user']);
+
+        return view('admin.learning.trainees-show', [
+            'trainee' => $enrollmentApplication,
+            'summary' => $this->summarizeTrainee($enrollmentApplication),
+            'learningStatuses' => EnrollmentApplication::learningStatuses(),
+            'rosterTab' => $enrollmentApplication->learning_status === EnrollmentApplication::LEARNING_GRADUATED
+                ? 'graduated'
+                : 'current',
         ]);
     }
 
     public function exportTrainees(Request $request, TraineeRosterCsv $csv): StreamedResponse
     {
-        $filters = $this->validateTraineeFilters($request);
-        $trainees = $this->filteredTrainees($filters)
+        $roster = $this->traineeRosterSelection($request);
+        $filters = $roster['query_filters'];
+        $trainees = $this->filteredTrainees($filters, $roster['exclude_graduated'])
             ->with(['batch', 'moduleProgress'])
             ->get();
         $scope = filled($filters['batch_id'] ?? null) ? 'batch-'.$filters['batch_id'] : 'all-batches';
@@ -243,19 +229,67 @@ class AdminLearningSystemController extends Controller
         ]);
 
         return redirect()
-            ->route('admin.learning.trainees')
+            ->route('admin.learning.trainees.show', $enrollmentApplication)
             ->with('saved', "{$enrollmentApplication->first_name} {$enrollmentApplication->last_name} is now {$enrollmentApplication->learningStatusLabel()}.");
     }
 
-    public function modules(Request $request, TrainingModuleDeletionService $deletion): View
+    public function destroyTrainee(
+        Request $request,
+        EnrollmentApplication $enrollmentApplication,
+        AccountDeletionService $accounts,
+    ): RedirectResponse {
+        abort_unless(
+            $enrollmentApplication->status === EnrollmentApplication::STATUS_APPROVED,
+            422,
+            'Only approved trainees can be deleted from trainee records.'
+        );
+
+        $traineeName = trim($enrollmentApplication->first_name.' '.$enrollmentApplication->last_name);
+        $wasHistoricalAlumni = $enrollmentApplication->is_historical_record;
+        $user = $enrollmentApplication->user;
+
+        if (! $user) {
+            return redirect()
+                ->route('admin.learning.trainees')
+                ->withErrors([
+                    'trainee' => "{$traineeName} has no linked account and cannot be deleted from trainee records.",
+                ]);
+        }
+
+        try {
+            $deleted = $accounts->delete($user, $request->user());
+        } catch (ValidationException $exception) {
+            return redirect()
+                ->route('admin.learning.trainees')
+                ->withErrors($exception->errors());
+        }
+
+        return redirect()
+            ->route('admin.learning.trainees', [
+                'tab' => $wasHistoricalAlumni ? 'graduated' : 'current',
+            ])
+            ->with(
+                'saved',
+                $wasHistoricalAlumni
+                    ? "Verified alumni record for {$traineeName} ({$deleted['email']}) was permanently removed."
+                    : "Trainee {$traineeName} ({$deleted['email']}) and related records were permanently removed."
+            );
+    }
+
+    public function modules(Request $request, TrainingModuleDeletionService $deletion, CompetencyCatalogService $catalog): View
     {
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
             'batch_id' => ['nullable', 'integer', 'exists:training_batches,id'],
             'published' => ['nullable', Rule::in(['yes', 'no'])],
+            'tab' => ['nullable', 'string', Rule::in(['modules', 'presets', 'units', 'outcomes'])],
+            'edit_preset' => ['nullable', 'integer', 'exists:competency_units,id'],
+            'edit_unit' => ['nullable', 'integer', 'exists:competency_units,id'],
+            'edit_outcome' => ['nullable', 'integer', 'exists:competency_outcomes,id'],
+            'unit_id' => ['nullable', 'integer', 'exists:competency_units,id'],
         ]);
 
-        $query = TrainingModule::query()->with(['batch', 'trainer'])->latest('published_at');
+        $query = TrainingModule::query()->with(['batch', 'trainer', 'submodules'])->latest('published_at');
 
         if ($batchId = $filters['batch_id'] ?? null) {
             $query->where('training_batch_id', $batchId);
@@ -273,10 +307,38 @@ class AdminLearningSystemController extends Controller
                 ->orWhereHas('trainer', fn ($trainer) => $trainer->where('name', 'like', "%{$search}%")));
         }
 
-        $modules = $query->paginate(15)->withQueryString();
+        $modules = $query->paginate(15)->appends(collect($filters)->except(['edit_preset', 'edit_unit', 'edit_outcome', 'tab'])->all());
         $moduleImpacts = $modules->getCollection()->mapWithKeys(
             fn (TrainingModule $module): array => [$module->id => $deletion->impact($module)],
         );
+        $catalogUnits = $catalog->caregivingUnits();
+        $catalogUnits->loadCount(['trainingModules', 'traineeRecords']);
+        $editingUnitId = (int) ($filters['edit_unit'] ?? $filters['edit_preset'] ?? 0);
+        $editingPreset = $editingUnitId > 0
+            ? $catalogUnits->firstWhere('id', $editingUnitId)
+            : null;
+        $editingOutcomeId = (int) ($filters['edit_outcome'] ?? 0);
+        $editingOutcome = $editingOutcomeId > 0
+            ? CompetencyOutcome::query()->with('unit')->find($editingOutcomeId)
+            : null;
+        $outcomeUnitId = (int) ($filters['unit_id'] ?? 0);
+        $catalogOutcomes = CompetencyOutcome::query()
+            ->with('unit')
+            ->withCount(['traineeResults', 'submodules'])
+            ->whereHas('unit', fn ($query) => $query->where('program_code', CaregivingNcIiCatalog::PROGRAM_CODE))
+            ->when($outcomeUnitId > 0, fn ($query) => $query->where('competency_unit_id', $outcomeUnitId))
+            ->orderBy('competency_unit_id')
+            ->orderBy('sort_order')
+            ->get();
+        $requestedTab = $filters['tab'] ?? 'modules';
+        if ($requestedTab === 'presets') {
+            $requestedTab = 'units';
+        }
+        $activeTab = $editingOutcome
+            ? 'outcomes'
+            : (($editingPreset || $requestedTab === 'units')
+                ? 'units'
+                : ($requestedTab === 'outcomes' ? 'outcomes' : 'modules'));
 
         return view('admin.learning.modules', [
             'batches' => $this->batches(),
@@ -284,9 +346,190 @@ class AdminLearningSystemController extends Controller
             'filters' => $filters,
             'modules' => $modules,
             'moduleImpacts' => $moduleImpacts,
-            'catalogUnits' => CaregivingNcIiCatalog::units(),
-            'coreUnits' => CaregivingNcIiCatalog::coreUnits(),
+            'catalogUnits' => $catalogUnits,
+            'catalogOutcomes' => $catalogOutcomes,
+            'trainerCatalogUnits' => $catalog->caregivingUnits(true),
+            'editingPreset' => $editingPreset,
+            'editingOutcome' => $editingOutcome,
+            'activeTab' => $activeTab,
         ]);
+    }
+
+    public function storeCatalogUnit(Request $request, CompetencyCatalogService $catalog): RedirectResponse
+    {
+        $validated = $request->validateWithBag('catalog', $this->catalogUnitRules());
+        $unit = $catalog->create([
+            ...$validated,
+            'outcomes' => $catalog->parseOutcomeLines($validated['outcomes'] ?? ''),
+            'is_tor_included' => $request->boolean('is_tor_included'),
+            'is_selectable' => $request->boolean('is_selectable'),
+        ]);
+
+        AdminActivityLog::record($request->user(), 'learning.catalog.created', $unit, [
+            'code' => $unit->code,
+            'title' => $unit->title,
+        ]);
+
+        return redirect()
+            ->route('admin.learning.modules', ['tab' => 'units'])
+            ->with('saved', "Competency unit {$unit->code} was saved. Trainers can now choose it when creating a classwork module.");
+    }
+
+    public function updateCatalogUnit(
+        Request $request,
+        CompetencyUnit $competencyUnit,
+        CompetencyCatalogService $catalog,
+    ): RedirectResponse {
+        $validated = $request->validateWithBag('catalog', $this->catalogUnitRules($competencyUnit));
+        $unit = $catalog->update($competencyUnit, [
+            ...$validated,
+            'outcomes' => $catalog->parseOutcomeLines($validated['outcomes'] ?? ''),
+            'is_tor_included' => $request->boolean('is_tor_included'),
+            'is_selectable' => $request->boolean('is_selectable'),
+        ]);
+
+        AdminActivityLog::record($request->user(), 'learning.catalog.updated', $unit, [
+            'code' => $unit->code,
+            'title' => $unit->title,
+        ]);
+
+        return redirect()
+            ->route('admin.learning.modules', ['tab' => 'units'])
+            ->with('saved', "Competency unit {$unit->code} was updated.");
+    }
+
+    public function destroyCatalogUnit(
+        Request $request,
+        CompetencyUnit $competencyUnit,
+        CompetencyCatalogService $catalog,
+    ): RedirectResponse {
+        try {
+            $code = $competencyUnit->code;
+            $title = $competencyUnit->title;
+            $catalog->deleteUnit($competencyUnit);
+        } catch (ValidationException $exception) {
+            return redirect()
+                ->route('admin.learning.modules', ['tab' => 'units'])
+                ->withErrors($exception->errors());
+        }
+
+        AdminActivityLog::record($request->user(), 'learning.catalog.deleted', null, [
+            'code' => $code,
+            'title' => $title,
+        ]);
+
+        return redirect()
+            ->route('admin.learning.modules', ['tab' => 'units'])
+            ->with('saved', "Competency unit {$code} was deleted.");
+    }
+
+    public function storeCatalogOutcome(Request $request, CompetencyCatalogService $catalog): RedirectResponse
+    {
+        $validated = $request->validateWithBag('catalogOutcome', $this->catalogOutcomeRules());
+        $outcome = $catalog->createOutcome([
+            ...$validated,
+            'is_required' => $request->boolean('is_required'),
+        ]);
+
+        AdminActivityLog::record($request->user(), 'learning.catalog.outcome.created', $outcome, [
+            'unit_id' => $outcome->competency_unit_id,
+            'title' => $outcome->title,
+        ]);
+
+        return redirect()
+            ->route('admin.learning.modules', ['tab' => 'outcomes', 'unit_id' => $outcome->competency_unit_id])
+            ->with('saved', "Outcome \"{$outcome->title}\" was added.");
+    }
+
+    public function updateCatalogOutcome(
+        Request $request,
+        CompetencyOutcome $competencyOutcome,
+        CompetencyCatalogService $catalog,
+    ): RedirectResponse {
+        $validated = $request->validateWithBag('catalogOutcome', $this->catalogOutcomeRules());
+        $outcome = $catalog->updateOutcome($competencyOutcome, [
+            ...$validated,
+            'is_required' => $request->boolean('is_required'),
+        ]);
+
+        AdminActivityLog::record($request->user(), 'learning.catalog.outcome.updated', $outcome, [
+            'unit_id' => $outcome->competency_unit_id,
+            'title' => $outcome->title,
+        ]);
+
+        return redirect()
+            ->route('admin.learning.modules', ['tab' => 'outcomes', 'unit_id' => $outcome->competency_unit_id])
+            ->with('saved', "Outcome \"{$outcome->title}\" was updated.");
+    }
+
+    public function destroyCatalogOutcome(
+        Request $request,
+        CompetencyOutcome $competencyOutcome,
+        CompetencyCatalogService $catalog,
+    ): RedirectResponse {
+        $unitId = $competencyOutcome->competency_unit_id;
+        $title = $competencyOutcome->title;
+
+        try {
+            $catalog->deleteOutcome($competencyOutcome);
+        } catch (ValidationException $exception) {
+            return redirect()
+                ->route('admin.learning.modules', ['tab' => 'outcomes', 'unit_id' => $unitId])
+                ->withErrors($exception->errors());
+        }
+
+        AdminActivityLog::record($request->user(), 'learning.catalog.outcome.deleted', null, [
+            'unit_id' => $unitId,
+            'title' => $title,
+        ]);
+
+        return redirect()
+            ->route('admin.learning.modules', ['tab' => 'outcomes', 'unit_id' => $unitId])
+            ->with('saved', "Outcome \"{$title}\" was deleted.");
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function catalogOutcomeRules(): array
+    {
+        return [
+            'competency_unit_id' => ['required', 'integer', 'exists:competency_units,id'],
+            'title' => ['required', 'string', 'max:255'],
+            'is_required' => ['sometimes', 'boolean'],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function catalogUnitRules(?CompetencyUnit $unit = null): array
+    {
+        $program = CaregivingNcIiCatalog::PROGRAM_CODE;
+
+        return [
+            'category' => ['required', 'string', Rule::in(array_keys(CompetencyUnit::categoryLabels()))],
+            'code' => [
+                'required',
+                'string',
+                'max:40',
+                Rule::unique('competency_units', 'code')
+                    ->where(fn ($query) => $query->where('program_code', $program))
+                    ->ignore($unit?->id),
+            ],
+            'title' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('competency_units', 'title')
+                    ->where(fn ($query) => $query->where('program_code', $program))
+                    ->ignore($unit?->id),
+            ],
+            'estimated_hours' => ['nullable', 'integer', 'min:1', 'max:500'],
+            'outcomes' => ['nullable', 'string', 'max:4000'],
+            'is_tor_included' => ['sometimes', 'boolean'],
+            'is_selectable' => ['sometimes', 'boolean'],
+        ];
     }
 
     public function storeModule(
@@ -298,50 +541,7 @@ class AdminLearningSystemController extends Controller
             'completion_mode' => $request->input('completion_mode', TrainingModule::COMPLETION_ASSESSED),
         ]);
 
-        $validated = $request->validate([
-            'trainer_id' => [
-                'required',
-                'integer',
-                Rule::exists('users', 'id')->where(fn ($query) => $query->where('role', 'trainer')),
-            ],
-            'training_batch_id' => ['required', 'integer', 'exists:training_batches,id'],
-            'module_code' => ['nullable', 'string', 'max:50'],
-            'competency_category' => ['nullable', 'string', Rule::in(['core', 'common', 'basic', 'custom'])],
-            'submodule_titles' => ['nullable', 'array', 'max:30'],
-            'submodule_titles.*' => ['nullable', 'string', 'max:255'],
-            'completion_mode' => [
-                'required',
-                Rule::in([
-                    TrainingModule::COMPLETION_ASSESSED,
-                    TrainingModule::COMPLETION_MATERIAL_ONLY,
-                ]),
-            ],
-            'title' => ['required', 'string', 'max:160'],
-            'topic' => ['nullable', 'string', 'max:120'],
-            'estimated_hours' => ['nullable', 'integer', 'min:1', 'max:500'],
-            'description' => ['required', 'string', 'max:5000'],
-            'module_file' => [
-                'required',
-                'file',
-                'max:'.TrainingModuleFiles::MAX_UPLOAD_KB,
-                new TrainingModuleFileType,
-            ],
-            'supplementary_files' => [
-                'nullable',
-                'array',
-                'max:'.TrainingModuleFiles::MAX_SUPPLEMENTARY_FILES,
-            ],
-            'supplementary_files.*' => [
-                'nullable',
-                'file',
-                'max:'.TrainingModuleFiles::MAX_SUPPLEMENTARY_UPLOAD_KB,
-                new TrainingModuleFileType,
-            ],
-            'is_published' => ['nullable', 'boolean'],
-        ], [
-            'module_file.max' => 'Learning materials must not exceed 38MB on the current MCARE server.',
-            'module_file.uploaded' => 'The upload did not reach MCARE. Check the server upload limit and try a smaller file.',
-        ]);
+        $validated = $request->validate($this->modulePayloadRules(true), $this->moduleValidationMessages());
 
         /** @var UploadedFile $file */
         $file = $request->file('module_file');
@@ -349,10 +549,7 @@ class AdminLearningSystemController extends Controller
         $supplementaryList = [];
 
         try {
-            $path = $file->store("training-modules/admin/{$request->user()->id}", 'local');
-            if ($path === false) {
-                throw new \RuntimeException('The primary learning material could not be stored.');
-            }
+            $path = TrainingModuleFiles::storeLearningFile($file, "training-modules/admin/{$request->user()->id}");
 
             if ($request->hasFile('supplementary_files')) {
                 $supplementaryList = TrainingModuleFiles::storeSupplementaryFiles(
@@ -370,7 +567,7 @@ class AdminLearningSystemController extends Controller
                     'file_path' => $path,
                     'original_file_name' => $file->getClientOriginalName(),
                     'mime_type' => $file->getMimeType(),
-                    'file_size' => $file->getSize() ?: 0,
+                    'file_size' => Storage::disk('local')->size($path) ?: ($file->getSize() ?: 0),
                     'supplementary_files' => $supplementaryList,
                     'is_published' => $request->boolean('is_published'),
                     'published_at' => $request->boolean('is_published') ? now() : null,
@@ -402,6 +599,204 @@ class AdminLearningSystemController extends Controller
         $module->trainer?->notify(new TrainerModuleAssignedByAdmin($module));
 
         return back()->with('saved', "Module {$module->title} was added.");
+    }
+
+    public function updateModule(
+        Request $request,
+        TrainingModule $module,
+        RollingModuleReleaseService $releases,
+        ModuleSubmoduleService $submodules,
+    ): RedirectResponse {
+        $request->merge([
+            'completion_mode' => $request->input('completion_mode', $module->completion_mode ?: TrainingModule::COMPLETION_ASSESSED),
+        ]);
+
+        $validated = $request->validateWithBag(
+            'moduleUpdate',
+            $this->modulePayloadRules(false),
+            $this->moduleValidationMessages(),
+        );
+
+        $previousTrainerId = $module->trainer_id;
+        $wasPublished = $module->is_published;
+        $requestedPublished = $request->boolean('is_published');
+        $shouldCloseDelivery = in_array($module->delivery_status, [
+            TrainingModule::DELIVERY_ACTIVE,
+            TrainingModule::DELIVERY_AVAILABLE,
+        ], true)
+            && $wasPublished
+            && ! $requestedPublished;
+
+        if ($module->isSupplemental()
+            && ($validated['competency_category'] ?? null) !== TrainingModule::CATEGORY_CUSTOM) {
+            throw ValidationException::withMessages([
+                'competency_category' => 'A supplemental custom module cannot be converted into the active rolling competency delivery.',
+            ])->errorBag('moduleUpdate');
+        }
+
+        if ($validated['completion_mode'] === TrainingModule::COMPLETION_MATERIAL_ONLY
+            && $module->requiresEvaluation()
+            && ($module->quizzes()->exists()
+                || $module->progressRecords()
+                    ->where(fn ($query) => $query
+                        ->whereNotNull('submitted_at')
+                        ->orWhereNotNull('evaluated_at'))
+                    ->exists())) {
+            throw ValidationException::withMessages([
+                'completion_mode' => 'An assessed module with classwork or submitted evaluations cannot be converted to learning-material-only.',
+            ])->errorBag('moduleUpdate');
+        }
+
+        $replacement = $request->file('module_file');
+        $replacementPath = null;
+        $oldPath = $module->file_path;
+        $currentSupplementary = $module->supplementaryList();
+        $newSupplementary = [];
+
+        try {
+            if ($replacement) {
+                $replacementPath = TrainingModuleFiles::storeLearningFile(
+                    $replacement,
+                    "training-modules/admin/{$request->user()->id}",
+                );
+            }
+
+            if ($request->hasFile('supplementary_files')) {
+                $newSupplementary = TrainingModuleFiles::storeSupplementaryFiles(
+                    $request->file('supplementary_files'),
+                    $request->user()->id
+                );
+                $currentSupplementary = array_merge($currentSupplementary, $newSupplementary);
+            }
+
+            DB::transaction(function () use (
+                $validated,
+                $request,
+                $module,
+                $replacement,
+                $replacementPath,
+                $currentSupplementary,
+                $shouldCloseDelivery,
+            ): void {
+                $published = $request->boolean('is_published');
+                if ($shouldCloseDelivery || $module->delivery_status === TrainingModule::DELIVERY_CLOSED) {
+                    $published = true;
+                }
+
+                $attributes = [
+                    ...collect($validated)->except(['module_file', 'supplementary_files', 'submodule_titles'])->all(),
+                    'release_mode' => ($validated['competency_category'] ?? null) === TrainingModule::CATEGORY_CUSTOM
+                        ? TrainingModule::RELEASE_SUPPLEMENTAL
+                        : TrainingModule::RELEASE_ROLLING,
+                    'supplementary_files' => $currentSupplementary,
+                    'is_published' => $published,
+                    'published_at' => $published ? ($module->published_at ?? now()) : null,
+                ];
+
+                if ($replacement && $replacementPath) {
+                    $attributes = [
+                        ...$attributes,
+                        'file_path' => $replacementPath,
+                        'original_file_name' => $replacement->getClientOriginalName(),
+                        'mime_type' => $replacement->getMimeType(),
+                        'file_size' => Storage::disk('local')->size($replacementPath) ?: ($replacement->getSize() ?: 0),
+                    ];
+                }
+
+                $module->update($attributes);
+            });
+            $submodules->ensureStructure($module->fresh(), $validated['submodule_titles'] ?? []);
+        } catch (\Throwable $exception) {
+            if ($replacementPath) {
+                Storage::disk('local')->delete($replacementPath);
+            }
+            TrainingModuleFiles::deleteSupplementaryFiles($newSupplementary);
+
+            throw $exception;
+        }
+
+        if ($replacementPath && $oldPath !== $replacementPath) {
+            Storage::disk('local')->delete($oldPath);
+        }
+
+        AdminActivityLog::record($request->user(), 'admin.module.updated', $module, [
+            'trainer_id' => $module->trainer_id,
+            'batch_id' => $module->training_batch_id,
+            'module_code' => $module->module_code,
+            'file_replaced' => (bool) $replacementPath,
+        ]);
+
+        if ($shouldCloseDelivery) {
+            $releases->close($module);
+        } elseif (! $wasPublished && $module->is_published) {
+            $releases->activate($module);
+        }
+
+        $module->loadMissing(['batch', 'trainer']);
+        if ((int) $module->trainer_id !== (int) $previousTrainerId) {
+            $module->trainer?->notify(new TrainerModuleAssignedByAdmin($module));
+        }
+
+        return back()->with('saved', "Module {$module->title} was updated.");
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function modulePayloadRules(bool $fileRequired): array
+    {
+        return [
+            'trainer_id' => [
+                'required',
+                'integer',
+                Rule::exists('users', 'id')->where(fn ($query) => $query->where('role', 'trainer')),
+            ],
+            'training_batch_id' => ['required', 'integer', 'exists:training_batches,id'],
+            'module_code' => ['nullable', 'string', 'max:50'],
+            'competency_category' => ['nullable', 'string', Rule::in(['core', 'common', 'basic', 'custom'])],
+            'submodule_titles' => ['nullable', 'array', 'max:30'],
+            'submodule_titles.*' => ['nullable', 'string', 'max:255'],
+            'completion_mode' => [
+                'required',
+                Rule::in([
+                    TrainingModule::COMPLETION_ASSESSED,
+                    TrainingModule::COMPLETION_MATERIAL_ONLY,
+                ]),
+            ],
+            'title' => ['required', 'string', 'max:160'],
+            'topic' => ['nullable', 'string', 'max:120'],
+            'estimated_hours' => ['nullable', 'integer', 'min:1', 'max:500'],
+            'description' => ['required', 'string', 'max:5000'],
+            'module_file' => [
+                $fileRequired ? 'required' : 'nullable',
+                'file',
+                'max:'.TrainingModuleFiles::MAX_UPLOAD_KB,
+                new TrainingModuleFileType,
+            ],
+            'supplementary_files' => [
+                'nullable',
+                'array',
+                'max:'.TrainingModuleFiles::MAX_SUPPLEMENTARY_FILES,
+            ],
+            'supplementary_files.*' => [
+                'nullable',
+                'file',
+                'max:'.TrainingModuleFiles::MAX_SUPPLEMENTARY_UPLOAD_KB,
+                new TrainingModuleFileType,
+            ],
+            'is_published' => ['nullable', 'boolean'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function moduleValidationMessages(): array
+    {
+        return [
+            'module_file.max' => 'Learning materials must not exceed 38MB on the current MCARE server.',
+            'module_file.uploaded' => 'The upload did not reach MCARE. Check the server upload limit and try a smaller file.',
+        ];
     }
 
     public function previewModule(Request $request, TrainingModule $module): View
@@ -553,12 +948,83 @@ class AdminLearningSystemController extends Controller
             ->get();
     }
 
+    /**
+     * @return array{total_modules: int, completed_modules: int, in_progress_modules: int, progress_percent: int, last_activity: mixed, assessment_ready: bool}
+     */
+    private function summarizeTrainee(EnrollmentApplication $trainee): array
+    {
+        // Use the exact same audience query as the trainee portal so an
+        // individual, batch, or future global module cannot drift between dashboards.
+        $availableModules = TrainingModule::query()
+            ->assignedTo($trainee)
+            ->orderBy('position')
+            ->get();
+        $availableModuleIds = $availableModules->pluck('id');
+        $progress = $trainee->moduleProgress
+            ->whereIn('training_module_id', $availableModuleIds->all());
+        $completedModules = $progress
+            ->where('status', ModuleProgress::STATUS_COMPLETED)
+            ->count();
+        $inProgressModules = $progress
+            ->where('status', ModuleProgress::STATUS_IN_PROGRESS)
+            ->count();
+        $totalModules = $availableModules->count();
+        $progressPercent = $totalModules > 0
+            ? (int) round($availableModules->sum(function (TrainingModule $module) use ($progress) {
+                return (int) ($progress->firstWhere('training_module_id', $module->id)?->progress_percent ?? 0);
+            }) / $totalModules)
+            : 0;
+        $lastActivity = $progress
+            ->filter(fn (ModuleProgress $record) => $record->last_viewed_at !== null)
+            ->sortByDesc('last_viewed_at')
+            ->first()?->last_viewed_at;
+
+        return [
+            'total_modules' => $totalModules,
+            'completed_modules' => $completedModules,
+            'in_progress_modules' => $inProgressModules,
+            'progress_percent' => $progressPercent,
+            'last_activity' => $lastActivity,
+            'assessment_ready' => $totalModules > 0 && $completedModules === $totalModules,
+        ];
+    }
+
+    /**
+     * @return array{form_filters: array<string, mixed>, query_filters: array<string, mixed>, tab: string, exclude_graduated: bool}
+     */
+    private function traineeRosterSelection(Request $request): array
+    {
+        $validated = $this->validateTraineeFilters($request);
+        $requestedTab = $validated['tab'] ?? null;
+        unset($validated['tab']);
+
+        $isGraduatedTab = $requestedTab === 'graduated'
+            || ($validated['learning_status'] ?? null) === EnrollmentApplication::LEARNING_GRADUATED;
+
+        $queryFilters = $validated;
+        $excludeGraduated = false;
+
+        if ($isGraduatedTab) {
+            $queryFilters['learning_status'] = EnrollmentApplication::LEARNING_GRADUATED;
+        } elseif (! filled($validated['learning_status'] ?? null)) {
+            $excludeGraduated = true;
+        }
+
+        return [
+            'form_filters' => $validated,
+            'query_filters' => $queryFilters,
+            'tab' => $isGraduatedTab ? 'graduated' : 'current',
+            'exclude_graduated' => $excludeGraduated,
+        ];
+    }
+
     private function validateTraineeFilters(Request $request): array
     {
         return $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
             'batch_id' => ['nullable', 'integer', 'exists:training_batches,id'],
             'schedule' => ['nullable', Rule::in(['AM', 'PM'])],
+            'tab' => ['nullable', Rule::in(['current', 'graduated'])],
             'learning_status' => ['nullable', Rule::in(array_keys(EnrollmentApplication::learningStatuses()))],
             'training_state' => ['nullable', Rule::in(['not_started', 'in_progress', 'completed'])],
             'joined_from' => ['nullable', 'date'],
@@ -566,7 +1032,7 @@ class AdminLearningSystemController extends Controller
         ]);
     }
 
-    private function filteredTrainees(array $filters)
+    private function filteredTrainees(array $filters, bool $excludeGraduated = false)
     {
         $query = EnrollmentApplication::query()
             ->where('status', EnrollmentApplication::STATUS_APPROVED)
@@ -578,7 +1044,12 @@ class AdminLearningSystemController extends Controller
         if ($schedule = $filters['schedule'] ?? null) {
             $query->where('schedule_preference', $schedule);
         }
-        if ($learningStatus = $filters['learning_status'] ?? null) {
+        if ($excludeGraduated) {
+            $query->where(function ($builder) {
+                $builder->whereNull('learning_status')
+                    ->orWhere('learning_status', '!=', EnrollmentApplication::LEARNING_GRADUATED);
+            });
+        } elseif ($learningStatus = $filters['learning_status'] ?? null) {
             $query->where('learning_status', $learningStatus);
         }
         if ($trainingState = $filters['training_state'] ?? null) {

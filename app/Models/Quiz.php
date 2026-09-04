@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\TraineeClassworkSequence;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -122,7 +123,7 @@ class Quiz extends Model
         }
 
         if ($this->training_module_id !== null) {
-            return ModuleProgress::query()
+            $assigned = ModuleProgress::query()
                 ->where('enrollment_application_id', $application->id)
                 ->where('training_module_id', $this->training_module_id)
                 ->whereNotNull('unlocked_at')
@@ -136,6 +137,15 @@ class Quiz extends Model
                         ->orWhereNull('competency_outcome');
                 })
                 ->exists();
+
+            if (! $assigned) {
+                return false;
+            }
+
+            $module = $this->trainingModule ?? TrainingModule::query()->find($this->training_module_id);
+
+            return $module === null
+                || app(TraineeClassworkSequence::class)->canAccess($application, $module);
         }
 
         if ($this->target_enrollment_application_id !== null) {

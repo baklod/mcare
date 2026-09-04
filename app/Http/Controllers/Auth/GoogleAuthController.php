@@ -8,19 +8,22 @@ use App\Models\EnrollmentApplication;
 use App\Models\HistoricalAlumniClaim;
 use App\Models\User;
 use App\Services\AnnouncementDeliveryService;
+use App\Services\ProfilePhotoStore;
 use App\Support\AccountPortal;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Laravel\Socialite\Contracts\Provider;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\InvalidStateException;
 use Throwable;
 
 class GoogleAuthController extends Controller
 {
     public function redirect(Request $request): RedirectResponse
     {
-        $redirectUri = (string) config('services.google.redirect');
+        $redirectUri = $this->oauthRedirectUri();
 
         if (! config('services.google.client_id') || ! config('services.google.client_secret')) {
             AdminActivityLog::record($request->user(), 'account.login.google.failed', $request->user(), [
@@ -42,27 +45,62 @@ class GoogleAuthController extends Controller
                 ->with('auth_error', 'Google sign in is temporarily unavailable because the secure callback URL is not configured correctly. Please use email sign in or contact the administrator.');
         }
 
-        /*
-         * Keep Socialite stateful for this normal browser/session application.
-         * Socialite stores an OAuth `state` value in the session and checks it
-         * on callback, which helps defend against login CSRF and response mixups.
-         */
+        $canonicalStart = $this->canonicalOauthStartUrl($request);
+        if ($canonicalStart !== null) {
+            return redirect()->away($canonicalStart);
+        }
+
         AdminActivityLog::record($request->user(), 'account.login.google.started', $request->user());
 
-        return Socialite::driver('google')->redirect();
+        return $this->googleDriver($request)->redirect();
     }
 
     public function callback(
         Request $request,
         AnnouncementDeliveryService $announcementDelivery,
+        ProfilePhotoStore $profilePhotos,
     ): RedirectResponse {
+        if ($request->filled('error')) {
+            $providerError = (string) $request->query('error');
+
+            AdminActivityLog::record($request->user(), 'account.login.google.failed', $request->user(), [
+                'reason' => $providerError === 'access_denied' ? 'provider_cancelled' : 'provider_returned_error',
+            ]);
+
+            return redirect()
+                ->route('landing')
+                ->with('auth_error', $providerError === 'access_denied'
+                    ? 'Google sign in was cancelled. Please try again when you are ready.'
+                    : 'Google sign in could not be completed. Please try again.');
+        }
+
+        $redirectUri = $this->oauthRedirectUri();
+
+        if (! $this->hasSafeRedirectUri($redirectUri)) {
+            AdminActivityLog::record($request->user(), 'account.login.google.failed', $request->user(), [
+                'reason' => 'unsafe_callback_configuration',
+            ]);
+
+            return redirect()
+                ->route('landing')
+                ->with('auth_error', 'Google sign in is temporarily unavailable because the secure callback URL is not configured correctly. Please use email sign in or contact the administrator.');
+        }
+
         try {
-            /*
-             * Do NOT call stateless() here. The application already uses web
-             * sessions, so preserving Socialite's state validation is safer.
-             */
-            $googleUser = Socialite::driver('google')->user();
-        } catch (Throwable) {
+            $googleUser = $this->googleDriver($request)->user();
+        } catch (InvalidStateException $exception) {
+            report($exception);
+
+            AdminActivityLog::record($request->user(), 'account.login.google.failed', $request->user(), [
+                'reason' => 'oauth_state_mismatch',
+            ]);
+
+            return redirect()
+                ->route('landing')
+                ->with('auth_error', 'Google sign in expired. Open this site at the same browser address and try again.');
+        } catch (Throwable $exception) {
+            report($exception);
+
             AdminActivityLog::record($request->user(), 'account.login.google.failed', $request->user(), [
                 'reason' => 'oauth_callback_failed',
             ]);
@@ -93,12 +131,10 @@ class GoogleAuthController extends Controller
 
             return redirect()
                 ->route('landing')
-                ->with('auth_error', 'No MCARE enrollment is registered for that Google email. Complete enrollment first, then return and use the same email to connect Google.')
+                ->with('auth_error', 'No MCARE enrollment is registered for that Google email. Submit an application first, complete enrollment after approval, then return and use the same email to connect Google.')
                 ->with('enrollment_required', true);
         }
 
-        // Staff accounts must complete password and challenge verification.
-        // Applicant OAuth must not become a privileged-session bypass.
         if (in_array($user->role, ['admin', 'trainer'], true)) {
             AdminActivityLog::record($user, 'account.login.google.rejected', $user, [
                 'role' => $user->role,
@@ -141,11 +177,11 @@ class GoogleAuthController extends Controller
 
         $displayName = trim((string) ($googleUser->getName() ?: $googleUser->getNickname() ?: $user->name));
 
-        // Enrollment and admin-reviewed names remain authoritative. Google is
-        // used only to verify and connect the already-registered identity.
         $user->forceFill([
             'google_id' => $googleId,
-            'avatar_url' => $googleUser->getAvatar(),
+            ...($profilePhotos->isManaged($user) ? [] : [
+                'avatar_url' => $googleUser->getAvatar(),
+            ]),
             'email_verified_at' => $user->email_verified_at ?: now(),
         ])->save();
 
@@ -214,8 +250,6 @@ class GoogleAuthController extends Controller
 
         Auth::login($user, true);
         $request->session()->forget('enrollment.awaiting_approval');
-
-        // Rotate the session ID after authentication to reduce fixation risk.
         $request->session()->regenerate();
 
         $this->recordSuccessfulGoogleLogin($user, $announcementDelivery, 'portal_login');
@@ -240,7 +274,6 @@ class GoogleAuthController extends Controller
         return redirect()->route('landing');
     }
 
-    /** @return array{email: string, first_name: string, middle_name: string, last_name: string, full_name: string, avatar_url: ?string} */
     private function enrollmentIdentity(object $googleUser, string $displayName, string $email): array
     {
         $raw = method_exists($googleUser, 'getRaw') && is_array($googleUser->getRaw())
@@ -267,6 +300,48 @@ class GoogleAuthController extends Controller
         ];
     }
 
+    private function googleDriver(Request $request): Provider
+    {
+        config(['services.google.redirect' => $this->oauthRedirectUri()]);
+
+        return Socialite::driver('google');
+    }
+
+    private function oauthRedirectUri(): string
+    {
+        return (string) config('services.google.redirect');
+    }
+
+    private function canonicalOauthStartUrl(Request $request): ?string
+    {
+        $configured = parse_url($this->oauthRedirectUri());
+        if (! is_array($configured) || empty($configured['scheme']) || empty($configured['host'])) {
+            return null;
+        }
+
+        $configuredHost = $this->normalizedHost((string) $configured['host']);
+        $requestHost = $this->normalizedHost((string) $request->getHost());
+
+        if ($configuredHost === $requestHost) {
+            return null;
+        }
+
+        if (! $this->isLoopbackHost($configuredHost) || ! $this->isLoopbackHost($requestHost)) {
+            return null;
+        }
+
+        $scheme = $request->getScheme();
+        $origin = $scheme.'://'.$configured['host'];
+        $port = (int) $request->getPort();
+        $defaultPort = strtolower($scheme) === 'https' ? 443 : 80;
+
+        if ($port > 0 && $port !== $defaultPort) {
+            $origin .= ':'.$port;
+        }
+
+        return $origin.'/auth/google';
+    }
+
     private function hasSafeRedirectUri(string $redirectUri): bool
     {
         $redirect = parse_url($redirectUri);
@@ -276,12 +351,35 @@ class GoogleAuthController extends Controller
             return false;
         }
 
-        $isLocal = in_array(strtolower((string) $redirect['host']), ['localhost', '127.0.0.1', '::1'], true);
-        $secureScheme = strtolower((string) $redirect['scheme']) === 'https' || ($isLocal && strtolower((string) $redirect['scheme']) === 'http');
-        $matchingHost = isset($app['host']) && strtolower((string) $redirect['host']) === strtolower((string) $app['host']);
-        $callbackPath = rtrim((string) ($redirect['path'] ?? ''), '/') === '/auth/google/callback';
+        $redirectHost = $this->normalizedHost((string) $redirect['host']);
+        $appHost = $this->normalizedHost((string) ($app['host'] ?? ''));
+        $isLocal = $this->isLoopbackHost($redirectHost);
+        $secureScheme = strtolower((string) $redirect['scheme']) === 'https'
+            || ($isLocal && strtolower((string) $redirect['scheme']) === 'http');
+        $matchingHost = $appHost !== '' && (
+            $redirectHost === $appHost
+            || ($isLocal && $this->isLoopbackHost($appHost))
+        );
+        $callbackPath = $this->normalizedPath((string) ($redirect['path'] ?? '')) === '/auth/google/callback';
 
         return $secureScheme && $matchingHost && $callbackPath;
+    }
+
+    private function normalizedHost(string $host): string
+    {
+        $host = strtolower(trim($host, '[]'));
+
+        return $host === '::1' ? '127.0.0.1' : $host;
+    }
+
+    private function isLoopbackHost(string $host): bool
+    {
+        return in_array($this->normalizedHost($host), ['localhost', '127.0.0.1'], true);
+    }
+
+    private function normalizedPath(string $path): string
+    {
+        return '/'.trim($path, '/');
     }
 
     private function recordSuccessfulGoogleLogin(

@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $title ?? 'MCARE Admin' }}</title>
     <x-dashboard-theme-head />
+    <script>
+        try {
+            if (window.localStorage.getItem('mcare-admin-sidebar-collapsed') === '1') {
+                document.documentElement.classList.add('is-admin-sidebar-collapsed');
+            }
+        } catch (error) {
+            // Keep the sidebar expanded when storage is unavailable.
+        }
+    </script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="dashboard-shell universal-dashboard" data-dashboard-role="admin">
@@ -17,14 +26,19 @@
 
         $primaryNav = [
             ['label' => 'Dashboard', 'icon' => 'fa-gauge-high', 'href' => route('admin.dashboard'), 'active' => request()->routeIs('admin.dashboard')],
-            ['label' => 'Applications', 'icon' => 'fa-user-check', 'href' => route('admin.enrollments.index'), 'active' => request()->routeIs('admin.enrollments.*')],
+            ['label' => 'Applications', 'icon' => 'fa-clipboard-list', 'href' => route('admin.applications.index'), 'active' => request()->routeIs('admin.applications.*')],
+            ['label' => 'Enrollments', 'icon' => 'fa-user-check', 'href' => route('admin.enrollments.index'), 'active' => request()->routeIs('admin.enrollments.*')],
+            ['label' => 'Alumni claims', 'icon' => 'fa-user-check', 'href' => route('admin.historical-alumni.index'), 'active' => request()->routeIs('admin.historical-alumni.*')],
             ['label' => 'Payments', 'icon' => 'fa-credit-card', 'href' => route('admin.payment-schedules.index'), 'active' => request()->routeIs('admin.payment-schedules.*')],
             ['label' => 'Announcements', 'icon' => 'fa-bullhorn', 'href' => route('admin.announcements.index'), 'active' => request()->routeIs('admin.announcements.*')],
+            ['label' => 'Public Settings', 'icon' => 'fa-gear', 'href' => route('admin.public-settings.index'), 'active' => request()->routeIs('admin.public-settings.*')],
+            ['label' => 'Programs', 'icon' => 'fa-file-text', 'href' => route('admin.training-programs.index'), 'active' => request()->routeIs('admin.training-programs.*')],
+            ['label' => 'Batches', 'icon' => 'fa-folder-open', 'href' => route('admin.batches.index'), 'active' => request()->routeIs('admin.batches.*')],
             ['label' => 'Schedules', 'icon' => 'fa-calendar-days', 'href' => route('admin.schedules.index'), 'active' => request()->routeIs('admin.schedules.*')],
         ];
 
         $capstoneNav = [
-            ['label' => 'Trainees', 'icon' => 'fa-users', 'href' => route('admin.learning.trainees'), 'active' => request()->routeIs('admin.learning.trainees')],
+            ['label' => 'Trainees', 'icon' => 'fa-users', 'href' => route('admin.learning.trainees'), 'active' => request()->routeIs('admin.learning.trainees', 'admin.learning.trainees.show')],
             ['label' => 'Attendance', 'icon' => 'fa-clipboard-user', 'href' => route('admin.learning.attendance'), 'active' => request()->routeIs('admin.learning.attendance*')],
             ['label' => 'LMS Modules', 'icon' => 'fa-book-open', 'href' => route('admin.learning.modules'), 'active' => request()->routeIs('admin.learning.modules')],
             ['label' => 'Training Records', 'icon' => 'fa-award', 'href' => route('admin.learning.certificates'), 'active' => request()->routeIs('admin.learning.certificates', 'admin.learning.documents.*', 'admin.learning.batch-exports.*')],
@@ -43,12 +57,13 @@
         );
     @endphp
 
-    <aside class="dashboard-sidebar" data-dashboard-sidebar>
+    <aside id="admin-dashboard-sidebar" class="dashboard-sidebar" data-dashboard-sidebar>
         <div class="flex min-h-11 items-center border-b border-slate-100 pb-3">
             <div class="dashboard-brand flex-1 min-w-0">
+                <img src="{{ asset('assets/images/logoicon.png') }}" alt="MCARE Hub" class="dashboard-brand-mark">
                 <span class="min-w-0">
                     <span class="dashboard-brand-title">MCARE Hub</span>
-                    <span class="dashboard-brand-subtitle">Admin Portal</span>
+                    <span class="dashboard-brand-subtitle">Administration</span>
                 </span>
             </div>
         </div>
@@ -106,18 +121,38 @@
     </aside>
 
     <div class="dashboard-layout">
+        <div class="admin-masthead">
+            <p class="admin-masthead-kicker">TESDA-Accredited Training and Assessment Center</p>
+            <p class="admin-masthead-aside">Official administration system · Authorized personnel only</p>
+        </div>
         <header class="dashboard-topbar">
             <div class="dashboard-topbar-inner">
                 <div class="flex min-w-0 items-center gap-3">
+                    <button
+                        type="button"
+                        class="dashboard-sidebar-collapse"
+                        data-dashboard-sidebar-collapse
+                        aria-controls="admin-dashboard-sidebar"
+                        aria-expanded="true"
+                        aria-label="Collapse sidebar"
+                        title="Collapse sidebar"
+                    >
+                        <span class="dashboard-sidebar-collapse-expanded">
+                            <x-dashboard-icon name="chevron-left" />
+                        </span>
+                        <span class="dashboard-sidebar-collapse-collapsed">
+                            <x-dashboard-icon name="chevron-right" />
+                        </span>
+                    </button>
                     <div class="min-w-0">
-                        <p class="dashboard-header-kicker">Mission Care Training Center</p>
-                        <h1 class="dashboard-header-title">{{ $title ?? 'MCARE Admin' }}</h1>
+                        <p class="dashboard-header-kicker">Mission Care Training and Assessment Center</p>
+                        <h1 class="dashboard-header-title">{{ $title ?? 'MCARE Administration' }}</h1>
                     </div>
                 </div>
 
                 <form method="GET" action="{{ route('admin.enrollments.index') }}" class="dashboard-search">
                     <x-dashboard-icon name="magnifying-glass" class="text-sm text-slate-400" />
-                    <input name="search" type="search" placeholder="Search applicants..." class="min-w-0 flex-1 border-0 bg-transparent py-2.5 text-sm outline-none placeholder:text-slate-400">
+                    <input name="search" type="search" placeholder="Search enrollments..." class="min-w-0 flex-1 border-0 bg-transparent py-2.5 text-sm outline-none placeholder:text-slate-400">
                     <button type="submit" class="sr-only">Search</button>
                 </form>
 
@@ -143,30 +178,12 @@
         </header>
 
         <main class="dashboard-main">
-            @if (session('saved'))
-                <div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800" role="status" aria-live="polite" data-auto-dismiss="5000">{{ session('saved') }}</div>
-            @endif
-
-            @if (session('error') || session('alert'))
-                <div class="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800" role="alert">{{ session('error') ?? session('alert') }}</div>
-            @endif
-
-            @if ($errors->any())
-                <div class="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800" role="alert">
-                    @if($errors->count() === 1)
-                        <p>{{ $errors->first() }}</p>
-                    @else
-                        <ul class="list-disc pl-4 space-y-1">
-                            @foreach($errors->all() as $err)
-                                <li>{{ $err }}</li>
-                            @endforeach
-                        </ul>
-                    @endif
-                </div>
-            @endif
-
             @yield('content')
         </main>
+        <footer class="admin-colophon">
+            <p>Mission Care Training and Assessment Center · Caregiving NC II</p>
+            <p>Official institutional records. Use of this system is restricted to authorized MCARE administrators.</p>
+        </footer>
     </div>
     <script>
         (() => {
@@ -204,11 +221,13 @@
             <span class="lms-confirm-icon" aria-hidden="true">!</span>
             <h2 id="lms-confirm-title">Confirm action</h2>
             <p data-lms-confirm-message>This action cannot be undone.</p>
+            <p data-lms-confirm-detail hidden></p>
             <div class="lms-confirm-actions">
                 <button value="cancel" class="secondary-action">Cancel</button>
-                <button value="confirm" class="lms-danger-action">Continue</button>
+                <button value="confirm" class="lms-danger-action" data-lms-confirm-action>Continue</button>
             </div>
         </form>
     </dialog>
+    <x-dashboard-toasts />
 </body>
 </html>

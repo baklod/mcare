@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Mail\TwoFactorCodeMail;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -12,19 +11,14 @@ class AdminTwoFactorTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
+    public function test_admin_password_login_skips_the_email_code_even_when_two_factor_is_enabled(): void
     {
-        parent::setUp();
-
         config()->set([
             'services.two_factor.enabled' => true,
             'services.two_factor.roles' => ['admin'],
         ]);
-    }
-
-    public function test_admin_password_login_requires_email_code_before_authentication(): void
-    {
         Mail::fake();
+
         $admin = User::factory()->create([
             'email' => 'admin@example.test',
             'password' => 'Password123',
@@ -36,31 +30,15 @@ class AdminTwoFactorTest extends TestCase
                 'email' => $admin->email,
                 'password' => 'Password123',
             ])
-            ->assertRedirect(route('login'))
-            ->assertSessionHas('admin.mfa.pending');
-
-        $this->assertGuest();
-        $code = null;
-
-        Mail::assertSent(TwoFactorCodeMail::class, function (TwoFactorCodeMail $mail) use ($admin, &$code): bool {
-            $code = $mail->code;
-
-            return $mail->hasTo($admin->email) && strlen($mail->code) === 6;
-        });
-
-        $this->get(route('login'))
-            ->assertOk()
-            ->assertSee('Verify your sign-in');
-
-        $this->withSession(['url.intended' => route('admin.enrollments.index')])
-            ->post(route('login.verify-2fa'), ['code' => $code])
-            ->assertRedirect(route('admin.dashboard'));
+            ->assertRedirect(route('admin.dashboard'))
+            ->assertSessionMissing('admin.mfa.pending');
 
         $this->assertAuthenticatedAs($admin);
-        $this->assertSame($admin->id, session('admin.mfa.verified_user_id'));
+        $this->get(route('admin.dashboard'))->assertOk();
+        Mail::assertNothingSent();
     }
 
-    public function test_public_account_login_cannot_bypass_admin_email_code(): void
+    public function test_admin_role_is_exempt_from_the_sign_in_code_on_the_shared_login_form(): void
     {
         Mail::fake();
         $admin = User::factory()->create([
@@ -73,10 +51,10 @@ class AdminTwoFactorTest extends TestCase
             'email' => $admin->email,
             'password' => 'Password123',
         ])
-            ->assertRedirect(route('login'))
-            ->assertSessionHas('admin.mfa.pending');
+            ->assertRedirect(route('admin.dashboard'))
+            ->assertSessionMissing('admin.mfa.pending');
 
-        $this->assertGuest();
-        Mail::assertSent(TwoFactorCodeMail::class);
+        $this->assertAuthenticatedAs($admin);
+        Mail::assertNothingSent();
     }
 }

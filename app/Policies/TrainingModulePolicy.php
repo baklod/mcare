@@ -3,9 +3,9 @@
 namespace App\Policies;
 
 use App\Models\EnrollmentApplication;
-use App\Models\ModuleProgress;
 use App\Models\TrainingModule;
 use App\Models\User;
+use App\Services\TraineeClassworkSequence;
 
 class TrainingModulePolicy
 {
@@ -45,11 +45,7 @@ class TrainingModulePolicy
             return false;
         }
 
-        return $module->progressRecords()
-            ->where('enrollment_application_id', $application->getKey())
-            ->whereNotNull('unlocked_at')
-            ->where('status', '!=', ModuleProgress::STATUS_LOCKED)
-            ->exists();
+        return app(TraineeClassworkSequence::class)->canAccess($application, $module);
     }
 
     public function create(User $user): bool

@@ -6,6 +6,7 @@ use App\Models\Quiz;
 use App\Models\QuizAttempt;
 use App\Models\QuizQuestion;
 use App\Models\TrainingBatch;
+use App\Models\TrainingSubmodule;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesLmsTestData;
@@ -68,9 +69,13 @@ class QuizAttemptTest extends TestCase
         $this->actingAs($trainee)
             ->get(route('trainee.quiz-attempts.show', $attempt))
             ->assertOk()
+            ->assertSee('lms-quiz-taking-page', false)
             ->assertSee('data-quiz-attempt-form', false)
             ->assertSee('data-quiz-timer', false)
+            ->assertSee('lms-answer-text', false)
+            ->assertSee('lms-take-question-heading', false)
             ->assertSee('Perform hand hygiene')
+            ->assertDontSee('lms-answer-letter', false)
             ->assertDontSee('correct_option', false);
 
         $this->actingAs($trainee)
@@ -115,6 +120,60 @@ class QuizAttemptTest extends TestCase
             ->assertSee('data-quiz-result', false)
             ->assertSee('Quiz Result')
             ->assertSee('100');
+    }
+
+    public function test_trainee_can_start_the_next_quiz_while_the_first_quiz_is_unfinished(): void
+    {
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch();
+        ['user' => $trainee, 'application' => $application] = $this->lmsTrainee($batch);
+        $module = $this->lmsModule($trainer, $batch);
+        $firstSubmodule = $this->lmsSubmodule($module);
+        $secondSubmodule = TrainingSubmodule::query()->create([
+            'training_module_id' => $module->id,
+            'title' => 'Second outcome',
+            'position' => ((int) $firstSubmodule->position) + 1,
+            'is_required' => true,
+        ]);
+        $firstQuiz = $this->publishedQuiz($trainer, $batch, [
+            'title' => 'First quiz',
+            'training_module_id' => $module->id,
+            'training_submodule_id' => $firstSubmodule->id,
+        ]);
+        $this->question($firstQuiz, 'First prompt', ['Yes', 'No'], 0);
+        $secondQuiz = $this->publishedQuiz($trainer, $batch, [
+            'title' => 'Second quiz',
+            'training_module_id' => $module->id,
+            'training_submodule_id' => $secondSubmodule->id,
+        ]);
+        $this->question($secondQuiz, 'Second prompt', ['Yes', 'No'], 0);
+
+        $this->actingAs($trainee)
+            ->post(route('trainee.quizzes.start', $firstQuiz))
+            ->assertRedirect();
+
+        $firstAttempt = QuizAttempt::query()
+            ->where('quiz_id', $firstQuiz->id)
+            ->where('enrollment_application_id', $application->id)
+            ->firstOrFail();
+        $this->assertSame(QuizAttempt::STATUS_IN_PROGRESS, $firstAttempt->status);
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.quizzes.show', $secondQuiz))
+            ->assertOk()
+            ->assertSee('Start quiz');
+
+        $startSecond = $this->actingAs($trainee)
+            ->post(route('trainee.quizzes.start', $secondQuiz));
+
+        $secondAttempt = QuizAttempt::query()
+            ->where('quiz_id', $secondQuiz->id)
+            ->where('enrollment_application_id', $application->id)
+            ->firstOrFail();
+
+        $startSecond->assertRedirect(route('trainee.quiz-attempts.show', $secondAttempt));
+        $this->assertSame(QuizAttempt::STATUS_IN_PROGRESS, $secondAttempt->status);
+        $this->assertSame(QuizAttempt::STATUS_IN_PROGRESS, $firstAttempt->fresh()->status);
     }
 
     public function test_wrong_batch_quiz_and_another_trainees_attempt_are_not_accessible(): void
@@ -440,7 +499,7 @@ class QuizAttemptTest extends TestCase
             ->assertSee('Perform hand hygiene');
     }
 
-    public function test_trainee_can_submit_docx_activity_file_and_download_it(): void
+    public function test_trainee_can_submit_pdf_activity_file_and_download_it(): void
     {
         \Illuminate\Support\Facades\Storage::fake('local');
 
@@ -456,7 +515,7 @@ class QuizAttemptTest extends TestCase
         $fileQuestion = QuizQuestion::create([
             'quiz_id' => $quiz->id,
             'type' => 'file_upload',
-            'prompt' => 'Upload your completed Caregiving Activity Sheet (.docx).',
+            'prompt' => 'Upload your completed Caregiving Activity Sheet (PDF or image).',
             'options' => [],
             'correct_option' => null,
             'points' => 10,
@@ -476,14 +535,15 @@ class QuizAttemptTest extends TestCase
             ->assertOk()
             ->assertSee('lms-activity-upload', false)
             ->assertSee('lms-activity-file-input', false)
-            ->assertSee('type="file"', false);
+            ->assertSee('type="file"', false)
+            ->assertSee('PDF or image');
 
-        $docxFile = \Illuminate\Http\UploadedFile::fake()->create('My_Activity.docx', 100, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        $pdfFile = \Illuminate\Http\UploadedFile::fake()->create('My_Activity.pdf', 100, 'application/pdf');
 
         $this->actingAs($trainee)
             ->post(route('trainee.quiz-attempts.submit', $attempt), [
                 'file_answers' => [
-                    $fileQuestion->id => $docxFile,
+                    $fileQuestion->id => $pdfFile,
                 ],
             ])
             ->assertRedirect(route('trainee.quiz-attempts.result', $attempt));
@@ -497,21 +557,66 @@ class QuizAttemptTest extends TestCase
         $this->actingAs($trainee)
             ->get(route('trainee.quiz-attempts.result', $attempt))
             ->assertOk()
-            ->assertSee('My_Activity.docx')
+            ->assertSee('My_Activity.pdf')
             ->assertSee(route('trainee.quiz-attempts.download', ['attempt' => $attempt, 'question' => $fileQuestion->id]));
 
         $download = $this->actingAs($trainee)
             ->get(route('trainee.quiz-attempts.download', ['attempt' => $attempt, 'question' => $fileQuestion->id]));
 
         $download->assertOk()
-            ->assertHeader('Content-Disposition', 'attachment; filename=My_Activity.docx');
+            ->assertHeader('Content-Disposition', 'attachment; filename=My_Activity.pdf');
 
         // Trainer can also download the student's submission from quiz results
         $trainerDownload = $this->actingAs($trainer)
             ->get(route('trainer.quizzes.attempts.download', ['quiz' => $quiz, 'attempt' => $attempt, 'question' => $fileQuestion->id]));
 
         $trainerDownload->assertOk()
-            ->assertHeader('Content-Disposition', 'attachment; filename=My_Activity.docx');
+            ->assertHeader('Content-Disposition', 'attachment; filename=My_Activity.pdf');
+    }
+
+    public function test_trainee_cannot_submit_docx_activity_file(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch();
+        ['user' => $trainee, 'application' => $application] = $this->lmsTrainee($batch);
+        $module = $this->lmsModule($trainer, $batch);
+        $quiz = $this->publishedQuiz($trainer, $batch, [
+            'training_module_id' => $module->id,
+            'attempt_limit' => 1,
+        ]);
+
+        $fileQuestion = QuizQuestion::create([
+            'quiz_id' => $quiz->id,
+            'type' => 'file_upload',
+            'prompt' => 'Upload your completed Caregiving Activity Sheet (PDF or image).',
+            'options' => [],
+            'correct_option' => null,
+            'points' => 10,
+            'position' => 0,
+        ]);
+
+        $attempt = QuizAttempt::create([
+            'quiz_id' => $quiz->id,
+            'enrollment_application_id' => $application->id,
+            'attempt_number' => 1,
+            'status' => QuizAttempt::STATUS_IN_PROGRESS,
+            'started_at' => now(),
+        ]);
+
+        $this->actingAs($trainee)
+            ->from(route('trainee.quiz-attempts.show', $attempt))
+            ->post(route('trainee.quiz-attempts.submit', $attempt), [
+                'file_answers' => [
+                    $fileQuestion->id => \Illuminate\Http\UploadedFile::fake()->create(
+                        'My_Activity.docx',
+                        100,
+                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                    ),
+                ],
+            ])
+            ->assertSessionHasErrors('file_answers.'.$fileQuestion->id);
     }
 
     private function publishedQuiz(

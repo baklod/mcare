@@ -24,6 +24,7 @@ class TraineeRosterCsv
                 'Total paid',
                 'Remaining balance',
                 'Downpayment cleared',
+                'Latest reference',
                 'Latest OR number',
                 'Completed modules',
                 'Modules in progress',
@@ -31,6 +32,9 @@ class TraineeRosterCsv
             ]);
 
             foreach ($trainees as $trainee) {
+                $latestReference = $trainee->latestPaymentReference()
+                    ?? $trainee->payment_reference
+                    ?? '';
                 $latestOr = $trainee->paymentTransactions?->where('status', 'verified')->first()?->or_number
                     ?? $trainee->payment_receipt_number
                     ?? '';
@@ -47,6 +51,7 @@ class TraineeRosterCsv
                     number_format((float) ($trainee->total_paid_amount ?? 0.00), 2),
                     number_format($trainee->remainingBalance(), 2),
                     $trainee->isDownpaymentSatisfied() ? 'Yes' : 'No',
+                    $latestReference,
                     $latestOr,
                     $trainee->moduleProgress->where('status', 'completed')->count(),
                     $trainee->moduleProgress->where('status', 'in_progress')->count(),

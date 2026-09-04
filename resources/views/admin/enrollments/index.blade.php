@@ -1,4 +1,4 @@
-@extends('admin.layouts.app', ['title' => 'Enrollment Queue | MCARE Admin'])
+@extends('admin.layouts.app', ['title' => 'Enrollments | MCARE Admin'])
 
 @section('content')
     @php
@@ -19,27 +19,23 @@
     @endphp
 
     <div class="space-y-6">
-        
-        <!-- Header -->
-        <header class="flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-end md:justify-between">
-            <div>
-                <h1 class="font-display text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">Applicant queue</h1>
-                <p class="mt-1.5 max-w-3xl text-sm text-slate-600">
-                    Review payment-released learner profiles across active programs and move qualified applicants into pre-enlistment, approval, or denial.
-                </p>
-            </div>
-            <div class="rounded-xl border border-purple-100 bg-purple-50 px-5 py-3 text-right">
-                <span class="text-xs font-bold uppercase tracking-wider text-purple-700">Total Applications</span>
-                <span class="block font-display text-2xl font-extrabold text-slate-950">{{ $totalApplications }}</span>
-            </div>
-        </header>
-
         <!-- Status Summary Horizontal Cards Grid -->
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        @php $enrollCardIcons = ['profile_submitted' => ['icon' => 'file-text', 'tone' => 'bg-sky-50 text-sky-700 ring-sky-100'], 'pre_enlistment' => ['icon' => 'clipboard-list', 'tone' => 'bg-amber-50 text-amber-700 ring-amber-100'], 'approved' => ['icon' => 'circle-check', 'tone' => 'bg-emerald-50 text-emerald-700 ring-emerald-100'], 'denied' => ['icon' => 'xmark', 'tone' => 'bg-red-50 text-red-700 ring-red-100']]; @endphp
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <a href="{{ route('admin.enrollments.index') }}" class="group flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:border-purple-300 hover:shadow-sm @if($selectedStatus === '') ring-2 ring-purple-500 border-purple-300 bg-purple-50/20 @endif">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500 group-hover:text-purple-700">Total enrollments</span>
+                    <span class="mt-2 block font-display text-2xl font-extrabold text-slate-900">{{ $totalApplications }}</span>
+                </div>
+                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-purple-50 text-purple-700 ring-1 ring-purple-100"><x-dashboard-icon name="users" /></span>
+            </a>
             @foreach ($statuses as $status => $label)
-                <a href="{{ route('admin.enrollments.index', ['status' => $status]) }}" class="group flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 transition hover:border-purple-300 hover:shadow-sm @if($selectedStatus === $status) ring-2 ring-purple-500 border-purple-300 bg-purple-50/20 @endif">
-                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500 group-hover:text-purple-700">{{ $label }}</span>
-                    <span class="mt-2 font-display text-2xl font-extrabold text-slate-900">{{ $counts[$status] ?? 0 }}</span>
+                <a href="{{ route('admin.enrollments.index', ['status' => $status]) }}" class="group flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:border-purple-300 hover:shadow-sm @if($selectedStatus === $status) ring-2 ring-purple-500 border-purple-300 bg-purple-50/20 @endif">
+                    <div>
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-500 group-hover:text-purple-700">{{ $label }}</span>
+                        <span class="mt-2 block font-display text-2xl font-extrabold text-slate-900">{{ $counts[$status] ?? 0 }}</span>
+                    </div>
+                    <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg ring-1 {{ $enrollCardIcons[$status]['tone'] ?? 'bg-slate-50 text-slate-600 ring-slate-100' }}"><x-dashboard-icon :name="$enrollCardIcons[$status]['icon'] ?? 'circle-question'" /></span>
                 </a>
             @endforeach
         </div>
@@ -144,15 +140,25 @@
                             </td>
                             <td class="px-5 py-4 text-slate-500 text-xs">{{ $application->created_at?->format('M d, Y') }}</td>
                             <td class="px-5 py-4 text-right">
-                                <a href="{{ route('admin.enrollments.show', $application) }}" class="inline-flex items-center justify-center rounded-lg border border-purple-200 bg-white px-3 py-1.5 text-xs font-bold text-purple-700 transition hover:bg-purple-50">
-                                    Review
-                                </a>
+                                <div class="flex flex-wrap items-center justify-end gap-2">
+                                    <a href="{{ route('admin.enrollments.show', $application) }}" class="inline-flex items-center justify-center rounded-lg border border-purple-200 bg-white px-3 py-1.5 text-xs font-bold text-purple-700 transition hover:bg-purple-50">
+                                        Review
+                                    </a>
+                                    <form method="POST" action="{{ route('admin.enrollments.destroy', $application) }}" data-confirm-title="{{ $application->accountDeletionTitle() }}" data-confirm="{{ $application->accountDeletionMessage() }}" @if($application->accountDeletionDetail()) data-confirm-detail="{{ $application->accountDeletionDetail() }}" @endif data-confirm-action="{{ $application->accountDeletionAction() }}">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-700 transition hover:bg-red-50" title="{{ $application->accountDeletionAction() }}">
+                                            <x-dashboard-icon name="trash-2" class="h-3.5 w-3.5" />
+                                            Delete
+                                        </button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
                             <td colspan="8" class="px-6 py-12 text-center text-slate-500">
-                                <p class="text-base font-bold text-slate-800">No applications found</p>
+                                <p class="text-base font-bold text-slate-800">No enrollments found</p>
                                 <p class="mt-1 text-xs text-slate-500">Try adjusting your search query or status filter options.</p>
                             </td>
                         </tr>

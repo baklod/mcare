@@ -3,27 +3,22 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\StaffAccountCredentialsMail;
 use App\Models\AdminActivityLog;
-use App\Models\AlumniProfile;
 use App\Models\EnrollmentApplication;
-use App\Models\HistoricalAlumniClaim;
 use App\Models\PaymentTransaction;
-use App\Models\Quiz;
-use App\Models\TrainerAnnouncement;
 use App\Models\TrainingBatch;
-use App\Models\TrainingModule;
 use App\Models\TrainingProgram;
 use App\Models\User;
+use App\Services\AccountDeletionService;
 use App\Services\RollingModuleReleaseService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Notifications\SendQueuedNotifications;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -112,14 +107,6 @@ class AdminAccountController extends Controller
             'roleFilter' => $roleFilter,
             'search' => $search,
             'counts' => $counts,
-            'historicalClaims' => HistoricalAlumniClaim::query()
-                ->with(['user', 'reviewer', 'onsiteVerifier'])
-                ->latest()
-                ->paginate(8, ['*'], 'claims_page'),
-            'historicalClaimCounts' => HistoricalAlumniClaim::query()
-                ->selectRaw('status, count(*) as aggregate')
-                ->groupBy('status')
-                ->pluck('aggregate', 'status'),
         ]);
     }
 
@@ -158,14 +145,17 @@ class AdminAccountController extends Controller
                 Rule::unique('users', 'email'),
                 Rule::unique('enrollment_applications', 'email'),
             ],
-            'password' => ['required', 'confirmed', 'max:255', Password::min(10)->mixedCase()->letters()->numbers()->symbols()],
         ], [
             'name.regex' => 'Use letters, spaces, periods, apostrophes, or hyphens only for the name.',
             'email.unique' => 'This email is already connected to an MCARE account or enrollment.',
         ]);
 
+        $plainPassword = $this->generateTemporaryPassword();
+
         $trainer = User::create([
-            ...$validated,
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => $plainPassword,
             'role' => 'trainer',
             'applicant_status' => 'staff_created',
         ]);
@@ -174,7 +164,7 @@ class AdminAccountController extends Controller
             'email' => $trainer->email,
         ]);
 
-        return $this->accountCreatedResponse($request, $trainer, "Trainer account created for {$trainer->name}.");
+        return $this->accountCreatedResponse($request, $trainer, "Trainer account created for {$trainer->name}.", $plainPassword);
     }
 
     public function storeTrainee(
@@ -198,7 +188,6 @@ class AdminAccountController extends Controller
                 Rule::unique('users', 'email'),
                 Rule::unique('enrollment_applications', 'email'),
             ],
-            'password' => ['required', 'confirmed', 'max:255', Password::min(10)->mixedCase()->letters()->numbers()->symbols()],
             'training_batch_id' => ['required', 'integer', 'exists:training_batches,id'],
             'birth_date' => ['required', 'date', 'before:today'],
             'gender' => ['required', Rule::in(['Male', 'Female'])],
@@ -252,11 +241,13 @@ class AdminAccountController extends Controller
             ])->errorBag('trainee');
         }
 
-        [$trainee, $application] = DB::transaction(function () use ($request, $validated, $program, $programFee, $requiredDownpayment, $verifiedAmount) {
+        $plainPassword = $this->generateTemporaryPassword();
+
+        [$trainee, $application] = DB::transaction(function () use ($request, $validated, $program, $programFee, $requiredDownpayment, $verifiedAmount, $plainPassword) {
             $trainee = User::create([
                 'name' => trim("{$validated['first_name']} {$validated['middle_name']} {$validated['last_name']}"),
                 'email' => $validated['email'],
-                'password' => $validated['password'],
+                'password' => $plainPassword,
                 'role' => 'trainee',
                 'applicant_status' => 'staff_created',
             ]);
@@ -324,6 +315,7 @@ class AdminAccountController extends Controller
                     : PaymentTransaction::TYPE_DOWNPAYMENT,
                 'payment_channel' => PaymentTransaction::CHANNEL_ONSITE,
                 'amount' => $verifiedAmount,
+                'reference_number' => $validated['onsite_or_number'],
                 'or_number' => $validated['onsite_or_number'],
                 'status' => PaymentTransaction::STATUS_VERIFIED,
                 'paid_at' => now(),
@@ -345,128 +337,25 @@ class AdminAccountController extends Controller
 
         $releases->assignCurrentTo($application);
 
-        return $this->accountCreatedResponse($request, $trainee, "Assisted trainee intake completed for {$trainee->name}.");
+        return $this->accountCreatedResponse($request, $trainee, "Assisted trainee intake completed for {$trainee->name}.", $plainPassword);
     }
 
-    public function destroy(Request $request, User $user): RedirectResponse
+    public function destroy(Request $request, User $user, AccountDeletionService $accounts): RedirectResponse
     {
-        abort_unless(in_array($user->role, ['trainer', 'trainee', 'applicant'], true), 404);
-
-        if ($user->id === $request->user()->id || $user->hasRole('admin') || $user->role === 'admin') {
-            return redirect()->route('admin.accounts.index')->withErrors([
-                'account' => 'Administrator accounts cannot be deleted here.',
-            ]);
-        }
-
-        $accountLabel = $user->name ?: 'Applicant';
-        $accountEmail = $user->email;
-        $accountRole = $user->role;
-
-        // 1. Gather all file paths from storage before DB deletion
-        $application = $user->enrollmentApplication()->first();
-        $historicalClaim = $user->historicalAlumniClaim()->first();
-
-        if ($historicalClaim?->status === HistoricalAlumniClaim::STATUS_APPROVED) {
-            return redirect()->route('admin.accounts.index')->withErrors([
-                'account' => 'Verified historical alumni records are protected and cannot be deleted from account management.',
-            ]);
-        }
-
-        $storageFiles = collect();
-
-        if ($historicalClaim) {
-            $storageFiles = $storageFiles->merge([
-                $historicalClaim->evidence_document_path,
-                $historicalClaim->evidence_document_page_2_path,
-            ])->filter();
-        }
-
-        if ($application) {
-            $storageFiles = $storageFiles->merge([
-                $application->birth_certificate_path,
-                $application->education_document_path,
-                $application->good_moral_certificate_path,
-                $application->id_photo_path,
-                $application->signature_path,
-            ])->filter();
-
-            $storageFiles = $storageFiles->merge(
-                $application->paymentTransactions()->pluck('receipt_proof_path')->filter()
-            );
-        }
-
-        $officialFiles = $application
-            ? $application->officialDocuments()
-                ->whereNotNull('file_path')
-                ->get(['storage_disk', 'file_path'])
-            : collect();
-
-        $queuedJobIds = $this->queuedNotificationJobIds($user);
-
-        // 2. Perform transactional deletion of all related database records
-        DB::transaction(function () use ($user, $application, $request, $accountRole, $accountEmail, $queuedJobIds): void {
-            if ($queuedJobIds !== []) {
-                DB::table('jobs')->whereIn('id', $queuedJobIds)->delete();
-            }
-
-            if (Schema::hasTable('sessions')) {
-                DB::table('sessions')->where('user_id', $user->id)->delete();
-            }
-
-            if (Schema::hasTable('notifications')) {
-                DB::table('notifications')
-                    ->where('notifiable_type', User::class)
-                    ->where('notifiable_id', $user->id)
-                    ->delete();
-            }
-
-            if ($application) {
-                // Clean up related child rows
-                $application->officialDocuments()->delete();
-                $application->competencyRecords()->delete();
-                $application->quizAttempts()->delete();
-                $application->moduleProgress()->delete();
-                $application->paymentTransactions()->delete();
-                $application->paymentAttempts()->delete();
-                $application->targetedQuizzes()->update(['target_enrollment_application_id' => null]);
-                TrainingModule::where('target_enrollment_application_id', $application->id)->update(['target_enrollment_application_id' => null]);
-
-                $application->delete();
-            }
-
-            if ($accountRole === 'trainer') {
-                TrainingBatch::where('trainer_id', $user->id)->update(['trainer_id' => null]);
-                TrainerAnnouncement::where('trainer_id', $user->id)->delete();
-                Quiz::where('trainer_id', $user->id)->delete();
-                TrainingModule::where('trainer_id', $user->id)->delete();
-            }
-
-            AlumniProfile::where('user_id', $user->id)->delete();
-
-            AdminActivityLog::record($request->user(), 'admin.account.deleted', $user, [
-                'deleted_role' => $accountRole,
-                'deleted_email' => $accountEmail,
-            ]);
-
-            $user->syncRoles([]);
-            $user->delete();
-        });
-
-        // 3. Delete physical files from storage
-        foreach ($storageFiles->unique() as $path) {
-            Storage::disk('local')->delete($path);
-        }
-        foreach ($officialFiles as $doc) {
-            Storage::disk($doc->storage_disk ?: 'local')->delete($doc->file_path);
+        try {
+            $deleted = $accounts->delete($user, $request->user());
+        } catch (ValidationException $exception) {
+            return redirect()->route('admin.accounts.index')->withErrors($exception->errors());
         }
 
         return redirect()
             ->route('admin.accounts.index')
-            ->with('saved', "Account for {$accountLabel} ({$accountEmail}) and related records were permanently removed. The applicant can now submit a fresh enrollment if needed.");
+            ->with('saved', "Account for {$deleted['label']} ({$deleted['email']}) and related records were permanently removed. The applicant can now submit a fresh enrollment if needed.");
     }
 
-    private function accountCreatedResponse(Request $request, User $user, string $message): RedirectResponse
+    private function accountCreatedResponse(Request $request, User $user, string $message, string $plainPassword): RedirectResponse
     {
+        $credentialsSent = $this->sendStaffAccountCredentials($request, $user, $plainPassword);
         $verificationSent = true;
 
         try {
@@ -479,43 +368,58 @@ class AdminAccountController extends Controller
             ]);
         }
 
+        $saved = $credentialsSent
+            ? "{$message} A temporary password was emailed to {$user->email}."
+            : "{$message} The account was created, but the password email could not be sent. Check the SMTP mail configuration.";
+
         return redirect()
             ->route('admin.accounts.index')
-            ->with('saved', $message)
+            ->with('saved', $saved)
             ->with('verification_notice', $verificationSent
                 ? "A verification link was sent to {$user->email}."
                 : 'The account was created, but the verification email could not be sent. Check the mail configuration and resend later.');
     }
 
-    /** @return list<int> */
-    private function queuedNotificationJobIds(User $user): array
+    private function sendStaffAccountCredentials(Request $request, User $user, string $plainPassword): bool
     {
-        if (! Schema::hasTable('jobs')) {
-            return [];
+        try {
+            Mail::to($user->email)->send(new StaffAccountCredentialsMail($user, $plainPassword));
+
+            return true;
+        } catch (Throwable $exception) {
+            report($exception);
+            AdminActivityLog::record($request->user(), 'admin.account.credentials-email.failed', $user, [
+                'email' => $user->email,
+            ]);
+
+            return false;
+        }
+    }
+
+    private function generateTemporaryPassword(): string
+    {
+        $sets = [
+            'abcdefghijkmnopqrstuvwxyz',
+            'ABCDEFGHJKLMNPQRSTUVWXYZ',
+            '23456789',
+            '!@#$%*?',
+        ];
+
+        $characters = [];
+        foreach ($sets as $set) {
+            $characters[] = $set[random_int(0, strlen($set) - 1)];
         }
 
-        return DB::table('jobs')
-            ->get(['id', 'payload'])
-            ->filter(function (object $job) use ($user): bool {
-                $payload = json_decode($job->payload, true);
-                if (data_get($payload, 'data.commandName') !== SendQueuedNotifications::class) {
-                    return false;
-                }
+        $pool = implode('', $sets);
+        while (count($characters) < 14) {
+            $characters[] = $pool[random_int(0, strlen($pool) - 1)];
+        }
 
-                try {
-                    $command = unserialize((string) data_get($payload, 'data.command'));
-                } catch (Throwable) {
-                    return false;
-                }
+        for ($index = count($characters) - 1; $index > 0; $index--) {
+            $swap = random_int(0, $index);
+            [$characters[$index], $characters[$swap]] = [$characters[$swap], $characters[$index]];
+        }
 
-                return $command instanceof SendQueuedNotifications
-                    && collect($command->notifiables)->contains(
-                        fn ($notifiable): bool => $notifiable instanceof User && $notifiable->is($user),
-                    );
-            })
-            ->pluck('id')
-            ->map(fn ($id): int => (int) $id)
-            ->values()
-            ->all();
+        return implode('', $characters);
     }
 }

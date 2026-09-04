@@ -1,7 +1,7 @@
 @extends('trainer.layouts.app', ['title' => 'Trainees | MCARE Trainer'])
 
 @section('content')
-<div class="mx-auto max-w-7xl space-y-7">
+<div class="w-full space-y-7">
     <header class="border-b border-stone-200 pb-6">
         <p class="dashboard-section-kicker">Trainees</p>
         <h1 class="dashboard-section-title mt-2 text-3xl">Approved learner roster</h1>
@@ -38,7 +38,7 @@
     </form>
 
     <div class="dashboard-table-wrap overflow-x-auto">
-        <table class="dashboard-table min-w-[62rem]">
+        <table class="dashboard-table w-full min-w-[62rem]">
             <thead>
                 <tr>
                     <th>Trainee</th>
@@ -111,10 +111,12 @@
                                                         </span>
                                                     </div>
                                                     <p class="text-stone-500">
+                                                        @if($tx->reference_number || $tx->ticket_number)
+                                                            Ref #: <strong class="font-mono text-purple-800">{{ $tx->reference_number ?: $tx->ticket_number }}</strong>
+                                                        @endif
                                                         @if($tx->or_number)
+                                                            @if($tx->reference_number || $tx->ticket_number) · @endif
                                                             OR #: <strong class="font-mono text-stone-800">{{ $tx->or_number }}</strong>
-                                                        @elseif($tx->ticket_number)
-                                                            Ticket #: <strong class="font-mono text-purple-800">{{ $tx->ticket_number }}</strong>
                                                         @endif
                                                         · {{ $tx->typeLabel() }}
                                                     </p>

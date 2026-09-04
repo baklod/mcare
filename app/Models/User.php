@@ -7,6 +7,7 @@ use App\Support\RolePermissionMatrix;
 use Database\Factories\UserFactory;
 use Illuminate\Auth\MustVerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -46,11 +47,39 @@ class User extends Authenticatable implements MustVerifyEmailContract
      */
     protected $fillable = [
         'name',
+        'first_name',
+        'middle_name',
+        'last_name',
+        'extension_name',
         'email',
+        'contact_email',
+        'contact_number',
+        'birth_date',
+        'birthplace_city',
+        'birthplace_province',
+        'birthplace_region',
+        'gender',
+        'civil_status',
+        'employment_status',
+        'employment_type',
+        'nationality',
+        'street',
+        'barangay',
+        'city',
+        'province',
+        'region',
+        'zip_code',
+        'educational_attainment',
+        'school_name',
+        'year_graduated',
+        'guardian_name',
+        'guardian_address',
         'google_id',
         'avatar_url',
+        'profile_photo_path',
         'role',
         'applicant_status',
+        'trainee_status',
         'password',
     ];
 
@@ -73,13 +102,65 @@ class User extends Authenticatable implements MustVerifyEmailContract
     {
         return [
             'email_verified_at' => 'datetime',
+            'birth_date' => 'date',
+            'year_graduated' => 'integer',
             'password' => 'hashed',
         ];
     }
 
     public function sendEmailVerificationNotification(): void
     {
-        $this->notify(new QueuedVerifyEmail);
+        $this->notifyNow(new QueuedVerifyEmail);
+    }
+
+    /**
+     * @return Attribute<string|null, string|null>
+     */
+    protected function avatarUrl(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): ?string => $this->profilePhotoUrl(),
+            set: fn (?string $value): array => [
+                'profile_photo_path' => self::storedPhotoFromInput($value),
+            ],
+        );
+    }
+
+    public function profilePhotoUrl(): ?string
+    {
+        $stored = trim((string) $this->profile_photo_path);
+        if ($stored === '' || str_contains($stored, '..')) {
+            return null;
+        }
+
+        if (str_starts_with($stored, 'avatars/'.$this->id.'/')) {
+            return '/storage/'.$stored;
+        }
+
+        if (str_starts_with($stored, 'https://')) {
+            return $stored;
+        }
+
+        if (str_starts_with($stored, '/') && ! str_starts_with($stored, '//')) {
+            return $stored;
+        }
+
+        return null;
+    }
+
+    public static function storedPhotoFromInput(?string $value): ?string
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return null;
+        }
+
+        $path = parse_url($value, PHP_URL_PATH) ?: $value;
+        $stored = str_starts_with((string) $path, '/storage/avatars/')
+            ? ltrim(substr((string) $path, strlen('/storage/')), '/')
+            : $value;
+
+        return str_contains($stored, '..') ? null : $stored;
     }
 
     public function trainingModules(): HasMany
@@ -137,8 +218,35 @@ class User extends Authenticatable implements MustVerifyEmailContract
         return $this->hasMany(ClassroomComment::class, 'recipient_user_id');
     }
 
+    /** @return array<string, string> */
+    public static function traineeStatuses(): array
+    {
+        return [
+            EnrollmentApplication::LEARNING_ACTIVE => 'Active student',
+            EnrollmentApplication::LEARNING_PAUSED => 'Paused',
+            EnrollmentApplication::LEARNING_GRADUATED => 'Graduate',
+            EnrollmentApplication::LEARNING_WITHDRAWN => 'Withdrawn',
+        ];
+    }
+
+    public function traineeStatusLabel(): string
+    {
+        return self::traineeStatuses()[$this->trainee_status]
+            ?? ($this->role === 'trainee' ? 'Active student' : 'Not a trainee');
+    }
+
+    public function isActiveStudent(): bool
+    {
+        return $this->trainee_status === EnrollmentApplication::LEARNING_ACTIVE
+            || ($this->trainee_status === null && $this->role === 'trainee' && ! $this->isGraduate());
+    }
+
     public function isGraduate(): bool
     {
+        if ($this->trainee_status === EnrollmentApplication::LEARNING_GRADUATED) {
+            return true;
+        }
+
         $application = $this->relationLoaded('enrollmentApplication')
             ? $this->enrollmentApplication
             : $this->enrollmentApplication()->first();

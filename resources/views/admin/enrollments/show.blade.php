@@ -23,6 +23,9 @@
 
         $documentsReadyForApproval = $pendingDocumentApprovals === [];
         $paymentReadyForApproval = $application->hasEnrollmentPaymentClearance();
+        $documentReviewSubmitted = $application->documents_reviewed_at !== null || filled($application->document_review);
+        $documentsReviewed = $documentsReadyForApproval && $application->documents_reviewed_at !== null;
+        $documentReviewRequiredNotice = $errors->has('status') && ! $documentsReviewed;
 
         $personalFields = [
             'Full name' => trim($application->first_name.' '.$application->middle_name.' '.$application->last_name.' '.$application->extension_name),
@@ -62,98 +65,81 @@
             'Signature name' => $application->signature_name,
             'Date accomplished' => $application->date_accomplished?->format('M d, Y'),
         ];
-
-        $documentMime = fn (?string $path) => $path && \Illuminate\Support\Facades\Storage::disk('local')->exists($path)
-            ? (\Illuminate\Support\Facades\Storage::disk('local')->mimeType($path) ?: 'application/octet-stream')
-            : null;
-
-        $documents = [
-            'birth-certificate' => [
-                'label' => 'Birth Certificate',
-                'path' => $application->birth_certificate_path,
-                'mime' => $documentMime($application->birth_certificate_path),
-            ],
-            'education-document' => [
-                'label' => 'Form 137/138 or Diploma',
-                'path' => $application->education_document_path,
-                'mime' => $documentMime($application->education_document_path),
-            ],
-            'good-moral-certificate' => [
-                'label' => 'Good Moral Certificate',
-                'path' => $application->good_moral_certificate_path,
-                'mime' => $documentMime($application->good_moral_certificate_path),
-            ],
-            'id-photo' => [
-                'label' => 'ID Photo',
-                'path' => $application->id_photo_path,
-                'mime' => $documentMime($application->id_photo_path),
-            ],
-            'signature' => [
-                'label' => 'E-Signature'.($application->signature_type ? ' ('.str($application->signature_type)->headline().')' : ''),
-                'path' => $application->signature_path,
-                'mime' => $documentMime($application->signature_path),
-            ],
-        ];
     @endphp
 
     <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <a href="{{ route('admin.enrollments.index') }}" class="inline-flex w-fit items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:border-purple-200 hover:text-purple-700">
-            Back to queue
-        </a>
-        <span class="inline-flex w-fit rounded-full px-4 py-2 text-sm font-bold ring-1 {{ $badgeClasses[$application->status] ?? 'bg-slate-50 text-slate-700 ring-slate-100' }}">
+        <div class="flex flex-wrap items-center gap-2">
+            <a href="{{ route('admin.enrollments.index') }}" class="secondary-action">
+                Back to queue
+            </a>
+            <form method="POST" action="{{ route('admin.enrollments.destroy', $application) }}" data-confirm-title="{{ $application->accountDeletionTitle() }}" data-confirm="{{ $application->accountDeletionMessage() }}" @if($application->accountDeletionDetail()) data-confirm-detail="{{ $application->accountDeletionDetail() }}" @endif data-confirm-action="{{ $application->accountDeletionAction() }}">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-700 transition hover:bg-red-50" title="{{ $application->accountDeletionAction() }}">
+                    <x-dashboard-icon name="trash-2" class="h-3.5 w-3.5" />
+                    Delete
+                </button>
+            </form>
+        </div>
+        <span class="dashboard-pill {{ $badgeClasses[$application->status] ?? 'bg-slate-50 text-slate-700 ring-slate-100' }}">
             {{ $application->statusLabel() }}
         </span>
     </div>
 
-    <section class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
+    <section class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_22rem]">
         <div class="space-y-6">
-            <div class="rounded-3xl border border-purple-100 bg-white p-7 shadow-xl shadow-purple-100/40 sm:p-8">
+            <section class="border border-slate-200 bg-white p-6">
                 <div class="flex items-center gap-4">
-                    <x-user-avatar :user="$application->user" :application="$application" :use-enrollment-photo="true" class="grid h-16 w-16 place-items-center rounded-full bg-purple-100 text-xl font-black text-purple-800" />
-                    <div class="min-w-0"><p class="text-sm font-bold uppercase text-purple-600">{{ $application->program ?: 'Training program' }}</p><h1 class="mt-2 truncate text-4xl font-bold leading-tight text-slate-900">{{ $application->last_name }}, {{ $application->first_name }}</h1></div>
-                </div>
-                <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <div class="rounded-2xl bg-slate-50 p-4">
-                        <p class="text-xs font-bold uppercase text-slate-500">Schedule</p>
-                        <p class="mt-1 font-bold text-slate-900">{{ $application->schedule_preference }}</p>
-                    </div>
-                    <div class="rounded-2xl bg-slate-50 p-4">
-                        <p class="text-xs font-bold uppercase text-slate-500">Submitted</p>
-                        <p class="mt-1 font-bold text-slate-900">{{ $application->created_at?->format('M d, Y g:i A') }}</p>
-                    </div>
-                    <div class="rounded-2xl bg-slate-50 p-4">
-                        <p class="text-xs font-bold uppercase text-slate-500">Account status</p>
-                        <p class="mt-1 font-bold text-slate-900">{{ str($application->user?->applicant_status ?? 'No account')->headline() }}</p>
+                    <x-user-avatar :user="$application->user" :application="$application" :use-enrollment-photo="true" class="grid h-16 w-16 place-items-center bg-purple-100 text-xl font-black text-purple-800" />
+                    <div class="min-w-0">
+                        <p class="text-xs font-bold uppercase tracking-wider text-purple-700">{{ $application->program ?: 'Training program' }}</p>
+                        <h1 class="mt-1 truncate text-2xl font-bold text-slate-950">{{ $application->last_name }}, {{ $application->first_name }}</h1>
                     </div>
                 </div>
-            </div>
+                <dl class="mt-6 grid gap-x-8 gap-y-4 sm:grid-cols-3">
+                    <div>
+                        <dt class="text-xs font-bold uppercase tracking-wider text-slate-500">Schedule</dt>
+                        <dd class="mt-1 text-sm font-semibold text-slate-900">{{ $application->schedule_preference }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-bold uppercase tracking-wider text-slate-500">Submitted</dt>
+                        <dd class="mt-1 text-sm font-semibold text-slate-900">{{ $application->created_at?->format('M d, Y g:i A') }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-bold uppercase tracking-wider text-slate-500">Account status</dt>
+                        <dd class="mt-1 text-sm font-semibold text-slate-900">{{ str($application->user?->applicant_status ?? 'No account')->headline() }}</dd>
+                    </div>
+                </dl>
+            </section>
 
-            <section class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm sm:p-7">
+            <section class="border border-slate-200 bg-white p-6">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <p class="text-sm font-bold uppercase text-purple-600">Payment</p>
-                        <h2 class="mt-2 text-xl font-bold text-slate-900">Payment selection</h2>
+                        <p class="text-xs font-bold uppercase tracking-wider text-purple-700">Payment</p>
+                        <h2 class="mt-1 text-xl font-bold text-slate-950">Payment selection</h2>
                     </div>
-                    <span class="inline-flex w-fit rounded-full px-4 py-2 text-sm font-bold ring-1 {{ $paymentBadgeClasses[$application->payment_status] ?? 'bg-slate-50 text-slate-700 ring-slate-100' }}">
+                    <span class="dashboard-pill {{ $paymentBadgeClasses[$application->payment_status] ?? 'bg-slate-50 text-slate-700 ring-slate-100' }}">
                         {{ $application->paymentStatusLabel() }}
                     </span>
                 </div>
-                <dl class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <dl class="mt-6 grid gap-x-8 gap-y-4 sm:grid-cols-2">
                     @foreach ([
+                        'Enrollment number' => $application->enrollment_number,
                         'Method' => $application->payment_method ? str($application->payment_method)->headline() : 'Not selected',
                         'Amount' => $application->payment_currency.' '.number_format((float) $application->payment_amount, 2),
                         'Batch' => $application->batch ? $application->batch->name.' '.$application->batch->year : 'Unassigned',
                         'Class schedule' => $application->batch?->scheduleLabelFor($application->schedule_preference),
                         'Room destination' => $application->batch?->roomFor($application->schedule_preference),
                         'Enrollment deadline' => $application->batch?->enrollment_ends_at?->format('M d, Y g:i A'),
-                        'Reference' => $application->payment_reference,
-                        'Receipt number' => $application->payment_receipt_number,
+                        'Reference' => $application->latestPaymentReference() ?: $application->payment_reference,
+                        'Official Receipt (OR)' => $application->payment_receipt_number,
                         'Receipt expires' => $application->effectivePaymentDeadline()?->format('M d, Y g:i A'),
-                        'PayMongo reference' => $application->paymongo_checkout_reference,
+                        'PayMongo payment' => $application->paymongoPaymentId(),
+                        'PayMongo checkout' => $application->paymongo_checkout_reference,
                     ] as $label => $value)
-                        <div class="rounded-2xl bg-slate-50 p-4">
-                            <dt class="text-xs font-bold uppercase text-slate-500">{{ $label }}</dt>
-                            <dd class="mt-1 break-all text-sm font-semibold leading-6 text-slate-900">{{ filled($value) ? $value : 'Not available' }}</dd>
+                        <div>
+                            <dt class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ $label }}</dt>
+                            <dd class="mt-1 break-all text-sm font-semibold text-slate-900">{{ filled($value) ? $value : '—' }}</dd>
                         </div>
                     @endforeach
                 </dl>
@@ -165,156 +151,124 @@
                 'Education and guardian' => $educationFields,
                 'TESDA classification' => $classificationFields,
             ] as $sectionTitle => $fields)
-                <section class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm sm:p-7">
-                    <h2 class="text-xl font-bold text-slate-900">{{ $sectionTitle }}</h2>
-                    <dl class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <section class="border border-slate-200 bg-white p-6">
+                    <h2 class="text-xl font-bold text-slate-950">{{ $sectionTitle }}</h2>
+                    <dl class="mt-6 grid gap-x-8 gap-y-4 sm:grid-cols-2">
                         @foreach ($fields as $label => $value)
-                            <div class="rounded-2xl bg-slate-50 p-4">
-                                <dt class="text-xs font-bold uppercase text-slate-500">{{ $label }}</dt>
-                                <dd class="mt-1 text-sm font-semibold leading-6 text-slate-900">{{ filled($value) ? $value : 'Not provided' }}</dd>
+                            <div>
+                                <dt class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ $label }}</dt>
+                                <dd class="mt-1 text-sm font-semibold text-slate-900">{{ filled($value) ? $value : '—' }}</dd>
                             </div>
                         @endforeach
                     </dl>
                 </section>
             @endforeach
 
-            <section id="document-review" class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm sm:p-7">
-                <div>
-                    <p class="text-sm font-bold uppercase text-purple-600">Applicant documents</p>
-                    <h2 class="mt-1 text-xl font-bold text-slate-900">Documents and feedback</h2>
-                    <p class="mt-2 text-sm leading-6 text-slate-500">Preview each file and record its status and feedback in one compact review area.</p>
-                </div>
-
-                <div class="mt-6 block">
-                    <div aria-label="Uploaded documents" class="hidden">
-                        <h3 class="text-sm font-bold uppercase tracking-wide text-slate-500">Uploaded documents</h3>
-                        @foreach ($documents as $key => $document)
-                            <article id="document-card-{{ $key }}" class="rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-shadow hover:shadow-sm">
-                                <div class="flex flex-wrap items-center justify-between gap-3">
-                                    <p class="text-sm font-bold text-slate-900">{{ $document['label'] }}</p>
-                                    @if ($document['path'])
-                                        <button type="button"
-                                            class="document-preview-trigger inline-flex items-center justify-center rounded-full border border-purple-200 bg-white px-4 py-2 text-sm font-bold text-purple-700 transition hover:border-purple-300 hover:bg-purple-50 focus:outline-none focus:ring-4 focus:ring-purple-100"
-                                            data-document-key="{{ $key }}"
-                                            data-document-label="{{ $document['label'] }}"
-                                            data-document-mime="{{ $document['mime'] ?? '' }}"
-                                            data-document-url="{{ route('admin.enrollments.documents.content', [$application, $key]) }}"
-                                            aria-haspopup="dialog">
-                                            Preview document
-                                        </button>
-                                    @else
-                                        <span class="text-sm font-semibold text-red-600">Missing</span>
-                                    @endif
-                                </div>
-                                @if ($document['path'])
-                                    <p class="mt-2 text-xs text-slate-500">Private preview · access is logged</p>
-                                @endif
-                            </article>
-                        @endforeach
+            <section id="document-review" class="border border-slate-200 bg-white p-6">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-wider text-purple-700">Applicant documents</p>
+                        <h2 class="mt-1 text-xl font-bold text-slate-950">Documents and feedback</h2>
+                        <p class="mt-2 text-sm leading-6 text-slate-600">Open the document review page to preview files, record status and feedback, then return here to save the enrollment decision.</p>
                     </div>
-
-                    <form method="POST" action="{{ route('admin.enrollments.documents.review', $application) }}" class="space-y-3">
-                        @csrf
-                        @method('PATCH')
-                        <div>
-                            <p class="text-sm font-bold uppercase tracking-wide text-purple-600">Document feedback</p>
-                            <h3 class="mt-1 text-lg font-bold text-slate-950">Tell the applicant what is accepted or lacking</h3>
-                        </div>
-                        @foreach($documents as $key => $document)
-                            @php
-                                $storedReview = data_get($application->document_review, $key, []);
-                                $defaultDocumentStatus = $document['path'] ? 'unreviewed' : 'missing';
-                            @endphp
-                            <div class="grid items-start gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 md:grid-cols-[minmax(14rem,0.8fr)_minmax(18rem,1.2fr)]">
-                                <div>
-                                    <div class="flex flex-wrap items-center justify-between gap-3">
-                                        <label for="review-{{ $key }}" class="text-sm font-bold text-slate-900">{{ $document['label'] }}</label>
-                                        @if ($document['path'])
-                                            <button type="button"
-                                                class="document-preview-trigger inline-flex items-center justify-center rounded-full border border-purple-200 bg-white px-3 py-1.5 text-xs font-bold text-purple-700 transition hover:border-purple-300 hover:bg-purple-50 focus:outline-none focus:ring-4 focus:ring-purple-100"
-                                                data-document-key="{{ $key }}"
-                                                data-document-label="{{ $document['label'] }}"
-                                                data-document-mime="{{ $document['mime'] ?? '' }}"
-                                                data-document-url="{{ route('admin.enrollments.documents.content', [$application, $key]) }}"
-                                                aria-haspopup="dialog">
-                                                Preview
-                                            </button>
-                                        @else
-                                            <span class="text-xs font-bold text-red-600">Missing</span>
-                                        @endif
-                                    </div>
-                                    <p class="mt-2 text-xs leading-5 text-slate-500">{{ $document['path'] ? 'Private preview; access is logged.' : 'Applicant must upload this file.' }}</p>
-                                </div>
-                                <div>
-                                    <label for="review-{{ $key }}" class="sr-only">Review status for {{ $document['label'] }}</label>
-                                    <select id="review-{{ $key }}" name="documents[{{ $key }}][status]" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-purple-300 focus:ring-4 focus:ring-purple-100">
-                                    <option value="unreviewed" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'unreviewed')>Not reviewed</option>
-                                    <option value="accepted" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'accepted')>Accepted</option>
-                                    <option value="replace" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'replace')>Needs replacement</option>
-                                    <option value="missing" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'missing')>Missing</option>
-                                </select>
-                                    <label for="note-{{ $key }}" class="mt-3 block text-xs font-bold uppercase tracking-wide text-slate-500">Feedback or problem found</label>
-                                    <textarea id="note-{{ $key }}" name="documents[{{ $key }}][note]" rows="2" maxlength="500" class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-purple-300 focus:ring-4 focus:ring-purple-100" placeholder="Example: Image is blurry; upload a clear copy showing all corners.">{{ old("documents.$key.note", $storedReview['note'] ?? '') }}</textarea>
-                                </div>
-                            </div>
-                        @endforeach
-                        <button type="submit" class="inline-flex items-center justify-center rounded-full bg-purple-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-purple-700 focus:outline-none focus:ring-4 focus:ring-purple-200">Save document feedback</button>
-                        @if($application->documents_reviewed_at)<p class="text-xs text-slate-500">Last reviewed {{ $application->documents_reviewed_at->format('M d, Y g:i A') }} by {{ $application->documentReviewer?->name ?? 'Admin' }}</p>@endif
-                    </form>
+                    <span class="dashboard-pill {{ $documentsReadyForApproval ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-amber-50 text-amber-700 ring-amber-100' }}">
+                        {{ $documentsReadyForApproval ? 'All accepted' : count($pendingDocumentApprovals).' pending' }}
+                    </span>
+                </div>
+                <div class="mt-5">
+                    <a href="{{ route('admin.enrollments.document-review', $application) }}" class="primary-action">
+                        Review documents
+                    </a>
+                    @if($documentsReviewed)
+                        <p class="mt-3 text-xs leading-5 text-slate-500">Last reviewed {{ $application->documents_reviewed_at->format('M d, Y g:i A') }} by {{ $application->documentReviewer?->name ?? 'Admin' }}. Open the review page again if you need to change a file decision.</p>
+                    @elseif(! $documentsReadyForApproval)
+                        <p class="mt-3 text-xs leading-5 text-amber-700">Pending: {{ implode(', ', $pendingDocumentApprovals) }}. Accept every required document before review can be completed.</p>
+                    @endif
                 </div>
             </section>
         </div>
 
         <aside class="space-y-6">
-            <section class="rounded-3xl border border-purple-100 bg-white p-6 shadow-xl shadow-purple-100/40">
-                <p class="text-sm font-bold uppercase text-purple-600">Official TESDA form</p>
-                <h2 class="mt-2 text-2xl font-bold text-slate-900">Registration Form MIS 03-01</h2>
-                <p class="mt-3 text-sm leading-6 text-slate-500">Applicant answers, ID photo, and e-signature are placed on the original two-page TESDA form.</p>
+            <section class="border border-slate-200 bg-white p-6">
+                <p class="text-xs font-bold uppercase tracking-wider text-purple-700">Official TESDA form</p>
+                <h2 class="mt-2 text-xl font-bold text-slate-950">Registration Form MIS 03-01</h2>
+                <p class="mt-3 text-sm leading-6 text-slate-600">Applicant answers, ID photo, and e-signature are placed on the original two-page TESDA form.</p>
                 <div class="mt-5 grid grid-cols-1 gap-3">
-                    <a href="{{ route('admin.enrollments.tesda-form', [$application, 'disposition' => 'inline']) }}" target="_blank" rel="noopener" class="inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700">
+                    <a href="{{ route('admin.enrollments.tesda-form', [$application, 'disposition' => 'inline']) }}" target="_blank" rel="noopener" class="primary-action w-full text-center">
                         Preview / Print form
                     </a>
-                    <a href="{{ route('admin.enrollments.tesda-form', [$application, 'disposition' => 'attachment']) }}" class="inline-flex w-full items-center justify-center rounded-full border border-purple-200 bg-white px-5 py-3 text-sm font-bold text-purple-700 hover:bg-purple-50">
+                    <a href="{{ route('admin.enrollments.tesda-form', [$application, 'disposition' => 'attachment']) }}" class="secondary-action w-full text-center">
                         Download PDF
                     </a>
                 </div>
             </section>
 
-            <section class="rounded-3xl border border-purple-100 bg-white p-6 shadow-xl shadow-purple-100/40">
-                <p class="text-sm font-bold uppercase text-purple-600">Review decision</p>
-                <h2 class="mt-2 text-2xl font-bold text-slate-900">Update application</h2>
+            <section class="border border-slate-200 bg-white p-6">
+                <p class="text-xs font-bold uppercase tracking-wider text-purple-700">Review decision</p>
+                <h2 class="mt-2 text-xl font-bold text-slate-950">Update application</h2>
 
-                <div class="mt-5 space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                <dl class="mt-5 space-y-3 border-y border-slate-200 py-4 text-sm">
                     <div class="flex items-start justify-between gap-3">
-                        <span class="font-semibold text-slate-700">Required documents</span>
-                        <span class="text-right font-bold {{ $documentsReadyForApproval ? 'text-emerald-700' : 'text-amber-700' }}">
+                        <dt class="text-slate-600">Document review</dt>
+                        <dd class="text-right font-semibold {{ $documentsReviewed ? 'text-emerald-700' : 'text-amber-700' }}">
+                            {{ $documentsReviewed ? 'Completed' : ($documentReviewSubmitted ? 'Incomplete' : 'Not reviewed') }}
+                        </dd>
+                    </div>
+                    <div class="flex items-start justify-between gap-3">
+                        <dt class="text-slate-600">Required documents</dt>
+                        <dd class="text-right font-semibold {{ $documentsReadyForApproval ? 'text-emerald-700' : 'text-amber-700' }}">
                             {{ $documentsReadyForApproval ? 'All accepted' : count($pendingDocumentApprovals).' pending' }}
-                        </span>
+                        </dd>
                     </div>
                     <div class="flex items-start justify-between gap-3">
-                        <span class="font-semibold text-slate-700">Enrollment payment</span>
-                        <span class="text-right font-bold {{ $paymentReadyForApproval ? 'text-emerald-700' : 'text-amber-700' }}">
+                        <dt class="text-slate-600">Enrollment payment</dt>
+                        <dd class="text-right font-semibold {{ $paymentReadyForApproval ? 'text-emerald-700' : 'text-amber-700' }}">
                             {{ $paymentReadyForApproval ? 'Verified' : 'Not verified' }}
-                        </span>
+                        </dd>
                     </div>
-                    @if (! $documentsReadyForApproval)
-                        <p class="pt-1 text-xs leading-5 text-slate-500">Pending: {{ implode(', ', $pendingDocumentApprovals) }}. Save document feedback separately before approving.</p>
-                    @endif
-                </div>
-
-                @if ($errors->any())
-                    <div class="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold leading-6 text-red-700">
-                        Please correct the review form before saving.
-                    </div>
+                </dl>
+                @if (! $documentsReviewed)
+                    <p class="mt-3 text-xs leading-5 text-amber-700">
+                        @if (! $documentsReadyForApproval)
+                            Document review stays incomplete while required documents are pending. Accept every file before it can be completed.
+                        @else
+                            Review documents first, then return here to save a decision.
+                        @endif
+                    </p>
                 @endif
+                <p class="mt-3 text-xs leading-5 text-slate-500">Approved or denied decisions email a verification link. The enrollee can log in only after that email is verified.</p>
 
-                <form method="POST" action="{{ route('admin.enrollments.update', $application) }}" class="mt-6 space-y-5">
+                <form method="POST" action="{{ route('admin.enrollments.update', $application) }}" class="mt-6 space-y-4" data-enrollment-decision-form data-documents-reviewed="{{ $documentsReviewed ? '1' : '0' }}" data-documents-review-submitted="{{ $documentReviewSubmitted ? '1' : '0' }}" data-documents-pending="{{ $documentsReadyForApproval ? '0' : '1' }}">
                     @csrf
                     @method('PATCH')
 
+                    <div id="document-review-required-notice"
+                        class="border border-amber-200 bg-amber-50 p-4"
+                        role="alert"
+                        tabindex="-1"
+                        @unless($documentReviewRequiredNotice) hidden @endunless>
+                        <p class="text-sm font-bold text-amber-950" data-document-review-notice-title>
+                            @if (! $documentsReadyForApproval)
+                                Document review cannot be completed while required documents are pending.
+                            @else
+                                Review the applicant documents first before saving a decision.
+                            @endif
+                        </p>
+                        <p class="mt-2 text-sm leading-6 text-amber-900" data-document-review-notice-body>
+                            @if (! $documentsReadyForApproval)
+                                Pending: {{ implode(', ', $pendingDocumentApprovals) }}. Open the document review page and mark every required file as Accepted.
+                            @else
+                                Open the document review page, preview the files, then finish that review. Approval requires every required document to be accepted.
+                            @endif
+                        </p>
+                        <a href="{{ route('admin.enrollments.document-review', $application) }}" class="primary-action mt-3">
+                            Review documents
+                        </a>
+                    </div>
+
                     <div>
-                        <label for="status" class="mb-2 block text-sm font-semibold text-slate-800">Decision</label>
-                        <select id="status" name="status" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                        <label for="status" class="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">Decision</label>
+                        <select id="status" name="status" required class="w-full border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600">
                             @foreach ($reviewableStatuses as $status)
                                 <option value="{{ $status }}" @selected(old('status', $defaultDecision) === $status)>{{ $statuses[$status] }}</option>
                             @endforeach
@@ -323,141 +277,101 @@
                     </div>
 
                     <div>
-                        <label for="admin_notes" class="mb-2 block text-sm font-semibold text-slate-800">Admin notes</label>
-                        <textarea id="admin_notes" name="admin_notes" rows="6" maxlength="2000" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100" placeholder="Add document requirements, pre-enlistment instructions, or denial reason.">{{ old('admin_notes', $application->admin_notes) }}</textarea>
-                        <p class="mt-2 text-xs leading-5 text-slate-500">A note is required when denying an application. Approval requires verified payment and all five required documents accepted.</p>
+                        <label for="admin_notes" class="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">Admin notes</label>
+                        <textarea id="admin_notes" name="admin_notes" rows="6" maxlength="2000" class="min-h-28 w-full border border-slate-200 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600" placeholder="Add document requirements, pre-enlistment instructions, or denial reason.">{{ old('admin_notes', $application->admin_notes) }}</textarea>
+                        <p class="mt-2 text-xs leading-5 text-slate-500">A note is required when denying an application. Review documents first, then save the decision. Approval also requires verified payment and all five required documents accepted.</p>
                         @error('admin_notes') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                     </div>
 
-                    <button type="submit" class="inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700">
+                    <button type="submit" class="primary-action w-full">
                         Save decision
                     </button>
                 </form>
             </section>
 
-            <section class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-                <p class="text-sm font-bold uppercase text-purple-600">Review trail</p>
-                <div class="mt-5 space-y-4 text-sm leading-6">
+            <section class="border border-slate-200 bg-white p-6">
+                <p class="text-xs font-bold uppercase tracking-wider text-purple-700">Review trail</p>
+                <dl class="mt-5 grid gap-4 text-sm">
                     <div>
-                        <p class="font-bold text-slate-900">Reviewed by</p>
-                        <p class="text-slate-500">{{ $application->reviewer?->name ?? 'Not reviewed yet' }}</p>
+                        <dt class="text-xs font-bold uppercase tracking-wider text-slate-500">Reviewed by</dt>
+                        <dd class="mt-1 font-semibold text-slate-900">{{ $application->reviewer?->name ?? 'Not reviewed yet' }}</dd>
                     </div>
                     <div>
-                        <p class="font-bold text-slate-900">Reviewed at</p>
-                        <p class="text-slate-500">{{ $application->reviewed_at?->format('M d, Y g:i A') ?? 'Not reviewed yet' }}</p>
+                        <dt class="text-xs font-bold uppercase tracking-wider text-slate-500">Reviewed at</dt>
+                        <dd class="mt-1 font-semibold text-slate-900">{{ $application->reviewed_at?->format('M d, Y g:i A') ?? 'Not reviewed yet' }}</dd>
                     </div>
                     <div>
-                        <p class="font-bold text-slate-900">Privacy consent</p>
-                        <p class="text-slate-500">{{ $application->privacy_consent ? 'Accepted' : 'Not accepted' }}</p>
+                        <dt class="text-xs font-bold uppercase tracking-wider text-slate-500">Privacy consent</dt>
+                        <dd class="mt-1 font-semibold text-slate-900">{{ $application->privacy_consent ? 'Accepted' : 'Not accepted' }}</dd>
                     </div>
-                </div>
+                </dl>
             </section>
         </aside>
     </section>
 
-    <div id="document-preview-modal"
-        class="fixed inset-0 z-[100] hidden"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="document-preview-title"
-        aria-hidden="true">
-        <div class="absolute inset-0 bg-slate-950/75 backdrop-blur-sm" data-document-modal-close></div>
-        <div class="relative mx-auto flex h-full w-full max-w-6xl flex-col p-3 sm:p-6">
-            <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/15 bg-slate-950 shadow-2xl">
-                <header class="flex shrink-0 items-center justify-between gap-4 border-b border-white/10 px-4 py-3 text-white sm:px-6">
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-purple-300">Private document preview</p>
-                        <h2 id="document-preview-title" class="truncate text-base font-bold sm:text-lg">Document</h2>
-                    </div>
-                    <button type="button" data-document-modal-close class="inline-flex shrink-0 items-center justify-center rounded-full border border-white/20 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/10 focus:outline-none focus:ring-4 focus:ring-purple-300/40">
-                        Close
-                    </button>
-                </header>
-                <div class="relative min-h-0 flex-1 overflow-hidden bg-slate-900">
-                    <div class="pointer-events-none absolute inset-0 z-20 grid grid-cols-2 grid-rows-4 overflow-hidden opacity-[0.12]" aria-hidden="true">
-                        @for($i = 0; $i < 8; $i++)
-                            <span class="grid -rotate-12 place-items-center whitespace-nowrap text-xs font-black uppercase tracking-widest text-white sm:text-sm">ADMIN REVIEW · {{ $application->email }} · {{ now()->format('Y-m-d H:i') }}</span>
-                        @endfor
-                    </div>
-                    <iframe id="document-preview-frame" class="relative z-10 hidden h-full min-h-[70vh] w-full bg-white" title="Document preview"></iframe>
-                    <div id="document-preview-image-wrap" class="relative z-10 hidden h-full overflow-auto bg-slate-100 p-4 sm:p-8">
-                        <img id="document-preview-image" src="" alt="" class="mx-auto h-auto max-w-full select-none object-contain" draggable="false">
-                    </div>
-                    <div id="document-preview-unavailable" class="relative z-10 hidden h-full min-h-[70vh] place-items-center bg-white p-8 text-center">
-                        <p class="max-w-md font-semibold leading-6 text-slate-700">This file type cannot be previewed in the browser. Ask the applicant to upload a PDF, JPG, or PNG.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <script>
         (() => {
-            const modal = document.getElementById('document-preview-modal');
-            if (!modal) return;
+            const form = document.querySelector('[data-enrollment-decision-form]');
+            const notice = document.getElementById('document-review-required-notice');
+            if (!form || !notice) return;
 
-            const frame = document.getElementById('document-preview-frame');
-            const imageWrap = document.getElementById('document-preview-image-wrap');
-            const image = document.getElementById('document-preview-image');
-            const unavailable = document.getElementById('document-preview-unavailable');
-            const title = document.getElementById('document-preview-title');
-            let activeTrigger = null;
-            let previousScrollY = 0;
+            const message = form.dataset.documentsPending === '1'
+                ? 'Document review cannot be completed while required documents are pending. Accept every required document first.'
+                : 'Review the applicant documents first before saving a decision.';
 
-            const resetViewer = () => {
-                frame.classList.add('hidden');
-                imageWrap.classList.add('hidden');
-                unavailable.classList.add('hidden');
-                frame.removeAttribute('src');
-                image.removeAttribute('src');
-                image.removeAttribute('alt');
-            };
-
-            const closeModal = () => {
-                modal.classList.add('hidden');
-                modal.setAttribute('aria-hidden', 'true');
-                document.body.classList.remove('overflow-hidden');
-                resetViewer();
-                window.scrollTo({ top: previousScrollY, behavior: 'auto' });
-                activeTrigger?.focus({ preventScroll: true });
-            };
-
-            const openModal = (trigger) => {
-                activeTrigger = trigger;
-                previousScrollY = window.scrollY;
-                const label = trigger.dataset.documentLabel || 'Document';
-                const url = trigger.dataset.documentUrl;
-                const mime = trigger.dataset.documentMime || '';
-                title.textContent = label;
-                resetViewer();
-
-                if (mime === 'application/pdf' || url.toLowerCase().endsWith('.pdf')) {
-                    frame.src = `${url}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`;
-                    frame.title = `${label} preview`;
-                    frame.classList.remove('hidden');
-                } else if (mime.startsWith('image/')) {
-                    image.src = url;
-                    image.alt = `${label} preview`;
-                    imageWrap.classList.remove('hidden');
-                } else {
-                    unavailable.classList.remove('hidden');
-                    unavailable.classList.add('grid');
+            const showNotice = (text) => {
+                const title = notice.querySelector('[data-document-review-notice-title]');
+                const body = notice.querySelector('[data-document-review-notice-body]');
+                if (title) title.textContent = text;
+                if (body && form.dataset.documentsPending === '1') {
+                    body.textContent = 'Open the document review page and mark every required file as Accepted before this can show as Completed.';
                 }
 
-                modal.classList.remove('hidden');
-                modal.setAttribute('aria-hidden', 'false');
-                document.body.classList.add('overflow-hidden');
-                modal.querySelector('[data-document-modal-close]')?.focus();
+                notice.hidden = false;
+                notice.focus({ preventScroll: true });
+                notice.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                if (document.querySelector('[data-document-review-toast]')) return;
+
+                const toast = document.createElement('div');
+                toast.className = 'dashboard-toast dashboard-toast-error';
+                toast.dataset.documentReviewToast = '1';
+                toast.setAttribute('role', 'alert');
+                toast.style.position = 'fixed';
+                toast.style.top = '1rem';
+                toast.style.right = '1rem';
+                toast.style.left = 'auto';
+                toast.style.zIndex = '90';
+                toast.style.width = 'min(24rem, calc(100vw - 2rem))';
+                toast.style.maxWidth = 'min(24rem, calc(100vw - 2rem))';
+                toast.style.pointerEvents = 'auto';
+
+                const toastBody = document.createElement('div');
+                toastBody.className = 'dashboard-toast-body';
+                const paragraph = document.createElement('p');
+                paragraph.textContent = text;
+                toastBody.appendChild(paragraph);
+                toast.appendChild(toastBody);
+                document.body.appendChild(toast);
+
+                window.setTimeout(() => toast.remove(), 8000);
             };
 
-            document.querySelectorAll('.document-preview-trigger').forEach((trigger) => {
-                trigger.addEventListener('click', () => openModal(trigger));
-            });
-            modal.querySelectorAll('[data-document-modal-close]').forEach((button) => {
-                button.addEventListener('click', closeModal);
-            });
-            document.addEventListener('keydown', (event) => {
-                if (event.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+            form.addEventListener('submit', (event) => {
+                const status = form.querySelector('#status')?.value;
+                const reviewCompleted = form.dataset.documentsReviewed === '1';
+                const reviewSubmitted = form.dataset.documentsReviewSubmitted === '1';
+
+                if (status === 'approved' && ! reviewCompleted) {
+                    event.preventDefault();
+                    showNotice(message);
+                    return;
+                }
+
+                if (! reviewSubmitted) {
+                    event.preventDefault();
+                    showNotice('Review the applicant documents first before saving a decision.');
+                }
             });
         })();
     </script>

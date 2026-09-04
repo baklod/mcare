@@ -1,85 +1,100 @@
-<!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Account Settings | MCARE</title>
-    <x-dashboard-theme-head />
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-</head>
-<body class="account-page min-h-screen bg-slate-50 text-slate-900 antialiased">
-    <header class="account-header border-b border-slate-200 bg-white">
-        <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
-            <a href="{{ $portalUrl }}" class="flex min-w-0 items-center gap-3">
-                <img src="{{ asset('assets/mcare-mark.png') }}" alt="MCARE mark" class="h-11 w-11 rounded-xl border border-slate-100 object-contain p-1">
-                <span><strong class="block text-sm sm:text-base">MCARE Hub</strong><span class="text-xs font-semibold text-purple-700">{{ $roleLabel }} settings</span></span>
-            </a>
-            <a href="{{ $portalUrl }}" class="secondary-action"><x-dashboard-icon name="arrow-left" class="mr-2" />Back to dashboard</a>
-        </div>
+@php
+    $layout = \App\Support\AccountPortal::dashboardLayoutFor($user);
+@endphp
+
+@extends($layout, ['title' => 'Account Settings | MCARE '.$roleLabel])
+
+@section('content')
+<section class="space-y-6">
+    @if (session('saved') && $user->role === 'admin')
+        <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800" role="status" aria-live="polite" data-auto-dismiss="5000">{{ session('saved') }}</div>
+    @endif
+
+    <header class="border-b border-slate-200 pb-6">
+        <p class="dashboard-section-kicker">Account preferences</p>
+        <h1 class="dashboard-section-title mt-2 text-3xl">Settings</h1>
+        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Manage the signed-in {{ strtolower($roleLabel) }} account, profile photo, display preference, and password.</p>
     </header>
 
-    <main class="mx-auto max-w-5xl px-5 py-8 sm:px-8 sm:py-12">
-        @if (session('saved'))
-            <div class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-800" role="status" aria-live="polite" data-auto-dismiss="5000">{{ session('saved') }}</div>
-        @endif
-        <div class="mb-8">
-            <p class="text-sm font-bold uppercase tracking-wide text-purple-700">Account preferences</p>
-            <h1 class="mt-2 text-3xl font-black sm:text-4xl">Settings</h1>
-            <p class="mt-3 text-sm leading-6 text-slate-600">Manage the signed-in {{ strtolower($roleLabel) }} account and display preference.</p>
-        </div>
-
-        <div class="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
-            <div class="space-y-6">
-                <section class="account-card rounded-2xl border border-slate-200 bg-white p-6">
-                    <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Signed-in account</p>
-                    <div class="mt-3 flex items-center gap-4">
-                        <x-user-avatar :user="$user" class="grid h-14 w-14 place-items-center rounded-full bg-purple-100 text-lg font-black text-purple-800" />
-                        <div class="min-w-0">
-                            <h2 class="truncate text-xl font-black">{{ $user->name }}</h2>
-                            <p class="mt-1 truncate text-sm text-slate-600">{{ $user->email }}</p>
-                        </div>
+    <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
+        <div class="space-y-6">
+            <section class="dashboard-panel space-y-4" data-profile-photo-form>
+                <p class="dashboard-section-kicker">Signed-in account</p>
+                <div class="flex items-center gap-4">
+                    <x-user-avatar :user="$user" class="grid h-14 w-14 place-items-center rounded-full bg-purple-100 text-lg font-black text-purple-800" />
+                    <div class="min-w-0">
+                        <h2 class="truncate text-xl font-bold text-slate-950">{{ $user->name }}</h2>
+                        <p class="mt-1 truncate text-sm text-slate-600">{{ $user->email }}</p>
                     </div>
-                    <span class="mt-4 inline-flex rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-800">{{ $roleLabel }}</span>
-                </section>
-                <section id="preferences" class="account-card rounded-2xl border border-slate-200 bg-white p-6">
-                    <p class="text-xs font-bold uppercase tracking-wide text-purple-700">Display</p>
-                    <h2 class="mt-2 text-xl font-black">Theme preference</h2>
-                    <p class="mt-2 text-sm leading-6 text-slate-600">Night mode is stored only on this browser and can be changed anytime.</p>
-                    <button type="button" class="secondary-action mt-5 w-full" data-dashboard-theme-toggle aria-pressed="false">
-                        <x-dashboard-icon name="moon" class="mr-2" data-dashboard-theme-icon="moon" />
-                        <x-dashboard-icon name="sun" class="mr-2 hidden" data-dashboard-theme-icon="sun" />
-                        <span data-dashboard-theme-label>Night mode</span>
-                    </button>
-                </section>
-                <a href="{{ route('account.help') }}" class="account-card block rounded-2xl border border-slate-200 bg-white p-6 transition hover:border-purple-300">
-                    <p class="text-xs font-bold uppercase tracking-wide text-purple-700">Need assistance?</p>
-                    <h2 class="mt-2 text-xl font-black">Open help center</h2>
-                    <p class="mt-2 text-sm leading-6 text-slate-600">View guidance tailored to the {{ strtolower($roleLabel) }} portal.</p>
-                </a>
-            </div>
+                </div>
+                <span class="inline-flex rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-800">{{ $roleLabel }}</span>
 
-            <section id="change-password" class="account-card scroll-mt-8 rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
-                <p class="text-xs font-bold uppercase tracking-wide text-purple-700">Security</p>
-                <h2 class="mt-2 text-2xl font-black">Change password</h2>
-                <p class="mt-2 text-sm leading-6 text-slate-600">Use at least eight characters with both letters and numbers.</p>
-                <form method="POST" action="{{ route('account.password.update') }}" class="mt-6 space-y-5">
+                <form method="POST" action="{{ route('account.avatar.update') }}" enctype="multipart/form-data" class="space-y-3 border-t border-slate-200 pt-4">
                     @csrf
                     @method('PATCH')
-                    <label class="block text-sm font-bold text-slate-700">Current password
-                        <input name="current_password" type="password" autocomplete="current-password" required class="form-field mt-2 text-base">
-                        @error('current_password') <span class="mt-2 block text-sm font-semibold text-red-600">{{ $message }}</span> @enderror
-                    </label>
-                    <label class="block text-sm font-bold text-slate-700">New password
-                        <input name="password" type="password" autocomplete="new-password" required class="form-field mt-2 text-base">
-                        @error('password') <span class="mt-2 block text-sm font-semibold text-red-600">{{ $message }}</span> @enderror
-                    </label>
-                    <label class="block text-sm font-bold text-slate-700">Confirm new password
-                        <input name="password_confirmation" type="password" autocomplete="new-password" required class="form-field mt-2 text-base">
-                    </label>
-                    <button type="submit" class="primary-action w-full sm:w-auto"><x-dashboard-icon name="key" class="mr-2" />Update password</button>
+                    <div>
+                        <label for="avatar" class="block text-sm font-bold text-slate-700">Profile photo</label>
+                        <p class="mt-1 text-xs leading-5 text-slate-500">JPG, PNG, or WEBP. Maximum 5MB. The photo is stored in public storage and used across MCARE dashboards.</p>
+                        <input
+                            id="avatar"
+                            name="avatar"
+                            type="file"
+                            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                            required
+                            class="form-field mt-3 text-sm"
+                            data-profile-photo-input
+                        >
+                        @error('avatar') <span class="mt-2 block text-sm font-semibold text-red-600">{{ $message }}</span> @enderror
+                    </div>
+                    <button type="submit" class="secondary-action w-full sm:w-auto">
+                        <x-dashboard-icon name="cloud-arrow-up" class="h-4 w-4" />
+                        <span>Save photo</span>
+                    </button>
                 </form>
             </section>
+
+            <section id="preferences" class="dashboard-panel space-y-3">
+                <p class="dashboard-section-kicker">Display</p>
+                <h2 class="text-lg font-bold text-slate-950">Theme preference</h2>
+                <p class="text-sm leading-6 text-slate-600">Night mode is stored only on this browser and can be changed anytime.</p>
+                <button type="button" class="secondary-action w-full sm:w-auto" data-dashboard-theme-toggle aria-pressed="false">
+                    <x-dashboard-icon name="moon" class="h-4 w-4" data-dashboard-theme-icon="moon" />
+                    <x-dashboard-icon name="sun" class="hidden h-4 w-4" data-dashboard-theme-icon="sun" />
+                    <span data-dashboard-theme-label>Night mode</span>
+                </button>
+            </section>
+
+            <a href="{{ route('account.help') }}" class="dashboard-panel block space-y-2 transition hover:border-purple-300">
+                <p class="dashboard-section-kicker">Need assistance?</p>
+                <h2 class="text-lg font-bold text-slate-950">Open help center</h2>
+                <p class="text-sm leading-6 text-slate-600">View guidance tailored to the {{ strtolower($roleLabel) }} portal.</p>
+            </a>
         </div>
-    </main>
-</body>
-</html>
+
+        <section id="change-password" class="dashboard-panel scroll-mt-8 space-y-4">
+            <p class="dashboard-section-kicker">Security</p>
+            <h2 class="text-lg font-bold text-slate-950">Change password</h2>
+            <p class="text-sm leading-6 text-slate-600">Use at least eight characters with both letters and numbers.</p>
+            <form method="POST" action="{{ route('account.password.update') }}" class="space-y-5">
+                @csrf
+                @method('PATCH')
+                <label class="block text-sm font-bold text-slate-700">Current password
+                    <input name="current_password" type="password" autocomplete="current-password" required class="form-field mt-2 text-base">
+                    @error('current_password') <span class="mt-2 block text-sm font-semibold text-red-600">{{ $message }}</span> @enderror
+                </label>
+                <label class="block text-sm font-bold text-slate-700">New password
+                    <input name="password" type="password" autocomplete="new-password" required class="form-field mt-2 text-base">
+                    @error('password') <span class="mt-2 block text-sm font-semibold text-red-600">{{ $message }}</span> @enderror
+                </label>
+                <label class="block text-sm font-bold text-slate-700">Confirm new password
+                    <input name="password_confirmation" type="password" autocomplete="new-password" required class="form-field mt-2 text-base">
+                </label>
+                <button type="submit" class="primary-action">
+                    <x-dashboard-icon name="key" class="h-4 w-4" />
+                    <span>Update password</span>
+                </button>
+            </form>
+        </section>
+    </div>
+</section>
+@endsection

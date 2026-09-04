@@ -1,11 +1,20 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth bg-white">
+<html lang="en" class="scroll-smooth bg-[#faf9f7]">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'MCARE Trainee' }}</title>
     <x-dashboard-theme-head />
+    <script>
+        try {
+            if (window.localStorage.getItem('mcare-trainee-sidebar-collapsed') === '1') {
+                document.documentElement.classList.add('is-admin-sidebar-collapsed');
+            }
+        } catch (error) {
+            // Keep the sidebar expanded when storage is unavailable.
+        }
+    </script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="dashboard-shell universal-dashboard" data-dashboard-role="trainee">
@@ -49,11 +58,10 @@
             ->all();
     @endphp
 
-    <div class="dashboard-gradient"></div>
-
-    <aside class="dashboard-sidebar" data-dashboard-sidebar>
+    <aside id="trainee-dashboard-sidebar" class="dashboard-sidebar" data-dashboard-sidebar>
         <div class="flex min-h-11 items-center border-b border-slate-100 pb-3">
             <div class="dashboard-brand flex-1 min-w-0">
+                <img src="{{ asset('assets/images/logoicon.png') }}" alt="MCARE Hub" class="dashboard-brand-mark">
                 <span class="min-w-0">
                     <span class="dashboard-brand-title">MCARE Hub</span>
                     <span class="dashboard-brand-subtitle">Trainee Portal</span>
@@ -62,20 +70,28 @@
         </div>
 
         <nav class="dashboard-nav" aria-label="Trainee navigation">
-            <p class="dashboard-menu-label">Classroom</p>
-            @foreach ($traineePrimaryNav as $item)
-                <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainee-{{ str($item['label'])->slug() }}" class="{{ $navItem }} {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
-                    <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
-                    <span>{{ $item['label'] }}</span>
-                </a>
-            @endforeach
-            <p class="dashboard-menu-label">My account</p>
-            @foreach ($traineeSecondaryNav as $item)
-                <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainee-{{ str($item['label'])->slug() }}" class="{{ $navItem }} {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
-                    <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
-                    <span>{{ $item['label'] }}</span>
-                </a>
-            @endforeach
+            <div>
+                <p class="px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Classroom</p>
+                <div class="mt-2 space-y-1">
+                    @foreach ($traineePrimaryNav as $item)
+                        <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainee-{{ str($item['label'])->slug() }}" class="{{ $navItem }} {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
+                            <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
+                            <span>{{ $item['label'] }}</span>
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+            <div>
+                <p class="px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">My account</p>
+                <div class="mt-2 space-y-1">
+                    @foreach ($traineeSecondaryNav as $item)
+                        <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainee-{{ str($item['label'])->slug() }}" class="{{ $navItem }} {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
+                            <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
+                            <span>{{ $item['label'] }}</span>
+                        </a>
+                    @endforeach
+                </div>
+            </div>
         </nav>
 
         <details class="dashboard-sidebar-footer" data-dashboard-account>
@@ -85,7 +101,7 @@
                     <span class="block truncate text-sm font-bold text-slate-950">{{ $traineeName }}</span>
                     <span class="block text-xs text-slate-500">{{ \App\Support\AccountPortal::roleLabelFor(auth()->user()) }}</span>
                 </span>
-                <x-dashboard-icon name="chevron-down" class="dashboard-chevron text-xs text-slate-400 transition" />
+                <x-dashboard-icon name="chevron-up" class="dashboard-chevron text-xs text-slate-400 transition" />
             </summary>
             <div class="dashboard-account-menu">
                 <x-dashboard-account-actions :logout-route="route('logout')" role-label="Trainee" />
@@ -94,89 +110,97 @@
     </aside>
 
     <div class="dashboard-layout">
+        <div class="admin-masthead">
+            <p class="admin-masthead-kicker">TESDA-Accredited Training and Assessment Center</p>
+            <p class="admin-masthead-aside">Official trainee learning system · Enrolled learners only</p>
+        </div>
         <header class="dashboard-topbar">
             <div class="dashboard-topbar-inner">
                 <div class="flex min-w-0 items-center gap-3">
+                    <button
+                        type="button"
+                        class="dashboard-sidebar-collapse"
+                        data-dashboard-sidebar-collapse
+                        aria-controls="trainee-dashboard-sidebar"
+                        aria-expanded="true"
+                        aria-label="Collapse sidebar"
+                        title="Collapse sidebar"
+                    >
+                        <span class="dashboard-sidebar-collapse-expanded">
+                            <x-dashboard-icon name="chevron-left" />
+                        </span>
+                        <span class="dashboard-sidebar-collapse-collapsed">
+                            <x-dashboard-icon name="chevron-right" />
+                        </span>
+                    </button>
                     <div class="min-w-0">
-                        <p class="dashboard-header-kicker">Caregiving NC II Program</p>
+                        <p class="dashboard-header-kicker">Mission Care Training and Assessment Center</p>
                         <h1 class="dashboard-header-title">
-                            <span class="dashboard-title-desktop">{{ $title ?? 'Trainee Portal' }}</span>
-                            <span class="dashboard-title-mobile">{{ str($title ?? 'Trainee Portal')->before('|')->trim() }}</span>
+                            <span class="dashboard-title-desktop">{{ $title ?? 'MCARE Trainee' }}</span>
+                            <span class="dashboard-title-mobile">{{ str($title ?? 'MCARE Trainee')->before('|')->trim() }}</span>
                         </h1>
                     </div>
                 </div>
-                <div class="flex items-center gap-2">
-                    <details class="relative shrink-0 justify-self-end" data-dashboard-account>
-                        <summary class="dashboard-account-summary">
+                <details class="relative shrink-0 justify-self-end" data-dashboard-account>
+                    <summary class="dashboard-account-summary">
                         <x-user-avatar :user="auth()->user()" :name="$traineeName" class="dashboard-account-avatar h-9 w-9" />
-                        <span class="hidden text-left sm:block">
-                            <span class="block text-sm font-bold">{{ $traineeName }}</span>
-                            <span class="block text-xs font-semibold text-slate-400">{{ \App\Support\AccountPortal::roleLabelFor(auth()->user()) }}</span>
-                        </span>
+                        <span class="hidden max-w-36 truncate sm:block">{{ $traineeName }}</span>
                         <x-dashboard-icon name="chevron-down" class="dashboard-chevron text-xs text-slate-400 transition" />
-                        </summary>
-                        <div class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
-                            <x-dashboard-account-actions :logout-route="route('logout')" role-label="Trainee" />
-                        </div>
-                    </details>
-                </div>
+                    </summary>
+                    <div class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                        <x-dashboard-account-actions :logout-route="route('logout')" role-label="Trainee" />
+                    </div>
+                </details>
             </div>
+            <x-dashboard-mobile-navigation
+                :primary-items="$traineeMobilePrimary"
+                :more-items="$traineeMobileMore"
+                label="Mobile trainee navigation"
+                menu-title="Trainee destinations"
+                role="trainee"
+            />
         </header>
 
-        <main class="dashboard-main pb-28 lg:pb-9">
+        <main class="dashboard-main">
             @if (session('saved'))
-                <div class="mb-6 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold leading-6 text-emerald-700" role="status" aria-live="polite" data-auto-dismiss="5000" data-flash-icon="{{ session('saved_icon', 'circle-check') }}">
-                    <x-dashboard-icon :name="session('saved_icon', 'circle-check')" class="h-5 w-5 shrink-0" />
-                    {{ session('saved') }}
-                </div>
+                <div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800" role="status" aria-live="polite" data-auto-dismiss="5000"@if (session('saved_icon')) data-flash-icon="{{ session('saved_icon') }}"@endif>{{ session('saved') }}</div>
             @endif
 
             @if (session('error') || session('alert'))
-                <div class="mb-6 flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-semibold leading-6 text-rose-800" role="alert">
-                    <x-dashboard-icon name="alert-triangle" class="h-5 w-5 shrink-0 text-rose-600" />
-                    {{ session('error') ?? session('alert') }}
-                </div>
+                <div class="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800" role="alert">{{ session('error') ?? session('alert') }}</div>
             @endif
 
             @if ($errors->any())
-                <div class="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-semibold leading-6 text-rose-800" role="alert">
-                    <div class="flex items-start gap-3">
-                        <x-dashboard-icon name="alert-triangle" class="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
-                        <div>
-                            @if($errors->count() === 1)
-                                <p>{{ $errors->first() }}</p>
-                            @else
-                                <ul class="list-disc pl-4 space-y-1">
-                                    @foreach($errors->all() as $err)
-                                        <li>{{ $err }}</li>
-                                    @endforeach
-                                </ul>
-                            @endif
-                        </div>
-                    </div>
+                <div class="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800" role="alert">
+                    @if($errors->count() === 1)
+                        <p>{{ $errors->first() }}</p>
+                    @else
+                        <ul class="list-disc pl-4 space-y-1">
+                            @foreach($errors->all() as $err)
+                                <li>{{ $err }}</li>
+                            @endforeach
+                        </ul>
+                    @endif
                 </div>
             @endif
 
             @yield('content')
         </main>
+        <footer class="admin-colophon">
+            <p>Mission Care Training and Assessment Center · Caregiving NC II</p>
+            <p>Official institutional records. Use of this system is restricted to enrolled MCARE trainees.</p>
+        </footer>
     </div>
-
-    <x-dashboard-mobile-navigation
-        :primary-items="$traineeMobilePrimary"
-        :more-items="$traineeMobileMore"
-        label="Mobile trainee navigation"
-        menu-title="Trainee destinations"
-        role="trainee"
-    />
 
     <dialog class="lms-confirm-dialog" data-lms-confirm-dialog aria-labelledby="lms-confirm-title">
         <form method="dialog" class="lms-confirm-card">
             <span class="lms-confirm-icon" aria-hidden="true">!</span>
             <h2 id="lms-confirm-title">Confirm action</h2>
             <p data-lms-confirm-message>This action cannot be undone.</p>
+            <p data-lms-confirm-detail hidden></p>
             <div class="lms-confirm-actions">
                 <button value="cancel" class="secondary-action">Cancel</button>
-                <button value="confirm" class="lms-danger-action">Continue</button>
+                <button value="confirm" class="lms-danger-action" data-lms-confirm-action>Continue</button>
             </div>
         </form>
     </dialog>

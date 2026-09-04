@@ -9,41 +9,24 @@
             'paid' => 'bg-emerald-50 text-emerald-800 ring-emerald-200',
             'expired' => 'bg-red-50 text-red-800 ring-red-200',
         ];
-        $firstApp = $allApplications->first();
     @endphp
 
     <section class="space-y-6">
-        <header class="border-b border-slate-200 pb-6">
-            <p class="dashboard-section-kicker">Tuition & Financial Management</p>
-            <div class="mt-2 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                    <h1 class="dashboard-section-title text-3xl">Payment Verification & Ledger</h1>
-                    <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                        Record on-site tuition transactions, verify physical official receipts, track remaining balances (₱22,000 program fee), and manage trainee payment milestones.
-                    </p>
-                </div>
-                <div class="flex flex-wrap items-center gap-3">
-                    <button type="button" data-dashboard-dialog-open="record-onsite-payment-dialog" class="primary-action">
-                        <x-dashboard-icon name="plus" class="h-4 w-4" />
-                        <span>Record On-Site Payment</span>
-                    </button>
-                    <a href="{{ route('admin.announcements.index') }}" class="secondary-action">
-                        <x-dashboard-icon name="bullhorn" class="h-4 w-4" />
-                        <span>Send Payment Reminder</span>
-                    </a>
-                </div>
+        <header class="flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
+            <p class="max-w-3xl text-sm leading-6 text-slate-600">
+                Record on-site tuition transactions, verify physical official receipts, track remaining balances (₱22,000 program fee), and manage trainee payment milestones.
+            </p>
+            <div class="flex flex-wrap items-center gap-3">
+                <button type="button" data-dashboard-dialog-open="record-onsite-payment-dialog" class="primary-action">
+                    <x-dashboard-icon name="plus" class="h-4 w-4" />
+                    <span>Record On-Site Payment</span>
+                </button>
+                <a href="{{ route('admin.announcements.index') }}" class="secondary-action">
+                    <x-dashboard-icon name="bullhorn" class="h-4 w-4" />
+                    <span>Send Payment Reminder</span>
+                </a>
             </div>
         </header>
-
-        @if ($errors->any())
-            <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-800">
-                <ul class="list-disc pl-5 space-y-1">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-            </div>
-        @endif
 
         <!-- Financial Stats -->
         <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -52,24 +35,28 @@
                     <p class="dashboard-stat-label">Total Tuition Collected</p>
                     <p class="dashboard-stat-value text-emerald-700">₱{{ number_format((float) $stats['total_collected'], 2) }}</p>
                 </div>
+                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"><x-dashboard-icon name="credit-card" class="h-5 w-5" /></span>
             </article>
             <article class="dashboard-stat min-h-0">
                 <div>
                     <p class="dashboard-stat-label">Fully Paid Trainees</p>
                     <p class="dashboard-stat-value">{{ $stats['fully_paid'] }}</p>
                 </div>
+                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-purple-50 text-purple-700 ring-1 ring-purple-100"><x-dashboard-icon name="user-check" class="h-5 w-5" /></span>
             </article>
             <article class="dashboard-stat min-h-0">
                 <div>
                     <p class="dashboard-stat-label">Partially Paid (Downpayment)</p>
                     <p class="dashboard-stat-value text-sky-700">{{ $stats['partially_paid'] }}</p>
                 </div>
+                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-700 ring-1 ring-sky-100"><x-dashboard-icon name="signal" class="h-5 w-5" /></span>
             </article>
             <article class="dashboard-stat min-h-0">
                 <div>
                     <p class="dashboard-stat-label">Pending On-Site Tickets</p>
                     <p class="dashboard-stat-value text-amber-700">{{ $stats['pending_tickets'] }}</p>
                 </div>
+                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-700 ring-1 ring-amber-100"><x-dashboard-icon name="clipboard-list" class="h-5 w-5" /></span>
             </article>
         </div>
 
@@ -123,9 +110,9 @@
 
         <!-- Payments Table -->
         <section class="dashboard-table-wrap">
-            <div class="overflow-x-auto">
-                <table class="dashboard-table min-w-[78rem]">
-                    <thead>
+            <div class="overflow-auto max-h-[72vh]">
+                <table class="dashboard-table w-full min-w-[78rem]">
+                    <thead class="sticky top-0 z-10">
                         <tr>
                             <th>Enrollee</th>
                             <th>Batch / Schedule</th>
@@ -141,7 +128,6 @@
                                 $totalFee = (float) ($application->total_program_fee ?? 22000.00);
                                 $totalPaid = (float) ($application->total_paid_amount ?? 0.00);
                                 $balance = $application->remainingBalance();
-                                $appFullName = $application->first_name . ' ' . $application->last_name;
                                 $pendingTicket = $application->paymentTransactions->first(fn ($transaction) => $transaction->isOnsiteTicket());
                             @endphp
                             <tr class="align-top">
@@ -177,13 +163,19 @@
                                     </div>
                                 </td>
                                 <td class="text-xs">
+                                    @php
+                                        $latestReference = $application->latestPaymentReference();
+                                    @endphp
                                     @if ($pendingTicket)
-                                        <p class="font-mono font-bold text-purple-900">{{ $pendingTicket->ticket_number }}</p>
-                                        <p class="mt-1 text-[11px] font-semibold text-amber-700">On-site ticket · ₱{{ number_format((float) $pendingTicket->amount, 2) }}</p>
+                                        <p class="font-mono font-bold text-purple-900">{{ $pendingTicket->reference_number ?: $pendingTicket->ticket_number }}</p>
+                                        <p class="mt-1 text-[11px] font-semibold text-amber-700">On-site reference · ₱{{ number_format((float) $pendingTicket->amount, 2) }}</p>
                                     @else
                                         <p class="font-mono font-bold text-slate-900">
-                                            {{ $application->payment_receipt_number ?: $application->paymongo_checkout_reference ?: $application->payment_reference ?: 'Reference pending' }}
+                                            {{ $latestReference ?: 'Reference pending' }}
                                         </p>
+                                        @if ($application->payment_method === 'online' && filled($application->payment_reference) && $application->payment_reference !== $latestReference)
+                                            <p class="mt-1 font-mono text-[11px] text-slate-600">MCARE ref: {{ $application->payment_reference }}</p>
+                                        @endif
                                     @endif
                                     <p class="mt-1 text-[11px] text-slate-500">
                                         Channel: <span class="font-semibold text-slate-700">{{ str($application->payment_method)->headline() }}</span>
@@ -202,7 +194,7 @@
                                 </td>
                                 <td>
                                     <div class="flex flex-col gap-2">
-                                        <button type="button" class="inline-flex items-center justify-center gap-1 rounded-lg bg-purple-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-purple-800 transition" data-record-for-app data-app-id="{{ $application->id }}" data-app-name="{{ $appFullName }}" data-app-balance="{{ $balance }}">
+                                        <button type="button" class="inline-flex items-center justify-center gap-1 rounded-lg bg-purple-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-purple-800 transition" data-record-for-app data-app-id="{{ $application->id }}" data-app-name="{{ $application->last_name }}, {{ $application->first_name }}" data-app-email="{{ $application->email }}" data-app-batch="{{ $application->batch ? $application->batch->name.' '.$application->batch->year : 'Unassigned' }}" data-app-schedule="{{ $application->schedule_preference }}" data-app-status="{{ $application->paymentStatusLabel() }}" data-app-balance="{{ $balance }}" data-app-downpayment="{{ (float) ($application->downpayment_amount ?? 0) }}" data-app-reference="{{ $latestReference ?? '' }}">
                                             <x-dashboard-icon name="plus" class="h-3.5 w-3.5" />
                                             <span>Record Payment</span>
                                         </button>
@@ -240,11 +232,16 @@
                                                             </span>
                                                         </div>
                                                         <p class="text-[11px] text-slate-600">
-                                                            @if ($tx->ticket_number)
-                                                                Ticket #: <strong class="font-mono text-purple-900">{{ $tx->ticket_number }}</strong>
-                                                                · {{ $tx->typeLabel() }} · Requested {{ $tx->created_at->format('M d, Y g:i A') }}
+                                                            @if ($tx->reference_number || $tx->ticket_number)
+                                                                Ref #: <strong class="font-mono text-purple-900">{{ $tx->reference_number ?: $tx->ticket_number }}</strong>
+                                                                @if ($tx->or_number)
+                                                                    · OR #: <strong class="font-mono">{{ $tx->or_number }}</strong>
+                                                                @endif
+                                                                · {{ $tx->typeLabel() }} · {{ $tx->paid_at?->format('M d, Y') ?? $tx->created_at->format('M d, Y g:i A') }}
+                                                            @elseif ($tx->or_number)
+                                                                OR #: <strong class="font-mono">{{ $tx->or_number }}</strong> · {{ $tx->typeLabel() }} · {{ $tx->paid_at?->format('M d, Y') ?? 'N/A' }}
                                                             @else
-                                                                OR #: <strong class="font-mono">{{ $tx->or_number ?: 'N/A' }}</strong> · {{ $tx->typeLabel() }} · {{ $tx->paid_at?->format('M d, Y') ?? 'N/A' }}
+                                                                {{ $tx->typeLabel() }} · {{ $tx->paid_at?->format('M d, Y') ?? 'N/A' }}
                                                             @endif
                                                         </p>
                                                         @if ($tx->receipt_proof_path)
@@ -294,74 +291,102 @@
             @endif
         </section>
 
+        <style>
+            #record-onsite-payment-dialog {
+                width: min(96vw, 72rem);
+                max-width: 72rem;
+                max-height: 92vh;
+            }
+            #record-onsite-payment-dialog .record-onsite-layout {
+                display: grid;
+                grid-template-columns: minmax(18rem, 0.9fr) minmax(24rem, 1.2fr);
+                align-items: stretch;
+                gap: 1.25rem;
+            }
+            @media (max-width: 860px) {
+                #record-onsite-payment-dialog .record-onsite-layout {
+                    grid-template-columns: 1fr;
+                }
+            }
+        </style>
         <!-- Native HTML5 Dialog: Record On-Site Payment -->
-        <dialog id="record-onsite-payment-dialog" data-dashboard-dialog class="m-auto max-h-[90vh] w-[min(94vw,36rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/45" aria-labelledby="record-dialog-title">
+        <dialog id="record-onsite-payment-dialog" data-dashboard-dialog class="m-auto rounded-2xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/45" aria-labelledby="record-dialog-title">
             <div class="flex items-center justify-between border-b border-slate-200 px-6 py-4">
                 <div>
                     <h2 id="record-dialog-title" class="font-display text-xl font-bold text-slate-950">Record On-Site Payment</h2>
-                    <p class="mt-0.5 text-xs text-slate-500">Issue an Official Receipt (OR) entry to credit a trainee's tuition balance.</p>
+                    <p class="mt-0.5 text-xs text-slate-500">Paste the enrollee reference number, then click Find to load their name and balance.</p>
                 </div>
                 <button type="button" data-dashboard-dialog-close class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900" aria-label="Close dialog" title="Close">
                     <x-dashboard-icon name="xmark" class="h-4 w-4" />
                 </button>
             </div>
 
-            <form id="record-onsite-payment-form" method="POST" action="{{ route('admin.payment-schedules.transactions.store', $firstApp->id ?? 1) }}" class="space-y-4 p-6" data-dashboard-dialog-form data-submit-label="Recording payment...">
+            <form id="record-onsite-payment-form" method="POST" action="#" class="p-6" data-dashboard-dialog-form data-submit-label="Recording payment..." data-lookup-url="{{ route('admin.payment-schedules.lookup') }}" data-store-url="{{ url('/admin/payment-scheduling') }}">
                 @csrf
 
-                <div>
-                    <label for="record-enrollee-select" class="mb-1.5 block text-xs font-bold uppercase text-slate-600">Enrollee / Trainee</label>
-                    <select id="record-enrollee-select" class="form-field" required>
-                        @foreach ($allApplications as $app)
-                            <option value="{{ $app->id }}" data-balance="{{ $app->remainingBalance() }}" @selected(($firstApp->id ?? null) === $app->id)>
-                                {{ $app->last_name }}, {{ $app->first_name }} ({{ $app->email }}) — Balance: ₱{{ number_format($app->remainingBalance(), 2) }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label for="record-or-number" class="mb-1.5 block text-xs font-bold uppercase text-slate-600">Official Receipt (OR) #</label>
-                        <input id="record-or-number" name="or_number" required maxlength="100" class="form-field font-mono" placeholder="e.g. OR-2026-0891">
+                <div class="mb-5">
+                    <label for="record-lookup-query" class="mb-1.5 block text-xs font-bold uppercase text-slate-600">Reference number</label>
+                    <div class="flex gap-2">
+                        <input id="record-lookup-query" type="text" maxlength="100" class="form-field font-mono" placeholder="e.g. MCARE-SITE-260903-XXXXXXXX" autocomplete="off" data-lookup-input>
+                        <button type="button" id="record-lookup-button" class="secondary-action shrink-0">Find</button>
                     </div>
-                    <div>
-                        <label for="record-paid-at" class="mb-1.5 block text-xs font-bold uppercase text-slate-600">Payment Date</label>
-                        <input id="record-paid-at" name="paid_at" type="date" required value="{{ now()->toDateString() }}" class="form-field">
+                    <p id="record-lookup-status" class="mt-1.5 text-xs text-slate-500" role="status" aria-live="polite">Paste the on-site reference, PayMongo ID, OR #, ticket, or enrollment #, then click Find.</p>
+                </div>
+
+                <div class="record-onsite-layout">
+                    <div id="record-enrollee-card" class="record-enrollee-panel rounded-xl border border-purple-200 bg-purple-50/70 p-4">
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-purple-700">Enrollee / Trainee</p>
+                        <div id="record-enrollee-empty" class="mt-4 text-sm leading-6 text-slate-600">
+                            Find a reference number to load the enrollee name, email, batch, and remaining balance here.
+                        </div>
+                        <div id="record-enrollee-details" hidden>
+                            <p id="record-enrollee-name" class="mt-1 font-display text-lg font-bold text-slate-950"></p>
+                            <p id="record-enrollee-email" class="mt-0.5 text-sm text-slate-600"></p>
+                            <p id="record-enrollee-meta" class="mt-2 text-xs text-slate-600"></p>
+                            <p id="record-enrollee-match" class="mt-2 text-xs font-semibold text-purple-800"></p>
+                        </div>
+                        <input type="hidden" id="record-application-id" value="">
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label for="record-paid-at" class="mb-1.5 block text-xs font-bold uppercase text-slate-600">Payment Date</label>
+                                <input id="record-paid-at" name="paid_at" type="date" required value="{{ now()->toDateString() }}" class="form-field">
+                            </div>
+                            <div>
+                                <label for="record-amount" class="mb-1.5 block text-xs font-bold uppercase text-slate-600">Amount Paid (PHP)</label>
+                                <div class="relative">
+                                    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm font-bold text-slate-500">₱</span>
+                                    <input id="record-amount" name="amount" type="number" step="0.01" min="1" max="100000" required placeholder="0.00" class="form-field pl-8">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" id="record-btn-downpayment" hidden class="rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200">Downpayment</button>
+                            <button type="button" id="record-btn-clear-balance" hidden class="rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200">Clear Balance</button>
+                        </div>
+
+                        <div>
+                            <label for="record-tx-type" class="mb-1.5 block text-xs font-bold uppercase text-slate-600">Payment Classification</label>
+                            <select id="record-tx-type" name="transaction_type" class="form-field" required>
+                                @foreach (\App\Models\PaymentTransaction::types() as $type => $label)
+                                    <option value="{{ $type }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="record-notes" class="mb-1.5 block text-xs font-bold uppercase text-slate-600">Admin Notes / Remarks (Optional)</label>
+                            <textarea id="record-notes" name="notes" rows="3" maxlength="1000" class="form-field" placeholder="e.g. Received cash payment at registration desk..."></textarea>
+                        </div>
                     </div>
                 </div>
 
-                <div>
-                    <label for="record-amount" class="mb-1.5 block text-xs font-bold uppercase text-slate-600">Amount Paid (PHP)</label>
-                    <div class="relative">
-                        <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm font-bold text-slate-500">₱</span>
-                        <input id="record-amount" name="amount" type="number" step="0.01" min="1" max="100000" required value="2000.00" class="form-field pl-8">
-                    </div>
-                    <div class="mt-2 flex flex-wrap items-center gap-2">
-                        <button type="button" data-preset-amount="2000.00" data-preset-type="downpayment" class="rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200">₱2,000 Downpayment</button>
-                        <button type="button" data-preset-amount="5000.00" data-preset-type="installment" class="rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200">₱5,000 Installment</button>
-                        <button type="button" id="record-btn-clear-balance" class="rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200">Clear Balance</button>
-                    </div>
-                </div>
-
-                <div>
-                    <label for="record-tx-type" class="mb-1.5 block text-xs font-bold uppercase text-slate-600">Payment Classification</label>
-                    <select id="record-tx-type" name="transaction_type" class="form-field" required>
-                        <option value="downpayment">Downpayment (Initial ₱2,000)</option>
-                        <option value="installment">Monthly Installment</option>
-                        <option value="full_payment">Full Program Payment</option>
-                        <option value="balance_settlement">Final Balance Settlement</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label for="record-notes" class="mb-1.5 block text-xs font-bold uppercase text-slate-600">Admin Notes / Remarks (Optional)</label>
-                    <textarea id="record-notes" name="notes" rows="2" maxlength="1000" class="form-field" placeholder="e.g. Received cash payment at registration desk..."></textarea>
-                </div>
-
-                <div class="flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                <div class="mt-5 flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
                     <button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button>
-                    <button type="submit" data-action-button class="primary-action">
+                    <button type="submit" id="record-submit-button" data-action-button class="primary-action" disabled>
                         <x-dashboard-icon name="check" class="h-4 w-4" />
                         <span>Save & Credit Payment</span>
                     </button>
@@ -374,74 +399,295 @@
         document.addEventListener('DOMContentLoaded', () => {
             const dialog = document.getElementById('record-onsite-payment-dialog');
             const form = document.getElementById('record-onsite-payment-form');
-            const enrolleeSelect = document.getElementById('record-enrollee-select');
+            const lookupInput = document.getElementById('record-lookup-query');
+            const lookupButton = document.getElementById('record-lookup-button');
+            const lookupStatus = document.getElementById('record-lookup-status');
+            const enrolleeCard = document.getElementById('record-enrollee-card');
+            const enrolleeEmpty = document.getElementById('record-enrollee-empty');
+            const enrolleeDetails = document.getElementById('record-enrollee-details');
+            const enrolleeName = document.getElementById('record-enrollee-name');
+            const enrolleeEmail = document.getElementById('record-enrollee-email');
+            const enrolleeMeta = document.getElementById('record-enrollee-meta');
+            const enrolleeMatch = document.getElementById('record-enrollee-match');
+            const applicationIdInput = document.getElementById('record-application-id');
             const amountInput = document.getElementById('record-amount');
             const txTypeSelect = document.getElementById('record-tx-type');
+            const downpaymentBtn = document.getElementById('record-btn-downpayment');
             const clearBalanceBtn = document.getElementById('record-btn-clear-balance');
-            const baseUrl = '{{ url('/admin/payment-scheduling') }}';
+            const submitButton = document.getElementById('record-submit-button');
+            const lookupUrl = form?.dataset.lookupUrl || '';
+            const storeUrl = form?.dataset.storeUrl || '';
+            const money = (value) => Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            let lookupTimer = null;
+            let lookupController = null;
+            let enrolleeLocked = false;
+            let lastLookedUp = '';
+
+            const setStatus = (message, isError = false) => {
+                if (!lookupStatus) return;
+                lookupStatus.textContent = message;
+                lookupStatus.className = `mt-1.5 text-xs ${isError ? 'font-semibold text-rose-700' : 'text-slate-500'}`;
+            };
+
+            const setSubmitEnabled = (enabled) => {
+                if (!submitButton) return;
+                submitButton.disabled = !enabled;
+            };
 
             const updateFormAction = (appId) => {
                 if (!form || !appId) return;
-                form.action = `${baseUrl}/${appId}/transactions`;
+                form.action = `${storeUrl}/${appId}/transactions`;
             };
 
-            const updateBalancePreset = () => {
-                const selectedOption = enrolleeSelect?.selectedOptions?.[0];
-                if (!selectedOption) return;
-                const balance = parseFloat(selectedOption.dataset.balance || '0');
+            const applyAmountPresets = (payload) => {
+                const downpayment = Number.parseFloat(payload.downpayment_amount || '0');
+                const balance = Number.parseFloat(payload.balance || '0');
+                const suggested = payload.suggested_amount == null || payload.suggested_amount === ''
+                    ? null
+                    : Number.parseFloat(payload.suggested_amount);
+
+                if (downpaymentBtn) {
+                    if (downpayment > 0) {
+                        downpaymentBtn.hidden = false;
+                        downpaymentBtn.textContent = `₱${money(downpayment)} Downpayment`;
+                        downpaymentBtn.dataset.presetAmount = downpayment.toFixed(2);
+                    } else {
+                        downpaymentBtn.hidden = true;
+                        delete downpaymentBtn.dataset.presetAmount;
+                    }
+                }
+
                 if (clearBalanceBtn) {
-                    clearBalanceBtn.textContent = `Clear Balance (₱${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })})`;
-                    clearBalanceBtn.dataset.balanceAmount = balance.toFixed(2);
+                    if (balance > 0) {
+                        clearBalanceBtn.hidden = false;
+                        clearBalanceBtn.textContent = `Clear Balance (₱${money(balance)})`;
+                        clearBalanceBtn.dataset.balanceAmount = balance.toFixed(2);
+                    } else {
+                        clearBalanceBtn.hidden = true;
+                        delete clearBalanceBtn.dataset.balanceAmount;
+                    }
+                }
+
+                if (!amountInput) return;
+
+                if (suggested != null && !Number.isNaN(suggested) && suggested > 0) {
+                    amountInput.value = suggested.toFixed(2);
+                    return;
+                }
+
+                if (downpayment > 0) {
+                    amountInput.value = (balance > 0 && balance < downpayment ? balance : downpayment).toFixed(2);
+                    return;
+                }
+
+                amountInput.value = '';
+            };
+
+            const hideEnrollee = () => {
+                enrolleeLocked = false;
+                lastLookedUp = '';
+                if (enrolleeEmpty) enrolleeEmpty.hidden = false;
+                if (enrolleeDetails) enrolleeDetails.hidden = true;
+                if (applicationIdInput) applicationIdInput.value = '';
+                if (form) form.action = '#';
+                if (downpaymentBtn) downpaymentBtn.hidden = true;
+                if (clearBalanceBtn) clearBalanceBtn.hidden = true;
+                setSubmitEnabled(false);
+            };
+
+            const showEnrollee = (payload) => {
+                enrolleeLocked = true;
+                if (enrolleeName) enrolleeName.textContent = payload.name || '';
+                if (enrolleeEmail) enrolleeEmail.textContent = payload.email || '';
+                if (enrolleeMeta) {
+                    enrolleeMeta.textContent = [
+                        payload.batch || 'Unassigned',
+                        payload.schedule || '',
+                        payload.payment_status || '',
+                        `Balance: ₱${money(payload.balance)}`,
+                    ].filter(Boolean).join(' · ');
+                }
+                if (enrolleeMatch) {
+                    enrolleeMatch.textContent = payload.matched_label
+                        ? `Matched ${payload.matched_label}.`
+                        : '';
+                }
+                if (applicationIdInput) applicationIdInput.value = payload.application_id || '';
+                if (enrolleeEmpty) enrolleeEmpty.hidden = true;
+                if (enrolleeDetails) enrolleeDetails.hidden = false;
+                updateFormAction(payload.application_id);
+                applyAmountPresets(payload);
+
+                if (payload.suggested_type && txTypeSelect) {
+                    txTypeSelect.value = payload.suggested_type;
+                } else if (txTypeSelect) {
+                    txTypeSelect.value = Number.parseFloat(payload.balance || '0') <= 0
+                        ? 'balance_settlement'
+                        : 'downpayment';
+                }
+
+                if (payload.already_paid) {
+                    setStatus('This enrollee is already fully paid. A new on-site payment cannot be recorded.', true);
+                    setSubmitEnabled(false);
+                    return;
+                }
+
+                if (payload.already_recorded) {
+                    setStatus('This official receipt is already on the ledger for this enrollee.');
+                } else {
+                    setStatus('Enrollee found. Review the amount, then save to credit this payment. MCARE will generate the official OR number automatically.');
+                }
+
+                setSubmitEnabled(true);
+            };
+
+            const lookupEnrollee = async (query, { force = false } = {}) => {
+                const value = String(query || '').trim();
+                if (value.length < 3) {
+                    if (!enrolleeLocked) {
+                        setStatus('Type at least 3 characters from the reference number, OR, ticket, or enrollment number.');
+                    }
+                    return;
+                }
+
+                if (!force && enrolleeLocked) {
+                    return;
+                }
+
+                if (!force && value.toUpperCase() === lastLookedUp) {
+                    return;
+                }
+
+                lastLookedUp = value.toUpperCase();
+                lookupController?.abort();
+                lookupController = new AbortController();
+                setStatus('Looking up enrollee...');
+
+                try {
+                    const response = await fetch(`${lookupUrl}?q=${encodeURIComponent(value)}`, {
+                        credentials: 'same-origin',
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        signal: lookupController.signal,
+                    });
+
+                    if (!response.ok) {
+                        setStatus('The enrollee lookup could not be completed. Try again.', true);
+                        return;
+                    }
+
+                    const payload = await response.json();
+                    if (!payload?.found) {
+                        hideEnrollee();
+                        lastLookedUp = value.toUpperCase();
+                        setStatus('No enrollee matched that reference number. Check the value from the ledger or payment slip.', true);
+                        return;
+                    }
+
+                    showEnrollee(payload);
+                } catch (error) {
+                    if (error?.name === 'AbortError') return;
+                    setStatus('The enrollee lookup could not be completed. Try again.', true);
                 }
             };
 
-            if (enrolleeSelect) {
-                enrolleeSelect.addEventListener('change', () => {
-                    updateFormAction(enrolleeSelect.value);
-                    updateBalancePreset();
-                });
-                updateFormAction(enrolleeSelect.value);
-                updateBalancePreset();
-            }
+            const scheduleLookup = () => {
+                window.clearTimeout(lookupTimer);
+                lookupTimer = window.setTimeout(() => lookupEnrollee(lookupInput?.value || ''), 350);
+            };
 
-            document.querySelectorAll('[data-preset-amount]').forEach((btn) => {
-                btn.addEventListener('click', () => {
-                    if (amountInput) amountInput.value = btn.dataset.presetAmount;
-                    if (txTypeSelect && btn.dataset.presetType) txTypeSelect.value = btn.dataset.presetType;
-                });
+            lookupInput?.addEventListener('input', () => {
+                if (enrolleeLocked && lookupInput.value.trim().toUpperCase() !== lastLookedUp) {
+                    enrolleeLocked = false;
+                }
+                scheduleLookup();
             });
 
-            if (clearBalanceBtn) {
-                clearBalanceBtn.addEventListener('click', () => {
-                    const balance = clearBalanceBtn.dataset.balanceAmount || '0.00';
-                    if (amountInput) amountInput.value = balance;
-                    if (txTypeSelect) txTypeSelect.value = 'balance_settlement';
-                });
-            }
+            lookupInput?.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    lookupEnrollee(lookupInput.value, { force: true });
+                }
+            });
 
-            // Per-row "Record Payment" button click handlers
+            lookupButton?.addEventListener('click', (event) => {
+                event.preventDefault();
+                lookupEnrollee(lookupInput?.value || '', { force: true });
+            });
+
+            downpaymentBtn?.addEventListener('click', () => {
+                if (amountInput && downpaymentBtn.dataset.presetAmount) {
+                    amountInput.value = downpaymentBtn.dataset.presetAmount;
+                }
+                if (txTypeSelect) txTypeSelect.value = 'downpayment';
+            });
+
+            clearBalanceBtn?.addEventListener('click', () => {
+                const balance = clearBalanceBtn.dataset.balanceAmount || '';
+                if (amountInput && balance) amountInput.value = balance;
+                if (txTypeSelect) txTypeSelect.value = 'balance_settlement';
+            });
+
+            form?.addEventListener('submit', (event) => {
+                if (!applicationIdInput?.value || form.action.endsWith('#')) {
+                    event.preventDefault();
+                    setStatus('Find the enrollee by reference number first.', true);
+                }
+            });
+
+            const resetDialog = () => {
+                window.clearTimeout(lookupTimer);
+                lookupController?.abort();
+                hideEnrollee();
+                if (lookupInput) {
+                    lookupInput.value = '';
+                    lookupInput.placeholder = 'e.g. MCARE-SITE-260903-XXXXXXXX';
+                }
+                if (amountInput) amountInput.value = '';
+                if (txTypeSelect) txTypeSelect.value = 'downpayment';
+                setStatus('Paste the reference number from the ledger, then click Find.');
+            };
+
+            dialog?.addEventListener('close', resetDialog);
+
             document.querySelectorAll('[data-record-for-app]').forEach((button) => {
                 button.addEventListener('click', () => {
-                    const appId = button.dataset.appId;
-                    const balance = parseFloat(button.dataset.appBalance || '0');
+                    const reference = (button.dataset.appReference || '').trim();
 
-                    if (enrolleeSelect && appId) {
-                        enrolleeSelect.value = appId;
-                        updateFormAction(appId);
-                        updateBalancePreset();
-                    }
-
-                    if (amountInput) {
-                        amountInput.value = balance > 0 && balance < 2000 ? balance.toFixed(2) : '2000.00';
-                    }
-
-                    if (txTypeSelect) {
-                        txTypeSelect.value = balance <= 0 ? 'balance_settlement' : 'downpayment';
-                    }
-
-                    if (dialog && typeof dialog.showModal === 'function') {
+                    if (dialog && typeof dialog.showModal === 'function' && !dialog.open) {
                         dialog.showModal();
                     }
+
+                    if (reference && lookupInput) {
+                        lookupInput.value = reference;
+                        lookupEnrollee(reference, { force: true });
+                        lookupInput.focus();
+                        return;
+                    }
+
+                    const appId = button.dataset.appId;
+                    const balance = parseFloat(button.dataset.appBalance || '0');
+                    const downpayment = parseFloat(button.dataset.appDownpayment || '0');
+
+                    showEnrollee({
+                        application_id: appId,
+                        name: button.dataset.appName,
+                        email: button.dataset.appEmail,
+                        batch: button.dataset.appBatch,
+                        schedule: button.dataset.appSchedule,
+                        payment_status: button.dataset.appStatus,
+                        balance,
+                        downpayment_amount: downpayment,
+                        suggested_amount: downpayment > 0 ? downpayment : null,
+                        matched_label: '',
+                        can_record: balance > 0,
+                        already_paid: balance <= 0,
+                    });
+
+                    if (lookupInput) lookupInput.value = '';
                 });
             });
         });

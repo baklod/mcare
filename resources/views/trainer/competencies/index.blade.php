@@ -19,10 +19,6 @@
         @endif
     </header>
 
-    @if($errors->any())
-        <div class="border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert"><p class="font-bold">The batch update was not saved.</p><ul class="mt-2 list-disc space-y-1 pl-5">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
-    @endif
-
     <form method="GET" action="{{ route('trainer.competencies.index') }}" class="grid gap-3 border-b border-slate-200 pb-5 md:grid-cols-[minmax(13rem,1fr)_minmax(12rem,1fr)_10rem_auto] md:items-end">
         <div><label class="mb-2 block text-xs font-bold uppercase text-slate-500" for="competency-search">Search trainee</label><input id="competency-search" class="form-field" name="search" value="{{ $filters['search'] ?? '' }}" maxlength="100" placeholder="Name or email"></div>
         <div><label class="mb-2 block text-xs font-bold uppercase text-slate-500" for="competency-batch">Batch</label><select id="competency-batch" class="form-field" name="batch_id">@foreach($batches as $batch)<option value="{{ $batch->id }}" @selected((int)($filters['batch_id'] ?? 0) === $batch->id)>{{ $batch->name }} {{ $batch->year }}</option>@endforeach</select></div>
@@ -36,14 +32,17 @@
         <div class="competency-board-toolbar">
             <div class="min-w-0">
                 <p class="truncate text-sm font-bold text-slate-950">{{ $selectedBatch->name }} {{ $selectedBatch->year }}{{ ! empty($filters['schedule']) ? ' | '.$filters['schedule'].' class' : '' }}</p>
-                <div class="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-slate-600" aria-label="Competency status legend"><span class="competency-legend is-competent">C Competent</span><span class="competency-legend is-progress">IP In progress</span><span class="competency-legend is-not-yet">NYC Not yet competent</span><span class="competency-legend is-empty">- Not assessed</span></div>
+                <p class="mt-1 text-xs font-medium text-slate-500">Click a competency cell to evaluate that trainee. The result is saved to classwork and the TESDA record.</p>
+                <div class="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-slate-600" aria-label="Competency status legend"><span class="competency-legend is-competent">C Competent</span><span class="competency-legend is-progress">IP In progress</span><span class="competency-legend is-not-yet">NYC Not yet competent</span><span class="competency-legend is-empty">Evaluate Not assessed</span></div>
             </div>
             <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                @if($summary['trainees'] > 0)
+                @if($summary['trainees'] > 0 && $unitsByCategory->flatten()->isNotEmpty())
                     <span class="text-xs font-bold text-violet-700" data-selected-trainee-count>0 selected</span>
                     <button type="button" data-dashboard-dialog-open="bulk-competency-dialog" data-bulk-update-open class="primary-action gap-2" disabled><x-dashboard-icon name="layer-group" class="h-4 w-4" />Bulk update</button>
                 @endif
+                @if($unitsByCategory->flatten()->isNotEmpty())
                 <div class="flex border border-slate-200 bg-white" aria-label="Scroll competency columns"><button type="button" class="competency-scroll-button" data-competency-scroll="left" aria-label="Scroll competencies left" title="Scroll left"><x-dashboard-icon name="chevron-left" /></button><button type="button" class="competency-scroll-button border-l border-slate-200" data-competency-scroll="right" aria-label="Scroll competencies right" title="Scroll right"><x-dashboard-icon name="chevron-right" /></button></div>
+                @endif
                 <a class="secondary-action gap-2" href="{{ route('trainer.competencies.export', ['trainingBatch' => $selectedBatch, 'schedule' => $filters['schedule'] ?? null]) }}"><x-dashboard-icon name="file-excel" class="h-4 w-4" />Export Excel</a>
                 <a class="secondary-action gap-2" href="{{ route('trainer.competencies.chart', ['trainingBatch' => $selectedBatch, 'chart' => 'progress', 'schedule' => $filters['schedule'] ?? null]) }}"><x-dashboard-icon name="table-columns" class="h-4 w-4" />Progress</a>
                 <a class="secondary-action gap-2" href="{{ route('trainer.competencies.chart', ['trainingBatch' => $selectedBatch, 'chart' => 'achievement', 'schedule' => $filters['schedule'] ?? null]) }}"><x-dashboard-icon name="list-check" class="h-4 w-4" />Achievement</a>
@@ -52,6 +51,12 @@
 
         @if($traineeLimitReached)<div class="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">The board is showing the first 100 matching trainees. Narrow the class or search filter before a bulk update.</div>@endif
 
+        @if($unitsByCategory->flatten()->isEmpty())
+            <div class="border border-slate-200 bg-white px-6 py-14 text-center text-slate-500">
+                <p class="font-semibold text-slate-700">No published modules for this batch yet.</p>
+                <p class="mt-2 text-sm">Create classwork from the trainer or admin Modules page. Only those units appear here, grouped by the admin catalog category.</p>
+            </div>
+        @else
         <div class="competency-matrix-shell" data-competency-scroller tabindex="0" aria-label="Batch competency grading matrix">
             <table class="competency-matrix">
                 <thead>
@@ -69,7 +74,12 @@
                                     :name="trim($trainee->first_name.' '.$trainee->last_name)"
                                     class="grid h-8 w-8 place-items-center rounded-full bg-purple-100 text-[10px] font-black text-purple-800"
                                 />
-                                <span class="min-w-0"><span class="block truncate">{{ $trainee->last_name }}, {{ $trainee->first_name }}</span><small>{{ $trainee->schedule_preference }} | {{ $trainee->email }}</small><x-graduate-batch-badge :application="$trainee" class="mt-1.5" /></span>
+                                <span class="min-w-0">
+                                    <span class="block truncate">{{ $trainee->last_name }}, {{ $trainee->first_name }}</span>
+                                    <small>{{ $trainee->schedule_preference }} | {{ $trainee->email }}</small>
+                                    <x-graduate-batch-badge :application="$trainee" class="mt-1.5" />
+                                    <a href="{{ route('trainer.competencies.edit', $trainee) }}" class="competency-evaluate-link">Evaluate record</a>
+                                </span>
                             </span>
                         </th>
                         @foreach($unitsByCategory as $category => $units)
@@ -93,7 +103,17 @@
                                     ];
                                     $encodedPayload = base64_encode(json_encode($payload, JSON_UNESCAPED_SLASHES));
                                 @endphp
-                                <td class="competency-record-cell is-{{ str($status)->replace('_', '-') }}"><button type="button" data-competency-cell data-record-payload="{{ $encodedPayload }}" aria-label="Open {{ $unit->title }} record for {{ $trainee->first_name }} {{ $trainee->last_name }}" title="{{ $statuses[$status] }}{{ $record?->percentage_score ? ' | '.$record->percentage_score.'%' : '' }}"><span>{{ $statusSymbols[$status] }}</span>@if($record?->percentage_score)<small>{{ number_format((float)$record->percentage_score, 0) }}</small>@endif @if($record?->locked_at)<x-dashboard-icon name="lock" class="competency-lock-icon" />@endif</button></td>
+                                <td class="competency-record-cell is-{{ str($status)->replace('_', '-') }}">
+                                    <button type="button" data-competency-cell data-record-payload="{{ $encodedPayload }}" aria-label="{{ $status === 'not_assessed' ? 'Evaluate' : 'Update evaluation for' }} {{ $unit->title }} for {{ $trainee->first_name }} {{ $trainee->last_name }}" title="{{ $status === 'not_assessed' ? 'Evaluate this competency' : ($statuses[$status].($record?->percentage_score ? ' | '.$record->percentage_score.'%' : '')) }}">
+                                        @if($status === 'not_assessed')
+                                            <span>Evaluate</span>
+                                        @else
+                                            <span>{{ $statusSymbols[$status] }}</span>
+                                            @if($record?->percentage_score)<small>{{ number_format((float) $record->percentage_score, 0) }}</small>@endif
+                                        @endif
+                                        @if($record?->locked_at)<x-dashboard-icon name="lock" class="competency-lock-icon" />@endif
+                                    </button>
+                                </td>
                             @endforeach
                         @endforeach
                     </tr>
@@ -103,9 +123,10 @@
                 </tbody>
             </table>
         </div>
+        @endif
     @endif
 
-    @if($selectedBatch && $summary['trainees'] > 0)
+    @if($selectedBatch && $summary['trainees'] > 0 && $unitsByCategory->flatten()->isNotEmpty())
         <dialog id="bulk-competency-dialog" data-dashboard-dialog data-auto-open="{{ $errors->any() ? 'true' : 'false' }}" class="m-auto max-h-[92vh] w-[min(94vw,40rem)] overflow-y-auto rounded-lg border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/45" aria-labelledby="bulk-competency-title">
             <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4"><div><p class="dashboard-section-kicker">Batch action</p><h2 id="bulk-competency-title" class="mt-1 text-xl font-bold text-slate-950">Update selected trainees</h2><p class="mt-1 text-sm text-slate-500" data-bulk-dialog-count>0 trainees selected</p></div><button type="button" data-dashboard-dialog-close class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50" aria-label="Close bulk update" title="Close"><x-dashboard-icon name="xmark" /></button></div>
             <form id="bulk-competency-form" method="POST" action="{{ route('trainer.competencies.bulk-update') }}" class="space-y-5 p-6" data-dashboard-dialog-form data-submit-label="Updating records...">
@@ -125,7 +146,7 @@
     <aside class="competency-record-drawer" data-competency-drawer aria-hidden="true" aria-labelledby="competency-drawer-title">
         <form method="POST" data-competency-drawer-form class="flex h-full flex-col">
             @csrf @method('PATCH')
-            <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6"><div class="min-w-0"><p class="dashboard-section-kicker" data-drawer-unit-code>Competency</p><h2 id="competency-drawer-title" class="mt-1 truncate text-xl font-bold text-slate-950" data-drawer-trainee>Trainee</h2><p class="mt-1 text-sm text-slate-500" data-drawer-unit-title></p></div><button type="button" data-competency-drawer-close class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50" aria-label="Close competency record" title="Close"><x-dashboard-icon name="xmark" /></button></div>
+            <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6"><div class="min-w-0"><p class="dashboard-section-kicker">Evaluate competency</p><p class="mt-1 text-[11px] font-bold uppercase tracking-wide text-violet-700" data-drawer-unit-code>Competency</p><h2 id="competency-drawer-title" class="mt-1 truncate text-xl font-bold text-slate-950" data-drawer-trainee>Trainee</h2><p class="mt-1 text-sm text-slate-500" data-drawer-unit-title></p></div><button type="button" data-competency-drawer-close class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50" aria-label="Close evaluation" title="Close"><x-dashboard-icon name="xmark" /></button></div>
             <div class="flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
                 <div data-drawer-lock-notice class="hidden border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">Locked after official document generation.</div>
                 <input type="hidden" data-drawer-unit-id>
@@ -133,7 +154,7 @@
                 <section><p class="mb-2 text-xs font-bold uppercase text-slate-500">Achievement outcomes</p><div class="divide-y divide-slate-100 border-y border-slate-200" data-drawer-outcomes></div></section>
                 <div><label class="mb-2 block text-xs font-bold uppercase text-slate-500" for="drawer-notes">Trainer notes</label><textarea id="drawer-notes" class="form-field min-h-24" maxlength="1000" data-drawer-notes></textarea></div>
             </div>
-            <div class="flex flex-col-reverse gap-2 border-t border-slate-200 bg-white px-5 py-4 sm:flex-row sm:justify-between sm:px-6"><a class="secondary-action" href="#" data-drawer-full-record>Full trainee record</a><button type="submit" class="primary-action gap-2" data-drawer-save><x-dashboard-icon name="floppy-disk" class="h-4 w-4" />Save record</button></div>
+            <div class="flex flex-col-reverse gap-2 border-t border-slate-200 bg-white px-5 py-4 sm:flex-row sm:justify-between sm:px-6"><a class="secondary-action" href="#" data-drawer-full-record>Full trainee record</a><button type="submit" class="primary-action gap-2" data-drawer-save><x-dashboard-icon name="check" class="h-4 w-4" />Save evaluation</button></div>
         </form>
     </aside>
 </section>

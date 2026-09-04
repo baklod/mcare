@@ -39,6 +39,17 @@ class AccountPortal
         };
     }
 
+    public static function dashboardLayoutFor(?User $user): string
+    {
+        return match ($user?->role) {
+            'admin' => 'admin.layouts.app',
+            'trainer' => 'trainer.layouts.app',
+            'trainee' => 'trainee.layouts.app',
+            'alumni' => 'alumni.layouts.app',
+            default => 'account.layouts.app',
+        };
+    }
+
     public static function urlFor(?User $user): string
     {
         return route(self::routeNameFor($user));

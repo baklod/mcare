@@ -31,6 +31,7 @@ class ModuleProgress extends Model
         'enrollment_application_id',
         'training_module_id',
         'sequence_number',
+        'is_deferred',
         'status',
         'progress_percent',
         'assigned_at',
@@ -52,6 +53,7 @@ class ModuleProgress extends Model
         return [
             'quiz_score' => 'decimal:2',
             'sequence_number' => 'integer',
+            'is_deferred' => 'boolean',
             'assigned_at' => 'datetime',
             'unlocked_at' => 'datetime',
             'submitted_at' => 'datetime',
@@ -104,6 +106,43 @@ class ModuleProgress extends Model
     {
         return $this->status === self::STATUS_COMPLETED
             && $this->competency_outcome === self::OUTCOME_COMPETENT;
+    }
+
+    public function needsRemediation(): bool
+    {
+        return $this->status === self::STATUS_NEEDS_REMEDIATION
+            || $this->competency_outcome === self::OUTCOME_NOT_YET_COMPETENT
+            || $this->practical_rating === self::RATING_NOT_YET_COMPETENT;
+    }
+
+    public function displayProgressPercent(): int
+    {
+        if ($this->status === self::STATUS_LOCKED || $this->unlocked_at === null) {
+            return 0;
+        }
+
+        if ($this->status === self::STATUS_NOT_STARTED) {
+            return 0;
+        }
+
+        if (
+            $this->submitted_at === null
+            && $this->completed_at === null
+            && $this->evaluated_at === null
+            && (int) $this->progress_percent <= 10
+        ) {
+            return 0;
+        }
+
+        return max(0, min(100, (int) $this->progress_percent));
+    }
+
+    public function hasRecordedClassworkProgress(): bool
+    {
+        return $this->submitted_at !== null
+            || $this->completed_at !== null
+            || $this->evaluated_at !== null
+            || (int) $this->progress_percent > 10;
     }
 
     public function workflowStatusLabel(): string

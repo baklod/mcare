@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AdminActivityLog;
+use App\Models\AdmissionApplication;
 use App\Models\HistoricalAlumniClaim;
 use App\Models\User;
 use App\Services\AdminOperationsNotifier;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Throwable;
 
@@ -33,43 +35,51 @@ class HistoricalAlumniClaimController extends Controller
             'contact_number' => trim((string) $request->input('contact_number')),
         ]);
 
-        $validated = $request->validateWithBag('alumniClaim', [
-            'first_name' => ['required', 'string', 'max:100', 'regex:/\A[\pL\pM .\'-]+\z/u'],
-            'middle_name' => ['nullable', 'string', 'max:100', 'regex:/\A[\pL\pM .\'-]+\z/u'],
-            'last_name' => ['required', 'string', 'max:100', 'regex:/\A[\pL\pM .\'-]+\z/u'],
-            'email' => [
-                'required', 'email:rfc', 'max:255',
-                Rule::unique('users', 'email'),
-                Rule::unique('enrollment_applications', 'email'),
-            ],
-            'password' => ['required', 'confirmed', 'max:255', Password::min(10)->mixedCase()->letters()->numbers()->symbols()],
-            'birth_date' => ['required', 'date', 'before:today'],
-            'gender' => ['required', Rule::in(['Male', 'Female'])],
-            'contact_number' => ['required', 'string', 'max:30', 'regex:/\A[0-9+(). \-]{7,30}\z/'],
-            'street' => ['required', 'string', 'max:180'],
-            'barangay' => ['required', 'string', 'max:120'],
-            'city' => ['required', 'string', 'max:120'],
-            'province' => ['required', 'string', 'max:120'],
-            'zip_code' => ['required', 'string', 'max:20'],
-            'educational_attainment' => ['required', 'string', 'max:150'],
-            'school_name' => ['required', 'string', 'max:180'],
-            'education_year_graduated' => ['required', 'integer', 'min:1950', 'max:'.now()->year],
-            'training_completion_year' => ['required', 'integer', 'min:1950', 'max:'.now()->year],
-            'historical_batch_name' => ['nullable', 'string', 'max:120'],
-            'training_schedule' => ['required', Rule::in(['AM', 'PM'])],
-            'evidence_type' => ['required', Rule::in(['certificate', 'tor', 'both'])],
-            'certificate_number' => ['nullable', 'string', 'max:120'],
-            'tor_reference' => ['nullable', 'string', 'max:120'],
-            'evidence_document' => ['nullable', 'file', 'mimetypes:application/pdf,image/jpeg,image/png,image/webp', 'max:10240'],
-            'evidence_document_page_2' => ['nullable', 'file', 'mimetypes:application/pdf,image/jpeg,image/png,image/webp', 'max:10240'],
-            'privacy_consent' => ['accepted'],
-        ], [
-            'email.unique' => 'This email is already connected to an MCARE account or enrollment.',
-            'privacy_consent.accepted' => 'Confirm that MCARE may use these details to verify the historical training record.',
-        ]);
+        try {
+            $validated = $request->validateWithBag('alumniClaim', [
+                'first_name' => ['required', 'string', 'max:100', 'regex:/\A[\pL\pM .\'-]+\z/u'],
+                'middle_name' => ['nullable', 'string', 'max:100', 'regex:/\A[\pL\pM .\'-]+\z/u'],
+                'last_name' => ['required', 'string', 'max:100', 'regex:/\A[\pL\pM .\'-]+\z/u'],
+                'email' => [
+                    'required', 'email:rfc', 'max:255',
+                    Rule::unique('users', 'email'),
+                    Rule::unique('enrollment_applications', 'email'),
+                ],
+                'password' => ['required', 'confirmed', 'max:255', Password::min(10)->mixedCase()->letters()->numbers()->symbols()],
+                'birth_date' => ['required', 'date', 'before:today'],
+                'gender' => ['required', Rule::in(['Male', 'Female'])],
+                'contact_number' => ['required', 'string', 'max:30', 'regex:/\A[0-9+(). \-]{7,30}\z/'],
+                'street' => ['required', 'string', 'max:180'],
+                'barangay' => ['required', 'string', 'max:120'],
+                'city' => ['required', 'string', 'max:120'],
+                'province' => ['required', 'string', 'max:120'],
+                'region' => ['required', 'string', 'max:120'],
+                'zip_code' => ['required', 'string', 'max:20'],
+                'educational_attainment' => ['required', 'string', Rule::in(AdmissionApplication::educationalAttainmentOptions())],
+                'school_name' => ['required', 'string', 'max:180'],
+                'education_year_graduated' => ['required', 'integer', 'min:1950', 'max:'.now()->year],
+                'training_completion_year' => ['required', 'integer', 'min:1950', 'max:'.now()->year],
+                'historical_batch_name' => ['nullable', 'string', 'max:120'],
+                'training_schedule' => ['required', Rule::in(['AM', 'PM'])],
+                'evidence_type' => ['required', Rule::in(['certificate', 'tor', 'both'])],
+                'certificate_number' => ['nullable', 'string', 'max:120'],
+                'tor_reference' => ['nullable', 'string', 'max:120'],
+                'evidence_document' => ['nullable', 'file', 'mimetypes:application/pdf,image/jpeg,image/png,image/webp', 'max:10240'],
+                'evidence_document_page_2' => ['nullable', 'file', 'mimetypes:application/pdf,image/jpeg,image/png,image/webp', 'max:10240'],
+                'privacy_consent' => ['accepted'],
+            ], [
+                'email.unique' => 'This email is already connected to an MCARE account or enrollment.',
+                'password.confirmed' => 'Password and confirmation must match.',
+                'educational_attainment.in' => 'Choose an educational attainment from the TESDA registration list.',
+                'privacy_consent.accepted' => 'Confirm that MCARE may use these details to verify the historical training record.',
+            ]);
+        } catch (ValidationException $exception) {
+            throw $exception->redirectTo(route('alumni.claim.create'));
+        }
 
         if ($request->hasFile('evidence_document_page_2') && ! $request->hasFile('evidence_document')) {
-            return back()
+            return redirect()
+                ->route('alumni.claim.create')
                 ->withErrors(['evidence_document_page_2' => 'Add evidence page 1 before attaching page 2.'], 'alumniClaim')
                 ->withInput();
         }
@@ -127,17 +137,38 @@ class HistoricalAlumniClaimController extends Controller
         $adminNotifier->notify(
             title: 'Historical alumni claim submitted',
             message: "{$user->name} submitted a record claim for on-site verification.",
-            url: route('admin.accounts.index').'#historical-alumni-claims',
+            url: route('admin.historical-alumni.index'),
             icon: 'user-check',
             event: 'historical-alumni.claim.submitted',
             context: ['claim_id' => $claim->id, 'email' => $user->email],
         );
 
+        $request->session()->put('alumni.claim.submitted_id', $claim->id);
+        $request->session()->put('alumni.claim.verification_sent', $verificationSent);
+
         return redirect()
-            ->route('alumni.claim.create')
-            ->with('claim_submitted', 'Your alumni claim was recorded. Verify your email, then visit MCARE with a valid ID and your original COTC or TOR.')
-            ->with('verification_notice', $verificationSent
-                ? "A verification link was sent to {$user->email}."
-                : 'The claim was recorded, but the verification email could not be sent. Contact MCARE administration.');
+            ->route('alumni.claim.received')
+            ->with('claim_submitted', true)
+            ->with('claim_name', $user->name)
+            ->with('claim_email', $user->email)
+            ->with('verification_sent', $verificationSent);
+    }
+
+    public function received(Request $request): View|RedirectResponse
+    {
+        $claimId = $request->session()->get('alumni.claim.submitted_id');
+        $claim = is_numeric($claimId)
+            ? HistoricalAlumniClaim::query()->with('user')->find((int) $claimId)
+            : null;
+
+        if (! $claim) {
+            return redirect()->route('alumni.claim.create');
+        }
+
+        return view('alumni.claim-received', [
+            'name' => $claim->user?->name ?: '',
+            'email' => $claim->user?->email ?: '',
+            'verificationSent' => (bool) $request->session()->get('alumni.claim.verification_sent', false),
+        ]);
     }
 }

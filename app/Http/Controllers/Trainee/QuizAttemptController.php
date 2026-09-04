@@ -7,6 +7,7 @@ use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\QuizAttempt;
 use App\Services\QuizGradingService;
+use App\Support\TrainingModuleFiles;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -69,7 +70,7 @@ class QuizAttemptController extends Controller
                 'nullable',
                 'file',
                 'max:20480',
-                'mimes:doc,docx,pdf,png,jpg,jpeg',
+                TrainingModuleFiles::mimesRule(),
             ],
         ]);
         $expired = $attempt->isExpiredAt();

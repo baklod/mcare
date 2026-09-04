@@ -20,6 +20,14 @@ class EnrollmentSubmissionTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Storage::fake('local');
+        Storage::fake('public');
+    }
+
     public function test_applicant_can_submit_documents_and_drawn_signature(): void
     {
         Notification::fake();
@@ -35,52 +43,10 @@ class EnrollmentSubmissionTest extends TestCase
             'enrollment_ends_at' => now()->addWeek(),
         ]);
 
-        $signature = 'data:image/png;base64,'.base64_encode('fake-signature-bytes');
-
-        $response = $this->post(route('enrollment.store'), [
+        $response = $this->post(route('enrollment.store'), $this->validEnrollmentPayload([
             'training_batch_id' => $batch->id,
             'email' => 'applicant@gmail.com',
-            'password' => 'Password123',
-            'password_confirmation' => 'Password123',
-            'first_name' => 'Maria',
-            'middle_name' => 'Reyes',
-            'last_name' => 'Santos',
-            'extension_name' => null,
-            'birth_date' => '2000-01-01',
-            'birthplace_city' => 'Quezon City',
-            'birthplace_province' => 'Metro Manila',
-            'birthplace_region' => 'NCR',
-            'gender' => 'Female',
-            'civil_status' => 'Single',
-            'employment_status' => 'Unemployed',
-            'employment_type' => null,
-            'contact_number' => '09170000000',
-            'nationality' => 'Filipino',
-            'schedule_preference' => 'AM',
-            'street' => '123 Training Street',
-            'barangay' => 'Central',
-            'city' => 'Quezon City',
-            'province' => 'Metro Manila',
-            'region' => 'NCR',
-            'zip_code' => '1100',
-            'educational_attainment' => 'High School Graduate',
-            'school_name' => 'MCARE High School',
-            'year_graduated' => 2020,
-            'guardian_name' => 'Ana Santos',
-            'guardian_address' => '123 Training Street',
-            'classification' => null,
-            'disability_type' => null,
-            'disability_cause' => null,
-            'scholarship_type' => null,
-            'privacy_consent' => '1',
-            'signature_name' => 'Maria Santos',
-            'signature_type' => 'draw',
-            'signature_data' => $signature,
-            'birth_certificate' => UploadedFile::fake()->create('birth-certificate.pdf', 100, 'application/pdf'),
-            'education_document' => UploadedFile::fake()->create('diploma.pdf', 100, 'application/pdf'),
-            'good_moral_certificate' => UploadedFile::fake()->create('good-moral.pdf', 100, 'application/pdf'),
-            'id_photo' => UploadedFile::fake()->create('id-photo.jpg', 100, 'image/jpeg'),
-        ]);
+        ]));
 
         $response->assertRedirect(route('payment.show'));
         // Completing the public enrollment handoff must not silently create an
@@ -92,9 +58,37 @@ class EnrollmentSubmissionTest extends TestCase
             'email' => 'applicant@gmail.com',
             'signature_type' => 'draw',
             'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+            'payment_status' => EnrollmentApplication::PAYMENT_NOT_SELECTED,
+            'payment_method' => null,
+        ]);
+        $this->assertDatabaseHas('users', [
+            'email' => 'applicant@gmail.com',
+            'first_name' => 'Maria',
+            'middle_name' => 'Reyes',
+            'last_name' => 'Santos',
+            'contact_email' => 'applicant@gmail.com',
+            'contact_number' => '09170000000',
+            'gender' => 'Female',
+            'city' => 'Quezon City',
+            'guardian_name' => 'Ana Santos',
+            'trainee_status' => null,
         ]);
 
         $application = EnrollmentApplication::firstOrFail();
+        $this->assertTrue($application->user?->birth_date?->isSameDay('2000-01-01'));
+        $this->assertMatchesRegularExpression('/^MCE-'.now()->year.'-[A-Z0-9]{6}$/', $application->enrollment_number);
+        $this->assertNull($application->paymongo_checkout_reference);
+        $this->get(route('payment.show'))
+            ->assertOk()
+            ->assertSee($application->enrollment_number, false)
+            ->assertSee('Copy', false)
+            ->assertSee('Continue with selected method', false)
+            ->assertSee('data-payment-confirm', false)
+            ->assertSee('Confirm PayMongo payment', false)
+            ->assertSee('Confirm pay on site', false)
+            ->assertSee('value="online"', false)
+            ->assertSee('value="onsite"', false)
+            ->assertDontSee('https://checkout.paymongo.com', false);
 
         Storage::disk('local')->assertExists($application->birth_certificate_path);
         Storage::disk('local')->assertExists($application->education_document_path);
@@ -102,21 +96,21 @@ class EnrollmentSubmissionTest extends TestCase
         Storage::disk('local')->assertExists($application->id_photo_path);
         Storage::disk('local')->assertExists($application->signature_path);
 
-        Notification::assertSentTo(
-            $application->user,
-            QueuedVerifyEmail::class,
-            fn (QueuedVerifyEmail $notification): bool => $notification instanceof ShouldQueue
-                && $notification->queue === 'mail',
-        );
+        $this->assertStringStartsWith('/storage/avatars/'.$application->user_id.'/', (string) $application->user?->profilePhotoUrl());
+        $this->assertNotNull($application->user?->profile_photo_path);
+        $this->assertTrue(Storage::disk('public')->exists($application->user->profile_photo_path));
+
+        Notification::assertNotSentTo($application->user, QueuedVerifyEmail::class);
         Notification::assertSentTo(
             $application->user,
             EnrollmentSubmittedNotification::class,
-            fn (EnrollmentSubmittedNotification $notification): bool => $notification instanceof ShouldQueue
-                && $notification->queue === 'mail',
+            fn (EnrollmentSubmittedNotification $notification, array $channels): bool => $notification instanceof ShouldQueue
+                && in_array('database', $channels, true)
+                && ! in_array('mail', $channels, true),
         );
     }
 
-    public function test_mobile_async_submission_reports_real_progress_and_returns_payment_handoff_json(): void
+    public function test_enrollment_form_uses_a_simple_browser_submit_and_json_handoff_still_works(): void
     {
         Notification::fake();
         Storage::fake('local');
@@ -131,13 +125,22 @@ class EnrollmentSubmissionTest extends TestCase
             'enrollment_ends_at' => now()->addWeek(),
         ]);
 
-        $this->get(route('enrollment.create', ['batch' => $batch->id]))
+        $this->withSession([
+            'enrollment.admission_application_id' => $this->makeApprovedAdmission([
+                'email' => 'mobile.applicant@gmail.com',
+            ])->id,
+        ])->get(route('enrollment.create', ['batch' => $batch->id]))
             ->assertOk()
-            ->assertSee('id="enrollment-upload-progress"', false)
-            ->assertSee('new XMLHttpRequest()', false)
-            ->assertSee("request.upload.addEventListener('progress'", false)
-            ->assertSee('No upload progress was received for one minute.', false)
-            ->assertDontSee('Still working (', false);
+            ->assertSee('id="enrollment-submit-progress"', false)
+            ->assertSee('mcare-spinner', false)
+            ->assertSee('action="'.route('enrollment.store', absolute: false).'"', false)
+            ->assertSee('formaction="'.route('enrollment.store', absolute: false).'"', false)
+            ->assertSee('id="privacy_consent"', false)
+            ->assertSee('data-enrollment-submit', false)
+            ->assertSee('Submitting…', false)
+            ->assertDontSee('new XMLHttpRequest()', false)
+            ->assertDontSee('The phone lost its connection to MCARE.', false)
+            ->assertDontSee('No upload progress was received for one minute.', false);
 
         $response = $this->post(route('enrollment.store'), $this->validEnrollmentPayload([
             'training_batch_id' => $batch->id,
@@ -186,6 +189,7 @@ class EnrollmentSubmissionTest extends TestCase
             'training_batch_id' => $batch->id,
             // The authenticated account email wins over a tampered form value.
             'email' => 'different.account@gmail.com',
+            'admission' => $this->makeApprovedAdmission(['email' => 'verified.applicant@gmail.com']),
         ]);
         unset($payload['password'], $payload['password_confirmation']);
 
@@ -205,9 +209,8 @@ class EnrollmentSubmissionTest extends TestCase
             $user,
             EnrollmentSubmittedNotification::class,
             fn (EnrollmentSubmittedNotification $notification, array $channels): bool => $notification instanceof ShouldQueue
-                && $notification->queue === 'mail'
                 && in_array('database', $channels, true)
-                && in_array('mail', $channels, true),
+                && ! in_array('mail', $channels, true),
         );
     }
 
@@ -256,8 +259,30 @@ class EnrollmentSubmissionTest extends TestCase
         $this->assertSame(EnrollmentApplication::PAYMENT_ONSITE_PENDING, $application->payment_status);
         $this->assertSame('onsite', $application->payment_method);
         $this->assertNotNull($application->payment_reference);
+        $this->assertStringStartsWith('MCARE-SITE-', $application->payment_reference);
         $this->assertNotNull($application->payment_receipt_number);
+        $this->assertStringStartsWith('MCARE-OR-', $application->payment_receipt_number);
         $this->assertTrue($application->payment_receipt_expires_at->isFuture());
+
+        $this->actingAs($user)
+            ->get(route('payment.show'))
+            ->assertOk()
+            ->assertSee('Pay on site is already selected', false)
+            ->assertSee('View receipt', false)
+            ->assertSeeInOrder([
+                'data-payment-continue',
+                'disabled',
+                'Continue with selected method',
+            ], false);
+
+        $this->actingAs($user)
+            ->post(route('payment.select'), [
+                'payment_method' => 'online',
+            ])
+            ->assertRedirect(route('payment.receipt'));
+
+        $this->assertSame(EnrollmentApplication::PAYMENT_ONSITE_PENDING, $application->refresh()->payment_status);
+        $this->assertSame('onsite', $application->payment_method);
     }
 
     public function test_denied_applicant_can_correct_and_resubmit_without_losing_verified_payment(): void
@@ -378,12 +403,99 @@ class EnrollmentSubmissionTest extends TestCase
         $this->assertNull($application->review_released_at);
     }
 
+    public function test_official_geographic_names_with_apostrophes_and_enye_are_accepted(): void
+    {
+        Notification::fake();
+        Storage::fake('local');
+
+        $batch = TrainingBatch::create([
+            'training_program_id' => TrainingProgram::query()->value('id'),
+            'name' => 'Bicol Enrollment Batch',
+            'year' => 2026,
+            'is_active' => true,
+            'show_on_enrollment_page' => true,
+            'enrollment_starts_at' => now()->subDay(),
+            'enrollment_ends_at' => now()->addWeek(),
+        ]);
+
+        $this->post(route('enrollment.store'), $this->validEnrollmentPayload([
+            'training_batch_id' => $batch->id,
+            'email' => 'bicol.applicant@gmail.com',
+            'first_name' => "Ma. D'Angelo",
+            'last_name' => "O'Brien",
+            'region' => 'Bicol Region',
+            'province' => 'Camarines Sur',
+            'city' => 'Pili',
+            'barangay' => 'Santo Niño',
+            'school_name' => "St. Mary's Academy",
+            'guardian_name' => 'Ana Dela Torre',
+            'guardian_address' => '24 E. Corporal Street, Santo Niño',
+        ]))->assertRedirect(route('payment.show'));
+
+        $this->assertDatabaseHas('enrollment_applications', [
+            'email' => 'bicol.applicant@gmail.com',
+            'barangay' => 'Santo Niño',
+            'first_name' => "Ma. D'Angelo",
+            'school_name' => "St. Mary's Academy",
+        ]);
+    }
+
+    public function test_failed_enrollment_returns_to_the_form_instead_of_the_address_lookup(): void
+    {
+        $admission = $this->makeApprovedAdmission([
+            'email' => 'retry.applicant@gmail.com',
+        ]);
+        $lookupUrl = route('enrollment.address.barangays', ['city_code' => '051706000']);
+
+        $this->from($lookupUrl)
+            ->withSession([
+                '_previous.url' => $lookupUrl,
+                'enrollment.admission_application_id' => $admission->id,
+            ])
+            ->post(route('enrollment.store'), [
+                'application_number' => $admission->application_number,
+                'email' => 'retry.applicant@gmail.com',
+            ])
+            ->assertRedirect(route('enrollment.create'))
+            ->assertSessionHasErrors(['first_name', 'barangay']);
+    }
+
+    public function test_submit_stays_disabled_until_the_certification_checkbox_is_checked(): void
+    {
+        $batch = TrainingBatch::create([
+            'training_program_id' => TrainingProgram::query()->value('id'),
+            'name' => 'Consent Batch',
+            'year' => 2026,
+            'is_active' => true,
+            'show_on_enrollment_page' => true,
+            'enrollment_starts_at' => now()->subDay(),
+            'enrollment_ends_at' => now()->addWeek(),
+        ]);
+
+        $html = $this->withSession([
+            'enrollment.admission_application_id' => $this->makeApprovedAdmission()->id,
+        ])->get(route('enrollment.create', ['batch' => $batch->id]))
+            ->assertOk()
+            ->assertSee('id="privacy_consent"', false)
+            ->assertSee('I agree and certify that the information stated above is true and correct.', false)
+            ->getContent();
+
+        $this->assertDoesNotMatchRegularExpression('/id="privacy_consent"[^>]*\bchecked\b/', $html);
+        $this->assertMatchesRegularExpression('/data-enrollment-submit[^>]*\bdisabled\b/', $html);
+        $this->assertStringContainsString('privacyConsentInput?.addEventListener(\'change\', syncEnrollmentSubmitButton)', $html);
+    }
+
     /** @return array<string, mixed> */
     private function validEnrollmentPayload(array $overrides = []): array
     {
+        $email = $overrides['email'] ?? 'applicant@gmail.com';
+        $admission = $overrides['admission'] ?? $this->makeApprovedAdmission(['email' => $email]);
+        unset($overrides['admission']);
+
         return array_merge([
+            'application_number' => $admission->application_number,
             'training_batch_id' => TrainingBatch::query()->value('id'),
-            'email' => 'applicant@gmail.com',
+            'email' => $email,
             'password' => 'Password123',
             'password_confirmation' => 'Password123',
             'first_name' => 'Maria',

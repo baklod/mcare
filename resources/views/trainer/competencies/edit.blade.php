@@ -1,21 +1,28 @@
 @extends('trainer.layouts.app', ['title' => 'Trainee Competency Record | MCARE Trainer'])
 
 @section('content')
-<section class="mx-auto max-w-6xl space-y-6">
+@php
+    $categoryLabels = ['basic' => 'Basic competencies', 'common' => 'Common competencies', 'core' => 'Core competencies', 'custom' => 'Institutional / Custom competencies'];
+@endphp
+<section class="w-full space-y-6">
     <header class="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
-        <div><p class="dashboard-section-kicker">Caregiving NC II record</p><h1 class="dashboard-section-title mt-2 text-3xl">{{ $trainee->first_name }} {{ $trainee->last_name }}</h1><p class="mt-2 text-sm text-slate-600">{{ $trainee->batch?->name }} {{ $trainee->batch?->year }} · {{ $trainee->schedule_preference }} class</p><x-graduate-batch-badge :application="$trainee" class="mt-2" /></div>
+        <div><p class="dashboard-section-kicker">Evaluate trainee</p><h1 class="dashboard-section-title mt-2 text-3xl">{{ $trainee->first_name }} {{ $trainee->last_name }}</h1><p class="mt-2 text-sm text-slate-600">{{ $trainee->batch?->name }} {{ $trainee->batch?->year }} · {{ $trainee->schedule_preference }} class</p><x-graduate-batch-badge :application="$trainee" class="mt-2" /></div>
         <a class="secondary-action" href="{{ route('trainer.competencies.index') }}">Back to records</a>
     </header>
 
-    @if($errors->any())<div class="border border-red-200 bg-red-50 p-4 text-sm text-red-800"><p class="font-bold">The record was not saved.</p><ul class="mt-2 list-disc space-y-1 pl-5">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
-
+    @if($unitsByCategory->flatten()->isEmpty())
+        <div class="border border-slate-200 bg-white px-6 py-14 text-center text-slate-500">
+            <p class="font-semibold text-slate-700">No published modules for this trainee's batch yet.</p>
+            <p class="mt-2 text-sm">Publish classwork from the trainer or admin Modules page and those units will appear here by category.</p>
+        </div>
+    @else
     <form method="POST" action="{{ route('trainer.competencies.update', $trainee) }}" class="space-y-6">
         @csrf
         @method('PATCH')
-        @foreach(['basic' => 'Basic competencies', 'common' => 'Common competencies', 'core' => 'Core competencies', 'custom' => 'Institutional / Custom competencies'] as $category => $label)
+        @foreach($unitsByCategory as $category => $units)
             <section class="space-y-3">
-                <div><p class="dashboard-section-kicker">{{ $label }}</p><p class="mt-1 text-sm text-slate-500">Progress uses the unit result; Achievement uses every learning outcome below it.</p></div>
-                @foreach($unitsByCategory->get($category, collect()) as $unit)
+                <div><p class="dashboard-section-kicker">{{ $categoryLabels[$category] ?? str($category)->headline() }}</p><p class="mt-1 text-sm text-slate-500">Progress uses the unit result; Achievement uses every learning outcome below it.</p></div>
+                @foreach($units as $unit)
                     @php
                         $record = $recordsByUnit->get($unit->id);
                         $results = $record?->outcomeResults?->keyBy('competency_outcome_id') ?? collect();
@@ -51,7 +58,8 @@
                 @endforeach
             </section>
         @endforeach
-        <div class="sticky bottom-4 flex justify-end border border-slate-200 bg-white p-4 shadow-lg"><button class="primary-action" type="submit">Save competency record</button></div>
+        <div class="sticky bottom-4 flex justify-end border border-slate-200 bg-white p-4 shadow-lg"><button class="primary-action" type="submit">Save evaluation</button></div>
     </form>
+    @endif
 </section>
 @endsection

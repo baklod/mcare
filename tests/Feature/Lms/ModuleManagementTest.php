@@ -171,7 +171,7 @@ class ModuleManagementTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame(ModuleProgress::STATUS_IN_PROGRESS, $progress->status);
-        $this->assertSame(10, $progress->progress_percent);
+        $this->assertSame(0, $progress->progress_percent);
         $this->assertNotNull($progress->first_opened_at);
         $this->assertNotNull($progress->last_viewed_at);
     }
@@ -197,7 +197,7 @@ class ModuleManagementTest extends TestCase
                 'module_file' => UploadedFile::fake()->create('core1-infant-care.pdf', 100, 'application/pdf'),
                 'supplementary_files' => [
                     UploadedFile::fake()->create('infant-feeding-rubric.pdf', 50, 'application/pdf'),
-                    UploadedFile::fake()->create('bathing-worksheet.docx', 30, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+                    UploadedFile::fake()->create('bathing-worksheet.png', 30, 'image/png'),
                 ],
             ]);
 
@@ -254,12 +254,6 @@ class ModuleManagementTest extends TestCase
         $this->lmsPassedAssessment($trainer, $module, $application, 92.5);
 
         foreach ($module->submodules()->get() as $submodule) {
-            $this->actingAs($trainee)
-                ->patch(route('trainee.modules.submodules.progress', [$module, $submodule]), [
-                    'action' => 'submit',
-                ])
-                ->assertSessionHasNoErrors();
-
             $response = $this->actingAs($trainer)
                 ->post(route('trainer.modules.evaluate', $module), [
                     'training_submodule_id' => $submodule->id,
@@ -287,6 +281,240 @@ class ModuleManagementTest extends TestCase
             'enrollment_application_id' => $application->id,
             'status' => TraineeCompetencyRecord::STATUS_COMPETENT,
         ]);
+    }
+
+    public function test_competency_board_grade_updates_trainee_classwork_status(): void
+    {
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch(['trainer_id' => $trainer->id]);
+        ['user' => $trainee, 'application' => $application] = $this->lmsTrainee($batch);
+        $module = $this->lmsModule($trainer, $batch, [
+            'module_code' => 'HCS323301',
+            'title' => 'Provide Care and Support to Infants and Toddlers',
+        ])->fresh(['competencyUnit.outcomes', 'submodules']);
+        $unit = $module->competencyUnit;
+
+        $this->assertNotNull($unit);
+        $this->assertGreaterThan(1, $module->submodules->count());
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.modules.show', $module))
+            ->assertOk()
+            ->assertSee('Your trainer records this grade after the face-to-face session.')
+            ->assertSee('Pending Evaluation')
+            ->assertDontSee('Mark Submodule as Done');
+
+        $this->actingAs($trainer)
+            ->patch(route('trainer.competencies.update', $application), [
+                'records' => [
+                    $unit->id => [
+                        'unit_id' => $unit->id,
+                        'status' => TraineeCompetencyRecord::STATUS_COMPETENT,
+                        'percentage_score' => 80,
+                        'notes' => 'Board evaluation recorded.',
+                        'outcomes' => $unit->outcomes->mapWithKeys(
+                            fn ($outcome) => [$outcome->id => TraineeCompetencyRecord::STATUS_COMPETENT]
+                        )->all(),
+                    ],
+                ],
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('saved');
+
+        $progress = ModuleProgress::query()
+            ->where('enrollment_application_id', $application->id)
+            ->where('training_module_id', $module->id)
+            ->firstOrFail();
+
+        $this->assertTrue($progress->isTrainerValidated());
+        $this->assertSame(ModuleProgress::RATING_COMPETENT, $progress->practical_rating);
+        $this->assertSame(ModuleProgress::OUTCOME_COMPETENT, $progress->competency_outcome);
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.modules.show', $module))
+            ->assertOk()
+            ->assertDontSee('Pending Evaluation')
+            ->assertDontSee('Awaiting trainer evaluation')
+            ->assertSee('Competent (C)')
+            ->assertSee('Competent (Passed)');
+    }
+
+    public function test_competency_board_nyc_locks_next_module_and_later_submodules(): void
+    {
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch(['trainer_id' => $trainer->id]);
+        ['user' => $trainee, 'application' => $application] = $this->lmsTrainee($batch);
+        $first = $this->lmsModule($trainer, $batch, [
+            'module_code' => 'HCS323301',
+            'title' => 'Provide Care and Support to Infants and Toddlers',
+        ])->fresh(['competencyUnit.outcomes', 'submodules']);
+        $next = $this->lmsModule($trainer, $batch, [
+            'module_code' => 'HCS323304',
+            'title' => 'Foster Physical Development of Children',
+        ]);
+        $unit = $first->competencyUnit;
+        $firstOutcome = $unit->outcomes->sortBy('sort_order')->first();
+        $firstSubmodule = $first->submodules
+            ->firstWhere('competency_outcome_id', $firstOutcome->id);
+        $laterSubmodule = $first->submodules
+            ->sortBy('position')
+            ->first(fn ($submodule) => (int) $submodule->id !== (int) $firstSubmodule->id);
+
+        $this->assertNotNull($firstSubmodule);
+        $this->assertNotNull($laterSubmodule);
+
+        $this->actingAs($trainer)
+            ->patch(route('trainer.competencies.update', $application), [
+                'records' => [
+                    $unit->id => [
+                        'unit_id' => $unit->id,
+                        'status' => TraineeCompetencyRecord::STATUS_NOT_YET_COMPETENT,
+                        'notes' => 'Needs remediation on the first outcome.',
+                        'outcomes' => $unit->outcomes->mapWithKeys(
+                            fn ($outcome) => [
+                                $outcome->id => (int) $outcome->id === (int) $firstOutcome->id
+                                    ? TraineeCompetencyRecord::STATUS_NOT_YET_COMPETENT
+                                    : TraineeCompetencyRecord::STATUS_NOT_ASSESSED,
+                            ]
+                        )->all(),
+                    ],
+                ],
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('saved');
+
+        $firstProgress = ModuleProgress::query()
+            ->where('enrollment_application_id', $application->id)
+            ->where('training_module_id', $first->id)
+            ->firstOrFail();
+        $nextProgress = ModuleProgress::query()
+            ->where('enrollment_application_id', $application->id)
+            ->where('training_module_id', $next->id)
+            ->firstOrFail();
+
+        $this->assertTrue($firstProgress->needsRemediation());
+        $this->assertFalse($firstProgress->isTrainerValidated());
+        $this->assertSame(ModuleProgress::STATUS_LOCKED, $nextProgress->status);
+        $this->assertNull($nextProgress->unlocked_at);
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.modules.index'))
+            ->assertOk()
+            ->assertSee('Locked until HCS323301 is Competent')
+            ->assertSee('Needs remediation');
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.modules.show', $next))
+            ->assertRedirect(route('trainee.modules.index'));
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.modules.show', $first))
+            ->assertOk()
+            ->assertSee('Not yet competent')
+            ->assertSee($laterSubmodule->title)
+            ->assertSee('Locked until '.$firstSubmodule->title.' is Competent');
+
+        $this->actingAs($trainee)
+            ->patch(route('trainee.modules.submodules.progress', [$first, $laterSubmodule]), [
+                'action' => 'submit',
+            ])
+            ->assertSessionHasErrors('action');
+
+        $this->actingAs($trainee)
+            ->patch(route('trainee.modules.submodules.progress', [$first, $firstSubmodule]), [
+                'action' => 'submit',
+            ])
+            ->assertSessionHasErrors('action');
+    }
+
+    public function test_competency_board_nyc_relocks_an_already_unlocked_next_module(): void
+    {
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch(['trainer_id' => $trainer->id]);
+        ['user' => $trainee, 'application' => $application] = $this->lmsTrainee($batch);
+        $first = $this->lmsModule($trainer, $batch, [
+            'module_code' => 'HCS323301',
+            'title' => 'Provide Care and Support to Infants and Toddlers',
+        ])->fresh(['competencyUnit.outcomes', 'submodules']);
+        $next = $this->lmsModule($trainer, $batch, [
+            'module_code' => 'HCS323304',
+            'title' => 'Foster Physical Development of Children',
+        ]);
+        $unit = $first->competencyUnit;
+
+        $this->actingAs($trainer)
+            ->patch(route('trainer.competencies.update', $application), [
+                'records' => [
+                    $unit->id => [
+                        'unit_id' => $unit->id,
+                        'status' => TraineeCompetencyRecord::STATUS_COMPETENT,
+                        'percentage_score' => 80,
+                        'notes' => 'Initially competent.',
+                        'outcomes' => $unit->outcomes->mapWithKeys(
+                            fn ($outcome) => [$outcome->id => TraineeCompetencyRecord::STATUS_COMPETENT]
+                        )->all(),
+                    ],
+                ],
+            ])
+            ->assertSessionHas('saved');
+
+        $this->assertTrue(
+            ModuleProgress::query()
+                ->where('enrollment_application_id', $application->id)
+                ->where('training_module_id', $first->id)
+                ->firstOrFail()
+                ->isTrainerValidated()
+        );
+        $this->assertNotNull(
+            ModuleProgress::query()
+                ->where('enrollment_application_id', $application->id)
+                ->where('training_module_id', $next->id)
+                ->firstOrFail()
+                ->unlocked_at
+        );
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.modules.show', $next))
+            ->assertOk();
+
+        $firstOutcome = $unit->outcomes->sortBy('sort_order')->first();
+        $this->actingAs($trainer)
+            ->patch(route('trainer.competencies.update', $application), [
+                'records' => [
+                    $unit->id => [
+                        'unit_id' => $unit->id,
+                        'status' => TraineeCompetencyRecord::STATUS_NOT_YET_COMPETENT,
+                        'notes' => 'Reassessed as NYC.',
+                        'outcomes' => $unit->outcomes->mapWithKeys(
+                            fn ($outcome) => [
+                                $outcome->id => (int) $outcome->id === (int) $firstOutcome->id
+                                    ? TraineeCompetencyRecord::STATUS_NOT_YET_COMPETENT
+                                    : TraineeCompetencyRecord::STATUS_COMPETENT,
+                            ]
+                        )->all(),
+                    ],
+                ],
+            ])
+            ->assertSessionHas('saved');
+
+        $nextProgress = ModuleProgress::query()
+            ->where('enrollment_application_id', $application->id)
+            ->where('training_module_id', $next->id)
+            ->firstOrFail();
+
+        $this->assertTrue(
+            ModuleProgress::query()
+                ->where('enrollment_application_id', $application->id)
+                ->where('training_module_id', $first->id)
+                ->firstOrFail()
+                ->needsRemediation()
+        );
+        $this->assertSame(ModuleProgress::STATUS_LOCKED, $nextProgress->status);
+        $this->assertNull($nextProgress->unlocked_at);
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.modules.show', $next))
+            ->assertRedirect(route('trainee.modules.index'));
     }
 
     public function test_trainee_can_download_supplementary_attachments(): void
@@ -388,12 +616,6 @@ class ModuleManagementTest extends TestCase
                 'competency_outcome' => ModuleProgress::OUTCOME_COMPETENT,
             ])
             ->assertSessionHasErrors('enrollment_application_id');
-
-        $this->actingAs($assignedUser)
-            ->patch(route('trainee.modules.submodules.progress', [$module, $submodule]), [
-                'action' => 'submit',
-            ])
-            ->assertSessionHasNoErrors();
 
         $this->actingAs($trainer)
             ->post(route('trainer.modules.evaluate', $module), [

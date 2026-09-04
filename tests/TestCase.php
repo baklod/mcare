@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use App\Models\AdmissionApplication;
 use App\Models\User;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 
@@ -22,5 +23,23 @@ abstract class TestCase extends BaseTestCase
         }
 
         return $this;
+    }
+
+    protected function makeApprovedAdmission(array $overrides = []): AdmissionApplication
+    {
+        return AdmissionApplication::query()->create(array_merge([
+            'application_number' => AdmissionApplication::generateNumber(),
+            'first_name' => 'Maria',
+            'middle_name' => 'Reyes',
+            'last_name' => 'Santos',
+            'email' => 'applicant@gmail.com',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'educational_attainment' => 'High School Graduate',
+            'program' => 'Caregiving NC II',
+            'status' => AdmissionApplication::STATUS_APPROVED,
+            'privacy_consent_at' => now(),
+            'reviewed_at' => now(),
+        ], $overrides));
     }
 }

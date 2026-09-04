@@ -5,11 +5,11 @@
         'formAction' => route('trainer.quizzes.update', $quiz),
         'formMethod' => 'PATCH',
         'pageTitle' => 'Edit quiz',
-        'pageDescription' => 'Revise the instructions, availability, questions, and publication state.',
+        'pageDescription' => 'Review the quiz settings, then revise questions before saving.',
         'submitLabel' => 'Save changes',
     ])
 
-    <div class="mx-auto mt-6 max-w-7xl">
+    <div class="lms-quiz-editor-followup">
         <x-classroom-comments :commentable="$quiz" :comments="$classroomComments" :private-recipients="$privateCommentRecipients" />
     </div>
 @endsection

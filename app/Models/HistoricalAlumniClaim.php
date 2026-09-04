@@ -30,6 +30,7 @@ class HistoricalAlumniClaim extends Model
         'barangay',
         'city',
         'province',
+        'region',
         'zip_code',
         'educational_attainment',
         'school_name',

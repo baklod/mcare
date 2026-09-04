@@ -49,6 +49,12 @@ class QuizAuthoringTest extends TestCase
             ->get(route('trainer.quizzes.edit', $quiz))
             ->assertOk()
             ->assertSee('data-quiz-builder', false)
+            ->assertSee('id="quiz-builder-form"', false)
+            ->assertSee('data-quiz-overview', false)
+            ->assertSee('Infection control check')
+            ->assertSee('>Title</dt>', false)
+            ->assertDontSee('id="quiz-title"', false)
+            ->assertDontSee('type="datetime-local"', false)
             ->assertSee('data-quiz-question', false);
 
         $this->actingAs($trainer)
@@ -291,7 +297,7 @@ class QuizAuthoringTest extends TestCase
             'questions' => [
                 [
                     'type' => 'file_upload',
-                    'prompt' => 'Upload your completed Caregiving Activity Sheet (.docx or .pdf).',
+                    'prompt' => 'Upload your completed Caregiving Activity Sheet (PDF or image).',
                     'points' => 5,
                     'position' => 0,
                 ],
@@ -330,10 +336,6 @@ class QuizAuthoringTest extends TestCase
         $this->lmsPassedAssessment($trainer, $module, $trainee, 90);
 
         foreach ($module->submodules as $submodule) {
-            $this->actingAs($trainee->user)
-                ->patch(route('trainee.modules.submodules.progress', [$module, $submodule]), ['action' => 'submit'])
-                ->assertSessionHasNoErrors();
-
             $this->actingAs($trainer)
                 ->post(route('trainer.modules.evaluate', $module), [
                     'training_submodule_id' => $submodule->id,

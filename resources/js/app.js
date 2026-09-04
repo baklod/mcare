@@ -1,10 +1,20 @@
 import './bootstrap';
+import { attachPhilippineAddressLookups } from './philippine-address-lookup';
+import { attachLandingChat } from './landing-chat';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 const dashboardThemeStorageKey = 'mcare-dashboard-theme';
+const adminSidebarCollapsedStorageKey = 'mcare-admin-sidebar-collapsed';
+const trainerSidebarCollapsedStorageKey = 'mcare-trainer-sidebar-collapsed';
+const traineeSidebarCollapsedStorageKey = 'mcare-trainee-sidebar-collapsed';
+const officialSidebarStorageKeys = {
+    admin: adminSidebarCollapsedStorageKey,
+    trainer: trainerSidebarCollapsedStorageKey,
+    trainee: traineeSidebarCollapsedStorageKey,
+};
 
 const readDashboardTheme = () => {
     try {
@@ -25,6 +35,8 @@ applyDashboardTheme(readDashboardTheme());
 
 document.addEventListener('DOMContentLoaded', () => {
     document.documentElement.classList.remove('dashboard-navigating');
+    attachPhilippineAddressLookups();
+    attachLandingChat();
 
     // Account forms use one accessible toggle so temporary passwords are easy to verify without exposing them by default.
     document.querySelectorAll('[data-password-toggle]').forEach((button) => {
@@ -62,6 +74,84 @@ document.addEventListener('DOMContentLoaded', () => {
     let navigationUnlockTimer = null;
     let navigationSpamReported = false;
 
+    const publicMenu = document.querySelector('[data-public-menu]');
+    const publicMenuOpen = document.querySelector('[data-public-menu-open]');
+    const publicMenuDesktop = window.matchMedia('(min-width: 1024px)');
+    const scrollHeaders = document.querySelectorAll('[data-header-scroll-border]');
+
+    if (scrollHeaders.length) {
+        let headerScrollTick = false;
+        const syncHeaderScrollBorder = () => {
+            const scrolled = window.scrollY > 8;
+            scrollHeaders.forEach((header) => header.classList.toggle('is-scrolled', scrolled));
+            headerScrollTick = false;
+        };
+        const onHeaderScroll = () => {
+            if (headerScrollTick) return;
+            headerScrollTick = true;
+            window.requestAnimationFrame(syncHeaderScrollBorder);
+        };
+
+        syncHeaderScrollBorder();
+        window.addEventListener('scroll', onHeaderScroll, { passive: true });
+    }
+
+    const setPublicMenuOpen = (open) => {
+        if (!publicMenu || !publicMenuOpen) return;
+
+        publicMenu.classList.toggle('is-open', open);
+        publicMenu.setAttribute('aria-hidden', open ? 'false' : 'true');
+        publicMenuOpen.setAttribute('aria-expanded', open ? 'true' : 'false');
+        document.body.classList.toggle('public-menu-open', open);
+    };
+
+    publicMenuOpen?.addEventListener('click', () => setPublicMenuOpen(true));
+    publicMenu?.querySelector('[data-public-menu-close]')?.addEventListener('click', () => setPublicMenuOpen(false));
+    publicMenu?.querySelector('[data-public-menu-overlay]')?.addEventListener('click', () => setPublicMenuOpen(false));
+    publicMenu?.querySelectorAll('[data-public-menu-link]').forEach((link) => {
+        link.addEventListener('click', () => setPublicMenuOpen(false));
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') setPublicMenuOpen(false);
+    });
+    const syncPublicMenu = () => {
+        if (publicMenuDesktop.matches) setPublicMenuOpen(false);
+    };
+    publicMenuDesktop.addEventListener('change', syncPublicMenu);
+
+    document.querySelectorAll('[data-application-form]').forEach((form) => {
+        const submitButton = form.querySelector('[data-application-submit]');
+        if (!(submitButton instanceof HTMLButtonElement)) return;
+
+        const requiredFields = () => Array.from(form.querySelectorAll('[required]'));
+
+        const formIsReady = () => requiredFields().every((field) => {
+            if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) {
+                return true;
+            }
+            if (field.disabled) return true;
+            if (field.type === 'checkbox' || field.type === 'radio') return field.checked;
+            if (field.value.trim() === '') return false;
+            if (field.type === 'email' && !field.value.trim().toLowerCase().endsWith('@gmail.com')) return false;
+            return field.checkValidity();
+        });
+
+        const syncSubmit = () => {
+            const ready = formIsReady();
+            submitButton.disabled = !ready;
+            submitButton.setAttribute('aria-disabled', ready ? 'false' : 'true');
+        };
+
+        form.addEventListener('input', syncSubmit);
+        form.addEventListener('change', syncSubmit);
+        form.addEventListener('submit', (event) => {
+            if (formIsReady()) return;
+            event.preventDefault();
+            syncSubmit();
+        });
+        syncSubmit();
+    });
+
     // Mobile dashboards keep the bottom bar compact while the More sheet
     // exposes every destination that is available in the desktop sidebar.
     document.querySelectorAll('[data-dashboard-mobile-menu-open]').forEach((button) => {
@@ -94,7 +184,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!notice.isConnected || notice.classList.contains('is-dismissing')) return;
 
             notice.classList.add('is-dismissing');
-            removeTimer = window.setTimeout(() => notice.remove(), 300);
+            removeTimer = window.setTimeout(() => {
+                notice.remove();
+                const toastRegion = document.querySelector('[data-dashboard-toast-region]');
+                if (
+                    toastRegion
+                    && !toastRegion.querySelector('[data-dashboard-toast]')
+                    && typeof toastRegion.hidePopover === 'function'
+                    && toastRegion.matches(':popover-open')
+                ) {
+                    toastRegion.hidePopover();
+                }
+            }, 300);
         };
 
         const pauseDismissal = () => window.clearTimeout(dismissTimer);
@@ -102,6 +203,8 @@ document.addEventListener('DOMContentLoaded', () => {
             window.clearTimeout(dismissTimer);
             dismissTimer = window.setTimeout(dismiss, delay);
         };
+
+        notice.querySelector('[data-dashboard-toast-dismiss]')?.addEventListener('click', dismiss);
 
         notice.addEventListener('mouseenter', pauseDismissal);
         notice.addEventListener('mouseleave', scheduleDismissal);
@@ -177,6 +280,63 @@ document.addEventListener('DOMContentLoaded', () => {
                 button.textContent = form.dataset.submitLabel || 'Saving...';
             });
         });
+    });
+
+    const formatCareerSmsDate = (value) => {
+        const parts = String(value || '').split('-');
+        if (parts.length !== 3) return 'TBA';
+
+        const date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        if (Number.isNaN(date.getTime())) return 'TBA';
+
+        return date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+    };
+
+    const selectedCareerSmsLabel = (field) => {
+        if (! (field instanceof HTMLSelectElement) || ! field.value) return '';
+
+        return field.options[field.selectedIndex]?.textContent?.trim() || '';
+    };
+
+    const careerSmsMessageFromForm = (form) => {
+        const title = form.querySelector('[data-career-sms-field="title"]')?.value?.trim() || 'Career opportunity';
+        const salary = form.querySelector('[data-career-sms-field="salary"]')?.value?.trim() || 'see Career Hub';
+        const startField = form.querySelector('[data-career-sms-field="start"]');
+        const age = form.querySelector('[data-career-sms-field="age"]')?.value?.trim();
+        const care = [
+            selectedCareerSmsLabel(form.querySelector('[data-career-sms-field="gender"]')),
+            selectedCareerSmsLabel(form.querySelector('[data-career-sms-field="mobility"]')),
+            age ? `age ${age}` : '',
+        ].filter(Boolean);
+        const parts = [
+            `MCARE Career Hub: ${title}`,
+            `Salary ${salary}`,
+            `Start ${startField?.value ? formatCareerSmsDate(startField.value) : 'TBA'}`,
+        ];
+
+        if (care.length) parts.push(care.join(', '));
+        parts.push('Open Career Hub for details.');
+
+        return parts.join('. ');
+    };
+
+    document.querySelectorAll('[data-career-sms-form]').forEach((form) => {
+        const preview = form.querySelector('[data-career-sms-preview-text]');
+        const count = form.querySelector('[data-career-sms-preview-count]');
+        if (! preview) return;
+
+        const refreshCareerSmsPreview = () => {
+            const message = careerSmsMessageFromForm(form);
+            preview.textContent = message;
+            if (count) count.textContent = String(message.length);
+        };
+
+        form.querySelectorAll('[data-career-sms-field]').forEach((field) => {
+            field.addEventListener('input', refreshCareerSmsPreview);
+            field.addEventListener('change', refreshCareerSmsPreview);
+        });
+
+        refreshCareerSmsPreview();
     });
 
     const reportClientSecurityEvent = (eventName) => {
@@ -293,7 +453,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const initPdfCanvasViewer = (container) => {
         const url = container.dataset.pdfUrl;
-        const watermarkText = container.dataset.watermark || '';
         const canvas = container.querySelector('[data-pdf-canvas]');
         if (!url || !canvas) return;
 
@@ -315,21 +474,40 @@ document.addEventListener('DOMContentLoaded', () => {
         let pageRendering = false;
         let pageNumPending = null;
         let scale = 1.25;
+        let userAdjustedZoom = false;
+        const minScale = 0.25;
+        const maxScale = 3.0;
 
-        const drawCanvasWatermark = (context, width, height) => {
-            if (!watermarkText) return;
-            context.save();
-            context.font = 'bold 13px sans-serif';
-            context.fillStyle = 'rgba(15, 23, 42, 0.22)';
-            context.rotate(-25 * Math.PI / 180);
-            const stepX = 360;
-            const stepY = 160;
-            for (let x = -width; x < width * 2; x += stepX) {
-                for (let y = -height; y < height * 2; y += stepY) {
-                    context.fillText(watermarkText, x, y);
-                }
+        const syncHorizontalPan = () => {
+            if (!containerWrapper) return;
+
+            window.requestAnimationFrame(() => {
+                const extraX = containerWrapper.scrollWidth - containerWrapper.clientWidth;
+                containerWrapper.scrollLeft = extraX > 1 ? Math.round(extraX / 2) : 0;
+            });
+        };
+
+        const applyCanvasSize = (cssWidth, cssHeight) => {
+            const outputScale = window.devicePixelRatio || 1;
+            const width = Math.max(1, Math.floor(cssWidth));
+            const height = Math.max(1, Math.floor(cssHeight));
+
+            canvas.width = Math.floor(width * outputScale);
+            canvas.height = Math.floor(height * outputScale);
+            canvas.style.width = `${width}px`;
+            canvas.style.height = `${height}px`;
+            canvas.style.maxWidth = 'none';
+            canvas.style.maxHeight = 'none';
+            canvas.style.aspectRatio = `${width} / ${height}`;
+
+            const pageWrapper = canvas.closest('[data-pdf-page-wrapper]');
+            if (pageWrapper) {
+                pageWrapper.style.width = `${width}px`;
+                pageWrapper.style.height = `${height}px`;
+                pageWrapper.style.aspectRatio = `${width} / ${height}`;
             }
-            context.restore();
+
+            return outputScale;
         };
 
         const renderPage = (num) => {
@@ -338,12 +516,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             pdfDoc.getPage(num).then((page) => {
                 const viewport = page.getViewport({ scale });
-                const outputScale = window.devicePixelRatio || 1;
-
-                canvas.width = Math.floor(viewport.width * outputScale);
-                canvas.height = Math.floor(viewport.height * outputScale);
-                canvas.style.width = Math.floor(viewport.width) + 'px';
-                canvas.style.height = Math.floor(viewport.height) + 'px';
+                const outputScale = applyCanvasSize(viewport.width, viewport.height);
 
                 const transform = outputScale !== 1
                     ? [outputScale, 0, 0, outputScale, 0, 0]
@@ -358,9 +531,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const renderTask = page.render(renderContext);
 
                 renderTask.promise.then(() => {
-                    drawCanvasWatermark(ctx, canvas.width, canvas.height);
                     pageRendering = false;
                     if (loadingEl) loadingEl.style.display = 'none';
+                    syncHorizontalPan();
 
                     if (pageNumPending !== null) {
                         renderPage(pageNumPending);
@@ -394,9 +567,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
             pdfDoc.getPage(pageNum).then((page) => {
                 const unscaledViewport = page.getViewport({ scale: 1.0 });
-                const availableWidth = Math.max(0, containerWrapper.clientWidth - 32);
-                const availableHeight = Math.max(0, containerWrapper.clientHeight - 32);
-                if (!availableWidth || !unscaledViewport.width) return;
+                const styles = window.getComputedStyle(containerWrapper);
+                const paddingX = (Number.parseFloat(styles.paddingLeft) || 0)
+                    + (Number.parseFloat(styles.paddingRight) || 0);
+                const paddingY = (Number.parseFloat(styles.paddingTop) || 0)
+                    + (Number.parseFloat(styles.paddingBottom) || 0);
+                const availableWidth = Math.max(0, containerWrapper.clientWidth - paddingX);
+                const availableHeight = Math.max(0, containerWrapper.clientHeight - paddingY);
+                if (!availableWidth || !unscaledViewport.width) {
+                    scale = 1;
+                    queueRenderPage(pageNum);
+                    return;
+                }
 
                 const widthScale = availableWidth / unscaledViewport.width;
                 const heightScale = availableHeight && unscaledViewport.height
@@ -406,38 +588,48 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? Math.min(widthScale, heightScale)
                     : widthScale;
 
-                scale = Math.max(0.5, Math.min(2.5, fittedScale));
+                scale = Math.max(minScale, Math.min(maxScale, fittedScale));
                 queueRenderPage(pageNum);
             });
         };
 
+        const showPage = (nextPage) => {
+            pageNum = nextPage;
+            if (userAdjustedZoom) {
+                queueRenderPage(pageNum);
+                return;
+            }
+            fitCurrentPage();
+        };
+
         prevBtn?.addEventListener('click', () => {
             if (pageNum <= 1) return;
-            pageNum--;
-            if (fitMode === 'page') fitCurrentPage();
-            else queueRenderPage(pageNum);
+            showPage(pageNum - 1);
         });
 
         nextBtn?.addEventListener('click', () => {
             if (!pdfDoc || pageNum >= pdfDoc.numPages) return;
-            pageNum++;
-            if (fitMode === 'page') fitCurrentPage();
-            else queueRenderPage(pageNum);
+            showPage(pageNum + 1);
         });
 
         zoomInBtn?.addEventListener('click', () => {
-            if (scale >= 3.0) return;
-            scale = Math.min(3.0, scale + 0.25);
+            if (scale >= maxScale) return;
+            userAdjustedZoom = true;
+            scale = Math.min(maxScale, scale + 0.25);
             queueRenderPage(pageNum);
         });
 
         zoomOutBtn?.addEventListener('click', () => {
-            if (scale <= 0.5) return;
-            scale = Math.max(0.5, scale - 0.25);
+            if (scale <= minScale) return;
+            userAdjustedZoom = true;
+            scale = Math.max(minScale, scale - 0.25);
             queueRenderPage(pageNum);
         });
 
-        fitWidthBtn?.addEventListener('click', fitCurrentPage);
+        fitWidthBtn?.addEventListener('click', () => {
+            userAdjustedZoom = false;
+            fitCurrentPage();
+        });
 
         container.addEventListener('contextmenu', (event) => event.preventDefault());
         container.addEventListener('dragstart', (event) => event.preventDefault());
@@ -450,18 +642,17 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingTask.promise.then((pdf) => {
             pdfDoc = pdf;
             if (totalPagesEl) totalPagesEl.textContent = String(pdf.numPages);
-            if (fitMode === 'page') fitCurrentPage();
-            else renderPage(pageNum);
+            fitCurrentPage();
         }).catch(() => {
             if (loadingEl) {
                 loadingEl.innerHTML = `<div class="p-6 text-center text-sm text-red-300">Unable to load document in canvas viewer. <a href="${url}" target="_blank" class="underline font-bold text-white">Open file directly</a></div>`;
             }
         });
 
-        if (fitMode === 'page' && containerWrapper && 'ResizeObserver' in window) {
+        if (containerWrapper && 'ResizeObserver' in window) {
             let resizeTimer = null;
             const resizeObserver = new ResizeObserver(() => {
-                if (!pdfDoc) return;
+                if (!pdfDoc || userAdjustedZoom) return;
                 window.clearTimeout(resizeTimer);
                 resizeTimer = window.setTimeout(fitCurrentPage, 120);
             });
@@ -471,34 +662,81 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelectorAll('[data-pdf-canvas-viewer]').forEach(initPdfCanvasViewer);
 
+    document.querySelectorAll('[data-lesson-document]').forEach((root) => {
+        const toggle = root.querySelector('[data-lesson-document-toggle]');
+        const label = toggle?.querySelector('[data-lesson-document-toggle-label]');
+        const panel = root.querySelector('[data-lesson-document-panel]');
+        if (!toggle || !panel) {
+            return;
+        }
+
+        const showLabel = 'Show lesson document';
+        const hideLabel = 'Hide lesson document';
+
+        const sync = (open) => {
+            panel.hidden = !open;
+            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            if (label) {
+                label.textContent = open ? hideLabel : showLabel;
+            }
+            if (open) {
+                window.requestAnimationFrame(() => {
+                    window.dispatchEvent(new Event('resize'));
+                });
+            }
+        };
+
+        sync(root.dataset.lessonDocumentOpen !== 'false');
+        toggle.addEventListener('click', () => sync(panel.hidden));
+    });
+
     const syncSidebarAccessibility = () => {
         if (!sidebar) return;
 
-        // Header and collapse controls were removed. The bottom navigation is
-        // the mobile entry surface, while the full sidebar remains desktop-only.
+        // Mobile uses the bottom navigation. The desktop sidebar stays available
+        // and can be collapsed from the top bar without hiding it.
         const isInaccessible = ! desktopDashboardMedia.matches;
         sidebar.inert = isInaccessible;
         sidebar.toggleAttribute('aria-hidden', isInaccessible);
     };
 
-    syncSidebarAccessibility();
-    desktopDashboardMedia.addEventListener?.('change', syncSidebarAccessibility);
+    const officialShell = document.querySelector('.universal-dashboard[data-dashboard-role="admin"], .universal-dashboard[data-dashboard-role="trainer"], .universal-dashboard[data-dashboard-role="trainee"]');
+    const sidebarCollapseButtons = document.querySelectorAll('[data-dashboard-sidebar-collapse]');
+    const sidebarCollapsedStorageKey = officialSidebarStorageKeys[officialShell?.dataset.dashboardRole] ?? adminSidebarCollapsedStorageKey;
+    const applyAdminSidebarCollapsed = (collapsed) => {
+        document.documentElement.classList.toggle('is-admin-sidebar-collapsed', collapsed);
+        sidebarCollapseButtons.forEach((button) => {
+            button.setAttribute('aria-expanded', String(!collapsed));
+            const label = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+            button.setAttribute('aria-label', label);
+            button.title = label;
+        });
+    };
 
-    // Keep the trainee roster compact: opening one learner summary closes the
-    // previously opened card while retaining native details keyboard behavior.
-    document.querySelectorAll('[data-trainee-accordion]').forEach((accordion) => {
-        const traineeCards = Array.from(accordion.querySelectorAll('[data-trainee-card]'));
+    if (officialShell && sidebarCollapseButtons.length > 0) {
+        let collapsed = false;
+        try {
+            collapsed = window.localStorage.getItem(sidebarCollapsedStorageKey) === '1';
+        } catch (error) {
+            collapsed = document.documentElement.classList.contains('is-admin-sidebar-collapsed');
+        }
 
-        traineeCards.forEach((card) => {
-            card.addEventListener('toggle', () => {
-                if (! card.open) return;
-
-                traineeCards.forEach((otherCard) => {
-                    if (otherCard !== card) otherCard.removeAttribute('open');
-                });
+        applyAdminSidebarCollapsed(collapsed);
+        sidebarCollapseButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                collapsed = !document.documentElement.classList.contains('is-admin-sidebar-collapsed');
+                applyAdminSidebarCollapsed(collapsed);
+                try {
+                    window.localStorage.setItem(sidebarCollapsedStorageKey, collapsed ? '1' : '0');
+                } catch (error) {
+                    // Preference persistence is optional when storage is blocked.
+                }
             });
         });
-    });
+    }
+
+    syncSidebarAccessibility();
+    desktopDashboardMedia.addEventListener?.('change', syncSidebarAccessibility);
 
     // Shared admin/trainer/trainee calendar behavior. Date selection swaps the
     // complete day agenda in place, so sessions never need modal popups.
@@ -578,6 +816,67 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         activateDate(calendar.dataset.initialDate, false);
+    });
+
+    document.querySelectorAll('[data-training-chart]').forEach((plot) => {
+        const tooltip = plot.querySelector('[data-training-chart-tooltip]');
+        if (!tooltip) {
+            return;
+        }
+
+        const svg = plot.querySelector('svg');
+
+        const hideTooltip = () => {
+            tooltip.classList.remove('is-visible');
+            tooltip.hidden = true;
+        };
+
+        const showTooltip = (dot) => {
+            const label = document.createElement('p');
+            label.className = 'admin-training-chart-tooltip-label';
+            label.textContent = dot.getAttribute('data-chart-label') || '';
+
+            const enrolledRow = document.createElement('p');
+            enrolledRow.className = 'admin-training-chart-tooltip-row';
+            const enrolledName = document.createElement('span');
+            enrolledName.textContent = 'Active';
+            const enrolledValue = document.createElement('strong');
+            enrolledValue.textContent = dot.getAttribute('data-chart-enrolled') || '0';
+            enrolledRow.append(enrolledName, enrolledValue);
+
+            const passingRow = document.createElement('p');
+            passingRow.className = 'admin-training-chart-tooltip-row';
+            const passingName = document.createElement('span');
+            passingName.textContent = 'Graduate';
+            const passingValue = document.createElement('strong');
+            passingValue.textContent = dot.getAttribute('data-chart-passing') || '0';
+            passingRow.append(passingName, passingValue);
+
+            tooltip.replaceChildren(label, enrolledRow, passingRow);
+
+            const plotRect = plot.getBoundingClientRect();
+            const svgRect = svg ? svg.getBoundingClientRect() : plotRect;
+            const vb = svg?.viewBox?.baseVal;
+            const cx = parseFloat(dot.getAttribute('cx'));
+            const cy = parseFloat(dot.getAttribute('cy'));
+
+            if (vb && vb.width > 0 && vb.height > 0) {
+                tooltip.style.left = `${svgRect.left - plotRect.left + (cx / vb.width) * svgRect.width}px`;
+                tooltip.style.top = `${svgRect.top - plotRect.top + (cy / vb.height) * svgRect.height}px`;
+            } else {
+                const dotRect = dot.getBoundingClientRect();
+                tooltip.style.left = `${dotRect.left - plotRect.left + dotRect.width / 2}px`;
+                tooltip.style.top = `${dotRect.top - plotRect.top}px`;
+            }
+
+            tooltip.hidden = false;
+            tooltip.classList.add('is-visible');
+        };
+
+        plot.querySelectorAll('.admin-training-chart-dot').forEach((dot) => {
+            dot.addEventListener('pointerenter', () => showTooltip(dot));
+            dot.addEventListener('pointerleave', hideTooltip);
+        });
     });
 
     const setActiveNavigationKey = (activeKey) => {
@@ -757,7 +1056,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Use one accessible confirmation surface for destructive actions and
     // timed quiz starts/submissions instead of browser-specific confirm boxes.
     const confirmDialog = document.querySelector('[data-lms-confirm-dialog]');
+    const confirmTitle = confirmDialog?.querySelector('#lms-confirm-title');
     const confirmMessage = confirmDialog?.querySelector('[data-lms-confirm-message]');
+    const confirmDetail = confirmDialog?.querySelector('[data-lms-confirm-detail]');
+    const confirmAction = confirmDialog?.querySelector('[data-lms-confirm-action]');
     let pendingConfirmedForm = null;
 
     document.querySelectorAll('form[data-confirm]').forEach((form) => {
@@ -768,8 +1070,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (!confirmDialog || typeof confirmDialog.showModal !== 'function') {
-                const message = form.dataset.confirm || 'Continue with this action?';
-                if (!window.confirm(message)) {
+                const message = [form.dataset.confirm, form.dataset.confirmDetail]
+                    .filter(Boolean)
+                    .join(' ');
+                if (!window.confirm(message || 'Continue with this action?')) {
                     event.preventDefault();
                     return;
                 }
@@ -778,8 +1082,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
             event.preventDefault();
             pendingConfirmedForm = form;
+            if (confirmTitle) {
+                confirmTitle.textContent = form.dataset.confirmTitle || 'Confirm action';
+            }
             if (confirmMessage) {
                 confirmMessage.textContent = form.dataset.confirm || 'Continue with this action?';
+            }
+            if (confirmDetail) {
+                const detail = form.dataset.confirmDetail || '';
+                confirmDetail.textContent = detail;
+                confirmDetail.hidden = detail === '';
+            }
+            if (confirmAction) {
+                confirmAction.textContent = form.dataset.confirmAction || 'Continue';
             }
             confirmDialog.showModal();
         });
@@ -798,6 +1113,30 @@ document.addEventListener('DOMContentLoaded', () => {
     // longer be loaded or was removed by its provider.
     document.querySelectorAll('[data-user-avatar-image]').forEach((image) => {
         image.addEventListener('error', () => image.remove(), { once: true });
+    });
+
+    document.querySelectorAll('[data-profile-photo-input]').forEach((input) => {
+        input.addEventListener('change', () => {
+            const file = input.files?.[0];
+            const form = input.closest('[data-profile-photo-form]');
+            const avatar = form?.querySelector('.user-avatar');
+            if (!file || !file.type.startsWith('image/') || !avatar) {
+                return;
+            }
+
+            const previewUrl = URL.createObjectURL(file);
+            let image = avatar.querySelector('[data-user-avatar-image]');
+            if (!image) {
+                image = document.createElement('img');
+                image.alt = '';
+                image.className = 'user-avatar-image';
+                image.decoding = 'async';
+                image.dataset.userAvatarImage = '';
+                image.addEventListener('error', () => image.remove(), { once: true });
+                avatar.appendChild(image);
+            }
+            image.src = previewUrl;
+        });
     });
 
     // Batch and single-trainee assignment share the same form component.
@@ -1309,11 +1648,122 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     drawerForm?.addEventListener('submit', () => {
         drawerSave.disabled = true;
-        drawerSave.textContent = 'Saving...';
+        drawerSave.textContent = 'Saving evaluation...';
     });
     board.querySelectorAll('[data-competency-drawer-close]').forEach((button) => button.addEventListener('click', closeDrawer));
     drawerBackdrop?.addEventListener('click', closeDrawer);
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && drawer?.classList.contains('is-open')) closeDrawer();
+    });
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.querySelector('[data-trainer-global-search]');
+    const input = form?.querySelector('input[type="search"]');
+    const suggestBox = form?.querySelector('[id="trainer-search-suggest"]');
+    const suggestUrl = form?.dataset.suggestUrl;
+    if (!form || !input || !suggestBox || !suggestUrl) {
+        return;
+    }
+
+    let timer = null;
+    let activeRequest = null;
+
+    const hideSuggest = () => {
+        suggestBox.hidden = true;
+        suggestBox.replaceChildren();
+        input.setAttribute('aria-expanded', 'false');
+    };
+
+    const renderSuggest = (groups) => {
+        suggestBox.replaceChildren();
+        if (!Array.isArray(groups) || groups.length === 0) {
+            const empty = document.createElement('p');
+            empty.className = 'trainer-search-suggest-empty';
+            empty.textContent = 'No matching pages or class records.';
+            suggestBox.append(empty);
+            suggestBox.hidden = false;
+            input.setAttribute('aria-expanded', 'true');
+            return;
+        }
+
+        groups.forEach((group) => {
+            const section = document.createElement('div');
+            section.className = 'trainer-search-suggest-group';
+            const label = document.createElement('p');
+            label.className = 'trainer-search-suggest-label';
+            label.textContent = group.label || '';
+            section.append(label);
+            (group.results || []).forEach((item) => {
+                const link = document.createElement('a');
+                link.href = item.href || '#';
+                link.setAttribute('role', 'option');
+                const title = document.createElement('strong');
+                title.textContent = item.title || '';
+                link.append(title);
+                if (item.subtitle) {
+                    const subtitle = document.createElement('small');
+                    subtitle.textContent = item.subtitle;
+                    link.append(subtitle);
+                }
+                section.append(link);
+            });
+            suggestBox.append(section);
+        });
+        suggestBox.hidden = false;
+        input.setAttribute('aria-expanded', 'true');
+    };
+
+    const requestSuggest = (query) => {
+        if (query.trim().length < 2) {
+            hideSuggest();
+            return;
+        }
+
+        activeRequest?.abort();
+        activeRequest = new AbortController();
+        const url = new URL(suggestUrl, window.location.origin);
+        url.searchParams.set('q', query);
+
+        fetch(url, {
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            signal: activeRequest.signal,
+        })
+            .then((response) => (response.ok ? response.json() : Promise.reject(response)))
+            .then((payload) => {
+                if (input.value.trim() !== query.trim()) {
+                    return;
+                }
+                renderSuggest(payload.groups || []);
+            })
+            .catch((error) => {
+                if (error?.name !== 'AbortError') {
+                    hideSuggest();
+                }
+            });
+    };
+
+    input.addEventListener('input', () => {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(() => requestSuggest(input.value), 220);
+    });
+
+    input.addEventListener('focus', () => {
+        if (input.value.trim().length >= 2 && suggestBox.childElementCount > 0) {
+            suggestBox.hidden = false;
+            input.setAttribute('aria-expanded', 'true');
+        }
+    });
+
+    document.addEventListener('click', (event) => {
+        if (!form.contains(event.target)) {
+            hideSuggest();
+        }
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && form.contains(document.activeElement)) {
+            hideSuggest();
+        }
     });
 });

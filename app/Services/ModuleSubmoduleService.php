@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Support\CaregivingNcIiCatalog;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ModuleSubmoduleService
 {
@@ -226,6 +227,105 @@ class ModuleSubmoduleService
             'assessed_by_id' => $assessor->id,
             'assessed_at' => now(),
         ])->save();
+    }
+
+    /**
+     * Earlier required outcomes marked Not yet competent block later classwork
+     * until those outcomes are Competent. The failed outcome itself stays open
+     * so the trainee can remediate it.
+     *
+     * @param  Collection<int, TrainingSubmodule>  $submodules
+     * @param  Collection<int, TrainingSubmoduleProgress>  $progressById
+     */
+    public function nycBlockerFor(
+        TrainingSubmodule $target,
+        Collection $submodules,
+        Collection $progressById,
+    ): ?TrainingSubmodule {
+        $required = $submodules
+            ->filter(fn (TrainingSubmodule $submodule): bool => $submodule->is_required)
+            ->sortBy(fn (TrainingSubmodule $submodule): array => [
+                (int) $submodule->position,
+                (int) $submodule->id,
+            ])
+            ->values();
+
+        foreach ($required as $candidate) {
+            if ((int) $candidate->id === (int) $target->id) {
+                return null;
+            }
+
+            if ((int) $candidate->position > (int) $target->position) {
+                return null;
+            }
+
+            if ($progressById->get($candidate->id)?->needsRemediation()) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  Collection<int, TrainingSubmodule>  $submodules
+     * @param  Collection<int, TrainingSubmoduleProgress>  $progressById
+     * @return array{can_work: bool, blocker: ?TrainingSubmodule}
+     */
+    public function accessForSubmodule(
+        TrainingSubmodule $target,
+        Collection $submodules,
+        Collection $progressById,
+    ): array {
+        $progress = $progressById->get($target->id);
+        $blocker = $this->nycBlockerFor($target, $submodules, $progressById);
+        $canWork = $progress?->needsRemediation() || $blocker === null;
+
+        return [
+            'can_work' => $canWork,
+            'blocker' => $canWork ? null : $blocker,
+        ];
+    }
+
+    public function assertTraineeCanWorkOnSubmodule(
+        EnrollmentApplication $application,
+        TrainingModule $module,
+        TrainingSubmodule $submodule,
+        string $field = 'action',
+    ): void {
+        $module->loadMissing('submodules');
+        $progressById = TrainingSubmoduleProgress::query()
+            ->where('enrollment_application_id', $application->id)
+            ->whereIn('training_submodule_id', $module->submodules->pluck('id'))
+            ->get()
+            ->keyBy('training_submodule_id');
+        $access = $this->accessForSubmodule($submodule, $module->submodules, $progressById);
+
+        if ($access['can_work']) {
+            return;
+        }
+
+        $blocker = $access['blocker'];
+        $label = $blocker?->title ?: 'the previous submodule';
+
+        throw ValidationException::withMessages([
+            $field => "{$label} is Not yet competent. Remediate that outcome before moving to {$submodule->title}. The next classwork module stays locked until this unit is Competent.",
+        ]);
+    }
+
+    public function traineeCanWorkOnSubmodule(
+        EnrollmentApplication $application,
+        TrainingModule $module,
+        TrainingSubmodule $submodule,
+    ): bool {
+        $module->loadMissing('submodules');
+        $progressById = TrainingSubmoduleProgress::query()
+            ->where('enrollment_application_id', $application->id)
+            ->whereIn('training_submodule_id', $module->submodules->pluck('id'))
+            ->get()
+            ->keyBy('training_submodule_id');
+
+        return $this->accessForSubmodule($submodule, $module->submodules, $progressById)['can_work'];
     }
 
     /** @param list<string> $outcomeTitles */

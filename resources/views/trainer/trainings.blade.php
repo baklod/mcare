@@ -1,7 +1,7 @@
 @extends('trainer.layouts.app', ['title' => 'My Trainings | MCARE Trainer'])
 
 @section('content')
-<div class="mx-auto max-w-7xl space-y-7">
+<div class="w-full space-y-7">
     <header class="border-b border-stone-200 pb-6">
         <p class="text-sm font-bold uppercase tracking-[0.16em] text-violet-700">My trainings</p>
         <h1 class="mt-2 text-3xl font-bold text-stone-950">Batch training overview</h1>

@@ -20,12 +20,28 @@ class PayMongoCheckoutTest extends TestCase
         parent::setUp();
 
         config()->set('services.paymongo.secret_key', 'sk_test_checkout_feature');
-        config()->set('services.paymongo.webhook_secret', 'whsk_test_webhook_feature');
         config()->set('services.paymongo.live_mode', false);
         config()->set('services.paymongo.payment_methods', ['card', 'gcash', 'qrph']);
         config()->set('logging.default', 'null');
 
         Http::preventStrayRequests();
+    }
+
+    public function test_payment_page_offers_paymongo_methods_without_a_webhook(): void
+    {
+        [$user] = $this->applicantWithApplication();
+
+        $this->actingAs($user)
+            ->get(route('payment.show'))
+            ->assertOk()
+            ->assertSee('PayMongo checkout', false)
+            ->assertSee('Continue with selected method', false)
+            ->assertSee('Confirm PayMongo payment', false)
+            ->assertSee('Confirm pay on site', false)
+            ->assertSee('GCash', false)
+            ->assertSee('Card', false)
+            ->assertSee('QR Ph', false)
+            ->assertDontSee('webhook', false);
     }
 
     public function test_online_checkout_is_created_server_side_and_reused_safely(): void
@@ -104,6 +120,40 @@ class PayMongoCheckoutTest extends TestCase
 
         Http::assertSentCount(1);
         $this->assertDatabaseCount('payment_attempts', 1);
+    }
+
+    public function test_online_checkout_records_the_program_downpayment_instead_of_a_hardcoded_amount(): void
+    {
+        [$user, $application] = $this->applicantWithApplication([
+            'downpayment_amount' => 1,
+            'payment_amount' => 2000,
+        ]);
+
+        Http::fake([
+            'https://api.paymongo.com/v2/checkout_sessions' => Http::response(
+                $this->checkoutResponse('cs_test_one_peso'),
+                200,
+            ),
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('payment.select'), ['payment_method' => 'online'])
+            ->assertRedirect('https://checkout.paymongo.com/cs_test_one_peso');
+
+        $application->refresh();
+
+        $this->assertSame('1.00', $application->payment_amount);
+        $this->assertDatabaseHas('payment_attempts', [
+            'enrollment_application_id' => $application->id,
+            'provider_checkout_id' => 'cs_test_one_peso',
+            'amount_minor' => 100,
+        ]);
+
+        Http::assertSent(function (HttpRequest $request): bool {
+            return $request->method() === 'POST'
+                && $request->url() === 'https://api.paymongo.com/v2/checkout_sessions'
+                && data_get($request->data(), 'data.attributes.line_items.0.amount') === 100;
+        });
     }
 
     public function test_checkout_rejects_an_untrusted_redirect_url(): void
@@ -201,24 +251,51 @@ class PayMongoCheckoutTest extends TestCase
         $this->assertSame(PaymentAttempt::STATUS_PENDING, $attempt->refresh()->status);
     }
 
-    public function test_online_checkout_fails_closed_until_the_webhook_secret_is_configured(): void
+    public function test_live_secret_key_enables_checkout_even_when_live_mode_flag_is_off(): void
     {
         [$user, $application] = $this->applicantWithApplication();
-        config()->set('services.paymongo.webhook_secret', null);
-        Http::fake();
+        config()->set('services.paymongo.secret_key', 'sk_live_from_actual_env');
+        config()->set('services.paymongo.live_mode', false);
+
+        Http::fake([
+            'https://api.paymongo.com/v2/checkout_sessions' => Http::response(
+                $this->checkoutResponse('cs_live_from_env', livemode: true),
+                200,
+            ),
+        ]);
 
         $this->actingAs($user)
             ->post(route('payment.select'), ['payment_method' => 'online'])
-            ->assertRedirect(route('payment.show'))
-            ->assertSessionHasErrors('payment');
+            ->assertRedirect('https://checkout.paymongo.com/cs_live_from_env');
 
-        Http::assertNothingSent();
         $this->assertSame(
-            EnrollmentApplication::PAYMENT_NOT_SELECTED,
+            EnrollmentApplication::PAYMENT_ONLINE_PENDING,
             $application->refresh()->payment_status,
         );
-        $this->assertNull($application->paymongo_checkout_reference);
-        $this->assertNull($application->payment_verified_at);
+        $this->assertTrue((bool) $application->paymentAttempts()->first()?->livemode);
+    }
+
+    public function test_online_checkout_starts_with_only_a_paymongo_secret_key(): void
+    {
+        [$user, $application] = $this->applicantWithApplication();
+        config()->set('services.paymongo.webhook_secret', null);
+
+        Http::fake([
+            'https://api.paymongo.com/v2/checkout_sessions' => Http::response(
+                $this->checkoutResponse('cs_test_without_webhook'),
+                200,
+            ),
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('payment.select'), ['payment_method' => 'online'])
+            ->assertRedirect('https://checkout.paymongo.com/cs_test_without_webhook');
+
+        $this->assertSame(
+            EnrollmentApplication::PAYMENT_ONLINE_PENDING,
+            $application->refresh()->payment_status,
+        );
+        $this->assertSame('cs_test_without_webhook', $application->paymongo_checkout_reference);
     }
 
     public function test_paid_application_cannot_be_regressed_by_starting_another_checkout(): void
@@ -252,17 +329,17 @@ class PayMongoCheckoutTest extends TestCase
         $this->assertNotNull($application->payment_verified_at);
     }
 
-    public function test_active_gateway_attempt_cannot_be_replaced_by_onsite_payment(): void
+    public function test_unpaid_online_checkout_can_be_replaced_by_onsite_payment(): void
     {
         [$user, $application] = $this->applicantWithApplication([
             'payment_method' => 'online',
-            'payment_status' => EnrollmentApplication::PAYMENT_EXPIRED,
+            'payment_status' => EnrollmentApplication::PAYMENT_ONLINE_PENDING,
             'payment_reference' => 'MCARE-ONLINE-STILL-PAYABLE',
             'paymongo_checkout_reference' => 'cs_test_still_payable',
             'paymongo_checkout_url' => 'https://checkout.paymongo.com/cs_test_still_payable',
             'payment_selected_at' => now()->subHour(),
         ]);
-        PaymentAttempt::create([
+        $attempt = PaymentAttempt::create([
             'enrollment_application_id' => $application->id,
             'provider' => 'paymongo',
             'merchant_reference' => $application->payment_reference,
@@ -275,24 +352,44 @@ class PayMongoCheckoutTest extends TestCase
             'livemode' => false,
         ]);
 
+        \Illuminate\Support\Facades\Mail::fake();
+
+        Http::fake([
+            'https://api.paymongo.com/v1/checkout_sessions/cs_test_still_payable' => Http::response([
+                'data' => [
+                    'id' => 'cs_test_still_payable',
+                    'attributes' => [
+                        'livemode' => false,
+                        'status' => 'active',
+                        'reference_number' => $application->payment_reference,
+                        'payments' => [],
+                    ],
+                ],
+            ], 200),
+        ]);
+
         $this->actingAs($user)
             ->post(route('payment.select'), ['payment_method' => 'onsite'])
-            ->assertRedirect(route('payment.show'))
-            ->assertSessionHasErrors('payment');
+            ->assertRedirect(route('payment.receipt'));
 
         $application->refresh();
-        $this->assertSame('online', $application->payment_method);
-        $this->assertSame('MCARE-ONLINE-STILL-PAYABLE', $application->payment_reference);
-        $this->assertSame('cs_test_still_payable', $application->paymongo_checkout_reference);
-        $this->assertNull($application->payment_receipt_number);
+        $this->assertSame('onsite', $application->payment_method);
+        $this->assertSame(EnrollmentApplication::PAYMENT_ONSITE_PENDING, $application->payment_status);
+        $this->assertNotNull($application->payment_reference);
+        $this->assertNotNull($application->payment_receipt_number);
+        $this->assertStringStartsWith('MCARE-OR-', $application->payment_receipt_number);
+        $this->assertNull($application->paymongo_checkout_reference);
+        $this->assertSame(PaymentAttempt::STATUS_EXPIRED, $attempt->refresh()->status);
     }
 
-    public function test_active_attempt_cannot_cross_from_test_mode_to_live_mode(): void
+    public function test_unpaid_attempt_from_the_other_mode_is_expired_so_current_keys_can_start_checkout(): void
     {
         [$user, $application] = $this->applicantWithApplication([
             'payment_method' => 'online',
             'payment_status' => EnrollmentApplication::PAYMENT_ONLINE_PENDING,
             'payment_reference' => 'MCARE-ONLINE-TEST-MODE',
+            'paymongo_checkout_reference' => 'cs_test_old_mode',
+            'paymongo_checkout_url' => 'https://checkout.paymongo.com/cs_test_old_mode',
             'payment_selected_at' => now(),
         ]);
         $attempt = PaymentAttempt::create([
@@ -300,29 +397,52 @@ class PayMongoCheckoutTest extends TestCase
             'provider' => 'paymongo',
             'merchant_reference' => $application->payment_reference,
             'idempotency_key' => Str::uuid()->toString(),
+            'provider_checkout_id' => 'cs_test_old_mode',
             'amount_minor' => 200000,
             'currency' => 'PHP',
-            'status' => PaymentAttempt::STATUS_CREATING,
+            'status' => PaymentAttempt::STATUS_PENDING,
+            'checkout_url' => 'https://checkout.paymongo.com/cs_test_old_mode',
             'livemode' => false,
             'meta' => ['checkout_payload' => ['data' => ['attributes' => []]]],
         ]);
 
         config()->set('services.paymongo.secret_key', 'sk_live_checkout_feature');
         config()->set('services.paymongo.live_mode', true);
-        Http::fake();
+
+        Http::fake([
+            'https://api.paymongo.com/v2/checkout_sessions' => Http::response(
+                $this->checkoutResponse('cs_live_after_mode_switch', livemode: true),
+                200,
+            ),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('payment.show'))
+            ->assertOk()
+            ->assertDontSee('A checkout from a different PayMongo mode is still active', false)
+            ->assertSee('Continue with selected method', false);
+
+        $this->assertSame(PaymentAttempt::STATUS_EXPIRED, $attempt->refresh()->status);
+        $this->assertSame(
+            EnrollmentApplication::PAYMENT_NOT_SELECTED,
+            $application->refresh()->payment_status,
+        );
 
         $this->actingAs($user)
             ->post(route('payment.select'), ['payment_method' => 'online'])
-            ->assertRedirect(route('payment.show'))
-            ->assertSessionHasErrors('payment');
+            ->assertRedirect('https://checkout.paymongo.com/cs_live_after_mode_switch');
 
-        Http::assertNothingSent();
         $this->assertFalse($attempt->refresh()->livemode);
-        $this->assertSame(PaymentAttempt::STATUS_CREATING, $attempt->status);
-        $this->assertDatabaseCount('payment_attempts', 1);
+        $this->assertSame(PaymentAttempt::STATUS_EXPIRED, $attempt->status);
+        $this->assertDatabaseHas('payment_attempts', [
+            'enrollment_application_id' => $application->id,
+            'provider_checkout_id' => 'cs_live_after_mode_switch',
+            'livemode' => true,
+            'status' => PaymentAttempt::STATUS_PENDING,
+        ]);
     }
 
-    public function test_browser_return_cannot_mark_an_online_payment_as_paid(): void
+    public function test_browser_return_does_not_mark_payment_paid_without_a_paid_paymongo_session(): void
     {
         [$user, $application] = $this->applicantWithApplication([
             'payment_method' => 'online',
@@ -333,12 +453,24 @@ class PayMongoCheckoutTest extends TestCase
             'payment_selected_at' => now(),
         ]);
 
-        $response = $this->actingAs($user)->get(route('payment.return'));
+        Http::fake([
+            'https://api.paymongo.com/v1/checkout_sessions/cs_test_return_only' => Http::response([
+                'data' => [
+                    'id' => 'cs_test_return_only',
+                    'attributes' => [
+                        'livemode' => false,
+                        'status' => 'active',
+                        'reference_number' => $application->payment_reference,
+                        'payments' => [],
+                    ],
+                ],
+            ], 200),
+        ]);
 
-        $this->assertTrue(
-            $response->isSuccessful() || $response->isRedirect(),
-            'The safe return endpoint should render or redirect without a server error.',
-        );
+        $this->actingAs($user)
+            ->get(route('payment.return'))
+            ->assertRedirect(route('payment.show'));
+
         $this->assertSame(
             EnrollmentApplication::PAYMENT_ONLINE_PENDING,
             $application->refresh()->payment_status,
@@ -422,7 +554,7 @@ class PayMongoCheckoutTest extends TestCase
     /**
      * @return array<string, mixed>
      */
-    private function checkoutResponse(string $checkoutId): array
+    private function checkoutResponse(string $checkoutId, bool $livemode = false): array
     {
         return [
             'data' => [
@@ -430,7 +562,7 @@ class PayMongoCheckoutTest extends TestCase
                 'type' => 'checkout_session',
                 'attributes' => [
                     'checkout_url' => 'https://checkout.paymongo.com/'.$checkoutId,
-                    'livemode' => false,
+                    'livemode' => $livemode,
                     'status' => 'active',
                 ],
             ],

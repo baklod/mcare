@@ -2,31 +2,15 @@
 
 @section('content')
 <section class="space-y-6">
-    <header class="border-b border-slate-200 pb-6">
-        <p class="dashboard-section-kicker">Communication & Notices</p>
-        <div class="mt-2 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-                <h1 class="dashboard-section-title text-3xl">Announcements & Reminders</h1>
-                <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                    Post institutional updates, batch schedule announcements, or monthly tuition payment reminders. You can target all trainees, a specific batch, or an individual enrollee, with optional email delivery.
-                </p>
-            </div>
-            <a href="{{ route('admin.payment-schedules.index') }}" class="secondary-action">
-                <x-dashboard-icon name="credit-card" class="h-4 w-4" />
-                <span>View Payment Ledger</span>
-            </a>
-        </div>
+    <header class="flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
+        <p class="max-w-3xl text-sm leading-6 text-slate-600">
+            Post institutional updates, batch schedule announcements, or monthly tuition payment reminders. You can target all trainees, a specific batch, or an individual enrollee, with optional email delivery.
+        </p>
+        <a href="{{ route('admin.payment-schedules.index') }}" class="secondary-action">
+            <x-dashboard-icon name="credit-card" class="h-4 w-4" />
+            <span>View Payment Ledger</span>
+        </a>
     </header>
-
-    @if ($errors->any())
-        <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-800">
-            <ul class="list-disc pl-5 space-y-1">
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </div>
-    @endif
 
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-[440px_1fr]">
         <!-- Create Announcement Form -->
@@ -124,7 +108,7 @@
             </div>
 
             <div class="overflow-x-auto">
-                <table class="dashboard-table min-w-[50rem]">
+                <table class="dashboard-table w-full min-w-[50rem]">
                     <thead>
                         <tr>
                             <th>Notice</th>

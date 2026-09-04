@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\User;
+use App\Services\ProfilePhotoStore;
 use Illuminate\Console\Command;
 use Illuminate\Notifications\SendQueuedNotifications;
 use Illuminate\Support\Facades\DB;
@@ -104,6 +105,7 @@ class PurgeTestAccount extends Command
         foreach ($officialFiles as $document) {
             $deletedFiles += Storage::disk($document->storage_disk ?: 'local')->delete($document->file_path) ? 1 : 0;
         }
+        app(ProfilePhotoStore::class)->deleteFor($user);
 
         $this->info("Purged {$email}: account and related rows removed, {$deletedFiles} stored files deleted, ".count($queuedJobIds).' queued notification jobs removed.');
 

@@ -15,9 +15,11 @@ class CompetencyUnit extends Model
         'category',
         'code',
         'title',
+        'estimated_hours',
         'sort_order',
         'is_required',
         'is_tor_included',
+        'is_selectable',
     ];
 
     protected function casts(): array
@@ -25,7 +27,38 @@ class CompetencyUnit extends Model
         return [
             'is_required' => 'boolean',
             'is_tor_included' => 'boolean',
+            'is_selectable' => 'boolean',
+            'estimated_hours' => 'integer',
         ];
+    }
+
+    public static function categoryLabels(): array
+    {
+        return [
+            'core' => 'Core competencies (TESDA TOR)',
+            'common' => 'Common competencies',
+            'basic' => 'Basic competencies',
+            'custom' => 'Institutional / custom',
+        ];
+    }
+
+    public function suggestedHours(): int
+    {
+        if ($this->estimated_hours) {
+            return (int) $this->estimated_hours;
+        }
+
+        return match ($this->category) {
+            'core' => 40,
+            'common' => 20,
+            'basic' => 18,
+            default => 20,
+        };
+    }
+
+    public function outcomeTitles(): array
+    {
+        return $this->outcomes->pluck('title')->filter()->values()->all();
     }
 
     public function outcomes(): HasMany

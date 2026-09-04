@@ -24,11 +24,14 @@ class CertificationController extends Controller
 {
     public function index(Request $request, CompletionEligibilityService $eligibility): View
     {
-        $filters = $request->validate([
+        $validated = $request->validate([
             'batch_id' => ['nullable', 'integer', 'exists:training_batches,id'],
             'schedule' => ['nullable', Rule::in(['AM', 'PM'])],
             'eligibility' => ['nullable', Rule::in(['eligible', 'blocked'])],
+            'tab' => ['nullable', Rule::in(['active', 'graduates'])],
         ]);
+        $activeTab = ($validated['tab'] ?? 'active') === 'graduates' ? 'graduates' : 'active';
+        $filters = collect($validated)->except('tab')->all();
         $records = EnrollmentApplication::query()
             ->with(['batch', 'officialDocuments' => fn ($query) => $query->latest('version')])
             ->where('status', EnrollmentApplication::STATUS_APPROVED)
@@ -37,29 +40,37 @@ class CertificationController extends Controller
             ->when($filters['schedule'] ?? null, fn ($query, $schedule) => $query
                 ->where('schedule_preference', $schedule))
             ->orderBy('last_name')
-            ->paginate(12)
-            ->withQueryString();
+            ->orderBy('first_name')
+            ->get()
+            ->transform(function ($application) use ($eligibility) {
+                $isGraduated = $application->learning_status === EnrollmentApplication::LEARNING_GRADUATED;
+                $eval = $eligibility->evaluate($application);
+                if ($isGraduated) {
+                    $eval['eligible'] = true;
+                }
+                $application->completion_eligibility = $eval;
 
-        $records->getCollection()->transform(function ($application) use ($eligibility) {
-            $isGraduated = $application->learning_status === EnrollmentApplication::LEARNING_GRADUATED;
-            $eval = $eligibility->evaluate($application);
-            if ($isGraduated) {
-                $eval['eligible'] = true;
-            }
-            $application->completion_eligibility = $eval;
-
-            return $application;
-        });
+                return $application;
+            });
 
         if (isset($filters['eligibility'])) {
             $wanted = $filters['eligibility'] === 'eligible';
-            $records->setCollection($records->getCollection()->filter(
+            $records = $records->filter(
                 fn ($application) => $application->completion_eligibility['eligible'] === $wanted
-            )->values());
+            )->values();
         }
 
+        $graduates = $records
+            ->filter(fn ($application) => $application->learning_status === EnrollmentApplication::LEARNING_GRADUATED)
+            ->values();
+        $activeTrainees = $records
+            ->reject(fn ($application) => $application->learning_status === EnrollmentApplication::LEARNING_GRADUATED)
+            ->values();
+
         return view('admin.learning.certificates', [
-            'records' => $records,
+            'activeTab' => $activeTab,
+            'activeTrainees' => $activeTrainees,
+            'graduates' => $graduates,
             'filters' => $filters,
             'batches' => TrainingBatch::query()->orderByDesc('year')->orderBy('name')->get(),
             'exports' => BatchDocumentExport::query()

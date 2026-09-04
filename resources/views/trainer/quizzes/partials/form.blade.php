@@ -25,6 +25,40 @@
     $moduleReturnUrl = $quiz?->training_module_id
         ? route('trainer.modules.show', $quiz->training_module_id).'#assessments'
         : route('trainer.resources');
+    $selectedModuleId = old('training_module_id', $quiz?->training_module_id);
+    $selectedSubmoduleId = old('training_submodule_id', $quiz?->training_submodule_id);
+    $selectedBatchId = old('training_batch_id', $quiz?->training_batch_id);
+    $selectedTraineeId = old('target_enrollment_application_id', $quiz?->target_enrollment_application_id);
+    $selectedModule = collect($modules ?? [])->firstWhere('id', (int) $selectedModuleId) ?? $quiz?->trainingModule;
+    $selectedSubmodule = $selectedModule?->submodules?->firstWhere('id', (int) $selectedSubmoduleId) ?? $quiz?->trainingSubmodule;
+    $selectedBatch = collect($batches ?? [])->firstWhere('id', (int) $selectedBatchId) ?? $quiz?->batch;
+    $selectedTrainee = collect($trainees ?? [])->firstWhere('id', (int) $selectedTraineeId) ?? $quiz?->targetTrainee;
+    $formatDateTime = static function ($value, string $empty = 'Not set'): string {
+        if (blank($value)) {
+            return $empty;
+        }
+
+        try {
+            return \Illuminate\Support\Carbon::parse($value)->format('M d, Y g:i A');
+        } catch (\Throwable) {
+            return (string) $value;
+        }
+    };
+    $availableAtValue = old('available_at', $quiz?->available_at?->format('Y-m-d\TH:i'));
+    $dueAtValue = old('due_at', $quiz?->due_at?->format('Y-m-d\TH:i'));
+    $timeLimitValue = old('time_limit_minutes', $quiz?->time_limit_minutes);
+    $attemptLimitValue = old('attempt_limit', $quiz?->attempt_limit ?? 1);
+    $passingScoreValue = old('passing_score_percent', $quiz?->passing_score_percent ?? 75);
+    $isPublishedValue = filter_var(old('is_published', $quiz?->is_published ?? false), FILTER_VALIDATE_BOOLEAN);
+    $moduleLabel = $selectedModule
+        ? trim(($selectedModule->module_code ? '['.$selectedModule->module_code.'] ' : '').$selectedModule->title)
+        : 'Not assigned';
+    $submoduleLabel = $selectedSubmodule
+        ? $selectedSubmodule->title
+        : 'Module-wide assessment';
+    $audienceLabel = $isPrivate
+        ? trim(($selectedTrainee?->last_name ?? '').', '.($selectedTrainee?->first_name ?? '')).' — specific trainee'
+        : trim(($selectedBatch?->name ?? 'Class').' '.($selectedBatch?->year ?? '')).' — entire class';
 @endphp
 
 <div class="lms-page" data-quiz-builder>
@@ -34,111 +68,163 @@
             <h1>{{ $pageTitle }}</h1>
             <p>{{ $pageDescription }}</p>
         </div>
-        <a href="{{ $moduleReturnUrl }}" class="secondary-action">Back to module</a>
+        <div class="lms-header-actions">
+            <a href="{{ $moduleReturnUrl }}" class="secondary-action">Back to module</a>
+            <button type="submit" class="primary-action" form="quiz-builder-form">{{ $submitLabel }}</button>
+        </div>
     </header>
 
-    @if($errors->any())
-        <div class="lms-inline-alert is-danger" role="alert">
-            <strong>The quiz was not saved.</strong>
-            <span>{{ $errors->first() }}</span>
-        </div>
-    @endif
-
-    <form method="POST" action="{{ $formAction }}" class="lms-builder-form">
+    <form id="quiz-builder-form" method="POST" action="{{ $formAction }}" class="lms-builder-form">
         @csrf
         @if($formMethod !== 'POST') @method($formMethod) @endif
 
-        <section class="lms-builder-section" aria-labelledby="quiz-details-heading">
+        <section class="lms-builder-section lms-quiz-overview" aria-labelledby="quiz-details-heading" data-quiz-overview>
             <div class="lms-builder-section-heading">
                 <span>1</span>
-                <div><h2 id="quiz-details-heading">Quiz details</h2><p>Name the quiz and explain what trainees should do.</p></div>
+                <div>
+                    <h2 id="quiz-details-heading">Quiz details</h2>
+                    <p>Title, class, schedule, and scoring for this assessment.</p>
+                </div>
             </div>
-            <div class="lms-form-grid">
-                <div class="lms-field lms-field-wide">
-                    <label for="quiz-title">Title</label>
-                <input id="quiz-title" name="title" value="{{ old('title', $quiz?->title) }}" required maxlength="160" placeholder="Example: Infection Control Knowledge Check">
-                    @error('title')<p class="lms-field-error">{{ $message }}</p>@enderror
-                </div>
-                <div class="lms-field lms-field-wide">
-                    <label for="quiz-module">Learning Module</label>
-                    <select id="quiz-module" name="training_module_id" class="form-field" required>
-                        <option value="">Choose a learning module</option>
-                        @foreach(($modules ?? []) as $mod)
-                            <option value="{{ $mod->id }}" @selected((string) old('training_module_id', $quiz?->training_module_id) === (string) $mod->id)>
-                                {{ $mod->module_code ? '['.$mod->module_code.'] ' : '' }}{{ $mod->title }}
-                            </option>
-                        @endforeach
-                    </select>
-                    <small class="text-xs text-slate-500">Every assessment belongs to one learning module.</small>
-                    @error('training_module_id')<p class="lms-field-error">{{ $message }}</p>@enderror
-                </div>
-                <div class="lms-field lms-field-wide">
-                    <label for="quiz-submodule">Competency Submodule</label>
-                    <select id="quiz-submodule" name="training_submodule_id" class="form-field">
-                        <option value="">Legacy module-wide assessment</option>
-                        @foreach(($modules ?? []) as $mod)
-                            @foreach($mod->submodules as $submodule)
-                                <option value="{{ $submodule->id }}" data-parent-module="{{ $mod->id }}" @selected((string) old('training_submodule_id', $quiz?->training_submodule_id) === (string) $submodule->id)>
-                                    {{ $mod->title }} — {{ $submodule->title }}
+
+            @if($editing)
+                <input type="hidden" name="title" value="{{ old('title', $quiz?->title) }}">
+                <input type="hidden" name="instructions" value="{{ old('instructions', $quiz?->instructions) }}">
+                <input type="hidden" name="training_module_id" value="{{ $selectedModuleId }}">
+                <input type="hidden" name="training_submodule_id" value="{{ $selectedSubmoduleId }}">
+                <input type="hidden" name="audience_type" value="{{ $isPrivate ? 'trainee' : 'batch' }}">
+                <input type="hidden" name="training_batch_id" value="{{ $selectedBatchId }}">
+                <input type="hidden" name="target_enrollment_application_id" value="{{ $selectedTraineeId }}">
+                <input type="hidden" name="available_at" value="{{ $availableAtValue }}">
+                <input type="hidden" name="due_at" value="{{ $dueAtValue }}">
+                <input type="hidden" name="time_limit_minutes" value="{{ $timeLimitValue }}">
+                <input type="hidden" name="attempt_limit" value="{{ $attemptLimitValue }}">
+                <input type="hidden" name="passing_score_percent" value="{{ $passingScoreValue }}">
+                <input type="hidden" name="is_published" value="{{ $isPublishedValue ? '1' : '0' }}">
+
+                <dl class="lms-quiz-facts">
+                    <div class="lms-quiz-fact-wide">
+                        <dt>Title</dt>
+                        <dd>{{ old('title', $quiz?->title) ?: 'Untitled quiz' }}</dd>
+                    </div>
+                    <div>
+                        <dt>Learning module</dt>
+                        <dd>{{ $moduleLabel }}</dd>
+                    </div>
+                    <div>
+                        <dt>Competency submodule</dt>
+                        <dd>{{ $submoduleLabel }}</dd>
+                    </div>
+                    <div class="lms-quiz-fact-wide">
+                        <dt>Assign to</dt>
+                        <dd>{{ $audienceLabel }}</dd>
+                    </div>
+                    <div>
+                        <dt>Available from</dt>
+                        <dd>{{ $formatDateTime($availableAtValue, 'Opens immediately') }}</dd>
+                    </div>
+                    <div>
+                        <dt>Due date</dt>
+                        <dd>{{ $formatDateTime($dueAtValue, 'No due date') }}</dd>
+                    </div>
+                    <div>
+                        <dt>Time limit</dt>
+                        <dd>{{ filled($timeLimitValue) ? $timeLimitValue.' minutes' : 'No time limit' }}</dd>
+                    </div>
+                    <div>
+                        <dt>Allowed attempts</dt>
+                        <dd>{{ $attemptLimitValue }} {{ \Illuminate\Support\Str::plural('attempt', (int) $attemptLimitValue) }}</dd>
+                    </div>
+                    <div>
+                        <dt>Passing score</dt>
+                        <dd>{{ rtrim(rtrim(number_format((float) $passingScoreValue, 2), '0'), '.') }}%</dd>
+                    </div>
+                    <div>
+                        <dt>Status</dt>
+                        <dd>{{ $isPublishedValue ? 'Published' : 'Draft' }}</dd>
+                    </div>
+                </dl>
+                @error('title')<p class="lms-field-error">{{ $message }}</p>@enderror
+                @error('training_module_id')<p class="lms-field-error">{{ $message }}</p>@enderror
+                @error('training_submodule_id')<p class="lms-field-error">{{ $message }}</p>@enderror
+                @error('due_at')<p class="lms-field-error">{{ $message }}</p>@enderror
+            @else
+                <div class="lms-form-grid">
+                    <div class="lms-field lms-field-wide">
+                        <label for="quiz-title">Title</label>
+                        <input id="quiz-title" name="title" value="{{ old('title', $quiz?->title) }}" required maxlength="160" placeholder="Example: Infection Control Knowledge Check">
+                        @error('title')<p class="lms-field-error">{{ $message }}</p>@enderror
+                    </div>
+                    <div class="lms-field">
+                        <label for="quiz-module">Learning Module</label>
+                        <select id="quiz-module" name="training_module_id" class="form-field" required>
+                            <option value="">Choose a learning module</option>
+                            @foreach(($modules ?? []) as $mod)
+                                <option value="{{ $mod->id }}" @selected((string) old('training_module_id', $quiz?->training_module_id) === (string) $mod->id)>
+                                    {{ $mod->module_code ? '['.$mod->module_code.'] ' : '' }}{{ $mod->title }}
                                 </option>
                             @endforeach
-                        @endforeach
-                    </select>
-                    <small class="text-xs text-slate-500">Choose the exact outcome trainees will mark done. The module-wide option is retained only for historical quizzes.</small>
-                    @error('training_submodule_id')<p class="lms-field-error">{{ $message }}</p>@enderror
-                </div>
-            </div>
-        </section>
-
-        <section class="lms-builder-section" aria-labelledby="quiz-audience-heading">
-            <div class="lms-builder-section-heading">
-                <span>2</span>
-                <div><h2 id="quiz-audience-heading">Class and availability</h2><p>Choose who receives the quiz and when it can be taken.</p></div>
-            </div>
-            <div class="lms-form-grid">
-                <fieldset class="lms-audience-fieldset lms-field-wide" data-audience-scope>
-                    <legend>Assign to</legend>
-                    <div class="lms-choice-grid">
-                        <label class="lms-choice-card">
-                            <span class="lms-choice-title"><input type="radio" name="audience_type" value="batch" data-audience-control @checked(! $isPrivate)> Entire class</span>
-                            <span class="lms-choice-help">Every active trainee in one batch</span>
-                            <select name="training_batch_id" data-audience-batch aria-label="Choose class">
-                                <option value="">Choose class</option>
-                                @foreach($batches as $batch)
-                                    <option value="{{ $batch->id }}" @selected((string) old('training_batch_id', $quiz?->training_batch_id) === (string) $batch->id)>{{ $batch->name }} {{ $batch->year }}</option>
+                        </select>
+                        @error('training_module_id')<p class="lms-field-error">{{ $message }}</p>@enderror
+                    </div>
+                    <div class="lms-field">
+                        <label for="quiz-submodule">Competency Submodule</label>
+                        <select id="quiz-submodule" name="training_submodule_id" class="form-field">
+                            <option value="">Legacy module-wide assessment</option>
+                            @foreach(($modules ?? []) as $mod)
+                                @foreach($mod->submodules as $submodule)
+                                    <option value="{{ $submodule->id }}" data-parent-module="{{ $mod->id }}" @selected((string) old('training_submodule_id', $quiz?->training_submodule_id) === (string) $submodule->id)>
+                                        {{ $mod->title }} — {{ $submodule->title }}
+                                    </option>
                                 @endforeach
-                            </select>
-                        </label>
-                        <label class="lms-choice-card">
-                            <span class="lms-choice-title"><input type="radio" name="audience_type" value="trainee" data-audience-control @checked($isPrivate)> Specific trainee</span>
-                            <span class="lms-choice-help">Private assessment or retake</span>
-                            <select name="target_enrollment_application_id" data-audience-trainee aria-label="Choose trainee">
-                                <option value="">Choose approved trainee</option>
-                                @foreach($trainees as $trainee)
-                                    <option value="{{ $trainee->id }}" @selected((string) old('target_enrollment_application_id', $quiz?->target_enrollment_application_id) === (string) $trainee->id)>{{ $trainee->last_name }}, {{ $trainee->first_name }} - {{ $trainee->batch?->name ?? 'No class' }}{{ $trainee->learning_status === \App\Models\EnrollmentApplication::LEARNING_GRADUATED ? ' - Graduated in this batch' : '' }}</option>
-                                @endforeach
-                            </select>
+                            @endforeach
+                        </select>
+                        @error('training_submodule_id')<p class="lms-field-error">{{ $message }}</p>@enderror
+                    </div>
+                    <fieldset class="lms-audience-fieldset lms-field-wide" data-audience-scope>
+                        <legend>Assign to</legend>
+                        <div class="lms-choice-grid">
+                            <label class="lms-choice-card">
+                                <span class="lms-choice-title"><input type="radio" name="audience_type" value="batch" data-audience-control @checked(! $isPrivate)> Entire class</span>
+                                <span class="lms-choice-help">Every active trainee in one batch</span>
+                                <select name="training_batch_id" data-audience-batch aria-label="Choose class">
+                                    <option value="">Choose class</option>
+                                    @foreach($batches as $batch)
+                                        <option value="{{ $batch->id }}" @selected((string) old('training_batch_id', $quiz?->training_batch_id) === (string) $batch->id)>{{ $batch->name }} {{ $batch->year }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+                            <label class="lms-choice-card">
+                                <span class="lms-choice-title"><input type="radio" name="audience_type" value="trainee" data-audience-control @checked($isPrivate)> Specific trainee</span>
+                                <span class="lms-choice-help">Private assessment or retake</span>
+                                <select name="target_enrollment_application_id" data-audience-trainee aria-label="Choose trainee">
+                                    <option value="">Choose approved trainee</option>
+                                    @foreach($trainees as $trainee)
+                                        <option value="{{ $trainee->id }}" @selected((string) old('target_enrollment_application_id', $quiz?->target_enrollment_application_id) === (string) $trainee->id)>{{ $trainee->last_name }}, {{ $trainee->first_name }} - {{ $trainee->batch?->name ?? 'No class' }}{{ $trainee->learning_status === \App\Models\EnrollmentApplication::LEARNING_GRADUATED ? ' - Graduated in this batch' : '' }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+                        </div>
+                    </fieldset>
+                    <div class="lms-field"><label for="quiz-available-at">Available from</label><input id="quiz-available-at" type="datetime-local" name="available_at" value="{{ $availableAtValue }}"></div>
+                    <div class="lms-field"><label for="quiz-due-at">Due date</label><input id="quiz-due-at" type="datetime-local" name="due_at" value="{{ $dueAtValue }}"></div>
+                    <div class="lms-field"><label for="quiz-time-limit">Time limit (minutes)</label><input id="quiz-time-limit" type="number" name="time_limit_minutes" value="{{ $timeLimitValue ?? 30 }}" min="1" max="240"></div>
+                    <div class="lms-field"><label for="quiz-attempt-limit">Allowed attempts</label><input id="quiz-attempt-limit" type="number" name="attempt_limit" value="{{ $attemptLimitValue }}" min="1" max="5"></div>
+                    <div class="lms-field"><label for="quiz-passing-score">Passing score (%)</label><input id="quiz-passing-score" type="number" name="passing_score_percent" value="{{ $passingScoreValue }}" min="1" max="100"></div>
+                    <div class="lms-form-options">
+                        <label class="lms-check">
+                            <input type="hidden" name="is_published" value="0">
+                            <input type="checkbox" name="is_published" value="1" @checked($isPublishedValue)>
+                            <span>Publish after saving</span>
                         </label>
                     </div>
-                </fieldset>
-                <div class="lms-field"><label for="quiz-available-at">Available from</label><input id="quiz-available-at" type="datetime-local" name="available_at" value="{{ old('available_at', $quiz?->available_at?->format('Y-m-d\TH:i')) }}"></div>
-                <div class="lms-field"><label for="quiz-due-at">Due date</label><input id="quiz-due-at" type="datetime-local" name="due_at" value="{{ old('due_at', $quiz?->due_at?->format('Y-m-d\TH:i')) }}"></div>
-                <div class="lms-field"><label for="quiz-time-limit">Time limit (minutes)</label><input id="quiz-time-limit" type="number" name="time_limit_minutes" value="{{ old('time_limit_minutes', $quiz?->time_limit_minutes ?? 30) }}" min="1" max="240"></div>
-                <div class="lms-field"><label for="quiz-attempt-limit">Allowed attempts</label><input id="quiz-attempt-limit" type="number" name="attempt_limit" value="{{ old('attempt_limit', $quiz?->attempt_limit ?? 1) }}" min="1" max="5"></div>
-                <div class="lms-field"><label for="quiz-passing-score">Passing score (%)</label><input id="quiz-passing-score" type="number" name="passing_score_percent" value="{{ old('passing_score_percent', $quiz?->passing_score_percent ?? 75) }}" min="1" max="100"></div>
-                <div class="lms-form-options">
-                    <label class="lms-check">
-                        <input type="hidden" name="is_published" value="0">
-                        <input type="checkbox" name="is_published" value="1" @checked(old('is_published', $quiz?->is_published ?? false))>
-                        <span>Publish after saving</span>
-                    </label>
                 </div>
-            </div>
+            @endif
         </section>
 
         <section class="lms-builder-section" aria-labelledby="quiz-questions-heading">
             <div class="lms-builder-section-heading">
-                <span>3</span>
+                <span>2</span>
                 <div><h2 id="quiz-questions-heading">Questions</h2><p>Add multiple-choice or true-or-false questions and choose the correct answer for each one.</p></div>
             </div>
 
@@ -162,7 +248,7 @@
                                 <select id="question-{{ $questionIndex }}-type" name="questions[{{ $questionIndex }}][type]" data-question-type>
                                     <option value="multiple_choice" @selected($questionType === 'multiple_choice')>Multiple choice</option>
                                     <option value="true_false" @selected($questionType === 'true_false')>True or false</option>
-                                    <option value="file_upload" @selected($questionType === 'file_upload')>Activity Document (.docx, .pdf, images)</option>
+                                    <option value="file_upload" @selected($questionType === 'file_upload')>Activity Document (PDF or image)</option>
                                     <option value="enumeration" @selected($questionType === 'enumeration')>Enumeration / Written Activity</option>
                                 </select>
                             </div>
@@ -209,7 +295,7 @@
 
         <div class="lms-sticky-submit">
             <a href="{{ $moduleReturnUrl }}" class="secondary-action">Cancel</a>
-            <button class="primary-action">{{ $submitLabel }}</button>
+            <button type="submit" class="primary-action">{{ $submitLabel }}</button>
         </div>
     </form>
 
@@ -218,7 +304,7 @@
             <header><span class="lms-question-number">Question __NUMBER__</span><button type="button" class="lms-text-action is-danger" data-remove-question>Remove</button></header>
             <input type="hidden" name="questions[__INDEX__][id]" value="">
             <div class="lms-form-grid">
-                <div class="lms-field"><label for="question-__INDEX__-type">Question type</label><select id="question-__INDEX__-type" name="questions[__INDEX__][type]" data-question-type><option value="multiple_choice">Multiple choice</option><option value="true_false">True or false</option><option value="file_upload">Activity Document (.docx, .pdf, images)</option><option value="enumeration">Enumeration / Written Activity</option></select></div>
+                <div class="lms-field"><label for="question-__INDEX__-type">Question type</label><select id="question-__INDEX__-type" name="questions[__INDEX__][type]" data-question-type><option value="multiple_choice">Multiple choice</option><option value="true_false">True or false</option><option value="file_upload">Activity Document (PDF or image)</option><option value="enumeration">Enumeration / Written Activity</option></select></div>
                 <div class="lms-field"><label for="question-__INDEX__-points">Points</label><input id="question-__INDEX__-points" type="number" name="questions[__INDEX__][points]" value="1" min="1" max="100" required></div>
                 <div class="lms-field lms-field-wide"><label for="question-__INDEX__-prompt">Question / Activity Instructions</label><textarea id="question-__INDEX__-prompt" name="questions[__INDEX__][prompt]" rows="3" maxlength="1200" required placeholder="Example: Create a DOCX or PDF file answering: Tell me about yourself and your caregiving background."></textarea></div>
             </div>

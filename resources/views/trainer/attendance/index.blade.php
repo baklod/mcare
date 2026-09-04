@@ -22,18 +22,6 @@
         @endif
     </div>
 
-    @if(session('status'))
-        <div class="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 text-sm font-medium text-emerald-800 shadow-sm">
-            <i class="fa-solid fa-circle-check mr-2"></i>{{ session('status') }}
-        </div>
-    @endif
-
-    @if(session('error'))
-        <div class="rounded-xl border border-rose-200 bg-rose-50/80 p-4 text-sm font-medium text-rose-800 shadow-sm">
-            <i class="fa-solid fa-circle-exclamation mr-2"></i>{{ session('error') }}
-        </div>
-    @endif
-
     <!-- Controls Bar -->
     <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
         <form method="GET" action="{{ route('trainer.attendance.index') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-4 items-end">
@@ -184,19 +172,28 @@
                 <!-- Summary Stats Cards -->
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-                        <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Total Recorded Sessions</p>
+                        <div class="flex items-start justify-between gap-3">
+                            <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Total Recorded Sessions</p>
+                            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-700 ring-1 ring-sky-100"><x-dashboard-icon name="calendar-days" /></span>
+                        </div>
                         <p class="mt-2 text-3xl font-extrabold text-slate-900">{{ $summary['total_days'] }}</p>
                         <p class="mt-1 text-xs text-slate-500">Training days recorded to date</p>
                     </div>
                     <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-                        <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Batch Average Attendance</p>
+                        <div class="flex items-start justify-between gap-3">
+                            <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Batch Average Attendance</p>
+                            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg {{ $summary['average_rate'] >= 80 ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-amber-50 text-amber-700 ring-amber-100' }} ring-1"><x-dashboard-icon name="chart-column" /></span>
+                        </div>
                         <p class="mt-2 text-3xl font-extrabold {{ $summary['average_rate'] >= 80 ? 'text-emerald-700' : 'text-amber-700' }}">
                             {{ $summary['average_rate'] }}%
                         </p>
                         <p class="mt-1 text-xs text-slate-500">TESDA standard benchmark: 80%</p>
                     </div>
                     <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-                        <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Trainees in Roster</p>
+                        <div class="flex items-start justify-between gap-3">
+                            <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Trainees in Roster</p>
+                            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-purple-50 text-purple-700 ring-1 ring-purple-100"><x-dashboard-icon name="users" /></span>
+                        </div>
                         <p class="mt-2 text-3xl font-extrabold text-purple-700">{{ count($summary['trainees']) }}</p>
                         <p class="mt-1 text-xs text-slate-500">Approved active enrolled learners</p>
                     </div>

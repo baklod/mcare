@@ -7,27 +7,19 @@
     $quizList = collect($quizzes ?? []);
     $publishedModuleCount = $moduleList->where('is_published', true)->count();
     $activeQuizCount = $quizList->where('is_published', true)->count();
-    $catalogUnits = $catalogUnits ?? \App\Support\CaregivingNcIiCatalog::units();
 @endphp
 
 <div class="lms-page" data-lms-classwork>
-    <header class="lms-class-header">
-        <div class="min-w-0">
-            <p class="lms-eyebrow">MCARE Classroom</p>
-            <h1>Classwork library</h1>
-            <p>Manage Caregiving NC II learning modules, attached lesson materials, in-module quizzes, and learner competency evaluations.</p>
-        </div>
-        <div class="lms-header-actions">
-            <button type="button" class="secondary-action" data-dashboard-dialog-open="quiz-creator-dialog">
-                <x-dashboard-icon name="list-check" class="h-4 w-4" />
-                Create quiz
-            </button>
-            <button type="button" class="primary-action" data-dashboard-dialog-open="module-creator-dialog">
-                <x-dashboard-icon name="plus" class="h-4 w-4" />
-                Create module
-            </button>
-        </div>
-    </header>
+    <div class="lms-header-actions lms-classwork-toolbar">
+        <button type="button" class="secondary-action" data-dashboard-dialog-open="quiz-creator-dialog">
+            <x-dashboard-icon name="list-check" class="h-4 w-4" />
+            Create quiz
+        </button>
+        <button type="button" class="primary-action" data-dashboard-dialog-open="module-creator-dialog">
+            <x-dashboard-icon name="plus" class="h-4 w-4" />
+            Create module
+        </button>
+    </div>
 
     <nav class="lms-context-tabs" aria-label="Trainer classroom sections">
         @if(\Illuminate\Support\Facades\Route::has('trainer.stream'))
@@ -36,13 +28,6 @@
         <a href="{{ route('trainer.resources') }}" class="is-active" aria-current="page">Classwork</a>
         <a href="{{ route('trainer.trainees') }}">People</a>
     </nav>
-
-    @if($errors->any())
-        <div class="lms-inline-alert is-danger" role="alert">
-            <strong>The classwork item was not saved.</strong>
-            <span>{{ $errors->first() }}</span>
-        </div>
-    @endif
 
     <!-- Content Type View Switcher Filter -->
     <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm">
@@ -76,37 +61,13 @@
             <!-- Caregiving NC II Core Preset Selector -->
             <div class="lms-field lms-field-wide">
                 <label for="module-preset-select" class="font-bold text-purple-900">Caregiving NC II Course Module Preset</label>
-                <select id="module-preset-select" class="form-field border-purple-300 focus:border-purple-600" data-module-preset-select>
-                    <option value="">-- Choose from Caregiving NC II Core Modules or enter custom --</option>
-                    <optgroup label="11 Core Competencies (TESDA TOR)">
-                        @foreach($catalogUnits as $unit)
-                            @if(($unit['category'] ?? '') === 'core')
-                                <option value="{{ $unit['code'] }}" data-code="{{ $unit['code'] }}" data-category="core" data-title="{{ $unit['title'] }}" data-hours="{{ $unit['hours'] ?? 40 }}" data-outcomes="{{ json_encode($unit['outcomes']) }}">
-                                    [{{ $unit['code'] }}] {{ $unit['title'] }}
-                                </option>
-                            @endif
-                        @endforeach
-                    </optgroup>
-                    <optgroup label="Common Competencies">
-                        @foreach($catalogUnits as $unit)
-                            @if(($unit['category'] ?? '') === 'common')
-                                <option value="{{ $unit['code'] }}" data-code="{{ $unit['code'] }}" data-category="common" data-title="{{ $unit['title'] }}" data-hours="{{ $unit['hours'] ?? 20 }}" data-outcomes="{{ json_encode($unit['outcomes']) }}">
-                                    [{{ $unit['code'] }}] {{ $unit['title'] }}
-                                </option>
-                            @endif
-                        @endforeach
-                    </optgroup>
-                    <optgroup label="Basic Competencies">
-                        @foreach($catalogUnits as $unit)
-                            @if(($unit['category'] ?? '') === 'basic')
-                                <option value="{{ $unit['code'] }}" data-code="{{ $unit['code'] }}" data-category="basic" data-title="{{ $unit['title'] }}" data-hours="{{ $unit['hours'] ?? 18 }}" data-outcomes="{{ json_encode($unit['outcomes']) }}">
-                                    [{{ $unit['code'] }}] {{ $unit['title'] }}
-                                </option>
-                            @endif
-                        @endforeach
-                    </optgroup>
-                </select>
-                <small class="text-xs text-slate-500">Choosing a course module preset automatically sets the official module code, title, competency category, nominal hours, and suggested subtopics.</small>
+                <x-module-preset-select
+                    id="module-preset-select"
+                    :units="$catalogUnits"
+                    data-module-preset-select
+                    class="form-field border-purple-300 focus:border-purple-600"
+                />
+                <small class="text-xs text-slate-500">These options come from the admin LMS modules catalog. Choosing one fills the official module code, title, category, hours, and suggested subtopics.</small>
             </div>
 
             <div class="lms-field">
@@ -218,12 +179,12 @@
 
             <!-- Primary Lesson File Upload -->
             <div class="lms-field lms-field-wide">
-                <label for="module-file">Primary Lesson File (PDF, PPTX, Video, Image, Audio)</label>
+                <label for="module-file">Primary Lesson File ({{ \App\Support\TrainingModuleFiles::humanLabel() }})</label>
                 <div class="lms-file-picker">
                     <input id="module-file" name="module_file" type="file" required accept="{{ \App\Support\TrainingModuleFiles::acceptAttribute() }}" data-lms-file-input>
                     <div class="lms-file-preview" data-lms-file-preview aria-live="polite">
                         <x-dashboard-icon name="cloud-arrow-up" />
-                        <span><strong>Choose primary lesson file</strong><small>PDF, PPTX, DOCX, Video, or Audio - maximum 38MB</small></span>
+                        <span><strong>Choose primary lesson file</strong><small>{{ \App\Support\TrainingModuleFiles::humanLabel() }} - maximum 38MB</small></span>
                     </div>
                 </div>
                 @error('module_file')<p class="lms-field-error">{{ $message }}</p>@enderror
@@ -252,7 +213,7 @@
         </form>
     </dialog>
 
-    <dialog id="quiz-creator-dialog" data-dashboard-dialog data-auto-open="{{ old('_composer') === 'quiz' && $errors->any() ? 'true' : 'false' }}" class="lms-workflow-dialog is-compact" aria-labelledby="quiz-creator-title">
+    <dialog id="quiz-creator-dialog" data-dashboard-dialog data-auto-open="{{ old('_composer') === 'quiz' && $errors->any() ? 'true' : 'false' }}" class="lms-workflow-dialog is-landscape" aria-labelledby="quiz-creator-title">
         <div class="lms-dialog-header">
             <div>
                 <p class="lms-eyebrow">New assessment</p>
@@ -266,12 +227,12 @@
             @csrf
             <input type="hidden" name="_composer" value="quiz">
 
-            <div class="lms-field lms-field-wide">
+            <div class="lms-field lms-field-span-2">
                 <label for="quick-quiz-title" class="font-bold text-amber-950">Quiz Title</label>
                 <input id="quick-quiz-title" name="title" required maxlength="160" placeholder="e.g. Provide Infant Care - Unit Assessment" class="form-field border-amber-300">
             </div>
 
-            <div class="lms-field lms-field-wide">
+            <div class="lms-field lms-field-span-2">
                 <label for="quick-quiz-module" class="font-bold text-amber-950">Parent Learning Module</label>
                 <select id="quick-quiz-module" name="training_module_id" class="form-field border-amber-300" required>
                     <option value="">-- Choose target learning module --</option>
@@ -284,7 +245,7 @@
                 <small class="text-xs text-stone-500">Every assessment belongs to a specific learning module.</small>
             </div>
 
-            <div class="lms-field lms-field-wide">
+            <div class="lms-field lms-field-span-2">
                 <label for="quick-quiz-submodule" class="font-bold text-amber-950">Competency Submodule</label>
                 <select id="quick-quiz-submodule" name="training_submodule_id" class="form-field border-amber-300" required>
                     <option value="">-- Choose the outcome this quiz evaluates --</option>
@@ -297,9 +258,9 @@
                 <small class="text-xs text-stone-500">New assessments are tracked against one submodule. Existing legacy quizzes remain module-wide.</small>
             </div>
 
-            <div class="lms-field lms-field-wide">
+            <div class="lms-field lms-field-span-2">
                 <label for="quick-quiz-instructions" class="font-bold text-stone-900">Instructions (Optional)</label>
-                <textarea id="quick-quiz-instructions" name="instructions" rows="2" placeholder="Instructions for trainees before taking the quiz..." class="form-field"></textarea>
+                <textarea id="quick-quiz-instructions" name="instructions" rows="3" placeholder="Instructions for trainees before taking the quiz..." class="form-field"></textarea>
             </div>
 
             <fieldset class="lms-audience-fieldset lms-field-wide" data-audience-scope>

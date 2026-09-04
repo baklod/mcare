@@ -1,6 +1,7 @@
 <?php
 
 use App\Console\Commands\PrepareDemoGraduate;
+use App\Console\Commands\SendScheduledCareerSms;
 use App\Http\Middleware\EnsureActiveTraining;
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureEnrollmentPaymentAccess;
@@ -29,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withCommands([
         PrepareDemoGraduate::class,
+        SendScheduledCareerSms::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         /*

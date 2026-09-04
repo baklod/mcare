@@ -32,4 +32,9 @@ class CompetencyOutcome extends Model
     {
         return $this->hasMany(TraineeOutcomeResult::class);
     }
+
+    public function submodules(): HasMany
+    {
+        return $this->hasMany(TrainingSubmodule::class, 'competency_outcome_id');
+    }
 }

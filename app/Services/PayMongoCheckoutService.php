@@ -11,7 +11,9 @@ use Illuminate\Support\Str;
 
 class PayMongoCheckoutService
 {
-    private const CHECKOUT_ENDPOINT = 'https://api.paymongo.com/v2/checkout_sessions';
+    private const CHECKOUT_CREATE_ENDPOINT = 'https://api.paymongo.com/v2/checkout_sessions';
+
+    private const CHECKOUT_RETRIEVE_ENDPOINT = 'https://api.paymongo.com/v1/checkout_sessions';
 
     public function secretConfigured(): bool
     {
@@ -21,20 +23,168 @@ class PayMongoCheckoutService
         return filled($secret) && Str::startsWith($secret, $expectedPrefix);
     }
 
-    public function webhookConfigured(): bool
-    {
-        $secret = trim((string) config('services.paymongo.webhook_secret'));
-
-        return filled($secret) && Str::startsWith($secret, 'whsk_');
-    }
-
     public function ready(): bool
     {
-        return $this->secretConfigured() && $this->webhookConfigured();
+        return $this->secretConfigured();
+    }
+
+    /**
+     * @return array{checkout_id: string, livemode: bool, reference: string, metadata: array<string, mixed>, attributes: array<string, mixed>}|null
+     *
+     * @throws PayMongoCheckoutException
+     */
+    public function retrieveCheckout(string $checkoutId): ?array
+    {
+        if (! $this->secretConfigured() || ! str_starts_with($checkoutId, 'cs_')) {
+            return null;
+        }
+
+        try {
+            $response = Http::acceptJson()
+                ->withBasicAuth($this->secretKey(), '')
+                ->connectTimeout(5)
+                ->timeout(15)
+                ->get(self::CHECKOUT_RETRIEVE_ENDPOINT.'/'.$checkoutId);
+        } catch (ConnectionException) {
+            throw new PayMongoCheckoutException(
+                'PayMongo could not be reached.',
+                retryable: true,
+            );
+        }
+
+        if ($response->failed()) {
+            throw new PayMongoCheckoutException(
+                'PayMongo rejected checkout retrieval.',
+                retryable: $response->status() >= 500,
+                responseStatus: $response->status(),
+            );
+        }
+
+        $id = $response->json('data.id');
+        $attributes = $response->json('data.attributes');
+        $livemode = $response->json('data.attributes.livemode');
+        $reference = $response->json('data.attributes.reference_number')
+            ?? $response->json('data.attributes.metadata.merchant_reference');
+
+        if (
+            ! is_string($id)
+            || $id !== $checkoutId
+            || ! is_array($attributes)
+            || ! is_bool($livemode)
+            || ! is_string($reference)
+            || $reference === ''
+        ) {
+            return null;
+        }
+
+        $metadata = $attributes['metadata'] ?? [];
+
+        return [
+            'checkout_id' => $id,
+            'livemode' => $livemode,
+            'reference' => $reference,
+            'metadata' => is_array($metadata) ? $metadata : [],
+            'attributes' => $attributes,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     * @return array{id: string, amount: int, currency: string, payment_intent_id: ?string}|null
+     */
+    public function paidPaymentFrom(array $attributes): ?array
+    {
+        $collections = [
+            $attributes['payments'] ?? null,
+            data_get($attributes, 'payment_intent.attributes.payments'),
+            data_get($attributes, 'payment_intent.payments'),
+        ];
+
+        foreach ($collections as $payments) {
+            if (! is_array($payments)) {
+                continue;
+            }
+
+            foreach ($payments as $payment) {
+                $normalized = $this->normalizePaidPayment($payment);
+                if ($normalized) {
+                    return $normalized;
+                }
+            }
+        }
+
+        return $this->normalizePaidPayment($attributes['payment'] ?? null);
+    }
+
+    /**
+     * @return array{id: string, amount: int, currency: string, payment_intent_id: ?string}|null
+     */
+    private function normalizePaidPayment(mixed $payment): ?array
+    {
+        if (! is_array($payment)) {
+            return null;
+        }
+
+        if (is_array($payment['data'] ?? null)) {
+            $payment = $payment['data'];
+        }
+
+        $paymentAttributes = is_array($payment['attributes'] ?? null)
+            ? $payment['attributes']
+            : $payment;
+
+        if (strtolower((string) ($paymentAttributes['status'] ?? '')) !== 'paid') {
+            return null;
+        }
+
+        $paymentId = $payment['id'] ?? $paymentAttributes['id'] ?? null;
+        $amount = $this->normalizePaidAmount($paymentAttributes['amount'] ?? null);
+        $currency = strtoupper((string) ($paymentAttributes['currency'] ?? ''));
+        $paymentIntentId = $paymentAttributes['payment_intent_id'] ?? null;
+
+        if (! is_string($paymentId) || ! str_starts_with($paymentId, 'pay_') || $amount === null || $currency === '') {
+            return null;
+        }
+
+        return [
+            'id' => $paymentId,
+            'amount' => $amount,
+            'currency' => $currency,
+            'payment_intent_id' => is_string($paymentIntentId) ? $paymentIntentId : null,
+        ];
+    }
+
+    private function normalizePaidAmount(mixed $amount): ?int
+    {
+        if (is_int($amount)) {
+            return $amount >= 0 ? $amount : null;
+        }
+
+        if (is_float($amount) && is_finite($amount) && abs($amount - round($amount)) < 0.0001) {
+            $normalized = (int) round($amount);
+
+            return $normalized >= 0 ? $normalized : null;
+        }
+
+        if (is_string($amount) && preg_match('/^\d+$/', $amount) === 1) {
+            return (int) $amount;
+        }
+
+        return null;
     }
 
     public function isLiveMode(): bool
     {
+        $secret = $this->secretKey();
+
+        if (Str::startsWith($secret, 'sk_live_')) {
+            return true;
+        }
+
+        if (Str::startsWith($secret, 'sk_test_')) {
+            return false;
+        }
+
         return (bool) config('services.paymongo.live_mode', false);
     }
 
@@ -82,7 +232,7 @@ class PayMongoCheckoutService
                 ])
                 ->connectTimeout(5)
                 ->timeout(15)
-                ->post(self::CHECKOUT_ENDPOINT, $payload);
+                ->post(self::CHECKOUT_CREATE_ENDPOINT, $payload);
         } catch (ConnectionException) {
             throw new PayMongoCheckoutException(
                 'PayMongo could not be reached.',

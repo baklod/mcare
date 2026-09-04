@@ -1,0 +1,1255 @@
+================================================================================
+MCARE HUB — SYSTEM WORKFLOW AND THIRD-PARTY SERVICES
+================================================================================
+Product: MCARE Hub
+Center: Mission Care Training and Assessment Center
+        San Isidro Poblacion, Pili, Camarines Sur
+Focus: TESDA Caregiving NC II training, enrollment, LMS, and graduate career
+       follow-through
+
+This file describes how the system flows from public applicant to admin,
+trainer, trainee, and graduate, which third-party services are used,
+includes a practical guide on how to use each part of the system, and lists
+the system modules and Caregiving NC II training modules with what each is for.
+
+
+================================================================================
+1. SYSTEM PURPOSE (HIGH LEVEL)
+================================================================================
+
+MCARE Hub supports the full institutional pipeline:
+
+  1) Public landing and short admission application
+  2) TESDA-style enrollment (profile + required documents)
+  3) Enrollment payment (PayMongo online or pay-on-site)
+  4) Admin review and account approval
+  5) Learning management (modules, quizzes, attendance, competency, COTC/TOR)
+  6) Graduate Career Hub (job postings, inquiries, optional SMS)
+
+Default Caregiving hours used on official documents: 786
+
+
+================================================================================
+2. ROLES AND PORTALS
+================================================================================
+
+ROLE              PORTAL / AREA              NOTES
+---------------   ------------------------  -----------------------------------
+Public            /                         Landing, apply, enroll, pay, claim
+Applicant         enrollment / payment      User role: applicant
+Admin             /admin/*                  Password login (Google blocked)
+Trainer           /trainer/*                Password login (Google blocked)
+Trainee           /trainee/*                Active training LMS
+Graduate          /trainee/career-hub       Same trainee account after graduation
+                  /trainee/grades           Legacy /alumni URLs also supported
+Historical claim  /alumni/claim             Pending until admin approves
+
+
+Access helpers:
+  - AccountPortal routes users to the correct dashboard after login
+  - Middleware: admin, trainer, trainee, active.training, graduate, two-factor
+
+
+================================================================================
+3. THIRD-PARTY WEBSITES, SERVICES, AND TECH STACK
+================================================================================
+
+This section lists the external websites/services MCARE Hub uses, what each
+is for, and the core technology stack of the system.
+
+
+--------------------------------------------------------------------------------
+3.1 Quick list of third-party websites / services
+--------------------------------------------------------------------------------
+
+SERVICE / WEBSITE          OFFICIAL SITE / API                 USED FOR
+-------------------------  ----------------------------------  -------------------
+PayMongo                   https://www.paymongo.com            Online enrollment
+                           https://api.paymongo.com            payment (GCash,
+                                                               card, QRPh)
+
+Semaphore SMS              https://semaphore.co                Career Hub SMS
+                           https://api.semaphore.co            alerts to graduates
+
+Google Cloud / OAuth       https://console.cloud.google.com    Trainee Google
+                           (OAuth Client)                      sign-in (Socialite)
+                           https://accounts.google.com
+
+PSGC Geographic API        https://psgc.gitlab.io/api          PH address
+                                                               dropdowns
+                                                               (region/province/
+                                                               city/barangay)
+
+SMTP / Amazon SES          https://aws.amazon.com/ses          Sending emails
+                                                               (admission,
+                                                               payment, 2FA,
+                                                               credentials, etc.)
+
+Spatie Browsershot +       https://github.com/spatie/          Generate official
+Chrome/Chromium            browsershot                         COTC / TOR PDFs
+                           (uses local Node + Chrome)
+
+
+--------------------------------------------------------------------------------
+3.2 What each third party is used for (simple explanation)
+--------------------------------------------------------------------------------
+
+1) PayMongo
+   Website: https://www.paymongo.com
+   What it is: Philippine payment gateway
+   What MCARE uses it for:
+     - Applicant pays enrollment fee online
+     - Creates Checkout Session
+     - Confirms payment after applicant returns to MCARE
+   Payment methods used: GCash, card, QRPh
+   Env keys: PAYMONGO_PUBLIC_KEY, PAYMONGO_SECRET_KEY,
+             PAYMONGO_LIVE_MODE, PAYMONGO_PAYMENT_METHODS
+
+2) Semaphore SMS
+   Website: https://semaphore.co
+   What it is: Philippine SMS API service
+   What MCARE uses it for:
+     - Send Career Hub job / caregiving opportunity SMS to graduates
+     - Immediate send or scheduled send
+   Env keys: SEMAPHORE_API_KEY, SEMAPHORE_SENDER_NAME
+   API endpoint used: https://api.semaphore.co/api/v4/messages
+
+3) Google OAuth
+   Website / console: https://console.cloud.google.com
+   What it is: Google sign-in for existing MCARE accounts
+   What MCARE uses it for:
+     - Trainee / applicant / graduate login with Gmail
+     - Link google_id and verify email
+   Not used for: admin and trainer login (password only)
+   Env keys: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI
+   Package: laravel/socialite
+
+4) PSGC API
+   Website / API: https://psgc.gitlab.io/api
+   What it is: Philippine Standard Geographic Code open data API
+   What MCARE uses it for:
+     - Region, province, city/municipality, barangay selectors
+       during enrollment and related address forms
+   Env keys: PSGC_API_URL, PSGC_API_TIMEOUT
+
+5) Amazon SES (email / SMTP)
+   Website: https://aws.amazon.com/ses
+   What it is: Amazon Simple Email Service
+   What MCARE uses it for:
+     - Admission received / reviewed emails
+     - Payment verified / receipt emails
+     - Enrollment status emails
+     - Staff account credentials email
+     - Email verification
+     - Optional 2FA login codes
+     - LMS / Career Hub notifications
+   Env keys: MAIL_MAILER=ses (or SMTP settings pointed at SES)
+             MAIL_FROM_ADDRESS, MAIL_FROM_NAME
+             AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION
+   Tech note:
+     - Laravel Mail sends through Amazon SES
+     - Symfony Mailer transport is used under the hood
+
+6) Browsershot + Chrome/Chromium
+   Package site: https://github.com/spatie/browsershot
+   What it is: HTML-to-PDF renderer using Node and Chrome
+   What MCARE uses it for:
+     - Official COTC and TOR document generation
+   Env keys: BROWSERSHOT_NODE_BINARY, BROWSERSHOT_NPM_BINARY,
+             BROWSERSHOT_CHROME_PATH
+   Related frontend package: puppeteer (Node)
+
+
+--------------------------------------------------------------------------------
+3.3 Core tech stack (what the system is built with)
+--------------------------------------------------------------------------------
+
+LAYER                 TECHNOLOGY                         USED FOR
+--------------------  ---------------------------------  ----------------------
+Backend framework     Laravel 12 (PHP 8.2+)              Web app, routes,
+                                                         auth, queues, mail
+
+Frontend build        Vite + Tailwind CSS 4              CSS/JS assets
+                                                         
+Browser JS            Axios, pdf.js                      API calls, PDF viewer
+
+Auth                  Laravel Auth + Socialite           Login, Google OAuth
+                      Spatie Laravel Permission          Role/permissions
+
+Payments              PayMongo API                       Online enrollment pay
+
+SMS                   Semaphore API                      Graduate job SMS
+
+Email                 Amazon SES via Laravel Mail        Notifications/receipts
+                      (Symfony Mailer)
+
+Address data          PSGC GitLab API                    PH geographic selects
+
+PDF stamping          setasign FPDF + FPDI               Learning PDF watermark
+
+Official PDFs         Spatie Browsershot + Chrome        COTC / TOR generation
+
+Spreadsheets          OpenSpout                          Excel exports
+
+Database              MySQL / SQLite (env-based)         App data storage
+
+Queue                 Laravel database queue             Mail, SMS, documents
+
+Scheduler             Laravel scheduler                  Scheduled Career SMS
+
+
+--------------------------------------------------------------------------------
+3.4 Detailed third-party configuration notes
+--------------------------------------------------------------------------------
+
+A) Google OAuth (Laravel Socialite)
+Purpose:
+  - Sign-in for trainees / applicants / graduates who already have an account
+  - Links Google ID and can verify email
+  - Staff (admin / trainer) must use email + password (Google is blocked)
+
+Config / env:
+  - GOOGLE_CLIENT_ID
+  - GOOGLE_CLIENT_SECRET
+  - GOOGLE_REDIRECT_URI  (default: {APP_URL}/auth/google/callback)
+
+Routes:
+  - /auth/google
+  - /auth/google/callback
+
+
+B) PayMongo (online enrollment payment)
+Purpose:
+  - Create Checkout Sessions for online payment
+  - Confirm payment when the applicant returns from PayMongo (retrieve API)
+  - Supported methods (default): GCash, card, QRPh
+
+Config / env:
+  - PAYMONGO_PUBLIC_KEY
+  - PAYMONGO_SECRET_KEY
+  - PAYMONGO_LIVE_MODE
+  - PAYMONGO_PAYMENT_METHODS=gcash,card,qrph
+
+Notes:
+  - Online confirmation in this system is return-URL / retrieve based
+  - A live PayMongo webhook endpoint is not used in the current routes
+
+
+C) Semaphore SMS
+Purpose:
+  - Send Career Hub job SMS alerts to graduated trainees
+  - Modes: none, immediate queue, or scheduled send
+  - Scheduler command: career:send-scheduled-sms (runs every minute)
+
+Config / env:
+  - SEMAPHORE_API_KEY
+  - SEMAPHORE_SENDER_NAME   (must match approved sender name in Semaphore)
+
+API:
+  - https://api.semaphore.co/api/v4/messages
+
+Service:
+  - App\Services\SemaphoreSmsService
+  - App\Services\CareerGraduateNotifier
+
+
+D) Philippine Standard Geographic Code (PSGC) API
+Purpose:
+  - Region / province / city / barangay address dropdowns during enrollment
+    and related forms
+
+Config / env:
+  - PSGC_API_URL=https://psgc.gitlab.io/api
+  - PSGC_API_TIMEOUT=5
+
+Service:
+  - App\Services\PhilippineGeographicService
+
+
+E) Amazon SES (email)
+Purpose:
+  - Admission received / reviewed
+  - Payment verified / receipts
+  - Enrollment status updates
+  - Staff account credentials
+  - Email verification and optional 2FA codes
+  - Career and LMS notifications
+
+Website:
+  - https://aws.amazon.com/ses
+
+Config / env:
+  - MAIL_MAILER=ses
+  - MAIL_FROM_ADDRESS, MAIL_FROM_NAME
+  - AWS_ACCESS_KEY_ID
+  - AWS_SECRET_ACCESS_KEY
+  - AWS_DEFAULT_REGION
+
+
+F) Spatie Browsershot (official documents)
+Purpose:
+  - Render official COTC and TOR PDF documents via Node/Chrome
+
+Config / env:
+  - BROWSERSHOT_NODE_BINARY
+  - BROWSERSHOT_NPM_BINARY
+  - BROWSERSHOT_CHROME_PATH
+  - OFFICIAL_DOCUMENT_DISK
+  - OFFICIAL_DOCUMENT_TEMPLATE_VERSION
+  - OFFICIAL_DOCUMENT_EXPORT_EXPIRY_HOURS
+  - MCARE_ORGANIZATION_NAME / ADDRESS / PHONE
+  - MCARE_TRAINER_SIGNATORY / MCARE_REGISTRAR_SIGNATORY
+  - MCARE_CAREGIVING_HOURS
+
+
+G) Email two-factor authentication (optional)
+Purpose:
+  - Extra login challenge via emailed 6-digit code
+
+Config / env:
+  - TWO_FACTOR_ENABLED
+  - TWO_FACTOR_ROLES
+  - TWO_FACTOR_TTL
+  - TWO_FACTOR_MAX_ATTEMPTS
+
+Note:
+  - Wired in the app; current code exempts admin from the MFA challenge.
+
+
+================================================================================
+4. END-TO-END WORKFLOW (PUBLIC TO GRADUATE)
+================================================================================
+
+OVERVIEW FLOW
+-------------
+Landing
+  -> Admission application
+  -> Admin approves admission
+  -> Unlock enrollment with application number
+  -> Submit TESDA enrollment + documents
+  -> Pay (online PayMongo OR pay-on-site)
+  -> Payment verified / cleared
+  -> Admin reviews enrollment documents
+  -> Admin approves -> user becomes TRAINEE
+  -> Trainer teaches / records attendance / quizzes / competency
+  -> Trainee completes modules and assessments
+  -> Admin graduates trainee
+  -> Career Hub + optional Semaphore SMS job alerts
+
+
+--------------------------------------------------------------------------------
+4.1 Public landing
+--------------------------------------------------------------------------------
+1. Visitor opens /
+2. Sees Caregiving NC II / Mission Care marketing
+3. Can start Application, Enrollment (if approved), Payment lookup,
+   Alumni claim, or Login
+
+
+--------------------------------------------------------------------------------
+4.2 Admission application (short form)
+--------------------------------------------------------------------------------
+Public:
+1. Open /applications
+2. Fill form (active training programs; Gmail required)
+3. Submit -> AdmissionApplication created (pending) with application_number
+4. Applicant receives email confirmation
+5. Admins are notified
+6. Applicant can check status at /applications/status
+
+Admin:
+1. Open /admin/applications
+2. Review and Approve or Deny (deny needs notes)
+3. Applicant receives review email
+
+Result of approval:
+  - Applicant can unlock the full enrollment form using the application number
+
+
+--------------------------------------------------------------------------------
+4.3 Enrollment (TESDA-style profile + documents)
+--------------------------------------------------------------------------------
+1. Open /enrollment
+2. Unlock with approved admission application number
+3. Select published training batch / program
+4. Fill applicant profile
+5. Choose address using PSGC cascade:
+     Region -> Province -> City/Municipality -> Barangay
+6. Upload required documents:
+     - Birth certificate
+     - Form 137 / 138 / diploma
+     - Good moral
+     - ID photo
+     - E-signature
+7. Submit enrollment
+8. User becomes role: applicant
+9. Redirect to payment page
+
+
+--------------------------------------------------------------------------------
+4.4 Payment
+--------------------------------------------------------------------------------
+Payment options:
+  A) Online via PayMongo
+  B) Pay on site (cashier)
+
+Typical fee model in system:
+  - Total program fee: 22000 (unless overridden on the record)
+  - Downpayment: 2000 (unless overridden)
+
+ONLINE:
+1. Choose online on /payment
+2. System creates PayMongo Checkout Session
+3. Applicant pays with GCash / card / QRPh
+4. Applicant returns to MCARE return/complete routes
+5. System retrieves checkout status from PayMongo
+6. If verified:
+     - payment clearance recorded
+     - receipt email may be sent
+     - admins notified
+     - enrollment can enter review queue
+
+ONSITE:
+1. Choose pay on site
+2. Receipt / ticket is issued
+3. Applicant pays at MCARE cashier
+4. Admin verifies payment under Payment Scheduling
+5. Same clearance lifecycle as online once verified
+
+Applicant after payment (before admin approval):
+  - Cannot fully enter trainee portal yet
+  - Google login may show awaiting-approval messaging on landing
+
+
+--------------------------------------------------------------------------------
+4.5 Admin enrollment review and account approval
+--------------------------------------------------------------------------------
+1. Admin opens /admin/enrollments
+2. Only applications with payment clearance / review release are reviewable
+3. Admin reviews each required document:
+     Accept / Replace / Missing + notes
+4. Admin Approves or Denies
+5. On Approve:
+     - User role becomes trainee
+     - Current learning modules are assigned (rolling release)
+     - Trainee is notified
+6. Admin may also:
+     - Manage programs and batches
+     - Manage payment schedules / proofs
+     - Create staff/trainee accounts
+     - Generate TESDA registration PDF
+     - View activity logs
+
+
+--------------------------------------------------------------------------------
+4.6 Trainer workflow (teaching / assessment)
+--------------------------------------------------------------------------------
+Trainer portal (/trainer):
+
+1. Dashboard / stream / announcements
+2. Create and publish learning modules (and handouts)
+3. Create and publish quizzes
+4. Record attendance by batch
+5. Evaluate competency outcomes
+6. Review quiz attempts / submissions
+7. Search trainees / classwork
+8. Generate class reports / exports where available
+
+Important:
+  - Trainers use password login
+  - Learning PDFs for trainees are watermarked for protection
+
+
+--------------------------------------------------------------------------------
+4.7 Trainee workflow (active training)
+--------------------------------------------------------------------------------
+Trainee portal (/trainee) while active:
+
+1. Login (Google or password, depending on account setup)
+2. Open Stream / Classwork
+3. View modules and download/view materials
+4. Complete submodule progress and assessments
+5. Take quizzes and view results
+6. View schedule / documents / payments area
+7. Upload payment proof or generate onsite ticket when needed
+8. Wait for trainer evaluation / competency recording
+
+Protected materials:
+  - PDF modules are stamped with the MCARE watermark logo
+
+
+--------------------------------------------------------------------------------
+4.8 Graduation and Career Hub
+--------------------------------------------------------------------------------
+Admin:
+1. Review completion eligibility
+     (required units, outcomes, validated modules, passed quizzes)
+2. Set trainee learning status to graduated
+   (or expedite administrative graduation when permitted)
+3. Graduate receives AlumniProfile / graduate access
+4. Official documents (COTC / TOR) can be generated, released, downloaded
+
+Graduate:
+1. Opens Career Hub (/trainee/career-hub)
+2. Sets availability for duty
+3. Views published job / caregiving opportunities
+4. Sends inquiry / contact interest to admin
+
+Admin Career Hub:
+1. Create / publish opportunity
+2. Optionally send SMS via Semaphore:
+     - none
+     - immediate
+     - scheduled (picked up by career:send-scheduled-sms)
+3. Review graduate inquiries and update status/notes
+
+
+--------------------------------------------------------------------------------
+4.9 Historical alumni claim (special entry)
+--------------------------------------------------------------------------------
+For people who already trained historically and need portal access:
+
+1. Submit /alumni/claim with identity + training evidence
+2. Email verification required
+3. Status moves toward pending onsite / pending admin checks
+4. Admin verifies identity + archive evidence
+5. On approve:
+     - Approved graduated enrollment is created
+     - User becomes graduated trainee
+     - Career Hub / graduate features unlock
+6. On reject:
+     - Rejection notes are recorded
+     - Portal remains locked for that claim path
+
+
+================================================================================
+5. ADMIN AREA SUMMARY
+================================================================================
+
+/admin areas typically include:
+  - Dashboard
+  - Admission applications
+  - Enrollment review
+  - Programs / batches / schedules
+  - Payment scheduling and verification
+  - Learning modules / trainees / attendance / certificates / reports
+  - Career Hub (alumni jobs)
+  - Accounts (staff + historical claims)
+  - Announcements
+  - Activity logs (view / print / export)
+
+
+================================================================================
+6. TRAINER AREA SUMMARY
+================================================================================
+
+/trainer areas typically include:
+  - Dashboard
+  - Stream / announcements
+  - Modules
+  - Quizzes
+  - Attendance
+  - Competency records
+  - Trainees
+  - Reports / resources / search
+
+
+================================================================================
+7. TRAINEE / GRADUATE AREA SUMMARY
+================================================================================
+
+Active trainee:
+  - Dashboard
+  - Stream
+  - Classwork / modules
+  - Quizzes
+  - Calendar / schedule
+  - Documents
+  - Payments
+
+Graduate:
+  - Career Hub
+  - Grades / results
+  - Released certificates where permitted
+
+
+================================================================================
+8. AUTHENTICATION SUMMARY
+================================================================================
+
+1. Email + password login at /login
+2. Verified email required for normal access
+3. Google OAuth for existing non-staff accounts
+4. Applicants awaiting approval are blocked from full portal entry
+5. Historical claimants stay locked until admin approval
+6. Optional email 2FA challenge exists (config-driven)
+7. Logout returns to landing
+
+
+================================================================================
+9. KEY INTERNAL SERVICES (NOT THIRD-PARTY)
+================================================================================
+
+  - PayMongoCheckoutService
+  - EnrollmentPaymentLifecycle
+  - SemaphoreSmsService
+  - CareerGraduateNotifier
+  - PhilippineGeographicService
+  - EmailTwoFactorService
+  - CompletionEligibilityService
+  - RollingModuleReleaseService
+  - OfficialDocumentManager / BrowsershotOfficialDocumentRenderer
+  - TesdaRegistrationPdfService
+  - CompetencyCatalogService
+  - LearningPdfWatermark
+  - AdminOperationsNotifier
+  - AttendanceService / QuizGradingService / ModuleAssessmentService
+
+
+================================================================================
+10. OPERATIONAL NOTES
+================================================================================
+
+  - Timezone: Asia/Manila
+  - Queue: database (notifications / document jobs may queue)
+  - Session: database driver
+  - Admission emails are restricted to Gmail in the application form
+  - Staff must not use Google login
+  - Keep Semaphore sender name approved in the Semaphore dashboard
+  - Keep PayMongo keys matched to test vs live mode
+  - Official PDF generation needs Node/Chrome paths for Browsershot
+
+
+================================================================================
+11. HOW TO USE THE SYSTEM (USER GUIDE)
+================================================================================
+
+Use this section as a day-to-day guide. Follow the steps in order for each role.
+
+
+--------------------------------------------------------------------------------
+11.0 Before you start (staff / IT setup)
+--------------------------------------------------------------------------------
+1. Copy .env.example to .env and fill required values.
+2. Set APP_URL to your real site URL.
+3. Configure Amazon SES (MAIL_MAILER=ses + AWS keys) so emails can send.
+4. Configure Google OAuth if trainees will use Continue with Google.
+5. Configure PayMongo keys for online payments.
+6. Configure Semaphore API key + approved sender name for Career Hub SMS.
+7. Configure Browsershot Node/Chrome paths if generating COTC/TOR PDFs.
+8. Run migrations / seeders as needed.
+9. Start the app:
+     php artisan serve
+10. Start a queue worker when using queued jobs (mail, SMS, documents):
+     php artisan queue:work
+11. Keep the scheduler running in production so career:send-scheduled-sms runs.
+
+
+--------------------------------------------------------------------------------
+11.1 Public visitor — how to apply
+--------------------------------------------------------------------------------
+Goal: Submit a short admission application and get an application number.
+
+Steps:
+1. Open the landing page (/).
+2. Click Apply / Applications.
+3. Fill the form with a Gmail address and required details.
+4. Submit the application.
+5. Save or write down your application number.
+6. Check status anytime at Applications -> Status using that number.
+7. Wait for MCARE admin approval email / status update.
+
+Tips:
+  - Use Gmail only for admission.
+  - Keep the application number. You need it to unlock enrollment.
+
+
+--------------------------------------------------------------------------------
+11.2 Applicant — how to enroll and pay
+--------------------------------------------------------------------------------
+Goal: Complete TESDA enrollment, upload documents, and pay.
+
+A) Unlock enrollment
+1. After admission is approved, open Enrollment.
+2. Enter your approved application number.
+3. Continue to the enrollment form.
+
+B) Fill enrollment
+1. Choose the published training batch / program.
+2. Complete personal and education details.
+3. Select address step by step:
+     Region -> Province -> City/Municipality -> Barangay
+4. Upload all required documents:
+     - Birth certificate
+     - Form 137 / 138 / diploma
+     - Good moral
+     - ID photo
+     - E-signature
+5. Submit enrollment.
+
+C) Pay
+1. You are redirected to Payment.
+2. Choose one:
+     ONLINE  -> PayMongo checkout (GCash / card / QRPh)
+     ONSITE  -> Pay at MCARE cashier using the receipt/ticket
+3. For online payment:
+     - Complete PayMongo checkout
+     - Return to MCARE so payment can be confirmed
+4. For onsite payment:
+     - Bring the receipt/reference to the cashier
+     - Wait for admin verification
+
+D) After payment
+1. Wait for admin document review and account approval.
+2. You may see “awaiting approval” if you try to log in early.
+3. Once approved, you can log in as a trainee.
+
+
+--------------------------------------------------------------------------------
+11.3 Applicant / trainee — how to log in
+--------------------------------------------------------------------------------
+Trainees and applicants with accounts:
+
+1. Open /login
+2. Prefer Continue with Google if your enrollment email is Gmail and already
+   registered in MCARE.
+   OR use email + password if staff created credentials for you.
+3. Verify email if prompted.
+4. After approval, you should land in the Trainee portal.
+
+Staff (admin / trainer):
+1. Open /login
+2. Use email + password only
+3. Do not use Google for staff accounts
+
+
+--------------------------------------------------------------------------------
+11.4 Admin — how to use the admin portal
+--------------------------------------------------------------------------------
+Login: /login with admin email + password -> redirected to /admin
+
+A) Review admission applications
+1. Open Applications.
+2. Open a pending application.
+3. Approve or Deny.
+4. If denying, add clear notes for the applicant.
+
+B) Verify payments (especially pay-on-site)
+1. Open Payment Scheduling.
+2. Find the applicant / receipt.
+3. Verify payment or record transaction / proof as needed.
+4. Once cleared, the enrollment can enter review.
+
+C) Review enrollments
+1. Open Enrollments.
+2. Open an application that already has payment clearance.
+3. Review each required document:
+     Accept / Replace / Missing + notes
+4. Approve only when documents and payment are complete.
+5. On approve, the applicant becomes a Trainee and gets learning access.
+
+D) Manage programs and batches
+1. Open Programs to create/update training programs.
+2. Open Batches to create schedules and publish batches for enrollment.
+3. Use Schedules/calendar for batch calendar view.
+
+E) Manage learning
+1. Open Learning modules / trainees / attendance / certificates / reports.
+2. Publish or manage modules as needed.
+3. Track trainee progress and competency.
+4. Generate / release COTC or TOR when eligible.
+5. Update trainee status (active / paused / graduated / withdrawn).
+
+F) Career Hub (graduates)
+1. Open Alumni Jobs / Career Hub in Learning.
+2. Create a job / caregiving opportunity.
+3. Publish it.
+4. Choose SMS option if needed:
+     - none
+     - send now
+     - schedule later
+5. Review graduate inquiries and update status/notes.
+
+G) Accounts
+1. Open Accounts to create trainer or trainee staff accounts.
+2. Credentials are emailed when created.
+3. Review Historical Alumni Claims and approve/reject with checks.
+
+
+--------------------------------------------------------------------------------
+11.5 Trainer — how to use the trainer portal
+--------------------------------------------------------------------------------
+Login: /login with trainer email + password -> redirected to /trainer
+
+A) Daily class flow
+1. Open Dashboard / Stream.
+2. Post announcements for trainees when needed.
+3. Open Trainees to check who is assigned to your batch.
+
+B) Modules
+1. Open Modules / Classwork.
+2. Create a module (or use catalog preset when available).
+3. Upload lesson file / handouts.
+4. Publish the module so trainees can open it.
+5. Evaluate trainee module outcomes when required.
+
+C) Quizzes
+1. Create a quiz and attach it to a module or standalone classwork.
+2. Publish the quiz.
+3. Review attempts and scores after trainees submit.
+
+D) Attendance
+1. Open Attendance.
+2. Select the batch / date.
+3. Mark present / absent / other status.
+4. Save / export workbook when needed.
+
+E) Competency
+1. Open Competency records.
+2. Record outcomes for Caregiving NC II units.
+3. Update bulk records when assessing a group.
+4. Export charts / Excel when needed for reports.
+
+
+--------------------------------------------------------------------------------
+11.6 Trainee — how to use the trainee portal
+--------------------------------------------------------------------------------
+Login: Google or password -> /trainee
+
+A) Start learning
+1. Open Stream for announcements and class updates.
+2. Open Classwork / Modules.
+3. Open a published module.
+4. Read / view / download the lesson.
+5. Complete required submodules and progress actions.
+
+B) Quizzes
+1. Open the quiz from Classwork or the module page.
+2. Start the attempt.
+3. Submit answers.
+4. View pass/fail and score after grading.
+
+C) Schedule and documents
+1. Open Calendar / Schedule for training dates.
+2. Open Documents for released files / certificates when available.
+3. Open Payments if you need an onsite ticket or proof upload.
+
+D) Important rules
+  - Learning PDFs are watermarked. Do not redistribute.
+  - Printing/saving protected materials may be restricted in the viewer.
+  - Finish required quizzes and modules before expecting evaluation.
+
+
+--------------------------------------------------------------------------------
+11.7 Graduate — how to use Career Hub
+--------------------------------------------------------------------------------
+After admin marks you graduated:
+
+1. Log in as usual.
+2. Open Career Hub.
+3. Set your availability for duty if shown.
+4. Browse published caregiving / job opportunities.
+5. Open a posting and send an inquiry / contact interest.
+6. Wait for MCARE admin follow-up.
+7. Open Grades / Documents for results and released certificates.
+
+
+--------------------------------------------------------------------------------
+11.8 Historical alumni — how to claim an old record
+--------------------------------------------------------------------------------
+For people who already trained before the system:
+
+1. Open /alumni/claim from the landing page.
+2. Fill identity, address, training year/schedule, and evidence type.
+3. Upload certificate / TOR evidence if available.
+4. Verify your email when prompted.
+5. Wait for onsite / admin verification.
+6. After approval, log in as a graduated trainee and use Career Hub.
+
+
+--------------------------------------------------------------------------------
+11.9 Common tasks cheat sheet
+--------------------------------------------------------------------------------
+TASK                              WHO           WHERE
+-------------------------------   -----------   ------------------------------
+Submit admission                  Applicant     /applications
+Check admission status            Applicant     /applications/status
+Unlock and submit enrollment      Applicant     /enrollment
+Pay online or onsite              Applicant     /payment or /payments
+Approve admission                 Admin         /admin/applications
+Verify payment                    Admin         /admin payment scheduling
+Approve enrollment                Admin         /admin/enrollments
+Create / publish modules          Trainer/Admin Trainer or Admin Learning
+Take attendance                   Trainer/Admin Trainer or Admin Attendance
+Record competency                 Trainer       /trainer competencies
+Take quizzes / open modules       Trainee       /trainee classwork
+Graduate a trainee                Admin         Learning trainee status
+Post job + optional SMS           Admin         Career Hub / alumni jobs
+Apply to a job posting            Graduate      /trainee/career-hub
+Claim historical alumni record    Alumni        /alumni/claim
+
+
+--------------------------------------------------------------------------------
+11.10 Troubleshooting (quick)
+--------------------------------------------------------------------------------
+Cannot log in as applicant after payment:
+  - Wait for admin enrollment approval. Payment alone is not enough.
+
+Google login fails for staff:
+  - Expected. Admin/trainer must use password login.
+
+Online payment paid but still pending:
+  - Return to the MCARE payment complete/return page so PayMongo status
+    can be retrieved.
+  - If still stuck, admin can verify from Payment Scheduling / records.
+
+No SMS for Career Hub:
+  - Check SEMAPHORE_API_KEY and SEMAPHORE_SENDER_NAME
+  - Confirm queue worker is running
+  - Confirm scheduled SMS command/scheduler is running
+  - Confirm graduates have valid Philippine mobile numbers
+
+No address dropdown data:
+  - Check internet access to PSGC_API_URL
+  - Confirm PSGC_API_TIMEOUT is reasonable
+
+COTC/TOR not generating:
+  - Check Browsershot Node/Chrome paths
+  - Confirm queue worker is running
+  - Check official document env settings
+
+Trainee cannot open a module:
+  - Confirm enrollment is approved
+  - Confirm module is published and assigned/released
+  - Confirm trainee status is active (not paused/withdrawn)
+
+
+================================================================================
+12. LIST OF MODULES AND WHAT EACH IS USED FOR
+================================================================================
+
+This section has two lists:
+  A) System feature modules (parts of the MCARE Hub software)
+  B) Caregiving NC II training / competency modules (TESDA catalog units)
+
+
+--------------------------------------------------------------------------------
+12.A System feature modules
+--------------------------------------------------------------------------------
+
+PUBLIC MODULES
+--------------
+MODULE                         USED FOR
+-----------------------------  ------------------------------------------------
+Landing                        Home page with program info and links to apply,
+                               check status, pay, log in, or claim alumni access
+
+Admission Applications         Short admission form, confirmation page, and
+                               status lookup before full enrollment
+
+Enrollment                     TESDA-style enrollment form: profile, PSGC
+                               address, and required document uploads
+
+Enrollment Payments            Online PayMongo payment or pay-on-site receipt;
+                               payment status lookup
+
+Alumni Claim                   Historical graduates request portal / Career Hub
+                               access by submitting identity and evidence
+
+Login / Authentication         Email-password login for all roles; Google login
+                               for trainees; email verification; optional 2FA
+
+
+ADMIN MODULES (/admin)
+----------------------
+MODULE                         USED FOR
+-----------------------------  ------------------------------------------------
+Dashboard                      Overview of operations and pending work
+
+Applications                   Review, approve, deny, or delete admission
+                               applications
+
+Enrollments                    Review enrollment packets, documents, TESDA form
+                               export, and approve/deny trainees
+
+Payment Scheduling             Record schedules, verify payments, and view
+                               payment proofs
+
+Announcements                  Post center-wide announcements for trainees
+
+Programs                       Create and maintain training programs
+
+Batches                        Create and manage training batches linked to
+                               programs and trainers
+
+Schedules                      Calendar view of batch schedules
+
+Learning Trainees              Trainee roster, learning status updates, export
+
+Learning Attendance            View/record attendance and export by batch
+
+LMS Modules                    Oversee learning modules, preview/download files,
+                               manage Caregiving NC II catalog presets
+
+Certificates / Training        Generate, release, reissue, preview, and download
+Records                        official COTC / TOR documents; batch TOR export;
+                               competency workbook download
+
+Career Hub (Alumni Jobs)       Publish job / caregiving opportunities, manage
+                               graduate inquiries, optional Semaphore SMS
+
+Reports                        Learning and operations reporting views
+
+Accounts                       Create trainer/trainee accounts; review historical
+                               alumni claims; remove users
+
+Admin Logs                     Search, print, and export system activity logs
+
+
+TRAINER MODULES (/trainer)
+--------------------------
+MODULE                         USED FOR
+-----------------------------  ------------------------------------------------
+Dashboard (Teaching Day)       Day-to-day teaching overview
+
+Stream / Announcements         Post class announcements for assigned batches
+
+Classes / Trainings            View assigned batches and classes
+
+Classwork / Modules            Create and publish learning modules (catalog or
+                               custom), attach files/handouts, evaluate progress
+
+Quizzes / Assessments          Create, publish, and review quiz attempts
+
+Calendar / Sessions            Teaching schedule / session view
+
+Attendance                     Mark and export trainee attendance by batch
+
+People / Trainees              View assigned trainees and export roster
+
+Competency Records             Assess Caregiving NC II (and custom) competency
+                               units; charts and Excel workbook export
+
+Certificates                   View certificate / training-record status
+                               (generation is done by admin)
+
+Reports                        Trainer progress and report views
+
+Search                         Search across trainer portal content
+
+
+TRAINEE / GRADUATE MODULES (/trainee)
+-------------------------------------
+MODULE                         USED FOR
+-----------------------------  ------------------------------------------------
+Home / Dashboard               Training home (or graduate dashboard after
+                               graduation)
+
+Stream                         Class announcements and updates (active trainee)
+
+Classwork / Modules            Open published lessons, track submodule progress,
+                               view/download watermarked materials
+
+Quizzes                        Take quizzes and view attempt results
+
+Calendar / Schedule            View training schedule
+
+Payments                       View balance, upload proof, generate onsite ticket
+
+Documents                      View official documents; download released COTC
+
+Grades                         Graduate competency / grade summary
+
+Career Hub                     Graduate job board, availability, and inquiries
+                               to published opportunities
+
+
+SHARED MODULES
+--------------
+MODULE                         USED FOR
+-----------------------------  ------------------------------------------------
+Notifications                  In-app notification inbox for signed-in users
+
+Account Settings / Help        Password and account help pages
+
+Classroom Comments             Comments on modules/quizzes between trainer and
+                               trainee
+
+
+--------------------------------------------------------------------------------
+12.B Caregiving NC II training / competency modules
+--------------------------------------------------------------------------------
+
+Program code: caregiving_nc_ii
+
+These are the TESDA Caregiving NC II competency units used for module presets,
+trainer assessment, and official training records.
+
+
+BASIC COMPETENCIES
+------------------
+CODE         TITLE                                              USED FOR
+-----------  -------------------------------------------------  ---------------
+500311105    Participate in Workplace Communication             Obtain/convey
+                                                                workplace info,
+                                                                follow
+                                                                instructions,
+                                                                complete work
+                                                                documents
+
+500311106    Work in a Team Environment                         Describe team
+                                                                role/scope and
+                                                                work as a team
+                                                                member
+
+500311107    Solve and Address General Workplace Problems       Identify routine
+                                                                problems and
+                                                                recommend
+                                                                solutions
+
+500311108    Develop Career and Life Decisions                  Manage emotion,
+                                                                reflective
+                                                                practice, and
+                                                                self-regulation
+
+500311109    Contribute to Workplace Innovation                 Identify
+                                                                improvements,
+                                                                develop ideas,
+                                                                integrate change
+
+500311110    Present Relevant Information                       Gather, assess,
+                                                                record, and
+                                                                present
+                                                                information
+
+500311111    Practice Occupational Safety and Health Policies   Identify OSH
+             and Procedures                                     requirements and
+                                                                perform tasks
+                                                                per OSH policy
+
+500311112    Exercise Efficient and Effective Sustainable       Assess resource
+             Practices in the Workplace                         use and report
+                                                                inefficient
+                                                                practices
+
+500311113    Practice Entrepreneurial Skills in the Workplace   Apply
+                                                                entrepreneurial
+                                                                and cost-
+                                                                effective
+                                                                operations
+
+
+COMMON COMPETENCIES
+-------------------
+CODE         TITLE                                              USED FOR
+-----------  -------------------------------------------------  ---------------
+HCS323201    Implement and Monitor Infection Control Policies   Inform,
+             and Procedures                                     integrate, and
+                                                                monitor
+                                                                infection-
+                                                                control
+                                                                practices
+
+HCS323202    Respond Effectively to Difficult or Challenging    Plan, apply,
+             Behavior                                           report, and
+                                                                review incident
+                                                                responses
+
+HCS323203    Apply Basic First Aid                              Assess situation,
+                                                                apply first aid,
+                                                                communicate
+                                                                incident details
+
+HCS323204    Maintain a High Standard of Patient Services       Communicate with
+                                                                patients,
+                                                                maintain
+                                                                relationships,
+                                                                act respectfully
+
+
+CORE COMPETENCIES (included in TOR)
+-----------------------------------
+CODE         TITLE                                              USED FOR
+-----------  -------------------------------------------------  ---------------
+HCS323301    Provide Care and Support to Infants and Toddlers   Comfort, bathe/
+                                                                dress, feed,
+                                                                sleep routines,
+                                                                developmental
+                                                                activities
+
+HCS323302    Provide Care and Support to Children               Hygiene, bathe/
+                                                                dress, and feed
+                                                                children
+
+HCS323303    Foster Social, Intellectual, Creative and          Foster
+             Emotional Development of Children                  independence,
+                                                                expression,
+                                                                creativity, and
+                                                                self-esteem
+
+HCS323304    Foster Physical Development of Children            Enhance physical
+                                                                activities and
+                                                                development
+                                                                opportunities
+
+HCS323305    Provide Care and Support to Elderly                Relationship,
+                                                                support, and
+                                                                personal-care
+                                                                assistance for
+                                                                elderly clients
+
+HCS323306    Provide Care and Support to People with Special    Relationship,
+             Needs                                              support, well-
+                                                                being, needs
+                                                                identification,
+                                                                independent
+                                                                living support
+
+HCS323307    Maintain a Healthy and Safe Environment            Keep a clean,
+                                                                hygienic, and
+                                                                safe environment;
+                                                                supervise client
+                                                                safety
+
+HCS323308    Respond to Emergency                               Infection control
+                                                                in emergencies,
+                                                                accidents,
+                                                                medication within
+                                                                guidelines,
+                                                                threats/danger
+
+HCS323309    Clean Living Room, Dining Room, Bedrooms, Toilet   Clean/sanitize
+             and Bathroom                                       rooms and
+                                                                fixtures; make
+                                                                beds; maintain
+                                                                kitchen
+                                                                cleanliness
+
+HCS323310    Wash and Iron Clothes, Linen and Fabric            Sort, remove
+                                                                stains, laundry,
+                                                                dry, iron;
+                                                                maintain laundry
+                                                                equipment
+
+HCS323311    Prepare Hot and Cold Meals                         Prep/cook/
+                                                                present meals,
+                                                                sauces,
+                                                                appetizers,
+                                                                desserts, salads,
+                                                                sandwiches;
+                                                                store leftovers
+
+
+CUSTOM TRAINING MODULES
+-----------------------
+  - Trainers can also publish custom learning modules (not in the fixed NC II
+    catalog list).
+  - Assessed custom modules may create an optional competency unit such as
+    MCARE-CUSTOM-{id}.
+  - Custom units are optional and are not included in TOR by default.
+  - Admins can manage catalog presets in LMS Modules for trainer selection.
+
+
+================================================================================
+END OF FILE
+================================================================================

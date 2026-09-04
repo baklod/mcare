@@ -12,15 +12,6 @@
 @endphp
 
 <div class="lms-page" data-lms-stream data-lms-role="trainer">
-    <header class="lms-class-header">
-        <div class="min-w-0">
-            <p class="lms-eyebrow">MCARE Classroom</p>
-            <h1>Class stream</h1>
-            <p>Share class updates, news, and reminders in one familiar feed. Posts can be aimed at one batch or every active class.</p>
-        </div>
-        <a href="{{ route('trainer.resources') }}" class="secondary-action">Open classwork</a>
-    </header>
-
     <nav class="lms-context-tabs" aria-label="Filter stream by class">
         <a href="{{ route('trainer.stream') }}" class="{{ $selectedBatchId === 0 ? 'is-active' : '' }}" @if($selectedBatchId === 0) aria-current="page" @endif>All classes</a>
         @foreach($batches as $batch)
@@ -32,13 +23,6 @@
 
     <div class="lms-stream-layout">
         <main class="lms-stream-feed">
-            @if($errors->any())
-                <div class="lms-inline-alert is-danger" role="alert">
-                    <strong>Check the announcement details.</strong>
-                    <span>{{ $errors->first() }}</span>
-                </div>
-            @endif
-
             <section class="lms-composer" data-announcement-composer aria-labelledby="announcement-composer-title">
                 <div class="lms-composer-heading">
                     <x-user-avatar :user="auth()->user()" :name="auth()->user()?->name ?? 'MCARE Trainer'" class="lms-avatar" />

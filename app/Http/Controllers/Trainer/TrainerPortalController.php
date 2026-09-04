@@ -8,6 +8,7 @@ use App\Models\ModuleProgress;
 use App\Models\Quiz;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
+use App\Services\CompetencyCatalogService;
 use App\Services\CompletionEligibilityService;
 use App\Services\TraineeRosterCsv;
 use App\Services\TrainingCalendarService;
@@ -100,7 +101,7 @@ class TrainerPortalController extends Controller
         ]);
     }
 
-    public function resources(Request $request): View
+    public function resources(Request $request, CompetencyCatalogService $catalog): View
     {
         $assignedBatch = TrainingBatch::assignedTo($request->user());
 
@@ -130,8 +131,7 @@ class TrainerPortalController extends Controller
             'quizzes' => $quizzes,
             'trainees' => $this->approvedTrainees($assignedBatch)->with('batch')->get(),
             'assignedBatch' => $assignedBatch,
-            'catalogUnits' => \App\Support\CaregivingNcIiCatalog::units(),
-            'coreUnits' => \App\Support\CaregivingNcIiCatalog::coreUnits(),
+            'catalogUnits' => $catalog->caregivingUnits(true),
         ]);
     }
 
@@ -193,8 +193,7 @@ class TrainerPortalController extends Controller
         ?int $batchId,
         ?string $schedule,
         ?TrainingBatch $assignedBatch,
-    )
-    {
+    ) {
         return $this->approvedTrainees($assignedBatch)
             ->when($batchId, fn ($query) => $query->where('training_batch_id', $batchId))
             ->when($schedule, fn ($query) => $query->where('schedule_preference', $schedule))

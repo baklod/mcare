@@ -4,13 +4,20 @@ namespace App\Services;
 
 use App\Models\CompetencyUnit;
 use App\Models\EnrollmentApplication;
+use App\Models\ModuleProgress;
 use App\Models\TraineeCompetencyRecord;
+use App\Models\TrainingModule;
+use App\Models\TrainingSubmoduleProgress;
 use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
 class CompetencyRecordUpdater
 {
-    public function __construct(private readonly TorGradeScale $gradeScale) {}
+    public function __construct(
+        private readonly TorGradeScale $gradeScale,
+        private readonly ModuleSubmoduleService $submodules,
+        private readonly RollingModuleReleaseService $releases,
+    ) {}
 
     /**
      * Persist one trainee/unit assessment inside the caller's transaction.
@@ -67,6 +74,14 @@ class CompetencyRecordUpdater
             ]);
         }
 
+        if ($payload['status'] === TraineeCompetencyRecord::STATUS_NOT_YET_COMPETENT
+            && $expectedOutcomeIds->isNotEmpty()
+            && ! $outcomeStatuses->contains(TraineeCompetencyRecord::STATUS_NOT_YET_COMPETENT)) {
+            throw ValidationException::withMessages([
+                'records' => "{$unit->title} needs at least one achievement outcome marked Not yet competent.",
+            ]);
+        }
+
         $assessed = $payload['status'] !== TraineeCompetencyRecord::STATUS_NOT_ASSESSED;
         $attributes = [
             'status' => $payload['status'],
@@ -104,6 +119,131 @@ class CompetencyRecordUpdater
             );
         }
 
+        $this->syncClassworkProgress($application, $unit, $record, $assessor);
+        $this->releases->unlockNext($application);
+
         return $record;
+    }
+
+    /**
+     * Push competency-board results onto the matching published classwork so
+     * the trainee portal does not stay on "Awaiting trainer evaluation".
+     */
+    private function syncClassworkProgress(
+        EnrollmentApplication $application,
+        CompetencyUnit $unit,
+        TraineeCompetencyRecord $record,
+        User $assessor,
+    ): void {
+        $results = $record->outcomeResults()->get()->keyBy('competency_outcome_id');
+        $modules = TrainingModule::query()
+            ->with('submodules')
+            ->where('is_published', true)
+            ->where('training_batch_id', $application->training_batch_id)
+            ->where(function ($query) use ($unit): void {
+                $query->where('competency_unit_id', $unit->id)
+                    ->orWhere(function ($codeQuery) use ($unit): void {
+                        $codeQuery->where('module_code', $unit->code)
+                            ->whereNotNull('module_code')
+                            ->where('module_code', '!=', '');
+                    });
+            })
+            ->get();
+
+        foreach ($modules as $module) {
+            $parent = ModuleProgress::query()
+                ->where('enrollment_application_id', $application->id)
+                ->where('training_module_id', $module->id)
+                ->where('status', '!=', ModuleProgress::STATUS_LOCKED)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $parent) {
+                continue;
+            }
+
+            $this->submodules->assignProgress($parent);
+
+            foreach ($module->submodules as $submodule) {
+                $resultStatus = $submodule->competency_outcome_id
+                    ? $results->get($submodule->competency_outcome_id)?->status
+                    : null;
+
+                if (! $resultStatus || $resultStatus === TraineeCompetencyRecord::STATUS_NOT_ASSESSED) {
+                    if ($submodule->competency_outcome_id) {
+                        continue;
+                    }
+
+                    $resultStatus = match ($record->status) {
+                        TraineeCompetencyRecord::STATUS_COMPETENT => TraineeCompetencyRecord::STATUS_COMPETENT,
+                        TraineeCompetencyRecord::STATUS_NOT_YET_COMPETENT => TraineeCompetencyRecord::STATUS_NOT_YET_COMPETENT,
+                        default => null,
+                    };
+                }
+
+                $isCompetent = $resultStatus === TraineeCompetencyRecord::STATUS_COMPETENT;
+                $isNyc = $resultStatus === TraineeCompetencyRecord::STATUS_NOT_YET_COMPETENT;
+
+                if (! $isCompetent && ! $isNyc) {
+                    continue;
+                }
+
+                $child = TrainingSubmoduleProgress::query()
+                    ->where('enrollment_application_id', $application->id)
+                    ->where('training_submodule_id', $submodule->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $child) {
+                    continue;
+                }
+
+                $child->fill([
+                    'practical_rating' => $isCompetent
+                        ? ModuleProgress::RATING_COMPETENT
+                        : ModuleProgress::RATING_NOT_YET_COMPETENT,
+                    'competency_outcome' => $isCompetent
+                        ? ModuleProgress::OUTCOME_COMPETENT
+                        : ModuleProgress::OUTCOME_NOT_YET_COMPETENT,
+                    'evaluation_remarks' => $record->notes ?: $child->evaluation_remarks,
+                    'evaluated_by_id' => $assessor->id,
+                    'evaluated_at' => now(),
+                    'status' => $isCompetent
+                        ? TrainingSubmoduleProgress::STATUS_COMPLETED
+                        : TrainingSubmoduleProgress::STATUS_NEEDS_REMEDIATION,
+                    'progress_percent' => $isCompetent ? 100 : min((int) ($child->progress_percent ?: 50), 99),
+                    'submitted_at' => $isCompetent
+                        ? ($child->submitted_at ?: now())
+                        : null,
+                    'completed_at' => $isCompetent
+                        ? ($child->completed_at ?: now())
+                        : null,
+                ])->save();
+            }
+
+            $parent = $this->submodules->recalculateParent($application, $module);
+
+            $hasNyc = $record->status === TraineeCompetencyRecord::STATUS_NOT_YET_COMPETENT
+                || $results->contains(
+                    fn ($result): bool => $result->status === TraineeCompetencyRecord::STATUS_NOT_YET_COMPETENT
+                );
+
+            if ($hasNyc) {
+                $this->applyUnitRemediation($parent);
+            }
+        }
+    }
+
+    private function applyUnitRemediation(ModuleProgress $parent): ModuleProgress
+    {
+        $parent->forceFill([
+            'status' => ModuleProgress::STATUS_NEEDS_REMEDIATION,
+            'practical_rating' => ModuleProgress::RATING_NOT_YET_COMPETENT,
+            'competency_outcome' => ModuleProgress::OUTCOME_NOT_YET_COMPETENT,
+            'completed_at' => null,
+            'progress_percent' => min((int) $parent->progress_percent, 99),
+        ])->save();
+
+        return $parent;
     }
 }

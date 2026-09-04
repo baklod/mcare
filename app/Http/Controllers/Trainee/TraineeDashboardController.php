@@ -19,8 +19,10 @@ use App\Models\TrainingSubmodule;
 use App\Models\TrainingSubmoduleProgress;
 use App\Services\ClassroomComments;
 use App\Services\CompletionEligibilityService;
+use App\Services\LearningPdfWatermark;
 use App\Services\ModuleAssessmentService;
 use App\Services\ModuleSubmoduleService;
+use App\Services\TraineeClassworkSequence;
 use App\Services\TrainingCalendarService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,6 +36,7 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\HeaderUtils;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TraineeDashboardController extends Controller
 {
@@ -95,7 +98,9 @@ class TraineeDashboardController extends Controller
                 ->orderByRaw('CASE WHEN due_at IS NULL THEN 1 ELSE 0 END')
                 ->orderBy('due_at')
                 ->limit(5)
-                ->get(),
+                ->get()
+                ->filter(fn (Quiz $quiz): bool => $quiz->targets($application))
+                ->values(),
         ]);
     }
 
@@ -270,6 +275,7 @@ class TraineeDashboardController extends Controller
                 'enrollment_application_id' => $lockedApplication->id,
                 'user_id' => $request->user()->id,
                 'ticket_number' => $ticketNumber,
+                'reference_number' => $ticketNumber,
                 'transaction_type' => $validated['transaction_type'],
                 'payment_channel' => PaymentTransaction::CHANNEL_ONSITE,
                 'amount' => $amount,
@@ -287,6 +293,7 @@ class TraineeDashboardController extends Controller
                     : $lockedApplication->payment_status,
                 'payment_amount' => number_format($amount, 2, '.', ''),
                 'payment_currency' => 'PHP',
+                'payment_reference' => $lockedApplication->payment_reference ?: $ticketNumber,
                 'payment_selected_at' => $lockedApplication->payment_selected_at ?: now(),
                 'payment_meta' => $paymentMeta,
             ])->save();
@@ -412,6 +419,7 @@ class TraineeDashboardController extends Controller
                         'transaction_type' => $validated['transaction_type'],
                         'payment_channel' => PaymentTransaction::CHANNEL_ONSITE,
                         'amount' => $amount,
+                        'reference_number' => $lockedApplication->payment_reference,
                         'or_number' => $validated['or_number'],
                         'receipt_proof_path' => $proofPath,
                         'status' => PaymentTransaction::STATUS_PENDING,
@@ -485,9 +493,18 @@ class TraineeDashboardController extends Controller
 
         $application->load('batch');
         $isGraduate = $application->learning_status === EnrollmentApplication::LEARNING_GRADUATED;
+        if (! $isGraduate) {
+            $this->classworkSequence()->syncLocks($application);
+        }
         $modules = $isGraduate
             ? collect()
-            : $this->availableModulesFor($application)->get();
+            : $this->classworkSequence()->orderedFor(
+                $application,
+                $this->assignedModulesFor($application)->get(),
+            );
+        $classworkAccess = $isGraduate
+            ? collect()
+            : $this->classworkSequence()->accessByModule($application, $modules);
         $progressByModule = ModuleProgress::query()
             ->where('enrollment_application_id', $application->id)
             ->whereIn('training_module_id', $modules->pluck('id'))
@@ -517,6 +534,7 @@ class TraineeDashboardController extends Controller
             'application' => $application,
             'batch' => $application->batch,
             'modules' => $modules,
+            'classworkAccess' => $classworkAccess,
             'progressByModule' => $progressByModule,
             'announcements' => $this->visibleAnnouncementsFor($application)
                 ->with(['batch', 'trainer'])
@@ -546,8 +564,24 @@ class TraineeDashboardController extends Controller
         ClassroomComments $comments,
         ModuleAssessmentService $assessments,
         ModuleSubmoduleService $submodules,
-    ): View {
+    ): View|RedirectResponse {
         $application = $this->approvedApplicationFor($request);
+
+        if (
+            $application
+            && ! $application->is_historical_record
+            && $application->learning_status !== EnrollmentApplication::LEARNING_GRADUATED
+            && ModuleProgress::query()
+                ->where('enrollment_application_id', $application->id)
+                ->where('training_module_id', $module->id)
+                ->exists()
+            && ! $this->classworkSequence()->canAccess($application, $module)
+        ) {
+            return redirect()
+                ->route('trainee.modules.index')
+                ->with('error', $this->classworkSequence()->lockMessage($application, $module));
+        }
+
         $this->authorizeModule($application, $module);
 
         // Opening the protected viewer is a server-side progress event and does not depend on JavaScript.
@@ -563,6 +597,15 @@ class TraineeDashboardController extends Controller
         $submoduleAssessmentSummaries = $moduleSubmodules->mapWithKeys(
             fn (TrainingSubmodule $submodule): array => [
                 $submodule->id => $assessments->summary($module, $application, $submodule),
+            ]
+        );
+        $submoduleAccess = $moduleSubmodules->mapWithKeys(
+            fn (TrainingSubmodule $submodule): array => [
+                $submodule->id => $submodules->accessForSubmodule(
+                    $submodule,
+                    $moduleSubmodules,
+                    $submoduleProgressById,
+                ),
             ]
         );
 
@@ -590,15 +633,20 @@ class TraineeDashboardController extends Controller
             'submodules' => $moduleSubmodules,
             'submoduleProgressById' => $submoduleProgressById,
             'submoduleAssessmentSummaries' => $submoduleAssessmentSummaries,
+            'submoduleAccess' => $submoduleAccess,
             'classroomComments' => $comments->visibleFor($request->user(), $module),
             'privateCommentRecipients' => $comments->privateRecipients($request->user(), $module),
         ]);
     }
 
-    public function supplementaryDownload(Request $request, TrainingModule $module, int $index): BinaryFileResponse
-    {
+    public function supplementaryDownload(
+        Request $request,
+        TrainingModule $module,
+        int $index,
+        LearningPdfWatermark $watermark,
+    ): BinaryFileResponse|StreamedResponse {
         $application = $this->approvedApplicationFor($request);
-        $this->authorizeModule($application, $module, allowEvaluated: false);
+        $this->authorizeModule($application, $module);
         $list = $module->supplementaryList();
         abort_unless(isset($list[$index]), 404);
 
@@ -614,20 +662,22 @@ class TraineeDashboardController extends Controller
         ]);
 
         $filename = basename($attachment['original_name'] ?? 'attachment');
-        $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
 
-        return response()->file(Storage::disk('local')->path($path), [
-            'Content-Type' => ($attachment['mime_type'] ?? null) ?: 'application/octet-stream',
-            'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_ATTACHMENT, $filename, $fallbackFilename),
-            'Accept-Ranges' => 'bytes',
-            'X-Content-Type-Options' => 'nosniff',
-        ]);
+        return $watermark->respond(
+            $path,
+            $filename,
+            $attachment['mime_type'] ?? null,
+            HeaderUtils::DISPOSITION_ATTACHMENT,
+        );
     }
 
-    public function moduleContent(Request $request, TrainingModule $module): BinaryFileResponse
-    {
+    public function moduleContent(
+        Request $request,
+        TrainingModule $module,
+        LearningPdfWatermark $watermark,
+    ): BinaryFileResponse|StreamedResponse {
         $application = $this->approvedApplicationFor($request);
-        $this->authorizeModule($application, $module, allowEvaluated: false);
+        $this->authorizeModule($application, $module);
         abort_unless(Storage::disk('local')->exists($module->file_path), 404);
 
         // The protected content URL can be opened directly by the browser, so
@@ -640,13 +690,16 @@ class TraineeDashboardController extends Controller
             'range_request' => $request->hasHeader('Range'),
         ]);
 
-        return $this->moduleFileResponse($module, HeaderUtils::DISPOSITION_INLINE);
+        return $this->moduleFileResponse($module, HeaderUtils::DISPOSITION_INLINE, $watermark);
     }
 
-    public function moduleDownload(Request $request, TrainingModule $module): BinaryFileResponse
-    {
+    public function moduleDownload(
+        Request $request,
+        TrainingModule $module,
+        LearningPdfWatermark $watermark,
+    ): BinaryFileResponse|StreamedResponse {
         $application = $this->approvedApplicationFor($request);
-        $this->authorizeModule($application, $module, allowEvaluated: false);
+        $this->authorizeModule($application, $module);
         abort_unless(Storage::disk('local')->exists($module->file_path), 404);
         $this->touchModuleProgress($application, $module);
 
@@ -655,7 +708,7 @@ class TraineeDashboardController extends Controller
             'mime_type' => $module->mime_type,
         ]);
 
-        return $this->moduleFileResponse($module, HeaderUtils::DISPOSITION_ATTACHMENT);
+        return $this->moduleFileResponse($module, HeaderUtils::DISPOSITION_ATTACHMENT, $watermark);
     }
 
     public function updateProgress(
@@ -736,72 +789,14 @@ class TraineeDashboardController extends Controller
         Request $request,
         TrainingModule $module,
         TrainingSubmodule $submodule,
-        ModuleAssessmentService $assessments,
-        ModuleSubmoduleService $submodules,
     ): RedirectResponse {
         $application = $this->approvedApplicationFor($request);
         $this->authorizeModule($application, $module);
         abort_unless((int) $submodule->training_module_id === (int) $module->id, 404);
-        $validated = $request->validate(['action' => ['required', Rule::in(['submit', 'reopen'])]]);
 
-        if (! $module->requiresEvaluation()) {
-            throw ValidationException::withMessages([
-                'action' => 'Learning-material-only modules do not require competency submissions.',
-            ]);
-        }
-
-        $parent = ModuleProgress::query()->where([
-            'enrollment_application_id' => $application->id,
-            'training_module_id' => $module->id,
-        ])->firstOrFail();
-        $submodules->assignProgress($parent);
-        $progress = TrainingSubmoduleProgress::query()->where([
-            'enrollment_application_id' => $application->id,
-            'training_submodule_id' => $submodule->id,
-        ])->firstOrFail();
-
-        if ($progress->isTrainerValidated()) {
-            throw ValidationException::withMessages([
-                'action' => 'A trainer-validated submodule cannot be returned to in progress.',
-            ]);
-        }
-
-        $submitting = $validated['action'] === 'submit';
-        if ($submitting) {
-            $summary = $assessments->summary($module, $application, $submodule);
-            if ($summary['required_count'] > 0 && ! $summary['all_passed']) {
-                $message = $summary['ready_for_remediation_evaluation']
-                    ? 'All attempts are used. Your trainer can now record a remediation evaluation for this submodule.'
-                    : 'Pass every quiz or activity assigned to this submodule before marking it done.';
-                throw ValidationException::withMessages(['action' => $message]);
-            }
-        }
-
-        DB::transaction(function () use ($progress, $submitting, $application, $module, $submodules): void {
-            $progress->forceFill([
-                'status' => $submitting
-                    ? TrainingSubmoduleProgress::STATUS_AWAITING_EVALUATION
-                    : TrainingSubmoduleProgress::STATUS_IN_PROGRESS,
-                'progress_percent' => $submitting ? 95 : 10,
-                'first_opened_at' => $progress->first_opened_at ?: now(),
-                'last_viewed_at' => now(),
-                'submitted_at' => $submitting ? now() : null,
-                'completed_at' => null,
-            ])->save();
-            $submodules->recalculateParent($application, $module);
-        }, 3);
-
-        AdminActivityLog::record($request->user(), 'trainee.submodule.progress.updated', $progress, [
-            'module_id' => $module->id,
-            'submodule_id' => $submodule->id,
-            'status' => $progress->status,
+        throw ValidationException::withMessages([
+            'action' => 'Submodules are completed in face-to-face class. Your trainer records the grade. You cannot mark this submodule as done.',
         ]);
-
-        return redirect()
-            ->to(route('trainee.modules.show', $module).'#submodules')
-            ->with('saved', $submitting
-                ? "{$submodule->title} submitted for trainer evaluation."
-                : "{$submodule->title} returned to in progress.");
     }
 
     public function securityEvent(Request $request, TrainingModule $module): Response
@@ -834,11 +829,20 @@ class TraineeDashboardController extends Controller
         $progress = ModuleProgress::query()
             ->where('enrollment_application_id', $application->id)
             ->where('training_module_id', $module->id)
-            ->whereNotNull('unlocked_at')
-            ->where('status', '!=', ModuleProgress::STATUS_LOCKED)
             ->first();
 
         abort_unless($progress, 404);
+
+        if (! $this->classworkSequence()->canAccess($application, $module)) {
+            abort(403, $this->classworkSequence()->lockMessage($application, $module));
+        }
+
+        if (! $progress->isAccessible()) {
+            $this->classworkSequence()->syncLocks($application);
+            $progress->refresh();
+        }
+
+        abort_unless($progress->isAccessible(), 404);
 
         if (! $allowEvaluated) {
             abort_if(
@@ -859,6 +863,13 @@ class TraineeDashboardController extends Controller
             ->first();
     }
 
+    private function assignedModulesFor(EnrollmentApplication $application)
+    {
+        return TrainingModule::query()
+            ->with(['trainer', 'batch'])
+            ->assignedTo($application);
+    }
+
     private function availableModulesFor(EnrollmentApplication $application)
     {
         return TrainingModule::query()
@@ -866,6 +877,11 @@ class TraineeDashboardController extends Controller
             ->availableTo($application)
             ->orderBy('position')
             ->latest('published_at');
+    }
+
+    private function classworkSequence(): TraineeClassworkSequence
+    {
+        return app(TraineeClassworkSequence::class);
     }
 
     private function evaluatedGradesFor(EnrollmentApplication $application)
@@ -892,7 +908,9 @@ class TraineeDashboardController extends Controller
         if ($progress->wasRecentlyCreated || $progress->status === ModuleProgress::STATUS_NOT_STARTED) {
             $progress->forceFill([
                 'status' => ModuleProgress::STATUS_IN_PROGRESS,
-                'progress_percent' => 10,
+                'progress_percent' => $progress->hasRecordedClassworkProgress()
+                    ? (int) $progress->progress_percent
+                    : 0,
                 'first_opened_at' => $progress->first_opened_at ?: now(),
             ]);
         }
@@ -905,16 +923,14 @@ class TraineeDashboardController extends Controller
     private function moduleFileResponse(
         TrainingModule $module,
         string $disposition,
-    ): BinaryFileResponse {
-        $filename = basename($module->original_file_name);
-        $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
-
-        return response()->file(Storage::disk('local')->path($module->file_path), [
-            'Content-Type' => $module->mime_type ?: 'application/octet-stream',
-            'Content-Disposition' => HeaderUtils::makeDisposition($disposition, $filename, $fallbackFilename),
-            'Accept-Ranges' => 'bytes',
-            'X-Content-Type-Options' => 'nosniff',
-        ]);
+        LearningPdfWatermark $watermark,
+    ): BinaryFileResponse|StreamedResponse {
+        return $watermark->respond(
+            $module->file_path,
+            basename($module->original_file_name),
+            $module->mime_type,
+            $disposition,
+        );
     }
 
     private function visibleAnnouncementsFor(EnrollmentApplication $application)
@@ -955,7 +971,11 @@ class TraineeDashboardController extends Controller
     {
         do {
             $ticketNumber = 'MCARE-OT-'.now()->format('ymd').'-'.Str::upper(Str::random(6));
-        } while (PaymentTransaction::query()->where('ticket_number', $ticketNumber)->exists());
+        } while (
+            PaymentTransaction::query()->where('ticket_number', $ticketNumber)->exists()
+            || PaymentTransaction::query()->where('reference_number', $ticketNumber)->exists()
+            || EnrollmentApplication::query()->where('payment_reference', $ticketNumber)->exists()
+        );
 
         return $ticketNumber;
     }

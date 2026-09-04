@@ -32,6 +32,7 @@ class PaymentTransaction extends Model
         'enrollment_application_id',
         'user_id',
         'ticket_number',
+        'reference_number',
         'recorded_by_admin_id',
         'transaction_type',
         'payment_channel',
@@ -58,13 +59,15 @@ class PaymentTransaction extends Model
     {
         return $this->payment_channel === self::CHANNEL_ONSITE
             && $this->status === self::STATUS_PENDING
-            && filled($this->ticket_number)
-            && blank($this->or_number);
+            && filled($this->ticket_number);
     }
 
     public function referenceLabel(): string
     {
-        return $this->ticket_number ?: $this->or_number ?: 'Reference pending';
+        return $this->reference_number
+            ?: $this->ticket_number
+            ?: $this->or_number
+            ?: 'Reference pending';
     }
 
     public static function types(): array

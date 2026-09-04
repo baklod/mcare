@@ -2,6 +2,7 @@
 
 @section('content')
 @php
+    $classworkAccess = $classworkAccess ?? collect();
     $categories = collect($modules)->groupBy(function ($module) {
         return match($module->competency_category) {
             'core' => '1. Core Competencies (TESDA Caregiving NC II)',
@@ -21,19 +22,13 @@
         <div class="min-w-0">
             <p class="lms-eyebrow">Classwork</p>
             <h1>Learning materials & modules</h1>
-            <p>Study Caregiving NC II modules, review supplementary handouts, take assessments, and monitor your competency outcomes.</p>
+            <p>Modules open in module-code number order. The previous assessed unit must be Competent before the next one unlocks. Not yet competent outcomes stay on remediation.</p>
         </div>
         <div class="lms-compact-progress" aria-label="{{ $completedCount }} of {{ collect($modules)->count() }} modules completed">
             <strong>{{ $completedCount }}/{{ collect($modules)->count() }}</strong>
             <span>completed</span>
         </div>
     </header>
-
-    <nav class="lms-context-tabs" aria-label="Trainee classroom sections">
-        <a href="{{ route('trainee.stream') }}">Stream</a>
-        <a href="{{ route('trainee.modules.index') }}" class="is-active" aria-current="page">Classwork</a>
-        <a href="{{ route('trainee.schedule') }}">Calendar</a>
-    </nav>
 
     <div class="lms-topic-list">
         @forelse($categories as $categoryName => $catModules)
@@ -43,17 +38,38 @@
                     <span>{{ $catModules->count() }} {{ str('unit')->plural($catModules->count()) }}</span>
                 </header>
                 <div class="lms-trainee-classwork-list">
-                    @foreach($catModules->sortBy([['position', 'asc'], ['module_code', 'asc']]) as $module)
+                    @foreach($catModules as $module)
                         @php
                             $moduleProgress = $progressByModule->get($module->id);
-                            $progressValue = (int) ($moduleProgress?->progress_percent ?? 0);
+                            $access = $classworkAccess[$module->id] ?? ['accessible' => true, 'blocker' => null];
+                            $isLocked = ! ($access['accessible'] ?? true);
+                            $blocker = $access['blocker'] ?? null;
+                            $progressValue = $isLocked ? 0 : (int) ($moduleProgress?->displayProgressPercent() ?? 0);
                             $isCompetent = $moduleProgress?->competency_outcome === 'competent';
                             $isCompleted = $moduleProgress?->status === 'completed' || $isCompetent;
                             $isMaterialOnly = !$module->requiresEvaluation();
+                            $isDeferred = (bool) ($moduleProgress?->is_deferred ?? false);
                             $suppCount = count($module->supplementaryList());
                             $quizCount = $module->quizzes()->where('is_published', true)->count();
+                            $blockerLabel = $blocker ? ($blocker->module_code ?: $blocker->title) : null;
+                            $blockerNeedsRemediation = $blocker
+                                ? (bool) ($progressByModule->get($blocker->id)?->needsRemediation())
+                                : false;
+                            if ($isDeferred && $isLocked) {
+                                $lockLabel = $blocker
+                                    ? ($blockerNeedsRemediation
+                                        ? 'Missed — opens after '.$blockerLabel.' is Competent'
+                                        : 'Missed — opens after '.$blockerLabel.' is graded')
+                                    : 'Missed — opens after your current modules';
+                            } elseif ($blockerNeedsRemediation) {
+                                $lockLabel = 'Locked until '.$blockerLabel.' is Competent';
+                            } else {
+                                $lockLabel = $blocker
+                                    ? 'Locked until '.$blockerLabel.' has a trainer grade'
+                                    : ($moduleProgress?->workflowStatusLabel() ?: 'Locked until the previous module is graded');
+                            }
                         @endphp
-                        <article class="lms-trainee-classwork-card">
+                        <article class="lms-trainee-classwork-card{{ $isLocked ? ' is-locked' : '' }}{{ $isDeferred ? ' is-deferred' : '' }}" @if($isDeferred) data-classwork-deferred="1" @endif>
                             <span class="lms-classwork-icon"><x-dashboard-icon name="book-open" /></span>
                             <div class="lms-classwork-main">
                                 <div class="lms-classwork-title-line">
@@ -63,14 +79,23 @@
                                                 {{ $module->module_code }}
                                             </span>
                                         @endif
+                                        @if($isDeferred && ! $isCompleted)
+                                            <span class="rounded bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-900 ring-1 ring-amber-300">
+                                                Catch-up
+                                            </span>
+                                        @endif
                                         <h3 class="font-bold text-slate-900 text-base">
-                                            <a href="{{ route('trainee.modules.show', $module) }}" class="hover:text-purple-700 transition">
+                                            @if($isLocked)
                                                 {{ $module->title }}
-                                            </a>
+                                            @else
+                                                <a href="{{ route('trainee.modules.show', $module) }}" class="hover:text-purple-700 transition">
+                                                    {{ $module->title }}
+                                                </a>
+                                            @endif
                                         </h3>
                                     </div>
-                                    <span class="lms-status-chip {{ $isCompleted ? 'is-green' : ($isMaterialOnly ? 'is-purple' : ($moduleProgress ? 'is-amber' : 'is-neutral')) }}">
-                                        {{ $isCompleted ? '✓ Completed — '.($module->module_code ?: $module->title) : ($isMaterialOnly ? 'Learning Material' : ($moduleProgress ? $moduleProgress->workflowStatusLabel() : 'Not started')) }}
+                                    <span class="lms-status-chip {{ $isLocked ? 'is-red' : ($isCompleted ? 'is-green' : ($isMaterialOnly ? 'is-purple' : ($moduleProgress ? 'is-amber' : 'is-neutral'))) }}">
+                                        {{ $isLocked ? $lockLabel : ($isCompleted ? '✓ Completed — '.($module->module_code ?: $module->title) : ($isMaterialOnly ? 'Learning Material' : ($moduleProgress ? $moduleProgress->workflowStatusLabel() : 'Not started'))) }}
                                     </span>
                                 </div>
 
@@ -95,13 +120,19 @@
                                     @endif
                                 </div>
 
-                                <div class="lms-progress-track" aria-label="{{ $progressValue }} percent complete">
-                                    <span style="width: {{ $progressValue }}%"></span>
+                                <div class="lms-progress-track" role="progressbar" aria-label="{{ $progressValue }} percent complete" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $progressValue }}">
+                                    @if($progressValue > 0)
+                                        <span style="width: {{ $progressValue }}%"></span>
+                                    @endif
                                 </div>
                             </div>
-                            <a href="{{ route('trainee.modules.show', $module) }}" class="{{ $isCompleted ? 'secondary-action' : 'primary-action' }} text-xs py-2 px-4 shrink-0">
-                                {{ $isCompleted ? 'View Completion' : 'Open Module' }}
-                            </a>
+                            @if($isLocked)
+                                <span class="secondary-action text-xs py-2 px-4 shrink-0" aria-disabled="true">Locked</span>
+                            @else
+                                <a href="{{ route('trainee.modules.show', $module) }}" class="{{ $isCompleted ? 'secondary-action' : 'primary-action' }} text-xs py-2 px-4 shrink-0">
+                                    {{ $isCompleted ? 'View Completion' : 'Open Module' }}
+                                </a>
+                            @endif
                         </article>
                     @endforeach
                 </div>

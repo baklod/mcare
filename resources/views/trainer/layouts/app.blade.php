@@ -6,6 +6,15 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'MCARE Trainer' }}</title>
     <x-dashboard-theme-head />
+    <script>
+        try {
+            if (window.localStorage.getItem('mcare-trainer-sidebar-collapsed') === '1') {
+                document.documentElement.classList.add('is-admin-sidebar-collapsed');
+            }
+        } catch (error) {
+            // Keep the sidebar expanded when storage is unavailable.
+        }
+    </script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="dashboard-shell universal-dashboard" data-dashboard-role="trainer">
@@ -46,9 +55,10 @@
             ->all();
     @endphp
 
-    <aside class="dashboard-sidebar" data-dashboard-sidebar>
+    <aside id="trainer-dashboard-sidebar" class="dashboard-sidebar" data-dashboard-sidebar>
         <div class="flex min-h-11 items-center border-b border-slate-100 pb-3">
             <div class="dashboard-brand flex-1 min-w-0">
+                <img src="{{ asset('assets/images/logoicon.png') }}" alt="MCARE Hub" class="dashboard-brand-mark">
                 <span class="min-w-0">
                     <span class="dashboard-brand-title">MCARE Hub</span>
                     <span class="dashboard-brand-subtitle">Trainer Portal</span>
@@ -57,24 +67,34 @@
         </div>
 
         <nav class="dashboard-nav" aria-label="Trainer navigation">
-            <p class="dashboard-menu-label">Classroom</p>
-            @foreach ($trainerPrimaryNav as $item)
-                <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainer-{{ str($item['label'])->slug() }}" class="{{ $navClass }} {{ $item['active'] ? $navActive : $navIdle }}" @if($item['active']) aria-current="page" @endif>
-                    <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
-                    <span>{{ $item['label'] }}</span>
+            <div>
+                <p class="px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Classroom</p>
+                <div class="mt-2 space-y-1">
+                    @foreach ($trainerPrimaryNav as $item)
+                        <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainer-{{ str($item['label'])->slug() }}" class="{{ $navClass }} {{ $item['active'] ? $navActive : $navIdle }}" @if($item['active']) aria-current="page" @endif>
+                            <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
+                            <span>{{ $item['label'] }}</span>
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+            <div>
+                <p class="px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Teaching tools</p>
+                <div class="mt-2 space-y-1">
+                    @foreach ($trainerSecondaryNav as $item)
+                        <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainer-{{ str($item['label'])->slug() }}" class="{{ $navClass }} {{ $item['active'] ? $navActive : $navIdle }}" @if($item['active']) aria-current="page" @endif>
+                            <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
+                            <span>{{ $item['label'] }}</span>
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+            <div class="border-t border-slate-200 pt-4">
+                <a href="{{ route('landing') }}" class="{{ $navClass }} {{ $navIdle }}">
+                    <x-dashboard-icon name="arrow-up-right-from-square" class="dashboard-nav-icon" />
+                    <span>Public site</span>
                 </a>
-            @endforeach
-            <p class="dashboard-menu-label">Teaching tools</p>
-            @foreach ($trainerSecondaryNav as $item)
-                <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainer-{{ str($item['label'])->slug() }}" class="{{ $navClass }} {{ $item['active'] ? $navActive : $navIdle }}" @if($item['active']) aria-current="page" @endif>
-                    <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
-                    <span>{{ $item['label'] }}</span>
-                </a>
-            @endforeach
-            <a href="{{ route('landing') }}" class="{{ $navClass }} {{ $navIdle }}">
-                <x-dashboard-icon name="arrow-up-right-from-square" class="dashboard-nav-icon" />
-                <span>Public site</span>
-            </a>
+            </div>
         </nav>
 
         <details class="dashboard-sidebar-footer" data-dashboard-account>
@@ -84,7 +104,7 @@
                     <span class="block truncate text-sm font-bold text-slate-950">{{ $trainerName }}</span>
                     <span class="block text-xs text-slate-500">Caregiving NC II Trainer</span>
                 </span>
-                <x-dashboard-icon name="chevron-down" class="dashboard-chevron text-xs text-slate-500 transition" />
+                <x-dashboard-icon name="chevron-up" class="dashboard-chevron text-xs text-slate-400 transition" />
             </summary>
             <div class="dashboard-account-menu">
                 <x-dashboard-account-actions :logout-route="route('logout')" role-label="Trainer" />
@@ -93,11 +113,31 @@
     </aside>
 
     <div class="dashboard-layout">
+        <div class="admin-masthead">
+            <p class="admin-masthead-kicker">TESDA-Accredited Training and Assessment Center</p>
+            <p class="admin-masthead-aside">Official trainer system · Authorized personnel only</p>
+        </div>
         <header class="dashboard-topbar">
             <div class="dashboard-topbar-inner">
-                <div class="flex min-w-0 items-center gap-3">
+                <div class="dashboard-topbar-start flex min-w-0 items-center gap-3">
+                    <button
+                        type="button"
+                        class="dashboard-sidebar-collapse"
+                        data-dashboard-sidebar-collapse
+                        aria-controls="trainer-dashboard-sidebar"
+                        aria-expanded="true"
+                        aria-label="Collapse sidebar"
+                        title="Collapse sidebar"
+                    >
+                        <span class="dashboard-sidebar-collapse-expanded">
+                            <x-dashboard-icon name="chevron-left" />
+                        </span>
+                        <span class="dashboard-sidebar-collapse-collapsed">
+                            <x-dashboard-icon name="chevron-right" />
+                        </span>
+                    </button>
                     <div class="min-w-0">
-                        <p class="dashboard-header-kicker">Mission Care Training Center</p>
+                        <p class="dashboard-header-kicker">Mission Care Training and Assessment Center</p>
                         <h1 class="dashboard-header-title">
                             <span class="dashboard-title-desktop">{{ $title ?? 'MCARE Trainer' }}</span>
                             <span class="dashboard-title-mobile">{{ str($title ?? 'MCARE Trainer')->before('|')->trim() }}</span>
@@ -105,18 +145,29 @@
                     </div>
                 </div>
 
-                <div class="dashboard-classroom-actions">
-                    <a href="{{ $trainerStreamHref }}" class="dashboard-context-link">Open stream</a>
-                    <a href="{{ route('trainer.resources') }}" class="dashboard-context-link is-primary">
-                        <span>Open modules</span>
-                    </a>
-                </div>
+                <form method="GET" action="{{ route('trainer.search') }}" class="dashboard-search" data-trainer-global-search data-suggest-url="{{ route('trainer.search.suggest') }}">
+                    <x-dashboard-icon name="magnifying-glass" class="shrink-0 text-sm text-slate-400" />
+                    <input
+                        name="q"
+                        type="search"
+                        value="{{ request('q') }}"
+                        placeholder="Search pages, people, modules..."
+                        maxlength="100"
+                        autocomplete="off"
+                        aria-label="Search the trainer portal"
+                        aria-autocomplete="list"
+                        aria-controls="trainer-search-suggest"
+                        aria-expanded="false"
+                    >
+                    <button type="submit" class="sr-only">Search</button>
+                    <div id="trainer-search-suggest" class="trainer-search-suggest" hidden role="listbox"></div>
+                </form>
 
-                <details class="relative shrink-0 justify-self-end" data-dashboard-account>
+                <details class="dashboard-topbar-account relative shrink-0 justify-self-end" data-dashboard-account>
                     <summary class="dashboard-account-summary">
                         <x-user-avatar :user="auth()->user()" :name="$trainerName" class="dashboard-account-avatar h-9 w-9" />
-                        <span class="hidden max-w-32 truncate sm:block">{{ $trainerName }}</span>
-                        <x-dashboard-icon name="chevron-down" class="dashboard-chevron text-xs text-slate-500 transition" />
+                        <span class="hidden max-w-36 truncate sm:block">{{ $trainerName }}</span>
+                        <x-dashboard-icon name="chevron-down" class="dashboard-chevron text-xs text-slate-400 transition" />
                     </summary>
                     <div class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
                         <x-dashboard-account-actions :logout-route="route('logout')" role-label="Trainer" />
@@ -133,30 +184,12 @@
         </header>
 
         <main class="dashboard-main">
-            @if (session('saved'))
-                <div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800" role="status" aria-live="polite" data-auto-dismiss="5000">{{ session('saved') }}</div>
-            @endif
-
-            @if (session('error') || session('alert'))
-                <div class="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800" role="alert">{{ session('error') ?? session('alert') }}</div>
-            @endif
-
-            @if ($errors->any())
-                <div class="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800" role="alert">
-                    @if($errors->count() === 1)
-                        <p>{{ $errors->first() }}</p>
-                    @else
-                        <ul class="list-disc pl-4 space-y-1">
-                            @foreach($errors->all() as $err)
-                                <li>{{ $err }}</li>
-                            @endforeach
-                        </ul>
-                    @endif
-                </div>
-            @endif
-
             @yield('content')
         </main>
+        <footer class="admin-colophon">
+            <p>Mission Care Training and Assessment Center · Caregiving NC II</p>
+            <p>Official institutional records. Use of this system is restricted to assigned MCARE trainers.</p>
+        </footer>
     </div>
 
     <dialog class="lms-confirm-dialog" data-lms-confirm-dialog aria-labelledby="lms-confirm-title">
@@ -164,11 +197,13 @@
             <span class="lms-confirm-icon" aria-hidden="true">!</span>
             <h2 id="lms-confirm-title">Confirm action</h2>
             <p data-lms-confirm-message>This action cannot be undone.</p>
+            <p data-lms-confirm-detail hidden></p>
             <div class="lms-confirm-actions">
                 <button value="cancel" class="secondary-action">Cancel</button>
-                <button value="confirm" class="lms-danger-action">Continue</button>
+                <button value="confirm" class="lms-danger-action" data-lms-confirm-action>Continue</button>
             </div>
         </form>
     </dialog>
+    <x-dashboard-toasts />
 </body>
 </html>

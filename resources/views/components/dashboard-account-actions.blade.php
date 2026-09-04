@@ -46,9 +46,6 @@
 <a href="{{ route('account.settings') }}" class="dashboard-account-action">
     <x-dashboard-icon name="gear" class="mr-3 w-4" />Settings
 </a>
-<a href="{{ route('account.settings') }}#change-password" class="dashboard-account-action">
-    <x-dashboard-icon name="key" class="mr-3 w-4" />Change password
-</a>
 <a href="{{ route('account.help') }}" class="dashboard-account-action">
     <x-dashboard-icon name="circle-question" class="mr-3 w-4" />Help
 </a>

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $status }} | MCARE</title>
+    <x-site-favicon />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-white font-sans text-slate-900 antialiased">
@@ -12,9 +13,9 @@
     <main class="mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center px-6 py-16 text-center">
         <a href="{{ route('landing') }}" class="mb-8 inline-flex items-center gap-3">
             <img src="{{ asset('assets/official-logo.png') }}" alt="Mission Care Training Center logo" class="h-14 w-14 rounded-2xl object-contain">
-            <span class="text-left">
-                <span class="block text-sm font-bold text-slate-900">MCARE</span>
-                <span class="block text-xs text-slate-500">Mission Care Training Center</span>
+            <span class="mcare-brand text-left">
+                <span class="mcare-mark">MCARE</span>
+                <p class="mcare-brand-name">Mission Care</p>
             </span>
         </a>
 

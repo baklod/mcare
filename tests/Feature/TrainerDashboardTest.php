@@ -29,10 +29,26 @@ class TrainerDashboardTest extends TestCase
     {
         $trainer = User::factory()->create(['role' => 'trainer']);
 
-        $this->actingAs($trainer)
+        $html = $this->actingAs($trainer)
             ->get(route('trainer.dashboard'))
             ->assertOk()
-        ->assertSee('Teaching day')
-        ->assertSee('Learner follow-up');
+            ->assertSee('Teaching day')
+            ->assertSee('Learning delivery')
+            ->assertSee('Delivery snapshot')
+            ->assertSee('Learner follow-up')
+            ->assertSee('data-dashboard-sidebar-collapse', false)
+            ->assertSee('id="trainer-dashboard-sidebar"', false)
+            ->assertSee('Official trainer system', false)
+            ->assertSee('Search pages, people, modules...')
+            ->assertDontSee('Open stream')
+            ->assertDontSee('Open modules')
+            ->assertDontSee('data-dashboard-menu-open', false)
+            ->getContent();
+
+        $this->assertLessThan(
+            strpos($html, "Today's schedule"),
+            strpos($html, 'Learning delivery'),
+            'Learning delivery should appear above the teaching schedule.'
+        );
     }
 }

@@ -55,6 +55,23 @@ class AccountSessionController extends Controller
                 ->onlyInput('email');
         }
 
+        $application = $user->enrollmentApplication()->latest()->first();
+        $historicalClaim = $user->historicalAlumniClaim()->first();
+
+        $awaitingAdminDecision = $user->role === 'applicant'
+            && $application
+            && $application->status !== EnrollmentApplication::STATUS_DENIED
+            && $application->status !== EnrollmentApplication::STATUS_APPROVED
+            && $application->hasEnrollmentPaymentClearance();
+
+        if ($awaitingAdminDecision) {
+            return back()
+                ->withErrors([
+                    'email' => 'Your payment is verified. Please wait for the administrator to approve your MCARE account. We will email a verification link as soon as you can log in.',
+                ])
+                ->onlyInput('email');
+        }
+
         if (! $user->hasVerifiedEmail()) {
             try {
                 $user->sendEmailVerificationNotification();
@@ -69,9 +86,6 @@ class AccountSessionController extends Controller
                 ->onlyInput('email');
         }
 
-        $application = $user->enrollmentApplication()->latest()->first();
-        $historicalClaim = $user->historicalAlumniClaim()->first();
-
         if ($user->role === 'applicant' && $historicalClaim) {
             $message = $historicalClaim->status === HistoricalAlumniClaim::STATUS_REJECTED
                 ? 'Your historical alumni claim needs attention. Please contact MCARE administration and bring the requested records.'
@@ -82,21 +96,11 @@ class AccountSessionController extends Controller
                 ->onlyInput('email');
         }
 
-        if ($user->role === 'applicant'
-            && $application?->status !== EnrollmentApplication::STATUS_DENIED
-            && $application?->hasEnrollmentPaymentClearance()) {
-            return back()
-                ->withErrors([
-                    'email' => 'Your payment is verified. Please wait for the administrator to approve your MCARE account. We will email you as soon as you can log in.',
-                ])
-                ->onlyInput('email');
-        }
-
-        // Keep administrator accounts on the dedicated staff challenge flow so
-        // the public login form cannot become a second-factor bypass.
+        // Administrators are exempt from the email sign-in code. Password
+        // authentication is enough to open the operations dashboard.
         $twoFactor = app(EmailTwoFactorService::class);
 
-        if ($user->hasRole('admin') && $twoFactor->enabledFor($user)) {
+        if (! $user->hasRole('admin') && $twoFactor->enabledFor($user)) {
             try {
                 $challenge = $twoFactor->issue($user);
                 $challenge['remember'] = $request->boolean('remember');
@@ -140,6 +144,8 @@ class AccountSessionController extends Controller
         // Admin sessions always start from the operations dashboard. A stale
         // intended URL must not send a newly signed-in admin into a submodule.
         if ($request->user()?->hasRole('admin')) {
+            $request->session()->put('admin.mfa.verified_user_id', $request->user()->id);
+
             return redirect()->route('admin.dashboard');
         }
 

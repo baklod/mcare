@@ -72,18 +72,21 @@
                 <p class="dashboard-stat-label">Total Program Tuition</p>
                 <p class="dashboard-stat-value">₱{{ number_format((float) ($application->total_program_fee ?? 22000.00), 2) }}</p>
             </div>
+            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600 ring-1 ring-slate-200"><x-dashboard-icon name="file-text" class="h-5 w-5" /></span>
         </article>
         <article class="dashboard-stat min-h-0">
             <div>
                 <p class="dashboard-stat-label">Downpayment Requirement</p>
                 <p class="dashboard-stat-value text-purple-700">₱{{ number_format((float) ($application->downpayment_amount ?? 2000.00), 2) }}</p>
             </div>
+            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-purple-50 text-purple-700 ring-1 ring-purple-100"><x-dashboard-icon name="credit-card" class="h-5 w-5" /></span>
         </article>
         <article class="dashboard-stat min-h-0">
             <div>
                 <p class="dashboard-stat-label">Total Paid to Date</p>
                 <p class="dashboard-stat-value text-emerald-700">₱{{ number_format((float) ($application->total_paid_amount ?? 0.00), 2) }}</p>
             </div>
+            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"><x-dashboard-icon name="circle-check" class="h-5 w-5" /></span>
         </article>
         <article class="dashboard-stat min-h-0">
             <div>
@@ -92,6 +95,7 @@
                     ₱{{ number_format($application->remainingBalance(), 2) }}
                 </p>
             </div>
+            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg {{ $application->remainingBalance() <= 0 ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-amber-50 text-amber-700 ring-amber-100' }} ring-1"><x-dashboard-icon name="signal" class="h-5 w-5" /></span>
         </article>
     </div>
 
@@ -204,7 +208,7 @@
                 </div>
 
                 <div class="overflow-x-auto">
-                    <table class="dashboard-table min-w-[36rem]">
+                    <table class="dashboard-table w-full min-w-[36rem]">
                         <thead>
                             <tr>
                                 <th>Date</th>
@@ -277,29 +281,31 @@
                         <x-dashboard-icon name="print" class="h-4 w-4" />
                         <span>Print Ticket</span>
                     </button>
-                @elseif ($application->payment_receipt_number)
+                @elseif ($application->payment_reference || $application->payment_receipt_number)
                     <div class="rounded-xl border border-purple-100 bg-white p-3.5 space-y-2 text-xs">
-                        <div class="flex items-center justify-between">
-                            <span class="text-slate-500">Receipt Order #:</span>
-                            <strong class="font-mono text-purple-950 font-bold">{{ $application->payment_receipt_number }}</strong>
+                        <div class="flex items-start justify-between gap-3">
+                            <span class="shrink-0 text-slate-500">Reference #:</span>
+                            <strong class="min-w-0 break-all text-right font-mono font-bold text-purple-950">{{ $application->payment_reference ?: $application->payment_receipt_number }}</strong>
                         </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-slate-500">Reference:</span>
-                            <span class="font-mono text-slate-700 text-[11px]">{{ $application->payment_reference ?: $application->payment_receipt_number }}</span>
-                        </div>
-                        <div class="flex items-center justify-between border-t border-slate-100 pt-1.5">
+                        @if ($application->payment_receipt_number && $application->payment_receipt_number !== $application->payment_reference)
+                            <div class="flex items-start justify-between gap-3">
+                                <span class="shrink-0 text-slate-500">Official Receipt:</span>
+                                <span class="min-w-0 break-all text-right font-mono text-[11px] text-slate-700">{{ $application->payment_receipt_number }}</span>
+                            </div>
+                        @endif
+                        <div class="flex items-center justify-between gap-3 border-t border-slate-100 pt-1.5">
                             <span class="text-slate-500">Amount for Cashier:</span>
                             <strong class="font-bold text-slate-900">PHP {{ number_format((float) ($application->total_paid_amount > 0 ? $application->remainingBalance() : ($application->downpayment_amount ?? 2000.00)), 2) }}</strong>
                         </div>
                     </div>
 
                     <div class="space-y-2 pt-1">
-                        <a href="{{ route('payment.receipt') }}" target="_blank" rel="noopener noreferrer" class="primary-action w-full justify-center">
-                            <x-dashboard-icon name="print" class="h-4 w-4" />
+                        <a href="{{ route('payment.receipt') }}" target="_blank" rel="noopener noreferrer" class="primary-action w-full">
+                            <x-dashboard-icon name="print" class="h-4 w-4 shrink-0" />
                             <span>View & Print Official Slip</span>
                         </a>
-                        <a href="{{ route('payment.receipt.download') }}" class="secondary-action w-full justify-center">
-                            <x-dashboard-icon name="download" class="h-4 w-4" />
+                        <a href="{{ route('payment.receipt.download') }}" class="secondary-action w-full">
+                            <x-dashboard-icon name="download" class="h-4 w-4 shrink-0" />
                             <span>Download Slip</span>
                         </a>
                     </div>

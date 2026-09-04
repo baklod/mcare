@@ -10,7 +10,7 @@
     $resolvedUser = $user ?: $application?->user;
     $displayName = trim((string) ($name ?: $resolvedUser?->name ?: $resolvedUser?->email ?: 'MCARE User'));
     $initial = \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($displayName, 0, 1));
-    $candidateUrl = trim((string) ($src ?: $resolvedUser?->avatar_url ?? ''));
+    $candidateUrl = trim((string) ($src ?: $resolvedUser?->profilePhotoUrl() ?? ''));
 
     if (
         $candidateUrl === ''

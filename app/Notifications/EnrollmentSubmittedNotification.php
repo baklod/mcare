@@ -25,9 +25,7 @@ class EnrollmentSubmittedNotification extends Notification implements ShouldQueu
     /** @return list<string> */
     public function via(object $notifiable): array
     {
-        return filled($notifiable->email)
-            ? ['database', 'mail']
-            : ['database'];
+        return ['database'];
     }
 
     /** @return array<string, mixed> */
@@ -36,9 +34,10 @@ class EnrollmentSubmittedNotification extends Notification implements ShouldQueu
         return [
             'title' => 'Enrollment registration saved',
             'message' => 'Your '.($this->application->program ?: 'training program').' enrollment was saved. Continue to payment; Admin Review begins after the required payment is verified.',
-            'url' => route('payment.show'),
+            'url' => route('payments.show'),
             'icon' => 'clipboard-check',
             'enrollment_application_id' => $this->application->id,
+            'enrollment_number' => $this->application->enrollment_number,
             'status' => $this->application->status,
         ];
     }
@@ -51,6 +50,7 @@ class EnrollmentSubmittedNotification extends Notification implements ShouldQueu
             ->subject('MCARE enrollment registration saved')
             ->greeting('Hello '.$notifiable->name.',')
             ->line('We saved your '.($this->application->program ?: 'training program').' enrollment registration.')
+            ->line('Your enrollment number is '.($this->application->enrollment_number ?: 'being issued').'. Keep this number if you want to pay later.')
             ->line('Next step: complete the required enrollment payment. Your application will be released to MCARE administration for document and account review only after payment is verified.');
 
         if ($this->application->batch) {
@@ -58,7 +58,9 @@ class EnrollmentSubmittedNotification extends Notification implements ShouldQueu
         }
 
         return $mail
-            ->action('Open MCARE', route('login'))
+            ->action('Continue payment', route('payments.show', array_filter([
+                'enrollment_number' => $this->application->enrollment_number,
+            ])))
             ->line('Keep this email for your records. MCARE will notify you after payment verification and again when the application status changes.')
             ->salutation('MCARE Training Center Administration');
     }

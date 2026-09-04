@@ -40,6 +40,9 @@
                     <p class="dashboard-stat-value">{{ $stats['progress'] }}%</p>
                     <p class="dashboard-stat-help">Calculated from your server-recorded module activity.</p>
                 </div>
+                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-purple-50 text-purple-700 ring-1 ring-purple-100">
+                    <x-dashboard-icon name="signal" class="h-5 w-5" />
+                </span>
             </div>
             <div class="dashboard-stat">
                 <div>
@@ -47,6 +50,9 @@
                     <p class="dashboard-stat-value">{{ $stats['modules'] }}</p>
                     <p class="dashboard-stat-help">Published by trainer for your batch.</p>
                 </div>
+                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-700 ring-1 ring-sky-100">
+                    <x-dashboard-icon name="book-open" class="h-5 w-5" />
+                </span>
             </div>
             <div class="dashboard-stat">
                 <div>
@@ -54,6 +60,9 @@
                     <p class="dashboard-stat-value">{{ $stats['documents'] }}/5</p>
                     <p class="dashboard-stat-help">TESDA registration files on record.</p>
                 </div>
+                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-700 ring-1 ring-amber-100">
+                    <x-dashboard-icon name="file-text" class="h-5 w-5" />
+                </span>
             </div>
             <div class="dashboard-stat">
                 <div>
@@ -61,6 +70,9 @@
                     <p class="mt-2 text-lg font-black leading-tight text-slate-900">{{ $stats['payment'] }}</p>
                     <p class="dashboard-stat-help">{{ $deadline ? 'Deadline '.$deadline->format('M d, Y g:i A') : 'Deadline TBA' }}</p>
                 </div>
+                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+                    <x-dashboard-icon name="credit-card" class="h-5 w-5" />
+                </span>
             </div>
         </div>
     </section>
@@ -78,25 +90,37 @@
             @forelse ($modules as $module)
                 @php
                     $moduleProgress = $progressByModule->get($module->id);
+                    $access = ($classworkAccess ?? collect())[$module->id] ?? ['accessible' => true, 'blocker' => null];
+                    $isLocked = ! ($access['accessible'] ?? true);
+                    $blocker = $access['blocker'] ?? null;
+                    $progressValue = $isLocked ? 0 : (int) ($moduleProgress?->displayProgressPercent() ?? 0);
                 @endphp
-                <article class="dashboard-card p-5">
+                <article class="dashboard-card p-5{{ $isLocked ? ' opacity-75' : '' }}">
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <p class="text-xs font-black uppercase tracking-wide text-purple-600">{{ $module->batch ? $module->batch->name.' '.$module->batch->year : 'General module' }}</p>
                             <h3 class="mt-2 font-display text-xl font-black leading-tight text-slate-900">{{ $module->title }}</h3>
                         </div>
-                        <span class="dashboard-pill {{ $moduleProgress?->status === 'completed' ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : ($moduleProgress ? 'bg-amber-50 text-amber-700 ring-amber-100' : 'bg-slate-50 text-slate-600 ring-slate-100') }}">{{ $moduleProgress ? str($moduleProgress->status)->headline() : 'Not started' }}</span>
+                        <span class="dashboard-pill {{ $isLocked ? 'bg-rose-50 text-rose-700 ring-rose-100' : ($moduleProgress?->status === 'completed' ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : ($moduleProgress ? 'bg-amber-50 text-amber-700 ring-amber-100' : 'bg-slate-50 text-slate-600 ring-slate-100')) }}">{{ $isLocked ? 'Locked' : ($moduleProgress ? str($moduleProgress->status)->headline() : 'Not started') }}</span>
                     </div>
                     <p class="mt-3 line-clamp-3 text-sm leading-6 text-slate-500">{{ $module->description }}</p>
                     <div class="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-500">
                         <x-user-avatar :user="$module->trainer" :name="$module->trainer?->name ?? 'MCARE Trainer'" class="grid h-7 w-7 place-items-center rounded-full bg-purple-100 text-[10px] font-black text-purple-800" />
                         <span class="truncate">Trainer: {{ $module->trainer?->name ?? 'MCARE Trainer' }}</span>
                     </div>
-                    <div class="mt-4 h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full bg-purple-600" style="width: {{ $moduleProgress?->progress_percent ?? 0 }}%"></div></div>
-                    <p class="mt-2 text-xs font-bold text-slate-500">{{ $moduleProgress?->progress_percent ?? 0 }}% recorded</p>
-                    <a href="{{ route('trainee.modules.show', $module) }}" class="secondary-action mt-5 w-full">
-                        Open protected viewer
-                    </a>
+                    <div class="mt-4 h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $progressValue }}">
+                        @if($progressValue > 0)
+                            <div class="h-full bg-purple-600" style="width: {{ $progressValue }}%"></div>
+                        @endif
+                    </div>
+                    <p class="mt-2 text-xs font-bold text-slate-500">{{ $isLocked && $blocker ? 'Unlocks after a trainer grade on '.($blocker->module_code ?: $blocker->title) : ($progressValue.'% recorded') }}</p>
+                    @if($isLocked)
+                        <span class="secondary-action mt-5 w-full" aria-disabled="true">Locked</span>
+                    @else
+                        <a href="{{ route('trainee.modules.show', $module) }}" class="secondary-action mt-5 w-full">
+                            Open protected viewer
+                        </a>
+                    @endif
                 </article>
             @empty
                 <div class="dashboard-card p-10 text-center md:col-span-2 xl:col-span-3">
@@ -163,7 +187,7 @@
                 </div>
                 <div class="rounded-2xl bg-slate-50 p-5 md:col-span-2">
                     <p class="text-xs font-black uppercase tracking-wide text-slate-500">Reference</p>
-                    <p class="mt-2 break-all text-lg font-black text-slate-900">{{ $application->payment_receipt_number ?: $application->paymongo_checkout_reference ?: $application->payment_reference ?: 'Reference pending' }}</p>
+                    <p class="mt-2 break-all text-lg font-black text-slate-900">{{ $application->latestPaymentReference() ?: 'Reference pending' }}</p>
                 </div>
             </div>
         </div>

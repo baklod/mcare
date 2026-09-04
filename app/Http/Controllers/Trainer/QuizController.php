@@ -106,7 +106,7 @@ class QuizController extends Controller
         $this->authorize('update', $quiz);
 
         return view('trainer.quizzes.edit', [
-            'quiz' => $quiz->load(['questions', 'batch', 'targetTrainee', 'trainingSubmodule']),
+            'quiz' => $quiz->load(['questions', 'batch', 'targetTrainee', 'trainingModule', 'trainingSubmodule']),
             'classroomComments' => $comments->visibleFor($request->user(), $quiz),
             'privateCommentRecipients' => $comments->privateRecipients($request->user(), $quiz),
             ...$this->formOptions(),

@@ -17,17 +17,48 @@ use Illuminate\View\View;
 
 class BatchScheduleController extends Controller
 {
-    public function index(Request $request, TrainingCalendarService $calendarService): View
+    public function index(): View
     {
-        return $this->scheduleView($request, $calendarService);
+        return $this->batchesView();
     }
 
-    public function edit(
-        Request $request,
-        TrainingBatch $trainingBatch,
-        TrainingCalendarService $calendarService,
-    ): View {
-        return $this->scheduleView($request, $calendarService, $trainingBatch);
+    public function calendar(Request $request, TrainingCalendarService $calendarService): View
+    {
+        $validated = $request->validate([
+            'month' => ['nullable', 'date_format:Y-m'],
+            'date' => ['nullable', 'date_format:Y-m-d'],
+            'batch_id' => ['nullable', 'integer', 'exists:training_batches,id'],
+        ]);
+        $calendarBatches = TrainingBatch::query()
+            ->with('program')
+            ->orderByDesc('is_active')
+            ->orderByDesc('year')
+            ->orderBy('name')
+            ->get();
+        $selectedBatchId = isset($validated['batch_id']) ? (int) $validated['batch_id'] : null;
+        $selectedBatch = $selectedBatchId
+            ? $calendarBatches->firstWhere('id', $selectedBatchId)
+            : null;
+        $visibleBatches = $selectedBatch ? collect([$selectedBatch]) : $calendarBatches;
+        $defaultMonth = $calendarService->suggestedMonth($selectedBatch ?? TrainingBatch::active());
+        $month = isset($validated['month'])
+            ? Carbon::createFromFormat('Y-m', $validated['month'])->startOfMonth()
+            : $defaultMonth;
+
+        return view('admin.schedules.index', [
+            'calendarMonth' => $month,
+            'calendarSessions' => $calendarService->monthForBatches($visibleBatches, $month),
+            'calendarSelectedDate' => $validated['date'] ?? null,
+            'calendarBatches' => $calendarBatches,
+            'selectedBatch' => $selectedBatch,
+            'selectedBatchId' => $selectedBatchId,
+            'calendarDescription' => $this->calendarDescription($calendarService, $selectedBatch),
+        ]);
+    }
+
+    public function edit(TrainingBatch $trainingBatch): View
+    {
+        return $this->batchesView($trainingBatch);
     }
 
     public function store(Request $request): RedirectResponse
@@ -47,7 +78,7 @@ class BatchScheduleController extends Controller
         ]);
 
         return redirect()
-            ->route('admin.schedules.index')
+            ->route('admin.batches.index')
             ->with('saved', 'Batch schedule created.');
     }
 
@@ -84,7 +115,7 @@ class BatchScheduleController extends Controller
         ]);
 
         return redirect()
-            ->route('admin.schedules.index')
+            ->route('admin.batches.index')
             ->with('saved', 'Batch schedule updated.');
     }
 
@@ -131,7 +162,7 @@ class BatchScheduleController extends Controller
         });
 
         return redirect()
-            ->route('admin.schedules.index')
+            ->route('admin.batches.index')
             ->with('saved', "Batch schedule {$batchLabel} deleted.");
     }
 
@@ -224,29 +255,22 @@ class BatchScheduleController extends Controller
         return $validated;
     }
 
-    private function scheduleView(
-        Request $request,
-        TrainingCalendarService $calendarService,
-        ?TrainingBatch $editingBatch = null,
-    ): View {
-        $validated = $request->validate([
-            'month' => ['nullable', 'date_format:Y-m'],
-            'date' => ['nullable', 'date_format:Y-m-d'],
-        ]);
-        $activeBatch = TrainingBatch::active();
-        $defaultMonth = $calendarService->suggestedMonth($editingBatch ?? $activeBatch);
-        $month = isset($validated['month'])
-            ? Carbon::createFromFormat('Y-m', $validated['month'])->startOfMonth()
-            : $defaultMonth;
-        $calendarBatches = TrainingBatch::query()
-            ->with('program')
-            ->orderByDesc('is_active')
-            ->orderByDesc('year')
-            ->orderBy('name')
-            ->get();
-        $calendarSessions = $calendarService->monthForBatches($calendarBatches, $month);
+    private function calendarDescription(TrainingCalendarService $calendarService, ?TrainingBatch $batch): string
+    {
+        if (! $batch) {
+            return 'All AM and PM sessions across configured batches. Choose a batch to isolate its recurring weekday pattern.';
+        }
 
-        return view('admin.schedules.index', [
+        return sprintf(
+            'AM %s · PM %s. Sessions only appear on those weekdays between this batch\'s training start and end dates.',
+            $calendarService->patternSummary($batch->am_days),
+            $calendarService->patternSummary($batch->pm_days),
+        );
+    }
+
+    private function batchesView(?TrainingBatch $editingBatch = null): View
+    {
+        return view('admin.batches.index', [
             'batches' => TrainingBatch::query()
                 ->with(['trainer', 'program'])
                 ->withCount([
@@ -272,9 +296,6 @@ class BatchScheduleController extends Controller
                 ->orderBy('name')
                 ->get(['id', 'name', 'email']),
             'editingBatch' => $editingBatch,
-            'calendarMonth' => $month,
-            'calendarSessions' => $calendarSessions,
-            'calendarSelectedDate' => $validated['date'] ?? null,
         ]);
     }
 }

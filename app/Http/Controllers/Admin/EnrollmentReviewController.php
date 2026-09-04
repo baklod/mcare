@@ -6,13 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
+use App\Models\User;
 use App\Notifications\EnrollmentStatusUpdatedNotification;
+use App\Services\AccountDeletionService;
 use App\Services\RollingModuleReleaseService;
 use App\Services\TesdaRegistrationPdfService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\HeaderUtils;
@@ -143,10 +146,22 @@ class EnrollmentReviewController extends Controller
 
         return view('admin.enrollments.show', [
             'application' => $enrollmentApplication,
-            'documentDefinitions' => $this->documentFields(),
             'pendingDocumentApprovals' => $this->pendingDocumentApprovals($enrollmentApplication),
             'reviewableStatuses' => EnrollmentApplication::reviewableStatuses(),
             'statuses' => EnrollmentApplication::statuses(),
+        ]);
+    }
+
+    public function documentReview(EnrollmentApplication $enrollmentApplication): View
+    {
+        $this->ensureReleasedForReview($enrollmentApplication);
+
+        $enrollmentApplication->load(['user', 'documentReviewer']);
+
+        return view('admin.enrollments.document-review', [
+            'application' => $enrollmentApplication,
+            'documents' => $this->documentsForReview($enrollmentApplication),
+            'pendingDocumentApprovals' => $this->pendingDocumentApprovals($enrollmentApplication),
         ]);
     }
 
@@ -169,12 +184,29 @@ class EnrollmentReviewController extends Controller
             'admin_notes.required' => 'Add a clear note before denying an application.',
         ]);
 
+        $pendingDocuments = $this->pendingDocumentApprovals($enrollmentApplication);
+        $reviewWasSubmitted = $enrollmentApplication->documents_reviewed_at !== null
+            || filled($enrollmentApplication->document_review);
+
+        if (! $reviewWasSubmitted) {
+            $message = 'Review the applicant documents first before saving a decision.';
+
+            return redirect()
+                ->route('admin.enrollments.show', $enrollmentApplication)
+                ->with('error', $message)
+                ->withErrors(['status' => $message])
+                ->withInput();
+        }
+
         if ($validated['status'] === EnrollmentApplication::STATUS_APPROVED) {
             $approvalIssues = [];
-            $pendingDocuments = $this->pendingDocumentApprovals($enrollmentApplication);
 
             if ($pendingDocuments !== []) {
-                $approvalIssues[] = 'Review and accept every required document first. Pending: '.implode(', ', $pendingDocuments).'.';
+                $approvalIssues[] = 'Document review cannot be completed while required documents are pending: '.implode(', ', $pendingDocuments).'. Accept every required document first.';
+            }
+
+            if ($enrollmentApplication->documents_reviewed_at === null) {
+                $approvalIssues[] = 'Accept every required document and finish document review before approving this account.';
             }
 
             if (! $enrollmentApplication->hasEnrollmentPaymentClearance()) {
@@ -182,7 +214,9 @@ class EnrollmentReviewController extends Controller
             }
 
             if ($approvalIssues !== []) {
-                return back()
+                return redirect()
+                    ->route('admin.enrollments.show', $enrollmentApplication)
+                    ->with('error', $approvalIssues[0])
                     ->withErrors(['status' => implode(' ', $approvalIssues)])
                     ->withInput();
             }
@@ -204,7 +238,9 @@ class EnrollmentReviewController extends Controller
             ? 'trainee'
             : ($enrollmentApplication->user?->role === 'trainee' ? 'applicant' : $enrollmentApplication->user?->role);
 
-        $enrollmentApplication->user?->forceFill([
+        $enrollee = $enrollmentApplication->user;
+
+        $enrollee?->forceFill([
             'applicant_status' => $validated['status'],
             'role' => $newRole,
         ])->save();
@@ -214,15 +250,21 @@ class EnrollmentReviewController extends Controller
             $releases->assignCurrentTo($enrollmentApplication->fresh());
         }
 
+        $verificationSent = $this->sendEnrolleeVerificationLink(
+            $enrollee,
+            $validated['status'],
+        );
+
         AdminActivityLog::record($request->user(), 'enrollment.review.updated', $enrollmentApplication, [
             'status' => $validated['status'],
             'applicant_email' => $enrollmentApplication->email,
+            'verification_link_sent' => $verificationSent,
         ]);
 
-        if ($previousStatus !== $validated['status'] && $enrollmentApplication->user) {
+        if ($previousStatus !== $validated['status'] && $enrollee) {
             try {
-                $enrollmentApplication->user->notify(
-                    new EnrollmentStatusUpdatedNotification($enrollmentApplication),
+                $enrollee->notifyNow(
+                    new EnrollmentStatusUpdatedNotification($enrollmentApplication->fresh()),
                 );
             } catch (Throwable $exception) {
                 // A mail outage must not undo an administrator's review decision.
@@ -230,9 +272,45 @@ class EnrollmentReviewController extends Controller
             }
         }
 
+        $saved = 'Enrollment review decision saved.';
+        if ($verificationSent) {
+            $saved .= ' A verification link was emailed to '.$enrollee->email.'. The enrollee can log in after verifying that email.';
+        }
+
         return redirect()
             ->route('admin.enrollments.show', $enrollmentApplication)
-            ->with('saved', 'Enrollment review decision saved.');
+            ->with('saved', $saved);
+    }
+
+    public function destroy(
+        Request $request,
+        EnrollmentApplication $enrollmentApplication,
+        AccountDeletionService $accounts,
+    ): RedirectResponse {
+        $this->ensureReleasedForReview($enrollmentApplication);
+
+        $applicantName = trim($enrollmentApplication->last_name.', '.$enrollmentApplication->first_name);
+        $user = $enrollmentApplication->user;
+
+        if (! $user) {
+            return redirect()
+                ->route('admin.enrollments.index')
+                ->withErrors([
+                    'enrollment' => $applicantName.' has no linked account and cannot be deleted from this queue.',
+                ]);
+        }
+
+        try {
+            $deleted = $accounts->delete($user, $request->user());
+        } catch (ValidationException $exception) {
+            return redirect()
+                ->route('admin.enrollments.index')
+                ->withErrors($exception->errors());
+        }
+
+        return redirect()
+            ->route('admin.enrollments.index')
+            ->with('saved', "Enrollment for {$applicantName} ({$deleted['email']}) and related records were permanently removed.");
     }
 
     public function tesdaForm(
@@ -286,6 +364,26 @@ class EnrollmentReviewController extends Controller
 
         $enrollmentApplication->forceFill([
             'document_review' => $review,
+        ]);
+
+        $pending = $this->pendingDocumentApprovals($enrollmentApplication);
+
+        if ($pending !== []) {
+            $enrollmentApplication->forceFill([
+                'documents_reviewed_at' => null,
+                'documents_reviewed_by_id' => null,
+            ])->save();
+
+            $message = 'Document review cannot be completed while required documents are pending: '.implode(', ', $pending).'. Accept every required document first.';
+
+            return redirect()
+                ->route('admin.enrollments.document-review', $enrollmentApplication)
+                ->with('error', $message)
+                ->withErrors(['documents' => $message])
+                ->withInput();
+        }
+
+        $enrollmentApplication->forceFill([
             'documents_reviewed_at' => now(),
             'documents_reviewed_by_id' => $request->user()->id,
         ])->save();
@@ -295,7 +393,9 @@ class EnrollmentReviewController extends Controller
             'review' => $review,
         ]);
 
-        return back()->with('saved', 'Document review and applicant feedback saved.');
+        return redirect()
+            ->route('admin.enrollments.show', $enrollmentApplication)
+            ->with('saved', 'Document review completed. You can now save the enrollment decision.');
     }
 
     public function documentPreview(EnrollmentApplication $enrollmentApplication, string $document): View
@@ -377,6 +477,62 @@ class EnrollmentReviewController extends Controller
             'id-photo' => ['label' => 'ID Photo', 'field' => 'id_photo_path'],
             'signature' => ['label' => 'E-Signature', 'field' => 'signature_path'],
         ];
+    }
+
+    /** @return array<string, array{label: string, path: ?string, mime: ?string}> */
+    private function documentsForReview(EnrollmentApplication $enrollmentApplication): array
+    {
+        $documents = [];
+
+        foreach ($this->documentFields() as $key => $definition) {
+            $path = $enrollmentApplication->{$definition['field']};
+            $label = $definition['label'];
+
+            if ($key === 'signature' && filled($enrollmentApplication->signature_type)) {
+                $label .= ' ('.str($enrollmentApplication->signature_type)->headline().')';
+            }
+
+            $documents[$key] = [
+                'label' => $label,
+                'path' => $path,
+                'mime' => $this->documentMimeType($path),
+            ];
+        }
+
+        return $documents;
+    }
+
+    private function documentMimeType(?string $path): ?string
+    {
+        if (! $path || ! Storage::disk('local')->exists($path)) {
+            return null;
+        }
+
+        return Storage::disk('local')->mimeType($path) ?: 'application/octet-stream';
+    }
+
+    private function sendEnrolleeVerificationLink(?User $enrollee, string $status): bool
+    {
+        if (! $enrollee || $enrollee->hasVerifiedEmail()) {
+            return false;
+        }
+
+        if (! in_array($status, [
+            EnrollmentApplication::STATUS_APPROVED,
+            EnrollmentApplication::STATUS_DENIED,
+        ], true)) {
+            return false;
+        }
+
+        try {
+            $enrollee->sendEmailVerificationNotification();
+
+            return true;
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return false;
+        }
     }
 
     private function ensureReleasedForReview(EnrollmentApplication $application): void

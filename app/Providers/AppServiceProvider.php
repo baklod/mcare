@@ -78,6 +78,18 @@ class AppServiceProvider extends ServiceProvider
                 ->by('search:'.$actorKey($request));
         });
 
+        // Cascading address dropdowns call this several times per form fill.
+        RateLimiter::for('address-lookup', function (Request $request) use ($actorKey) {
+            return Limit::perMinute(60)
+                ->by('address-lookup:'.$actorKey($request));
+        });
+
+        // Public Groq chat is metered; keep a tight IP ceiling.
+        RateLimiter::for('landing-chat', function (Request $request) use ($actorKey) {
+            return Limit::perMinute(8)
+                ->by('landing-chat:'.$actorKey($request));
+        });
+
         // Protect high-impact write operations such as review decisions and CRUD.
         RateLimiter::for('sensitive-mutation', function (Request $request) use ($actorKey) {
             return Limit::perMinute(20)
@@ -90,13 +102,5 @@ class AppServiceProvider extends ServiceProvider
                 ->by('document-downloads:'.$actorKey($request));
         });
 
-        /*
-         * PayMongo retries webhook delivery, so this is intentionally generous.
-         * Signature validation and the unique event ledger remain the real gates.
-         */
-        RateLimiter::for('paymongo-webhooks', function (Request $request) {
-            return Limit::perMinute(180)
-                ->by('paymongo-webhooks:'.$request->ip());
-        });
     }
 }

@@ -9,8 +9,8 @@
 @endphp
 <div class="mx-auto max-w-7xl space-y-5">
     <header class="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
-        <div><p class="text-sm font-bold uppercase tracking-wide text-purple-600">Applicant document preview</p><h1 class="mt-2 text-3xl font-black text-slate-950">{{ $label }}</h1><p class="mt-2 text-sm text-slate-600">{{ $application->first_name }} {{ $application->last_name }} · {{ $application->email }}</p></div>
-        <a href="{{ route('admin.enrollments.show', $application).'#document-review' }}" class="inline-flex items-center justify-center rounded-full border border-purple-200 bg-white px-5 py-3 text-sm font-bold text-purple-700">Back to document review</a>
+        <p class="text-sm text-slate-600">{{ $application->first_name }} {{ $application->last_name }} · {{ $application->email }}</p>
+        <a href="{{ route('admin.enrollments.document-review', $application) }}" class="inline-flex items-center justify-center rounded-full border border-purple-200 bg-white px-5 py-3 text-sm font-bold text-purple-700">Back to document review</a>
     </header>
     <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">Preview only. The private source file remains behind admin authentication and every view is recorded.</div>
     <section class="relative min-h-[75vh] overflow-hidden rounded-xl border border-slate-200 bg-slate-950">

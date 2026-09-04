@@ -34,27 +34,10 @@ return new class extends Migration
                 'payment_attempt_application_status_index'
             );
         });
-
-        Schema::create('paymongo_webhook_events', function (Blueprint $table) {
-            $table->id();
-            $table->string('event_id', 160)->unique();
-            $table->string('event_type', 120);
-            $table->string('resource_id', 120)->nullable()->index();
-            $table->boolean('livemode')->default(false);
-            $table->char('payload_sha256', 64);
-            $table->string('status', 30)->default('received');
-            $table->string('error_code', 80)->nullable();
-            $table->timestamp('received_at');
-            $table->timestamp('processed_at')->nullable();
-            $table->timestamps();
-
-            $table->index(['event_type', 'received_at']);
-        });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('paymongo_webhook_events');
         Schema::dropIfExists('payment_attempts');
     }
 };

@@ -14,7 +14,6 @@
             <h1>{{ $batchLabel }}</h1>
             <p>Class announcements, reminders, and the next activities your trainer has shared.</p>
         </div>
-        <span class="lms-banner-mark" aria-hidden="true">M</span>
     </header>
 
     <nav class="lms-context-tabs" aria-label="Trainee classroom sections">

@@ -25,9 +25,7 @@ class PaymentVerifiedNotification extends Notification implements ShouldQueue
     /** @return list<string> */
     public function via(object $notifiable): array
     {
-        return filled($notifiable->email)
-            ? ['database', 'mail']
-            : ['database'];
+        return ['database'];
     }
 
     /** @return array<string, mixed> */

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
+use App\Models\TrainingProgram;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -21,7 +22,7 @@ class BatchScheduleAssignmentTest extends TestCase
             ['name' => 'September Batch 1', 'deadline' => now()->addMonths(2)],
         ] as $batch) {
             $this->actingAs($admin)
-                ->post(route('admin.schedules.store'), [
+                ->post(route('admin.batches.store'), [
                     'name' => $batch['name'],
                     'year' => 2026,
                     'is_active' => '1',
@@ -29,7 +30,7 @@ class BatchScheduleAssignmentTest extends TestCase
                     'am_days' => 'MWF',
                     'pm_days' => 'TTS',
                 ])
-                ->assertRedirect(route('admin.schedules.index'));
+                ->assertRedirect(route('admin.batches.index'));
         }
 
         $this->assertDatabaseHas('training_batches', [
@@ -44,7 +45,7 @@ class BatchScheduleAssignmentTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->get(route('admin.schedules.index'))
+            ->get(route('admin.batches.index'))
             ->assertSee('August Batch 1 2026')
             ->assertSee('September Batch 1 2026');
     }
@@ -67,7 +68,7 @@ class BatchScheduleAssignmentTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->post(route('admin.schedules.store'), [
+            ->post(route('admin.batches.store'), [
                 'name' => 'September Batch 1',
                 'year' => 2026,
                 'trainer_id' => $trainer->id,
@@ -76,7 +77,7 @@ class BatchScheduleAssignmentTest extends TestCase
                 'am_days' => 'MWF',
                 'pm_days' => 'TTS',
             ])
-            ->assertRedirect(route('admin.schedules.index'))
+            ->assertRedirect(route('admin.batches.index'))
             ->assertSessionHas('saved');
 
         $this->assertDatabaseHas('training_batches', [
@@ -114,7 +115,7 @@ class BatchScheduleAssignmentTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->patch(route('admin.schedules.update', $batch), [
+            ->patch(route('admin.batches.update', $batch), [
                 'name' => 'Batch 1',
                 'year' => 2026,
                 'trainer_id' => $trainer->id,
@@ -132,7 +133,7 @@ class BatchScheduleAssignmentTest extends TestCase
                 'pm_end_time' => '17:00:00',
                 'pm_room' => 'Lecture Room',
             ])
-            ->assertRedirect(route('admin.schedules.index'))
+            ->assertRedirect(route('admin.batches.index'))
             ->assertSessionHas('saved');
 
         $this->assertDatabaseHas('training_batches', [
@@ -159,7 +160,7 @@ class BatchScheduleAssignmentTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->patch(route('admin.schedules.update', $batch), [
+            ->patch(route('admin.batches.update', $batch), [
                 'name' => 'August Batch 1',
                 'year' => 2026,
                 'trainer_id' => $trainer->id,
@@ -178,7 +179,7 @@ class BatchScheduleAssignmentTest extends TestCase
                 'pm_room' => 'Updated Lecture Room',
                 'notes' => 'Schedule updated after enrollment closed.',
             ])
-            ->assertRedirect(route('admin.schedules.index'))
+            ->assertRedirect(route('admin.batches.index'))
             ->assertSessionHas('saved');
 
         $this->assertDatabaseHas('training_batches', [
@@ -226,6 +227,140 @@ class BatchScheduleAssignmentTest extends TestCase
             ->assertOk()
             ->assertSee('Assigned Learner')
             ->assertDontSee('Other Learner');
+    }
+
+    public function test_program_catalog_and_batch_editor_live_on_separate_admin_pages(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->get(route('admin.training-programs.index'))
+            ->assertOk()
+            ->assertSee('Training program catalog')
+            ->assertSee('Caregiving NC II')
+            ->assertSee('CAREGIVING-NC-II')
+            ->assertSee('₱22,000.00')
+            ->assertSee('<table class="min-w-full divide-y divide-slate-100 text-sm">', false)
+            ->assertDontSee('data-batch-dialog', false)
+            ->assertDontSee('Admin master calendar');
+
+        $program = TrainingProgram::query()->where('code', 'CAREGIVING-NC-II')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->get(route('admin.training-programs.edit', $program))
+            ->assertOk()
+            ->assertSee('data-program-dialog', false)
+            ->assertSee('data-auto-open="true"', false)
+            ->assertSee('Edit program');
+
+        $this->actingAs($admin)
+            ->get(route('admin.batches.index'))
+            ->assertOk()
+            ->assertSee('Create batch')
+            ->assertSee('Configured batches')
+            ->assertDontSee('Training program catalog')
+            ->assertDontSee('Admin master calendar');
+
+        $this->actingAs($admin)
+            ->get(route('admin.schedules.index'))
+            ->assertOk()
+            ->assertSee('Admin master calendar')
+            ->assertDontSee('Training program catalog')
+            ->assertDontSee('data-batch-dialog', false);
+    }
+
+    public function test_admin_can_delete_a_program_without_related_records(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $program = TrainingProgram::create([
+            'name' => 'Caregiving NC III',
+            'code' => 'CAREGIVING-NC-III',
+            'description' => 'Advanced caregiving training.',
+            'total_program_fee' => 30000,
+            'downpayment_amount' => 3500,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.training-programs.index'))
+            ->assertOk()
+            ->assertSee('Delete')
+            ->assertSee(route('admin.training-programs.destroy', $program), false);
+
+        $this->actingAs($admin)
+            ->delete(route('admin.training-programs.destroy', $program))
+            ->assertRedirect(route('admin.training-programs.index'))
+            ->assertSessionHas('saved');
+
+        $this->assertDatabaseMissing('training_programs', ['id' => $program->id]);
+    }
+
+    public function test_admin_cannot_delete_a_program_that_has_batches(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $program = TrainingProgram::create([
+            'name' => 'Caregiving NC III',
+            'code' => 'CAREGIVING-NC-III',
+            'total_program_fee' => 30000,
+            'downpayment_amount' => 3500,
+            'is_active' => true,
+        ]);
+        TrainingBatch::create([
+            'training_program_id' => $program->id,
+            'name' => 'Protected Batch',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+            'am_days' => 'MWF',
+            'pm_days' => 'TTS',
+        ]);
+
+        $this->actingAs($admin)
+            ->from(route('admin.training-programs.index'))
+            ->delete(route('admin.training-programs.destroy', $program))
+            ->assertRedirect(route('admin.training-programs.index'))
+            ->assertSessionHasErrors('program');
+
+        $this->assertDatabaseHas('training_programs', ['id' => $program->id]);
+    }
+
+    public function test_admin_cannot_delete_the_last_training_program(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $program = TrainingProgram::query()->where('code', 'CAREGIVING-NC-II')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->from(route('admin.training-programs.index'))
+            ->delete(route('admin.training-programs.destroy', $program))
+            ->assertRedirect(route('admin.training-programs.index'))
+            ->assertSessionHasErrors('program');
+
+        $this->assertDatabaseHas('training_programs', ['id' => $program->id]);
+    }
+
+    public function test_admin_program_save_feedback_uses_a_toast_instead_of_a_page_banner(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->post(route('admin.training-programs.store'), [
+                'program_name' => 'Caregiving NC III',
+                'program_code' => 'CAREGIVING-NC-III',
+                'program_description' => 'Advanced caregiving training.',
+                'program_total_fee' => '30000.00',
+                'program_downpayment' => '3500.00',
+                'program_is_active' => '1',
+            ])
+            ->assertRedirect(route('admin.training-programs.index'))
+            ->assertSessionHas('saved');
+
+        $this->actingAs($admin)
+            ->get(route('admin.training-programs.index'))
+            ->assertOk()
+            ->assertSee('data-dashboard-toast', false)
+            ->assertSee('dashboard-toast-success', false)
+            ->assertSee('Training program Caregiving NC III created.')
+            ->assertDontSee('mb-6 rounded-lg border border-emerald-200 bg-emerald-50', false);
     }
 
     private function approvedApplication(User $user, TrainingBatch $batch, string $firstName): EnrollmentApplication

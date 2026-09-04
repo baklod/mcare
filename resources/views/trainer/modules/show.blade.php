@@ -15,7 +15,7 @@
     }
 @endphp
 
-<div class="mx-auto max-w-7xl space-y-6" data-trainer-module-hub>
+<div class="w-full space-y-6" data-trainer-module-hub>
     <!-- Header -->
     <header class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -103,12 +103,6 @@
             @endif
         </nav>
     </header>
-
-    @if($errors->any())
-        <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-800">
-            {{ $errors->first() }}
-        </div>
-    @endif
 
     <!-- SECTION 1: LEARNING MATERIALS & PREVIEW -->
     @if($activeTab === 'materials')
@@ -230,19 +224,19 @@
                 @endforelse
             </div>
 
-            <dialog id="module-quiz-dialog" data-dashboard-dialog data-auto-open="{{ old('_composer') === 'module-quiz' && $errors->any() ? 'true' : 'false' }}" class="lms-workflow-dialog is-compact" aria-labelledby="module-quiz-title">
+            <dialog id="module-quiz-dialog" data-dashboard-dialog data-auto-open="{{ old('_composer') === 'module-quiz' && $errors->any() ? 'true' : 'false' }}" class="lms-workflow-dialog is-landscape" aria-labelledby="module-quiz-title">
                 <div class="lms-dialog-header">
                     <div><p class="lms-eyebrow">{{ $module->title }}</p><h2 id="module-quiz-title">Create module quiz</h2><p>Create the draft, then add the answer key and questions.</p></div>
                     <button type="button" data-dashboard-dialog-close class="lms-dialog-close" aria-label="Close quiz creator"><x-dashboard-icon name="xmark" /></button>
                 </div>
-                <form method="POST" action="{{ route('trainer.modules.quizzes.store', $module) }}" class="grid gap-3 p-6 sm:grid-cols-2" data-dashboard-dialog-form data-submit-label="Creating quiz...">
+                <form method="POST" action="{{ route('trainer.modules.quizzes.store', $module) }}" class="lms-form-grid lms-composer-form" data-dashboard-dialog-form data-submit-label="Creating quiz...">
                     @csrf
                     <input type="hidden" name="_composer" value="module-quiz">
-                    <div class="sm:col-span-2">
+                    <div class="lms-field lms-field-span-2">
                         <label class="block text-xs font-bold text-purple-900 mb-1">Assessment / Quiz Title</label>
                         <input name="title" required maxlength="160" placeholder="e.g. {{ $module->title }} - Mastery Assessment" class="form-field">
                     </div>
-                    <div class="sm:col-span-2">
+                    <div class="lms-field lms-field-span-2">
                         <label class="block text-xs font-bold text-purple-900 mb-1">Competency Submodule</label>
                         <select name="training_submodule_id" class="form-field" required>
                             <option value="">Choose the outcome this quiz measures</option>
@@ -252,20 +246,20 @@
                         </select>
                         <p class="mt-1 text-[10px] text-stone-500">A trainee must pass this quiz before marking the selected submodule done.</p>
                     </div>
-                    <div class="sm:col-span-2">
+                    <div class="lms-field lms-field-span-2">
                         <label class="block text-xs font-bold text-purple-900 mb-1">Instructions</label>
-                        <textarea name="instructions" rows="2" placeholder="Instructions for trainees before starting the quiz..." class="form-field"></textarea>
+                        <textarea name="instructions" rows="3" placeholder="Instructions for trainees before starting the quiz..." class="form-field"></textarea>
                     </div>
-                    <div>
+                    <div class="lms-field">
                         <label class="block text-xs font-bold text-purple-900 mb-1">Time Limit (Minutes)</label>
                         <input type="number" name="time_limit_minutes" value="20" min="1" max="180" class="form-field">
                     </div>
-                    <div>
+                    <div class="lms-field">
                         <label class="block text-xs font-bold text-purple-900 mb-1">Passing Score (%)</label>
                         <input type="number" name="passing_score_percent" value="75" min="50" max="100" class="form-field">
                     </div>
-                    <p class="sm:col-span-2 text-xs text-stone-600">The assessment starts as a draft. Add the answer key and questions before publishing it to trainees.</p>
-                    <div class="flex flex-col-reverse gap-2 border-t border-stone-200 pt-4 sm:col-span-2 sm:flex-row sm:justify-end">
+                    <p class="lms-field-wide text-xs text-stone-600">The assessment starts as a draft. Add the answer key and questions before publishing it to trainees.</p>
+                    <div class="lms-form-actions lms-field-wide">
                         <button type="button" data-dashboard-dialog-close class="secondary-action text-xs">Cancel</button>
                         <button type="submit" data-action-button class="primary-action text-xs">Create & Add Questions</button>
                     </div>
@@ -319,7 +313,7 @@
                                     $childHasQuiz = ($childSummary['required_count'] ?? 0) > 0;
                                     $childAllPassed = (bool) ($childSummary['all_passed'] ?? false);
                                     $childReadyForRemediation = (bool) ($childSummary['ready_for_remediation_evaluation'] ?? false);
-                                    $canMarkCompetent = (bool) $childProgress?->submitted_at && (!$childHasQuiz || $childAllPassed);
+                                    $canMarkCompetent = ! $childHasQuiz || $childAllPassed;
                                 @endphp
                                 <form method="POST" action="{{ route('trainer.modules.evaluate', $module) }}" class="space-y-3 rounded-xl border border-stone-200 bg-white p-4">
                                     @csrf
@@ -343,14 +337,14 @@
                                             @if($childAverage !== null)<span class="block text-[10px]">Average {{ number_format((float) $childAverage, 1) }}%</span>@endif
                                         </div>
                                         <div class="rounded-lg bg-stone-100 p-2.5 text-stone-800">
-                                            <span class="block text-[10px] font-semibold">Trainee submission</span>
-                                            <strong>{{ $childProgress?->submitted_at ? $childProgress->submitted_at->format('M d, g:i A') : 'Not submitted' }}</strong>
+                                            <span class="block text-[10px] font-semibold">Face-to-face grade</span>
+                                            <strong>{{ $childProgress?->evaluated_at ? $childProgress->evaluated_at->format('M d, g:i A') : 'Awaiting trainer evaluation' }}</strong>
                                         </div>
                                     </div>
 
-                                    @if(!$childProgress?->submitted_at && !$childReadyForRemediation)
-                                        <p class="rounded-lg bg-amber-50 p-2 text-[11px] font-semibold leading-4 text-amber-800">Competent and NYC require this submodule's Mark as Done submission.</p>
-                                    @elseif($childReadyForRemediation && !$childProgress?->submitted_at)
+                                    @if($childHasQuiz && ! $childAllPassed && ! $childReadyForRemediation)
+                                        <p class="rounded-lg bg-amber-50 p-2 text-[11px] font-semibold leading-4 text-amber-800">Competent unlocks after assigned classwork is passed. You can still record Not yet competent from the face-to-face session.</p>
+                                    @elseif($childReadyForRemediation)
                                         <p class="rounded-lg bg-amber-50 p-2 text-[11px] font-semibold leading-4 text-amber-800">Attempts are exhausted. You may record Not Yet Competent with remediation feedback.</p>
                                     @endif
 
@@ -371,7 +365,7 @@
                                                 <option value="not_yet_competent" @selected($childProgress?->competency_outcome === 'not_yet_competent')>Not Yet Competent</option>
                                             </select>
                                             @unless($canMarkCompetent)
-                                                <p class="mt-1 text-[10px] font-semibold leading-4 text-amber-700">Competent unlocks after submission and passed assigned classwork.</p>
+                                                <p class="mt-1 text-[10px] font-semibold leading-4 text-amber-700">Competent unlocks after assigned classwork is passed.</p>
                                             @endunless
                                         </div>
                                     </div>
@@ -392,7 +386,7 @@
             </div>
 
             <div class="hidden" aria-hidden="true">
-                <table class="dashboard-table min-w-[58rem]">
+                <table class="dashboard-table w-full min-w-[58rem]">
                     <thead>
                         <tr>
                             <th>Learner</th>
@@ -412,8 +406,8 @@
                                 $assessmentSummary = $assessmentSummaryByApp->get($trainee->id, []);
                                 $assessmentAverage = $assessmentSummary['average_score'] ?? null;
                                 $readyForRemediation = (bool) ($assessmentSummary['ready_for_remediation_evaluation'] ?? false);
-                                $canMarkCompetent = (bool) $progress?->submitted_at
-                                    && (bool) ($assessmentSummary['all_passed'] ?? false);
+                                $canMarkCompetent = ($assessmentSummary['required_count'] ?? 0) === 0
+                                    || (bool) ($assessmentSummary['all_passed'] ?? false);
                             @endphp
                             <tr class="align-middle">
                                 <td>
@@ -466,10 +460,10 @@
                                             <div class="font-bold text-stone-900 border-b border-stone-100 pb-2">
                                                 Grade: {{ $trainee->first_name }} {{ $trainee->last_name }}
                                             </div>
-                                            @if(!$progress?->submitted_at && !$readyForRemediation)
-                                                <p class="rounded-lg bg-amber-50 p-2 text-amber-800">Final Competent/NYC outcomes stay blocked until the trainee clicks Mark as Done.</p>
-                                            @elseif($readyForRemediation && !$progress?->submitted_at)
-                                                <p class="rounded-lg bg-amber-50 p-2 text-amber-800">The trainee used every attempt and still has failed classwork. You may record Not Yet Competent and remediation feedback without a Mark as Done submission.</p>
+                                            @if($readyForRemediation)
+                                                <p class="rounded-lg bg-amber-50 p-2 text-amber-800">The trainee used every attempt and still has failed classwork. You may record Not Yet Competent and remediation feedback from the face-to-face session.</p>
+                                            @elseif(($assessmentSummary['required_count'] ?? 0) > 0 && ! ($assessmentSummary['all_passed'] ?? false))
+                                                <p class="rounded-lg bg-amber-50 p-2 text-amber-800">Competent unlocks after assigned classwork is passed. You can still record Not yet competent from the face-to-face session.</p>
                                             @endif
                                             <form method="POST" action="{{ route('trainer.modules.evaluate', $module) }}" class="space-y-3">
                                                 @csrf
@@ -498,7 +492,7 @@
                                                         <option value="in_progress" @selected(!$progress || $progress->competency_outcome === 'in_progress')>In Progress</option>
                                                     </select>
                                                     @unless($canMarkCompetent)
-                                                        <p class="mt-1 text-[10px] font-semibold leading-4 text-amber-700">Competent is selectable, but saving it requires passed classwork and the trainee's Mark as Done submission.</p>
+                                                        <p class="mt-1 text-[10px] font-semibold leading-4 text-amber-700">Competent is selectable, but saving it requires passed assigned classwork.</p>
                                                     @endunless
                                                 </div>
 

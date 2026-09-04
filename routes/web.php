@@ -9,12 +9,15 @@ use App\Http\Controllers\Admin\AdminCareerHubController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminLearningSystemController;
 use App\Http\Controllers\Admin\AdminSessionController;
+use App\Http\Controllers\Admin\AdmissionApplicationReviewController;
 use App\Http\Controllers\Admin\BatchScheduleController;
 use App\Http\Controllers\Admin\CertificationController;
 use App\Http\Controllers\Admin\EnrollmentReviewController;
 use App\Http\Controllers\Admin\HistoricalAlumniClaimController as AdminHistoricalAlumniClaimController;
 use App\Http\Controllers\Admin\PaymentScheduleController;
+use App\Http\Controllers\Admin\PublicUpdateController;
 use App\Http\Controllers\Admin\TrainingProgramController;
+use App\Http\Controllers\AdmissionApplicationController;
 use App\Http\Controllers\Alumni\AlumniCareerHubController;
 use App\Http\Controllers\Auth\AccountSessionController;
 use App\Http\Controllers\Auth\EmailVerificationController;
@@ -24,7 +27,9 @@ use App\Http\Controllers\CompetencyWorkbookController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\EnrollmentPaymentController;
 use App\Http\Controllers\HistoricalAlumniClaimController;
+use App\Http\Controllers\LandingChatController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PhilippineAddressController;
 use App\Http\Controllers\Trainee\CertificateController as TraineeCertificateController;
 use App\Http\Controllers\Trainee\QuizAttemptController as TraineeQuizAttemptController;
 use App\Http\Controllers\Trainee\QuizController as TraineeQuizController;
@@ -35,9 +40,13 @@ use App\Http\Controllers\Trainer\CompetencyRecordController as TrainerCompetency
 use App\Http\Controllers\Trainer\QuizController as TrainerQuizController;
 use App\Http\Controllers\Trainer\TrainerDashboardController;
 use App\Http\Controllers\Trainer\TrainerPortalController;
+use App\Http\Controllers\Trainer\TrainerSearchController;
 use App\Http\Controllers\Trainer\TrainingModuleController as TrainerTrainingModuleController;
 use App\Models\EnrollmentApplication;
 use App\Models\OfficialDocument;
+use App\Models\PublicSiteSetting;
+use App\Models\PublicUpdate;
+use App\Models\TrainingProgram;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -51,9 +60,16 @@ Route::middleware('throttle:global-web')->group(function () {
         $applicationProgress = is_numeric($applicationId)
             ? EnrollmentApplication::query()->whereKey((int) $applicationId)->first()
             : null;
+        $programs = TrainingProgram::query()->active()->orderBy('name')->get();
+        $publicUpdates = PublicUpdate::query()->forLanding()->get();
+        $socialLinks = PublicSiteSetting::current()->socialLinks();
 
-        return view('landing.home', compact('applicationProgress'));
+        return view('landing.home', compact('applicationProgress', 'programs', 'publicUpdates', 'socialLinks'));
     })->name('landing');
+
+    Route::post('/landing/chat', [LandingChatController::class, 'store'])
+        ->middleware('throttle:landing-chat')
+        ->name('landing.chat');
 
     /*
      * OAuth callback URLs can temporarily contain authorization parameters.
@@ -93,6 +109,9 @@ Route::middleware('throttle:global-web')->group(function () {
     Route::post('/alumni/claim', [HistoricalAlumniClaimController::class, 'store'])
         ->middleware(['throttle:3,1', 'private.response'])
         ->name('alumni.claim.store');
+    Route::get('/alumni/claim/received', [HistoricalAlumniClaimController::class, 'received'])
+        ->middleware('private.response')
+        ->name('alumni.claim.received');
 
     Route::prefix('account')
         ->name('account.')
@@ -100,6 +119,9 @@ Route::middleware('throttle:global-web')->group(function () {
         ->group(function () {
             Route::get('/settings', [AccountSettingsController::class, 'show'])->name('settings');
             Route::get('/help', [AccountSettingsController::class, 'help'])->name('help');
+            Route::patch('/avatar', [AccountSettingsController::class, 'updateAvatar'])
+                ->middleware('throttle:sensitive-mutation')
+                ->name('avatar.update');
             Route::patch('/password', [AccountSettingsController::class, 'updatePassword'])
                 ->middleware('throttle:sensitive-mutation')
                 ->name('password.update');
@@ -145,16 +167,51 @@ Route::middleware('throttle:global-web')->group(function () {
      * no-cache/no-index response headers even though the form is publicly reachable.
      */
     Route::middleware('private.response')->group(function () {
+        Route::get('/applications', [AdmissionApplicationController::class, 'create'])
+            ->name('applications.create');
+        Route::post('/applications', [AdmissionApplicationController::class, 'store'])
+            ->middleware('throttle:3,1')
+            ->name('applications.store');
+        Route::get('/applications/received', [AdmissionApplicationController::class, 'received'])
+            ->name('applications.received');
+        Route::get('/applications/status', [AdmissionApplicationController::class, 'status'])
+            ->name('applications.status');
+        Route::post('/applications/status', [AdmissionApplicationController::class, 'lookup'])
+            ->middleware('throttle:search')
+            ->name('applications.lookup');
+
         Route::get('/enrollment', [EnrollmentController::class, 'create'])
             ->name('enrollment.create');
+        Route::post('/enrollment/unlock', [EnrollmentController::class, 'unlock'])
+            ->middleware('throttle:search')
+            ->name('enrollment.unlock');
+
+        Route::get('/enrollment/address/regions', [PhilippineAddressController::class, 'regions'])
+            ->middleware('throttle:address-lookup')
+            ->name('enrollment.address.regions');
+        Route::get('/enrollment/address/provinces', [PhilippineAddressController::class, 'provinces'])
+            ->middleware('throttle:address-lookup')
+            ->name('enrollment.address.provinces');
+        Route::get('/enrollment/address/cities', [PhilippineAddressController::class, 'cities'])
+            ->middleware('throttle:address-lookup')
+            ->name('enrollment.address.cities');
+        Route::get('/enrollment/address/barangays', [PhilippineAddressController::class, 'barangays'])
+            ->middleware('throttle:address-lookup')
+            ->name('enrollment.address.barangays');
 
         Route::post('/enrollment', [EnrollmentController::class, 'store'])
-            ->middleware('throttle:3,1')
+            ->middleware('throttle:8,1')
             ->name('enrollment.store');
 
         Route::get('/enrollment/drafts/{field}/content', [EnrollmentController::class, 'draftContent'])
             ->middleware('throttle:document-downloads')
             ->name('enrollment.drafts.content');
+
+        Route::get('/payments', [EnrollmentPaymentController::class, 'payments'])
+            ->name('payments.show');
+        Route::post('/payments', [EnrollmentPaymentController::class, 'lookup'])
+            ->middleware('throttle:search')
+            ->name('payments.lookup');
 
         Route::middleware(['enrollment.payment.access'])->group(function () {
             Route::get('/payment', [EnrollmentPaymentController::class, 'show'])
@@ -205,6 +262,22 @@ Route::middleware('throttle:global-web')->group(function () {
             Route::middleware(['auth', 'admin', 'two-factor', 'permission:admin.access'])->group(function () {
                 Route::get('/', AdminDashboardController::class)->name('dashboard');
 
+                Route::get('/applications', [AdmissionApplicationReviewController::class, 'index'])
+                    ->middleware(['permission:enrollments.review', 'throttle:search'])
+                    ->name('applications.index');
+
+                Route::get('/applications/{admissionApplication}', [AdmissionApplicationReviewController::class, 'show'])
+                    ->middleware('permission:enrollments.review')
+                    ->name('applications.show');
+
+                Route::patch('/applications/{admissionApplication}', [AdmissionApplicationReviewController::class, 'update'])
+                    ->middleware(['permission:enrollments.review', 'throttle:sensitive-mutation'])
+                    ->name('applications.update');
+
+                Route::delete('/applications/{admissionApplication}', [AdmissionApplicationReviewController::class, 'destroy'])
+                    ->middleware(['permission:enrollments.review', 'throttle:sensitive-mutation'])
+                    ->name('applications.destroy');
+
                 Route::get('/enrollments', [EnrollmentReviewController::class, 'index'])
                     ->middleware(['permission:enrollments.review', 'throttle:search'])
                     ->name('enrollments.index');
@@ -217,9 +290,17 @@ Route::middleware('throttle:global-web')->group(function () {
                     ->middleware(['permission:enrollments.review', 'throttle:sensitive-mutation'])
                     ->name('enrollments.update');
 
+                Route::delete('/enrollments/{enrollmentApplication}', [EnrollmentReviewController::class, 'destroy'])
+                    ->middleware(['permission:enrollments.review', 'throttle:sensitive-mutation'])
+                    ->name('enrollments.destroy');
+
                 Route::get('/enrollments/{enrollmentApplication}/tesda-form', [EnrollmentReviewController::class, 'tesdaForm'])
                     ->middleware(['permission:enrollments.review', 'throttle:document-downloads'])
                     ->name('enrollments.tesda-form');
+
+                Route::get('/enrollments/{enrollmentApplication}/document-review', [EnrollmentReviewController::class, 'documentReview'])
+                    ->middleware('permission:enrollments.review')
+                    ->name('enrollments.document-review');
 
                 Route::patch('/enrollments/{enrollmentApplication}/documents/review', [EnrollmentReviewController::class, 'updateDocumentReview'])
                     ->middleware(['permission:enrollments.review', 'throttle:sensitive-mutation'])
@@ -233,13 +314,39 @@ Route::middleware('throttle:global-web')->group(function () {
                     ->middleware(['permission:enrollments.review', 'throttle:document-downloads'])
                     ->name('enrollments.documents.content');
 
-                Route::get('/schedules', [BatchScheduleController::class, 'index'])
-                    ->middleware('permission:schedules.manage')
-                    ->name('schedules.index');
+                Route::redirect('/public-updates', '/admin/public-settings');
 
-                Route::post('/schedules', [BatchScheduleController::class, 'store'])
-                    ->middleware(['permission:schedules.manage', 'throttle:sensitive-mutation'])
-                    ->name('schedules.store');
+                Route::get('/public-settings', [PublicUpdateController::class, 'index'])
+                    ->middleware('permission:announcements.manage')
+                    ->name('public-settings.index');
+
+                Route::get('/public-settings/{publicUpdate}/edit', [PublicUpdateController::class, 'edit'])
+                    ->middleware('permission:announcements.manage')
+                    ->name('public-settings.edit');
+
+                Route::post('/public-settings', [PublicUpdateController::class, 'store'])
+                    ->middleware(['permission:announcements.manage', 'throttle:sensitive-mutation'])
+                    ->name('public-settings.store');
+
+                Route::patch('/public-settings/social', [PublicUpdateController::class, 'updateSocial'])
+                    ->middleware(['permission:announcements.manage', 'throttle:sensitive-mutation'])
+                    ->name('public-settings.social');
+
+                Route::patch('/public-settings/{publicUpdate}', [PublicUpdateController::class, 'update'])
+                    ->middleware(['permission:announcements.manage', 'throttle:sensitive-mutation'])
+                    ->name('public-settings.update');
+
+                Route::delete('/public-settings/{publicUpdate}', [PublicUpdateController::class, 'destroy'])
+                    ->middleware(['permission:announcements.manage', 'throttle:sensitive-mutation'])
+                    ->name('public-settings.destroy');
+
+                Route::get('/programs', [TrainingProgramController::class, 'index'])
+                    ->middleware('permission:schedules.manage')
+                    ->name('training-programs.index');
+
+                Route::get('/programs/{trainingProgram}/edit', [TrainingProgramController::class, 'edit'])
+                    ->middleware('permission:schedules.manage')
+                    ->name('training-programs.edit');
 
                 Route::post('/training-programs', [TrainingProgramController::class, 'store'])
                     ->middleware(['permission:schedules.manage', 'throttle:sensitive-mutation'])
@@ -249,21 +356,41 @@ Route::middleware('throttle:global-web')->group(function () {
                     ->middleware(['permission:schedules.manage', 'throttle:sensitive-mutation'])
                     ->name('training-programs.update');
 
-                Route::get('/schedules/{trainingBatch}/edit', [BatchScheduleController::class, 'edit'])
+                Route::delete('/training-programs/{trainingProgram}', [TrainingProgramController::class, 'destroy'])
+                    ->middleware(['permission:schedules.manage', 'throttle:sensitive-mutation'])
+                    ->name('training-programs.destroy');
+
+                Route::get('/batches', [BatchScheduleController::class, 'index'])
                     ->middleware('permission:schedules.manage')
-                    ->name('schedules.edit');
+                    ->name('batches.index');
 
-                Route::patch('/schedules/{trainingBatch}', [BatchScheduleController::class, 'update'])
+                Route::post('/batches', [BatchScheduleController::class, 'store'])
                     ->middleware(['permission:schedules.manage', 'throttle:sensitive-mutation'])
-                    ->name('schedules.update');
+                    ->name('batches.store');
 
-                Route::delete('/schedules/{trainingBatch}', [BatchScheduleController::class, 'destroy'])
+                Route::get('/batches/{trainingBatch}/edit', [BatchScheduleController::class, 'edit'])
+                    ->middleware('permission:schedules.manage')
+                    ->name('batches.edit');
+
+                Route::patch('/batches/{trainingBatch}', [BatchScheduleController::class, 'update'])
                     ->middleware(['permission:schedules.manage', 'throttle:sensitive-mutation'])
-                    ->name('schedules.destroy');
+                    ->name('batches.update');
+
+                Route::delete('/batches/{trainingBatch}', [BatchScheduleController::class, 'destroy'])
+                    ->middleware(['permission:schedules.manage', 'throttle:sensitive-mutation'])
+                    ->name('batches.destroy');
+
+                Route::get('/schedules', [BatchScheduleController::class, 'calendar'])
+                    ->middleware('permission:schedules.manage')
+                    ->name('schedules.index');
 
                 Route::get('/payment-scheduling', [PaymentScheduleController::class, 'index'])
                     ->middleware('permission:payments.verify')
                     ->name('payment-schedules.index');
+
+                Route::get('/payment-scheduling/lookup', [PaymentScheduleController::class, 'lookupEnrollee'])
+                    ->middleware(['permission:payments.verify', 'throttle:search'])
+                    ->name('payment-schedules.lookup');
 
                 Route::patch('/payment-scheduling/{enrollmentApplication}', [PaymentScheduleController::class, 'update'])
                     ->middleware(['permission:payments.verify', 'throttle:sensitive-mutation'])
@@ -298,9 +425,15 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/learning/trainees/export', [AdminLearningSystemController::class, 'exportTrainees'])
                     ->middleware(['permission:reports.export', 'throttle:document-downloads'])
                     ->name('learning.trainees.export');
+                Route::get('/learning/trainees/{enrollmentApplication}', [AdminLearningSystemController::class, 'showTrainee'])
+                    ->middleware('permission:trainees.manage')
+                    ->name('learning.trainees.show');
                 Route::patch('/learning/trainees/{enrollmentApplication}/status', [AdminLearningSystemController::class, 'updateTraineeStatus'])
                     ->middleware(['permission:trainees.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.trainees.status');
+                Route::delete('/learning/trainees/{enrollmentApplication}', [AdminLearningSystemController::class, 'destroyTrainee'])
+                    ->middleware(['permission:trainees.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.trainees.destroy');
                 Route::get('/learning/attendance', [AdminAttendanceController::class, 'index'])
                     ->middleware('permission:trainees.manage')
                     ->name('learning.attendance');
@@ -325,6 +458,27 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::post('/learning/modules', [AdminLearningSystemController::class, 'storeModule'])
                     ->middleware(['permission:modules.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.modules.store');
+                Route::patch('/learning/modules/{module}', [AdminLearningSystemController::class, 'updateModule'])
+                    ->middleware(['permission:modules.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.modules.update');
+                Route::post('/learning/modules/presets', [AdminLearningSystemController::class, 'storeCatalogUnit'])
+                    ->middleware(['permission:modules.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.modules.presets.store');
+                Route::patch('/learning/modules/presets/{competencyUnit}', [AdminLearningSystemController::class, 'updateCatalogUnit'])
+                    ->middleware(['permission:modules.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.modules.presets.update');
+                Route::delete('/learning/modules/presets/{competencyUnit}', [AdminLearningSystemController::class, 'destroyCatalogUnit'])
+                    ->middleware(['permission:modules.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.modules.presets.destroy');
+                Route::post('/learning/modules/outcomes', [AdminLearningSystemController::class, 'storeCatalogOutcome'])
+                    ->middleware(['permission:modules.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.modules.outcomes.store');
+                Route::patch('/learning/modules/outcomes/{competencyOutcome}', [AdminLearningSystemController::class, 'updateCatalogOutcome'])
+                    ->middleware(['permission:modules.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.modules.outcomes.update');
+                Route::delete('/learning/modules/outcomes/{competencyOutcome}', [AdminLearningSystemController::class, 'destroyCatalogOutcome'])
+                    ->middleware(['permission:modules.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.modules.outcomes.destroy');
                 Route::delete('/learning/modules/{module}', [AdminLearningSystemController::class, 'destroyModule'])
                     ->middleware(['permission:modules.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.modules.destroy');
@@ -372,7 +526,26 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::delete('/learning/alumni-jobs/{careerOpportunity}', [AdminCareerHubController::class, 'destroy'])
                     ->middleware(['permission:alumni.jobs.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.alumni-jobs.destroy');
+                Route::patch('/learning/alumni-jobs/inquiries/{careerInquiry}', [AdminCareerHubController::class, 'updateInquiry'])
+                    ->middleware(['permission:alumni.jobs.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.alumni-jobs.inquiries.update');
+                Route::delete('/learning/alumni-jobs/inquiries/{careerInquiry}', [AdminCareerHubController::class, 'destroyInquiry'])
+                    ->middleware(['permission:alumni.jobs.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.alumni-jobs.inquiries.destroy');
                 Route::get('/learning/reports', [AdminLearningSystemController::class, 'reports'])->name('learning.reports');
+
+                Route::get('/historical-alumni', [AdminHistoricalAlumniClaimController::class, 'index'])
+                    ->middleware('permission:accounts.manage')
+                    ->name('historical-alumni.index');
+                Route::get('/historical-alumni/{historicalAlumniClaim}', [AdminHistoricalAlumniClaimController::class, 'show'])
+                    ->middleware('permission:accounts.manage')
+                    ->name('historical-alumni.show');
+                Route::patch('/historical-alumni/{historicalAlumniClaim}', [AdminHistoricalAlumniClaimController::class, 'update'])
+                    ->middleware(['permission:accounts.manage', 'throttle:sensitive-mutation'])
+                    ->name('historical-alumni.update');
+                Route::get('/historical-alumni/{historicalAlumniClaim}/evidence', [AdminHistoricalAlumniClaimController::class, 'evidence'])
+                    ->middleware(['permission:accounts.manage', 'throttle:document-downloads'])
+                    ->name('historical-alumni.evidence');
 
                 Route::get('/accounts', [AdminAccountController::class, 'index'])
                     ->middleware('permission:accounts.manage')
@@ -421,6 +594,12 @@ Route::middleware('throttle:global-web')->group(function () {
             Route::middleware(['auth', 'trainer', 'permission:trainer.access'])->group(function () {
                 Route::get('/', TrainerDashboardController::class)
                     ->name('dashboard');
+                Route::get('/search', [TrainerSearchController::class, 'index'])
+                    ->middleware('throttle:search')
+                    ->name('search');
+                Route::get('/search/suggest', [TrainerSearchController::class, 'suggest'])
+                    ->middleware('throttle:search')
+                    ->name('search.suggest');
 
                 Route::get('/stream', [TrainerAnnouncementController::class, 'index'])
                     ->middleware('permission:announcements.manage')
@@ -633,6 +812,9 @@ Route::middleware('throttle:global-web')->group(function () {
                         Route::patch('/career-hub/availability', [AlumniCareerHubController::class, 'updateAvailability'])
                             ->middleware('throttle:sensitive-mutation')
                             ->name('career-hub.availability');
+                        Route::post('/career-hub/{careerOpportunity}/contact', [AlumniCareerHubController::class, 'contact'])
+                            ->middleware('throttle:sensitive-mutation')
+                            ->name('career-hub.contact');
                     });
                 });
             });
@@ -646,4 +828,8 @@ Route::middleware('throttle:global-web')->group(function () {
     Route::patch('/alumni/availability', [AlumniCareerHubController::class, 'updateAvailability'])
         ->middleware(['auth', 'trainee', 'graduate', 'permission:alumni.jobs.view', 'throttle:sensitive-mutation', 'private.response'])
         ->name('alumni.availability.update');
+
+    Route::post('/alumni/{careerOpportunity}/contact', [AlumniCareerHubController::class, 'contact'])
+        ->middleware(['auth', 'trainee', 'graduate', 'permission:alumni.jobs.view', 'throttle:sensitive-mutation', 'private.response'])
+        ->name('alumni.jobs.contact');
 });

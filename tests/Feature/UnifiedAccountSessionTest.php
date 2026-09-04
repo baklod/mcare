@@ -27,11 +27,14 @@ class UnifiedAccountSessionTest extends TestCase
             ->assertSee('assets/login-dashboard-preview.png', false)
             ->assertSee(route('login.store'), false)
             ->assertSee(route('auth.google.redirect'), false)
+            ->assertSee(route('applications.create'), false)
             ->assertSee(route('enrollment.create'), false)
             ->assertSee(route('alumni.claim.create'), false)
             ->assertSeeText('Sign in to your account')
             ->assertSeeText('Remember me')
-            ->assertSeeText('Sign in with Google');
+            ->assertSeeText('Sign in with Google')
+            ->assertSee('data-auth-login-form', false)
+            ->assertSeeText('Sign In');
     }
 
     public function test_every_role_signs_out_through_the_shared_landing_flow(): void

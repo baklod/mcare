@@ -14,6 +14,60 @@ class TrainingCalendarTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_admin_calendar_can_filter_by_batch_and_follows_mwf_and_tth_days(): void
+    {
+        $this->travelTo(Carbon::parse('2026-09-03 09:00:00'));
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $filteredBatch = $this->recurringBatch('MWF Filter Batch', 'MWF', 'TTH', 'Filtered AM Lab', 'Filtered PM Hall');
+        $hiddenBatch = $this->recurringBatch('Hidden Calendar Batch', 'MWF', 'TTS', 'Hidden AM Lab', 'Hidden PM Hall');
+
+        $this->actingAs($admin)
+            ->get(route('admin.schedules.index', [
+                'month' => '2026-09',
+                'batch_id' => $filteredBatch->id,
+            ]))
+            ->assertOk()
+            ->assertSee('name="batch_id"', false)
+            ->assertSee('MWF Filter Batch')
+            ->assertSee('AM MWF (Mon, Wed, Fri)')
+            ->assertSee('PM TTH (Tue, Thu)')
+            ->assertSee('Filtered AM Lab')
+            ->assertSee('Filtered PM Hall')
+            ->assertDontSee('Hidden AM Lab')
+            ->assertDontSee('Hidden PM Hall');
+
+        $sessions = app(TrainingCalendarService::class)->month($filteredBatch, Carbon::parse('2026-09-01'));
+        $amDays = $sessions->where('period', 'AM')->map(fn (array $session) => $session['date']->dayOfWeekIso)->unique()->sort()->values()->all();
+        $pmDays = $sessions->where('period', 'PM')->map(fn (array $session) => $session['date']->dayOfWeekIso)->unique()->sort()->values()->all();
+
+        $this->assertSame([1, 3, 5], $amDays);
+        $this->assertSame([2, 4], $pmDays);
+        $this->assertTrue($sessions->where('period', 'AM')->every(
+            fn (array $session) => ! in_array($session['date']->dayOfWeekIso, [2, 4, 6, 7], true)
+        ));
+        $this->assertTrue($sessions->where('period', 'PM')->every(
+            fn (array $session) => ! in_array($session['date']->dayOfWeekIso, [1, 3, 5, 6, 7], true)
+        ));
+        $this->assertNotSame($filteredBatch->id, $hiddenBatch->id);
+    }
+
+    public function test_ttf_day_pattern_matches_tuesday_and_thursday(): void
+    {
+        $this->assertSame(
+            ['Tue', 'Thu'],
+            app(TrainingCalendarService::class)->weekdayLabels('TTF'),
+        );
+        $this->assertSame(
+            ['Tue', 'Thu'],
+            app(TrainingCalendarService::class)->weekdayLabels('TTH'),
+        );
+        $this->assertSame(
+            ['Tue', 'Thu', 'Sat'],
+            app(TrainingCalendarService::class)->weekdayLabels('TTS'),
+        );
+    }
+
     public function test_admin_calendar_combines_sessions_from_multiple_batches(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
@@ -32,9 +86,9 @@ class TrainingCalendarTest extends TestCase
             ->assertSee('Room Beta')
             ->assertSee('data-training-calendar', false)
             ->assertSee('data-calendar-month-url', false)
-            ->assertSee('data-batch-dialog', false)
-            ->assertSee('data-batch-dialog-open', false)
-            ->assertSee('data-auto-open="false"', false);
+            ->assertDontSee('data-batch-dialog', false)
+            ->assertDontSee('Create batch')
+            ->assertDontSee('Training program catalog');
     }
 
     public function test_admin_batch_edit_opens_the_existing_batch_in_the_modal(): void
@@ -43,13 +97,15 @@ class TrainingCalendarTest extends TestCase
         $batch = $this->scheduledBatch('Modal Edit Batch', 'MWF', '08:00', '12:00', 'Skills Lab');
 
         $this->actingAs($admin)
-            ->get(route('admin.schedules.edit', $batch))
+            ->get(route('admin.batches.edit', $batch))
             ->assertOk()
             ->assertSee('data-batch-dialog', false)
             ->assertSee('data-auto-open="true"', false)
             ->assertSee('Edit batch')
             ->assertSee('Modal Edit Batch')
-            ->assertSee(route('admin.schedules.update', $batch), false);
+            ->assertSee(route('admin.batches.update', $batch), false)
+            ->assertDontSee('Training program catalog')
+            ->assertDontSee('Admin master calendar');
     }
 
     public function test_trainee_calendar_only_contains_their_assigned_period(): void
@@ -145,6 +201,31 @@ class TrainingCalendarTest extends TestCase
         $month = app(TrainingCalendarService::class)->suggestedMonth($batch, $reference);
 
         $this->assertSame('2026-07', $month->format('Y-m'));
+    }
+
+    private function recurringBatch(
+        string $name,
+        string $amDays,
+        string $pmDays,
+        string $amRoom = 'AM Skills Lab',
+        string $pmRoom = 'PM Lecture Room',
+    ): TrainingBatch {
+        return TrainingBatch::create([
+            'name' => $name,
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => Carbon::parse('2026-08-31'),
+            'training_starts_at' => Carbon::parse('2026-09-01'),
+            'training_ends_at' => Carbon::parse('2026-09-30'),
+            'am_days' => $amDays,
+            'am_start_time' => '08:00',
+            'am_end_time' => '12:00',
+            'am_room' => $amRoom,
+            'pm_days' => $pmDays,
+            'pm_start_time' => '13:00',
+            'pm_end_time' => '17:00',
+            'pm_room' => $pmRoom,
+        ]);
     }
 
     private function scheduledBatch(

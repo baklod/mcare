@@ -2,11 +2,9 @@
 
 namespace App\Services;
 
-use App\Models\CompetencyUnit;
 use App\Models\EnrollmentApplication;
 use App\Models\TraineeCompetencyRecord;
 use App\Models\TrainingBatch;
-use App\Support\CaregivingNcIiCatalog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -27,12 +25,7 @@ class CompetencyWorkbookExporter
      */
     public function build(TrainingBatch $batch, ?string $schedule = null): array
     {
-        $units = CompetencyUnit::query()
-            ->with('outcomes')
-            ->where('program_code', CaregivingNcIiCatalog::PROGRAM_CODE)
-            ->where('is_required', true)
-            ->orderBy('sort_order')
-            ->get();
+        $units = app(CompetencyCatalogService::class)->unitsDeliveredForBatch((int) $batch->id);
         $outcomes = $units->flatMap(fn ($unit) => $unit->outcomes)->values();
         $traineeCount = $this->traineeQuery($batch, $schedule)->count();
         $path = tempnam(sys_get_temp_dir(), 'mcare-competencies-');

@@ -69,6 +69,13 @@ class TrainingSubmoduleProgress extends Model
             && $this->competency_outcome === ModuleProgress::OUTCOME_COMPETENT;
     }
 
+    public function needsRemediation(): bool
+    {
+        return $this->status === self::STATUS_NEEDS_REMEDIATION
+            || $this->competency_outcome === ModuleProgress::OUTCOME_NOT_YET_COMPETENT
+            || $this->practical_rating === ModuleProgress::RATING_NOT_YET_COMPETENT;
+    }
+
     public function workflowStatusLabel(): string
     {
         return match ($this->status) {

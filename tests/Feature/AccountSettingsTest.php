@@ -6,7 +6,9 @@ use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AccountSettingsTest extends TestCase
@@ -20,8 +22,6 @@ class AccountSettingsTest extends TestCase
 
     public function test_shared_admin_login_lands_on_the_dashboard(): void
     {
-        config()->set('services.two_factor.enabled', false);
-
         $admin = User::factory()->create([
             'role' => 'admin',
             'password' => 'Password123!',
@@ -49,12 +49,18 @@ class AccountSettingsTest extends TestCase
                 ->assertOk()
                 ->assertSee('Night mode')
                 ->assertSee('Change password')
+                ->assertSee('Profile photo')
+                ->assertSee('data-dashboard-sidebar', false)
+                ->assertSee('data-dashboard-role="'.$role.'"', false)
+                ->assertDontSee('Back to dashboard')
                 ->assertSee($avatarUrl, false);
 
             $this->actingAs($user)
                 ->get(route('account.help'))
                 ->assertOk()
-                ->assertSee('Help for');
+                ->assertSee('Help for')
+                ->assertSee('data-dashboard-sidebar', false)
+                ->assertSee('data-dashboard-role="'.$role.'"', false);
         }
     }
 
@@ -78,6 +84,58 @@ class AccountSettingsTest extends TestCase
         $this->assertTrue(AdminActivityLog::query()->where('action', 'account.password.updated')->exists());
     }
 
+    public function test_user_can_store_a_profile_photo_on_the_public_disk(): void
+    {
+        $disk = Storage::fake('public');
+        $trainee = User::factory()->create([
+            'role' => 'trainee',
+            'avatar_url' => 'https://example.test/google-face.jpg',
+        ]);
+        $photo = UploadedFile::fake()->image('profile.jpg', 120, 120);
+
+        $this->actingAs($trainee)
+            ->from(route('account.settings'))
+            ->patch(route('account.avatar.update'), [
+                'avatar' => $photo,
+            ])
+            ->assertRedirect(route('account.settings'))
+            ->assertSessionHas('saved');
+
+        $trainee->refresh();
+        $this->assertNotNull($trainee->profile_photo_path);
+        $this->assertTrue($disk->exists($trainee->profile_photo_path));
+        $this->assertSame('/storage/'.$trainee->profile_photo_path, $trainee->profilePhotoUrl());
+        $this->assertStringStartsWith('avatars/'.$trainee->id.'/', (string) $trainee->profile_photo_path);
+        $this->assertDatabaseHas('users', [
+            'id' => $trainee->id,
+            'profile_photo_path' => $trainee->profile_photo_path,
+        ]);
+        $this->assertTrue(AdminActivityLog::query()->where('action', 'account.avatar.updated')->exists());
+
+        $this->actingAs($trainee)
+            ->get(route('account.settings'))
+            ->assertOk()
+            ->assertSee($trainee->profilePhotoUrl(), false);
+    }
+
+    public function test_profile_photo_upload_rejects_non_image_files(): void
+    {
+        Storage::fake('public');
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->from(route('account.settings'))
+            ->patch(route('account.avatar.update'), [
+                'avatar' => UploadedFile::fake()->create('notes.pdf', 40, 'application/pdf'),
+            ])
+            ->assertRedirect(route('account.settings'))
+            ->assertSessionHasErrors('avatar');
+
+        $this->assertNull($admin->fresh()->avatar_url);
+        $this->assertNull($admin->fresh()->profile_photo_path);
+        $this->assertFalse(AdminActivityLog::query()->where('action', 'account.avatar.updated')->exists());
+    }
+
     public function test_dashboard_account_dropdowns_include_the_new_actions(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
@@ -87,6 +145,7 @@ class AccountSettingsTest extends TestCase
             ->assertSee('Night mode')
             ->assertSee('Settings')
             ->assertSee('Help')
+            ->assertDontSee(route('account.settings').'#change-password', false)
             ->assertDontSee('data-dashboard-notifications', false);
 
         $trainer = User::factory()->create(['role' => 'trainer']);
@@ -96,6 +155,7 @@ class AccountSettingsTest extends TestCase
             ->assertSee('Night mode')
             ->assertSee('Settings')
             ->assertSee('Help')
+            ->assertDontSee(route('account.settings').'#change-password', false)
             ->assertDontSee('data-dashboard-notifications', false);
 
         $trainee = User::factory()->create(['role' => 'trainee']);
@@ -125,6 +185,7 @@ class AccountSettingsTest extends TestCase
             ->assertSee('Night mode')
             ->assertSee('Settings')
             ->assertSee('Help')
+            ->assertDontSee(route('account.settings').'#change-password', false)
             ->assertDontSee('data-dashboard-notifications', false);
     }
 }
