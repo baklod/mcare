@@ -222,7 +222,8 @@ class PaymentScheduleController extends Controller
 
         $paymentLifecycle->handleVerifiedPayment($enrollmentApplication->refresh());
 
-        return back()->with('saved', 'On-site payment of ₱'.number_format((float) $validated['amount'], 2)." recorded for {$enrolleeName} (OR #{$orNumber}).");
+        return $this->redirectToLedger($request)
+            ->with('saved', 'On-site payment of ₱'.number_format((float) $validated['amount'], 2)." recorded for {$enrolleeName} (OR #{$orNumber}).");
     }
 
     public function verifyTransaction(
@@ -252,7 +253,8 @@ class PaymentScheduleController extends Controller
         $validated = $request->validate($rules);
 
         if ($transaction->status !== PaymentTransaction::STATUS_PENDING) {
-            return back()->withErrors(['payment' => 'This payment request has already been processed.']);
+            return $this->redirectToLedger($request)
+                ->withErrors(['payment' => 'This payment request has already been processed.']);
         }
 
         $application = $transaction->enrollmentApplication;
@@ -314,7 +316,8 @@ class PaymentScheduleController extends Controller
         }, 3);
 
         if (isset($result['error'])) {
-            return back()->withErrors(['payment' => $result['error']]);
+            return $this->redirectToLedger($request)
+                ->withErrors(['payment' => $result['error']]);
         }
 
         if ($validated['action'] === 'verify') {
@@ -323,7 +326,8 @@ class PaymentScheduleController extends Controller
 
         $actionVerb = $validated['action'] === 'verify' ? 'verified' : 'rejected';
 
-        return back()->with('saved', "Payment transaction for {$enrolleeName} was {$actionVerb}.");
+        return $this->redirectToLedger($request)
+            ->with('saved', "Payment transaction for {$enrolleeName} was {$actionVerb}.");
     }
 
     public function receiptProof(Request $request, PaymentTransaction $transaction): BinaryFileResponse
@@ -341,8 +345,11 @@ class PaymentScheduleController extends Controller
             'or_number' => $transaction->or_number,
         ]);
 
-        return response()->file(Storage::disk('local')->path($path), [
-            'Content-Type' => Storage::disk('local')->mimeType($path) ?: 'application/octet-stream',
+        /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
+        $disk = Storage::disk('local');
+
+        return response()->file($disk->path($path), [
+            'Content-Type' => $disk->mimeType($path) ?: 'application/octet-stream',
             'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_INLINE, $filename, $fallbackFilename),
             'X-Content-Type-Options' => 'nosniff',
         ]);
@@ -416,10 +423,12 @@ class PaymentScheduleController extends Controller
         }, 3);
 
         if (isset($result['error'])) {
-            return back()->withErrors(['payment' => $result['error']]);
+            return $this->redirectToLedger($request)
+                ->withErrors(['payment' => $result['error']]);
         }
 
-        return back()->with('saved', 'Payment verification updated for '.$result['name'].'.');
+        return $this->redirectToLedger($request)
+            ->with('saved', 'Payment verification updated for '.$result['name'].'.');
     }
 
     /**
@@ -657,5 +666,24 @@ class PaymentScheduleController extends Controller
             'suggested_amount' => $suggestedAmount,
             'suggested_type' => $pending?->transaction_type,
         ];
+    }
+
+    private function redirectToLedger(Request $request): RedirectResponse
+    {
+        return redirect()->to($this->ledgerUrl());
+    }
+
+    private function ledgerUrl(): string
+    {
+        $index = route('admin.payment-schedules.index');
+        $previous = url()->previous($index);
+        $previousPath = (string) parse_url($previous, PHP_URL_PATH);
+        $indexPath = (string) parse_url($index, PHP_URL_PATH);
+
+        if ($previousPath !== $indexPath) {
+            return $index;
+        }
+
+        return $previous;
     }
 }

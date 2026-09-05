@@ -2,6 +2,7 @@
 
 use App\Console\Commands\PrepareDemoGraduate;
 use App\Console\Commands\SendScheduledCareerSms;
+use App\Http\Middleware\DoNotStoreAsPreviousUrl;
 use App\Http\Middleware\EnsureActiveTraining;
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureEnrollmentPaymentAccess;
@@ -38,6 +39,9 @@ return Application::configure(basePath: dirname(__DIR__))
          * common browser-security baseline instead of relying on each page.
          */
         $middleware->append(SecurityHeaders::class);
+        $middleware->web(prepend: [
+            DoNotStoreAsPreviousUrl::class,
+        ]);
 
         // Preserve ngrok/reverse-proxy HTTPS and host information when the
         // proxy is explicitly trusted (loopback-only by default, or * for all).

@@ -8,6 +8,7 @@ use App\Models\AlumniProfile;
 use App\Models\EnrollmentApplication;
 use App\Models\HistoricalAlumniClaim;
 use App\Notifications\HistoricalAlumniClaimStatusUpdated;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -225,8 +226,11 @@ class HistoricalAlumniClaimController extends Controller
             'disposition' => $disposition,
         ]);
 
-        return response()->file(Storage::disk('local')->path($path), [
-            'Content-Type' => Storage::disk('local')->mimeType($path) ?: 'application/octet-stream',
+        /** @var FilesystemAdapter $disk */
+        $disk = Storage::disk('local');
+
+        return response()->file($disk->path($path), [
+            'Content-Type' => $disk->mimeType($path) ?: 'application/octet-stream',
             'Content-Disposition' => HeaderUtils::makeDisposition($disposition, $filename),
             'Cache-Control' => 'private, no-store, max-age=0',
             'X-Content-Type-Options' => 'nosniff',

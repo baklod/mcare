@@ -68,6 +68,23 @@ class AdminPaymentTransactionsTest extends TestCase
             ->assertDontSee('id="record-enrollee-select"', false);
     }
 
+    public function test_recording_onsite_payment_does_not_follow_an_avatar_photo_url(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $application = $this->createApprovedApplication($trainee, $this->batch());
+
+        $this->actingAs($admin)
+            ->from(route('admin.enrollments.photo', $application))
+            ->post(route('admin.payment-schedules.transactions.store', $application), [
+                'amount' => 2000.00,
+                'transaction_type' => 'downpayment',
+                'paid_at' => now()->toDateString(),
+            ])
+            ->assertRedirect(route('admin.payment-schedules.index'))
+            ->assertSessionHas('saved');
+    }
+
     public function test_pay_on_site_and_paymongo_store_reference_numbers_on_the_admin_ledger(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);

@@ -241,6 +241,23 @@ class HistoricalAlumniClaimTest extends TestCase
             ->assertSee('Verify and activate alumni');
     }
 
+    public function test_admin_can_open_claim_evidence(): void
+    {
+        Storage::fake('local');
+        $admin = User::factory()->create(['role' => 'admin']);
+        $claimant = User::factory()->create(['role' => 'applicant']);
+        $path = 'historical-alumni/'.$claimant->id.'/cotc.pdf';
+        Storage::disk('local')->put($path, '%PDF-1.4 evidence');
+        $claim = $this->createClaim($claimant);
+        $claim->forceFill(['evidence_document_path' => $path])->save();
+
+        $this->actingAs($admin)
+            ->get(route('admin.historical-alumni.evidence', $claim))
+            ->assertOk()
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('Content-Type', 'application/pdf');
+    }
+
     public function test_non_admin_cannot_open_alumni_claims(): void
     {
         $trainee = User::factory()->create(['role' => 'trainee']);

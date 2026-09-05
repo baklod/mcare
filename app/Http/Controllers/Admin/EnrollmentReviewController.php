@@ -12,6 +12,7 @@ use App\Services\AccountDeletionService;
 use App\Services\RollingModuleReleaseService;
 use App\Services\StaffVisiblePhoto;
 use App\Services\TesdaRegistrationPdfService;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -440,7 +441,7 @@ class EnrollmentReviewController extends Controller
             'application' => $enrollmentApplication,
             'document' => $document,
             'label' => $definition['label'],
-            'mimeType' => Storage::disk('local')->mimeType($path) ?: 'application/octet-stream',
+            'mimeType' => $this->documentMimeType($path) ?: 'application/octet-stream',
         ]);
     }
 
@@ -460,8 +461,8 @@ class EnrollmentReviewController extends Controller
             'applicant_email' => $enrollmentApplication->email,
         ]);
 
-        return response()->file(Storage::disk('local')->path($path), [
-            'Content-Type' => Storage::disk('local')->mimeType($path) ?: 'application/octet-stream',
+        return response()->file($this->localDisk()->path($path), [
+            'Content-Type' => $this->documentMimeType($path) ?: 'application/octet-stream',
             'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_INLINE, $filename, $fallbackFilename),
         ]);
     }
@@ -528,11 +529,20 @@ class EnrollmentReviewController extends Controller
 
     private function documentMimeType(?string $path): ?string
     {
-        if (! $path || ! Storage::disk('local')->exists($path)) {
+        $disk = $this->localDisk();
+        if (! $path || ! $disk->exists($path)) {
             return null;
         }
 
-        return Storage::disk('local')->mimeType($path) ?: 'application/octet-stream';
+        return $disk->mimeType($path) ?: 'application/octet-stream';
+    }
+
+    private function localDisk(): FilesystemAdapter
+    {
+        /** @var FilesystemAdapter $disk */
+        $disk = Storage::disk('local');
+
+        return $disk;
     }
 
     private function sendEnrolleeVerificationLink(?User $enrollee, string $status): bool

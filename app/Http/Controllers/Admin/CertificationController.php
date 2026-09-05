@@ -12,6 +12,7 @@ use App\Models\OfficialDocumentDownload;
 use App\Models\TrainingBatch;
 use App\Services\CompletionEligibilityService;
 use App\Services\OfficialDocumentManager;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -155,7 +156,7 @@ class CertificationController extends Controller
             'type' => $officialDocument->type,
         ]);
 
-        return Storage::disk($officialDocument->storage_disk)->download(
+        return $this->documentDisk($officialDocument->storage_disk)->download(
             $officialDocument->file_path,
             $officialDocument->document_number.'.pdf',
             ['Content-Type' => 'application/pdf'],
@@ -211,10 +212,18 @@ class CertificationController extends Controller
             'training_batch_id' => $batchDocumentExport->training_batch_id,
         ]);
 
-        return Storage::disk($batchDocumentExport->storage_disk)->download(
+        return $this->documentDisk($batchDocumentExport->storage_disk)->download(
             $batchDocumentExport->file_path,
             'MCARE-batch-'.$batchDocumentExport->training_batch_id.'-TOR.zip',
             ['Content-Type' => 'application/zip'],
         );
+    }
+
+    private function documentDisk(string $disk): FilesystemAdapter
+    {
+        /** @var FilesystemAdapter $filesystem */
+        $filesystem = Storage::disk($disk);
+
+        return $filesystem;
     }
 }
