@@ -299,6 +299,10 @@ Route::middleware('throttle:global-web')->group(function () {
                     ->middleware(['permission:enrollments.review', 'throttle:sensitive-mutation'])
                     ->name('enrollments.destroy');
 
+                Route::get('/enrollments/{enrollmentApplication}/photo', [EnrollmentReviewController::class, 'photo'])
+                    ->middleware('permission:enrollments.review')
+                    ->name('enrollments.photo');
+
                 Route::get('/enrollments/{enrollmentApplication}/tesda-form', [EnrollmentReviewController::class, 'tesdaForm'])
                     ->middleware(['permission:enrollments.review', 'throttle:document-downloads'])
                     ->name('enrollments.tesda-form');

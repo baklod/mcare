@@ -10,12 +10,16 @@
     $resolvedUser = $user ?: $application?->user;
     $displayName = trim((string) ($name ?: $resolvedUser?->name ?: $resolvedUser?->email ?: 'MCARE User'));
     $initial = \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($displayName, 0, 1));
-    $enrollmentPhotoUrl = (
-        $useEnrollmentPhoto
-        && $resolvedUser
-        && filled($application?->id_photo_path)
-        && auth()->user()?->role === 'admin'
-    ) ? route('admin.accounts.photo', $resolvedUser, absolute: false) : '';
+    $staffCanViewPhoto = $useEnrollmentPhoto && auth()->user()?->role === 'admin';
+    $profilePhotoPath = (string) ($resolvedUser?->profile_photo_path ?? '');
+    $hasLocalProfilePhoto = $profilePhotoPath !== '' && ! str_starts_with($profilePhotoPath, 'https://');
+    $hasStoredPhoto = filled($application?->id_photo_path) || $hasLocalProfilePhoto;
+    $enrollmentPhotoUrl = '';
+    if ($staffCanViewPhoto && $hasStoredPhoto) {
+        $enrollmentPhotoUrl = ($application?->id && $application->isReleasedForReview())
+            ? route('admin.enrollments.photo', $application, absolute: false)
+            : ($resolvedUser ? route('admin.accounts.photo', $resolvedUser, absolute: false) : '');
+    }
 
     $candidateUrl = trim((string) ($src ?: $enrollmentPhotoUrl ?: $resolvedUser?->profilePhotoUrl() ?? ''));
 

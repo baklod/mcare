@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Notifications\EnrollmentStatusUpdatedNotification;
 use App\Services\AccountDeletionService;
 use App\Services\RollingModuleReleaseService;
+use App\Services\StaffVisiblePhoto;
 use App\Services\TesdaRegistrationPdfService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -311,6 +312,28 @@ class EnrollmentReviewController extends Controller
         return redirect()
             ->route('admin.enrollments.index')
             ->with('saved', "Enrollment for {$applicantName} ({$deleted['email']}) and related records were permanently removed.");
+    }
+
+    public function photo(EnrollmentApplication $enrollmentApplication, StaffVisiblePhoto $photos): BinaryFileResponse
+    {
+        $this->ensureReleasedForReview($enrollmentApplication);
+
+        $enrollmentApplication->loadMissing('user');
+        $located = $photos->locate($enrollmentApplication->user, $enrollmentApplication);
+        abort_unless($located !== null, 404);
+
+        $fallbackFilename = str($located['filename'])->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
+
+        return response()->file($located['path'], [
+            'Content-Type' => $located['mime'],
+            'Content-Disposition' => HeaderUtils::makeDisposition(
+                HeaderUtils::DISPOSITION_INLINE,
+                $located['filename'],
+                $fallbackFilename
+            ),
+            'Cache-Control' => 'private, max-age=300',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function tesdaForm(

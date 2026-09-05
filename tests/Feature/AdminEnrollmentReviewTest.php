@@ -278,13 +278,23 @@ class AdminEnrollmentReviewTest extends TestCase
             'review_released_at' => now(),
         ]);
 
-        $photoUrl = route('admin.accounts.photo', $applicant, absolute: false);
+        $photoUrl = route('admin.enrollments.photo', $application, absolute: false);
 
         $this->actingAs($admin)
             ->get(route('admin.enrollments.show', $application))
             ->assertOk()
             ->assertSee($photoUrl, false)
             ->assertDontSee('/storage/'.$applicant->profile_photo_path, false);
+
+        $this->actingAs($admin)
+            ->get(route('admin.enrollments.index'))
+            ->assertOk()
+            ->assertSee($photoUrl, false);
+
+        $this->actingAs($admin)
+            ->get($photoUrl)
+            ->assertOk()
+            ->assertHeader('content-type', 'image/jpeg');
 
         $preview = $this->actingAs($admin)->get(route('admin.enrollments.tesda-form', [
             $application,
@@ -295,6 +305,51 @@ class AdminEnrollmentReviewTest extends TestCase
         $this->assertStringStartsWith('%PDF-', $preview->getContent());
         $this->assertStringContainsString('/DCTDecode', $preview->getContent());
         $this->assertGreaterThanOrEqual(3, preg_match_all('/\/Subtype\s*\/Image/', $preview->getContent()));
+    }
+
+    public function test_enrollment_photo_falls_back_to_the_public_profile_photo(): void
+    {
+        Storage::fake('local');
+        Storage::fake('public');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->create(['role' => 'trainee']);
+        $publicPath = 'avatars/'.$applicant->id.'/face.jpg';
+        $this->storeTesdaJpeg($publicPath, 80, 80);
+        Storage::disk('public')->put($publicPath, Storage::disk('local')->get($publicPath));
+        $applicant->forceFill(['profile_photo_path' => $publicPath])->save();
+
+        $application = EnrollmentApplication::create([
+            'user_id' => $applicant->id,
+            'email' => $applicant->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => 'Julianne',
+            'last_name' => 'Alipio',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'street' => 'Street',
+            'barangay' => 'Barangay',
+            'city' => 'City',
+            'province' => 'Province',
+            'zip_code' => '1000',
+            'educational_attainment' => 'College Graduate',
+            'school_name' => 'MCARE College',
+            'year_graduated' => 2022,
+            'id_photo_path' => 'enrollment-documents/'.$applicant->id.'/missing.jpg',
+            'status' => EnrollmentApplication::STATUS_APPROVED,
+            'review_released_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.enrollments.photo', $application))
+            ->assertOk()
+            ->assertHeader('content-type', 'image/jpeg');
+
+        $this->actingAs($applicant)
+            ->get(route('admin.enrollments.photo', $application))
+            ->assertForbidden();
     }
 
     public function test_non_admin_cannot_generate_tesda_registration_form(): void

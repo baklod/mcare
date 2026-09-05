@@ -11,12 +11,12 @@ use App\Models\TrainingBatch;
 use App\Models\TrainingProgram;
 use App\Models\User;
 use App\Services\AccountDeletionService;
+use App\Services\StaffVisiblePhoto;
 use App\Services\RollingModuleReleaseService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -110,22 +110,22 @@ class AdminAccountController extends Controller
         ]);
     }
 
-    public function photo(User $user): BinaryFileResponse
+    public function photo(User $user, StaffVisiblePhoto $photos): BinaryFileResponse
     {
-        abort_unless(in_array($user->role, ['trainer', 'trainee', 'applicant'], true), 404);
+        abort_unless(in_array($user->role, ['trainer', 'trainee', 'applicant', 'alumni'], true), 404);
 
-        $path = $user->enrollmentApplication?->id_photo_path;
-        abort_unless($path && Storage::disk('local')->exists($path), 404);
+        $located = $photos->locate($user, $user->enrollmentApplication);
+        abort_unless($located !== null, 404);
 
-        $mime = Storage::disk('local')->mimeType($path) ?: 'application/octet-stream';
-        abort_unless(str_starts_with($mime, 'image/'), 404);
+        $fallbackFilename = str($located['filename'])->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
 
-        $filename = basename($path);
-        $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
-
-        return response()->file(Storage::disk('local')->path($path), [
-            'Content-Type' => $mime,
-            'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_INLINE, $filename, $fallbackFilename),
+        return response()->file($located['path'], [
+            'Content-Type' => $located['mime'],
+            'Content-Disposition' => HeaderUtils::makeDisposition(
+                HeaderUtils::DISPOSITION_INLINE,
+                $located['filename'],
+                $fallbackFilename
+            ),
             'Cache-Control' => 'private, max-age=300',
             'X-Content-Type-Options' => 'nosniff',
         ]);
