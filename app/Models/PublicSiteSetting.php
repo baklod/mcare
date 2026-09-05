@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class PublicSiteSetting extends Model
 {
@@ -10,6 +11,9 @@ class PublicSiteSetting extends Model
         'facebook_url',
         'instagram_url',
         'youtube_url',
+        'registrar_name',
+        'registrar_signature_type',
+        'registrar_signature_path',
     ];
 
     public static function current(): self
@@ -18,6 +22,9 @@ class PublicSiteSetting extends Model
             'facebook_url' => null,
             'instagram_url' => null,
             'youtube_url' => null,
+            'registrar_name' => null,
+            'registrar_signature_type' => null,
+            'registrar_signature_path' => null,
         ]);
     }
 
@@ -33,7 +40,28 @@ class PublicSiteSetting extends Model
             'facebook_url' => null,
             'instagram_url' => null,
             'youtube_url' => null,
+            'registrar_name' => null,
+            'registrar_signature_type' => null,
+            'registrar_signature_path' => null,
         ]);
+    }
+
+    public function registrarName(): string
+    {
+        return trim((string) $this->registrar_name);
+    }
+
+    public function registrarNameForForm(): string
+    {
+        return $this->registrarName()
+            ?: trim((string) config('official_documents.organization.registrar_name'));
+    }
+
+    public function hasRegistrarSignature(): bool
+    {
+        $path = trim((string) $this->registrar_signature_path);
+
+        return $path !== '' && Storage::disk('local')->exists($path);
     }
 
     /** @return array{facebook: ?string, instagram: ?string, youtube: ?string} */
@@ -104,4 +132,4 @@ class PublicSiteSetting extends Model
 
         return $normalized !== '' && in_array($host, self::allowedHosts($network), true);
     }
-};
+}

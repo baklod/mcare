@@ -176,7 +176,7 @@
             @endif
         </div>
 
-        <form method="POST" action="{{ $formAction }}" class="p-6" data-single-action data-public-update-form>
+        <form method="POST" action="{{ $formAction }}" class="p-6" data-single-action data-public-update-form data-saving-label="{{ $update ? 'Saving changes...' : 'Saving Facebook update...' }}">
             @csrf
             @if ($update)
                 @method('PATCH')
@@ -272,7 +272,7 @@
                 form.querySelectorAll('[data-action-button]').forEach((button) => {
                     button.disabled = true;
                     button.classList.add('cursor-not-allowed', 'opacity-70');
-                    button.textContent = '{{ $update ? 'Saving changes...' : 'Saving Facebook update...' }}';
+                    button.textContent = form.dataset.savingLabel || 'Saving...';
                 });
             });
             if (dialog.dataset.autoOpen === 'true') openDialog();

@@ -1,5 +1,11 @@
 @php
     $layout = \App\Support\AccountPortal::dashboardLayoutFor($user);
+    $isAdmin = $user->role === 'admin';
+    $siteSettings = $siteSettings ?? null;
+    $registrarHasErrors = $errors->registrar->any();
+    $registrarName = $registrarHasErrors ? old('registrar_name') : ($siteSettings?->registrarNameForForm() ?? '');
+    $registrarSignatureType = $registrarHasErrors ? old('registrar_signature_type', 'draw') : ($siteSettings?->registrar_signature_type ?: 'draw');
+    $hasSavedRegistrarSignature = (bool) $siteSettings?->hasRegistrarSignature();
 @endphp
 
 @extends($layout, ['title' => 'Account Settings | MCARE '.$roleLabel])
@@ -13,7 +19,7 @@
     <header class="border-b border-slate-200 pb-6">
         <p class="dashboard-section-kicker">Account preferences</p>
         <h1 class="dashboard-section-title mt-2 text-3xl">Settings</h1>
-        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Manage the signed-in {{ strtolower($roleLabel) }} account, profile photo, display preference, and password.</p>
+        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Manage the signed-in {{ strtolower($roleLabel) }} account, profile photo, display preference, and password.{{ $isAdmin ? ' Admins can also save the TESDA form registrar name and signature here.' : '' }}</p>
     </header>
 
     <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
@@ -96,5 +102,223 @@
             </form>
         </section>
     </div>
+
+    @if ($isAdmin)
+        <section id="tesda-registrar" class="dashboard-panel scroll-mt-8 space-y-4">
+            <p class="dashboard-section-kicker">TESDA form</p>
+            <h2 class="text-lg font-bold text-slate-950">TESDA form registrar</h2>
+            <p class="text-sm leading-6 text-slate-600">This name and signature are placed on the <span class="font-semibold">Noted by: Registrar / School Administrator</span> line when you preview or download Registration Form MIS 03-01.</p>
+            <form
+                method="POST"
+                action="{{ route('account.registrar.update') }}"
+                enctype="multipart/form-data"
+                class="space-y-5"
+                data-single-action
+                data-registrar-signature-form
+                data-signature-saved="{{ $hasSavedRegistrarSignature ? '1' : '0' }}"
+            >
+                @csrf
+                @method('PATCH')
+                <div>
+                    <label for="registrar_name" class="block text-sm font-bold text-slate-700">Registrar / school administrator name</label>
+                    <input id="registrar_name" name="registrar_name" type="text" value="{{ $registrarName }}" required maxlength="180" placeholder="Salvacion A. Collao" class="form-field mt-2 max-w-xl text-base">
+                    <p class="mt-2 text-xs leading-5 text-slate-500">Use the same printed name that should appear under the signature.</p>
+                    @error('registrar_name', 'registrar') <span class="mt-2 block text-sm font-semibold text-red-600">{{ $message }}</span> @enderror
+                </div>
+
+                <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-wider text-purple-700">Signature method</p>
+                            <p class="mt-1 text-xs leading-5 text-slate-500">Draw on the pad or upload a clear JPG or PNG. Maximum 5MB.</p>
+                        </div>
+                        <div class="flex rounded-full border border-purple-100 bg-white p-1">
+                            <label class="cursor-pointer rounded-full px-4 py-2 text-sm font-bold text-slate-700">
+                                <input type="radio" name="registrar_signature_type" value="draw" class="mr-1" @checked($registrarSignatureType === 'draw')>
+                                Draw
+                            </label>
+                            <label class="cursor-pointer rounded-full px-4 py-2 text-sm font-bold text-slate-700">
+                                <input type="radio" name="registrar_signature_type" value="upload" class="mr-1" @checked($registrarSignatureType === 'upload')>
+                                Upload
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="registrar-draw-signature-panel" class="mt-4">
+                        <canvas id="registrar_signature_canvas" width="900" height="220" class="block h-44 w-full touch-none rounded-lg border border-slate-200 bg-white" aria-label="Draw the registrar signature"></canvas>
+                        <input id="registrar_signature_data" name="registrar_signature_data" type="hidden" value="{{ old('registrar_signature_data') }}">
+                        <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <p id="registrar_signature_draw_status" class="text-xs font-semibold text-slate-500">
+                                {{ $hasSavedRegistrarSignature ? 'Previously saved. Draw again to replace it.' : 'No signature drawn yet.' }}
+                            </p>
+                            <button type="button" id="clear_registrar_signature" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:border-purple-200 hover:text-purple-700">
+                                Clear signature
+                            </button>
+                        </div>
+                        @error('registrar_signature_data', 'registrar') <span class="mt-2 block text-sm font-semibold text-red-600">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div id="registrar-upload-signature-panel" class="mt-4 hidden">
+                        <div data-registrar-upload-zone class="relative rounded-xl border-2 border-dashed border-purple-200 bg-white px-5 py-7 text-center transition hover:border-purple-400 hover:bg-purple-50/50">
+                            <input id="registrar_signature_upload" name="registrar_signature_upload" type="file" accept=".jpg,.jpeg,.png" class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0">
+                            <p class="text-sm font-bold text-purple-700">Click to upload signature</p>
+                            <p data-registrar-upload-name class="mt-1 text-xs font-semibold text-slate-500">
+                                {{ $hasSavedRegistrarSignature ? 'Previously saved. Upload a new image to replace it.' : 'No file selected' }}
+                            </p>
+                        </div>
+                        @error('registrar_signature_upload', 'registrar') <span class="mt-2 block text-sm font-semibold text-red-600">{{ $message }}</span> @enderror
+                    </div>
+
+                    @if ($hasSavedRegistrarSignature)
+                        <div class="mt-4 overflow-hidden rounded-xl border border-emerald-200 bg-white p-3">
+                            <p class="text-[11px] font-black uppercase tracking-wide text-emerald-700">Saved signature</p>
+                            <img src="{{ route('account.registrar.signature') }}" alt="Saved registrar signature" class="mt-2 max-h-24 w-full bg-white object-contain">
+                        </div>
+                    @endif
+                </div>
+
+                <button type="submit" data-action-button class="primary-action">
+                    <x-dashboard-icon name="save" class="h-4 w-4" />
+                    <span>Save registrar signature</span>
+                </button>
+            </form>
+        </section>
+    @endif
 </section>
+
+@if ($isAdmin)
+    <script>
+        (() => {
+            const form = document.querySelector('[data-registrar-signature-form]');
+            const canvas = document.getElementById('registrar_signature_canvas');
+            const signatureData = document.getElementById('registrar_signature_data');
+            const clearButton = document.getElementById('clear_registrar_signature');
+            const status = document.getElementById('registrar_signature_draw_status');
+            const drawPanel = document.getElementById('registrar-draw-signature-panel');
+            const uploadPanel = document.getElementById('registrar-upload-signature-panel');
+            const uploadInput = document.getElementById('registrar_signature_upload');
+            const uploadName = document.querySelector('[data-registrar-upload-name]');
+            const radios = document.querySelectorAll('input[name="registrar_signature_type"]');
+            if (!form || !canvas || !signatureData) return;
+
+            const existingSignatureSaved = form.dataset.signatureSaved === '1';
+            const restoredSignatureData = signatureData.value;
+            const context = canvas.getContext('2d');
+            let drawing = false;
+            let signatureDrawn = false;
+
+            function resizeCanvas() {
+                const image = signatureDrawn ? canvas.toDataURL('image/png') : null;
+                const rect = canvas.getBoundingClientRect();
+                const ratio = window.devicePixelRatio || 1;
+                canvas.width = Math.max(Math.floor(rect.width * ratio), 1);
+                canvas.height = Math.max(Math.floor(rect.height * ratio), 1);
+                context.setTransform(ratio, 0, 0, ratio, 0, 0);
+                context.lineWidth = 2.5;
+                context.lineCap = 'round';
+                context.lineJoin = 'round';
+                context.strokeStyle = '#1e293b';
+                if (image) {
+                    const restored = new Image();
+                    restored.onload = () => context.drawImage(restored, 0, 0, rect.width, rect.height);
+                    restored.src = image;
+                }
+            }
+
+            function pointFromEvent(event) {
+                const rect = canvas.getBoundingClientRect();
+                return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+            }
+
+            function startDrawing(event) {
+                event.preventDefault();
+                drawing = true;
+                const point = pointFromEvent(event);
+                context.beginPath();
+                context.moveTo(point.x, point.y);
+            }
+
+            function draw(event) {
+                if (!drawing) return;
+                event.preventDefault();
+                const point = pointFromEvent(event);
+                context.lineTo(point.x, point.y);
+                context.stroke();
+                signatureDrawn = true;
+                signatureData.value = canvas.toDataURL('image/png');
+                if (status) {
+                    status.textContent = 'Signature captured.';
+                    status.classList.remove('text-red-600');
+                    status.classList.add('text-slate-500');
+                }
+            }
+
+            function stopDrawing() {
+                drawing = false;
+                context.beginPath();
+            }
+
+            function syncSignatureMode() {
+                const mode = document.querySelector('input[name="registrar_signature_type"]:checked')?.value || 'draw';
+                drawPanel?.classList.toggle('hidden', mode !== 'draw');
+                uploadPanel?.classList.toggle('hidden', mode !== 'upload');
+            }
+
+            function restoreSignature(data) {
+                if (!data || !data.startsWith('data:image/png;base64,')) return;
+                const restored = new Image();
+                restored.onload = () => {
+                    const rect = canvas.getBoundingClientRect();
+                    context.drawImage(restored, 0, 0, rect.width, rect.height);
+                    signatureDrawn = true;
+                    signatureData.value = data;
+                    if (status) status.textContent = 'Signature restored. Draw again to replace it.';
+                };
+                restored.src = data;
+            }
+
+            canvas.addEventListener('pointerdown', startDrawing);
+            canvas.addEventListener('pointermove', draw);
+            canvas.addEventListener('pointerup', stopDrawing);
+            canvas.addEventListener('pointerleave', stopDrawing);
+            clearButton?.addEventListener('click', () => {
+                context.clearRect(0, 0, canvas.width, canvas.height);
+                signatureDrawn = false;
+                signatureData.value = '';
+                if (status) {
+                    status.textContent = existingSignatureSaved
+                        ? 'Previously saved. Draw again to replace it.'
+                        : 'No signature drawn yet.';
+                    status.classList.remove('text-red-600');
+                    status.classList.add('text-slate-500');
+                }
+            });
+            radios.forEach((radio) => radio.addEventListener('change', syncSignatureMode));
+            uploadInput?.addEventListener('change', () => {
+                const file = uploadInput.files?.[0];
+                if (uploadName) uploadName.textContent = file ? `Selected: ${file.name}` : (existingSignatureSaved ? 'Previously saved. Upload a new image to replace it.' : 'No file selected');
+            });
+            window.addEventListener('resize', resizeCanvas);
+            form.addEventListener('submit', (event) => {
+                const mode = document.querySelector('input[name="registrar_signature_type"]:checked')?.value || 'draw';
+                if (mode === 'draw' && !signatureDrawn && !existingSignatureSaved) {
+                    event.preventDefault();
+                    if (status) {
+                        status.textContent = 'Draw the registrar signature before saving.';
+                        status.classList.remove('text-slate-500');
+                        status.classList.add('text-red-600');
+                    }
+                    return;
+                }
+                if (mode === 'upload' && !uploadInput?.files?.length && !existingSignatureSaved) {
+                    event.preventDefault();
+                    if (uploadName) uploadName.textContent = 'Upload a registrar signature image before saving.';
+                }
+            });
+            resizeCanvas();
+            restoreSignature(restoredSignatureData);
+            syncSignatureMode();
+        })();
+    </script>
+@endif
 @endsection

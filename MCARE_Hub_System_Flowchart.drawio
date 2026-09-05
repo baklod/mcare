@@ -1,0 +1,1188 @@
+<mxfile host="app.diagrams.net" agent="MCARE Hub" pages="6">
+  <diagram id="detailed-pipeline" name="1. Detailed System Pipeline">
+    <mxGraphModel dx="4710" dy="1860" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="2140" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="p1ban" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#0B3D2E;fontColor=#FFFFFF;strokeColor=none;fontSize=20;fontStyle=1;align=center;" value="MCARE Hub — Detailed System Flowchart" vertex="1">
+          <mxGeometry height="50" width="2120" x="40" y="16" as="geometry" />
+        </mxCell>
+        <mxCell id="p1sub" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#14532D;fontColor=#D1FAE5;strokeColor=none;fontSize=12;align=center;" value="Mission Care Training and Assessment Center · San Isidro Poblacion, Pili, Camarines Sur · TESDA Caregiving NC II (786 hours) · Laravel 12" vertex="1">
+          <mxGeometry height="28" width="2120" x="40" y="66" as="geometry" />
+        </mxCell>
+        <mxCell id="p1leg0" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F2FE;strokeColor=#0369A1;fontColor=#0C4A6E;fontSize=10;fontStyle=1;" value="Public / Applicant" vertex="1">
+          <mxGeometry height="26" width="140" x="40" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="p1leg1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=10;fontStyle=1;" value="Admin" vertex="1">
+          <mxGeometry height="26" width="80" x="188" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="p1leg2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=10;fontStyle=1;" value="Payment / External" vertex="1">
+          <mxGeometry height="26" width="150" x="276" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="p1leg3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=10;fontStyle=1;" value="Enrollment" vertex="1">
+          <mxGeometry height="26" width="100" x="434" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="p1leg4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E8FF;strokeColor=#7E22CE;fontColor=#581C87;fontSize=10;fontStyle=1;" value="Trainer / LMS" vertex="1">
+          <mxGeometry height="26" width="110" x="542" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="p1leg5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CCFBF1;strokeColor=#0F766E;fontColor=#134E4A;fontSize=10;fontStyle=1;" value="Trainee" vertex="1">
+          <mxGeometry height="26" width="80" x="660" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="p1leg6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D1FAE5;strokeColor=#047857;fontColor=#065F46;fontSize=10;fontStyle=1;" value="Graduate" vertex="1">
+          <mxGeometry height="26" width="90" x="748" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="p1leg7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF7ED;strokeColor=#C2410C;fontColor=#7C2D12;fontSize=10;fontStyle=1;" value="Alumni claim" vertex="1">
+          <mxGeometry height="26" width="100" x="846" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="p1leg8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=10;fontStyle=1;" value="Decision" vertex="1">
+          <mxGeometry height="26" width="80" x="954" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="ph1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 8;fillColor=#F8FAFC;strokeColor=#94A3B8;verticalAlign=top;align=left;fontStyle=1;fontSize=13;spacingLeft=12;spacingTop=6;fontColor=#334155;" value="&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;Phase 1 — Public landing and admission" vertex="1">
+          <mxGeometry height="430" width="2120" x="50" y="148" as="geometry" />
+        </mxCell>
+        <mxCell id="ph2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 8;fillColor=#F8FAFC;strokeColor=#94A3B8;verticalAlign=top;align=left;fontStyle=1;fontSize=13;spacingLeft=12;spacingTop=6;fontColor=#334155;" value="&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; Phase 2 — TESDA enrollment packet" vertex="1">
+          <mxGeometry height="250" width="2120" x="40" y="594" as="geometry" />
+        </mxCell>
+        <mxCell id="ph3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 8;fillColor=#F8FAFC;strokeColor=#94A3B8;verticalAlign=top;align=left;fontStyle=1;fontSize=13;spacingLeft=12;spacingTop=6;fontColor=#334155;" value="&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;Phase 3 — Enrollment payment and clearance" vertex="1">
+          <mxGeometry height="290" width="2120" x="40" y="860" as="geometry" />
+        </mxCell>
+        <mxCell id="ph4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 8;fillColor=#F8FAFC;strokeColor=#94A3B8;verticalAlign=top;align=left;fontStyle=1;fontSize=13;spacingLeft=12;spacingTop=6;fontColor=#334155;" value="&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; Phase 4 — Admin document review and trainee account" vertex="1">
+          <mxGeometry height="250" width="2120" x="40" y="1166" as="geometry" />
+        </mxCell>
+        <mxCell id="ph5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 8;fillColor=#F8FAFC;strokeColor=#94A3B8;verticalAlign=top;align=left;fontStyle=1;fontSize=13;spacingLeft=12;spacingTop=6;fontColor=#334155;" value="&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;Phase 5 — Active LMS (trainer + trainee loop)" vertex="1">
+          <mxGeometry height="280" width="2120" x="40" y="1432" as="geometry" />
+        </mxCell>
+        <mxCell id="ph6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 8;fillColor=#F8FAFC;strokeColor=#94A3B8;verticalAlign=top;align=left;fontStyle=1;fontSize=13;spacingLeft=12;spacingTop=6;fontColor=#334155;" value="&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;Phase 6 — Graduation, official documents, and Career Hub" vertex="1">
+          <mxGeometry height="320" width="2120" x="40" y="1728" as="geometry" />
+        </mxCell>
+        <mxCell id="p1s" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#0B6E4F;fontColor=#FFFFFF;strokeColor=#064E3B;fontStyle=1;fontSize=12;" value="Start" vertex="1">
+          <mxGeometry height="40" width="120" x="70" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="p1land" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F2FE;strokeColor=#0369A1;fontColor=#0C4A6E;fontSize=11;arcSize=8;" value="&lt;b&gt;1. Landing /&lt;/b&gt;&lt;br&gt;Programs, public updates,&lt;br&gt;social links, apply / pay / login" vertex="1">
+          <mxGeometry height="68" width="210" x="216" y="186" as="geometry" />
+        </mxCell>
+        <mxCell id="p1chat" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F2FE;strokeColor=#0369A1;fontColor=#0C4A6E;fontSize=11;arcSize=8;" value="&lt;b&gt;Optional landing chat&lt;/b&gt;&lt;br&gt;POST /landing/chat&lt;br&gt;Throttled Q and A" vertex="1">
+          <mxGeometry height="60" width="210" x="188" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="p1want" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;fontStyle=1;" value="Visitor&lt;br&gt;action?" vertex="1">
+          <mxGeometry height="90" width="160" x="492" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="p1apply" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F2FE;strokeColor=#0369A1;fontColor=#0C4A6E;fontSize=11;arcSize=8;" value="&lt;b&gt;2. Admission form&lt;/b&gt;&lt;br&gt;/applications&lt;br&gt;Active program + Gmail only" vertex="1">
+          <mxGeometry height="68" width="210" x="700" y="186" as="geometry" />
+        </mxCell>
+        <mxCell id="p1submit" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F2FE;strokeColor=#0369A1;fontColor=#0C4A6E;fontSize=11;arcSize=8;" value="&lt;b&gt;3. Submit application&lt;/b&gt;&lt;br&gt;Status: pending&lt;br&gt;application_number issued" vertex="1">
+          <mxGeometry height="68" width="210" x="940" y="186" as="geometry" />
+        </mxCell>
+        <mxCell id="p1ses" parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;" value="&lt;b&gt;Amazon SES&lt;/b&gt;&lt;br&gt;Applicant confirmation&lt;br&gt;Admins notified" vertex="1">
+          <mxGeometry height="68" width="190" x="1180" y="186" as="geometry" />
+        </mxCell>
+        <mxCell id="p1status" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F2FE;strokeColor=#0369A1;fontColor=#0C4A6E;fontSize=11;arcSize=8;" value="&lt;b&gt;4. Status lookup&lt;/b&gt;&lt;br&gt;/applications/status&lt;br&gt;Track pending / approved / denied" vertex="1">
+          <mxGeometry height="68" width="220" x="1400" y="186" as="geometry" />
+        </mxCell>
+        <mxCell id="p1rev" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;fontStyle=1;" value="Admin&lt;br&gt;approves&lt;br&gt;admission?" vertex="1">
+          <mxGeometry height="100" width="170" x="1660" y="176" as="geometry" />
+        </mxCell>
+        <mxCell id="p1ok" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;5. Admission approved&lt;/b&gt;&lt;br&gt;Review email sent&lt;br&gt;Unlock enrollment allowed" vertex="1">
+          <mxGeometry height="68" width="230" x="1880" y="186" as="geometry" />
+        </mxCell>
+        <mxCell id="p1deny" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;Admission denied&lt;/b&gt;&lt;br&gt;Notes required&lt;br&gt;SES review email then End" vertex="1">
+          <mxGeometry height="70" width="230" x="1630" y="323" as="geometry" />
+        </mxCell>
+        <mxCell id="p1end1" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#1E293B;fontColor=#FFFFFF;strokeColor=#0F172A;fontStyle=1;fontSize=12;" value="End" vertex="1">
+          <mxGeometry height="36" width="120" x="1685" y="450" as="geometry" />
+        </mxCell>
+        <mxCell id="p1login" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;arcSize=8;" value="&lt;b&gt;Login /login&lt;/b&gt;&lt;br&gt;Staff: password only&lt;br&gt;Trainee/applicant: Google or password&lt;br&gt;Verified email required" vertex="1">
+          <mxGeometry height="80" width="250" x="180" y="440" as="geometry" />
+        </mxCell>
+        <mxCell id="p1route" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;arcSize=8;" value="&lt;b&gt;AccountPortal routes role&lt;/b&gt;&lt;br&gt;admin to /admin · trainer to /trainer&lt;br&gt;trainee to /trainee · applicant to payment&lt;br&gt;or enrollment if denied / new" vertex="1">
+          <mxGeometry height="80" width="280" x="468" y="388" as="geometry" />
+        </mxCell>
+        <mxCell id="p1claim" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF7ED;strokeColor=#C2410C;fontColor=#7C2D12;fontSize=11;arcSize=8;" value="&lt;b&gt;Historical alumni claim&lt;/b&gt;&lt;br&gt;/alumni/claim · evidence + email verify&lt;br&gt;Admin archive review (dashed path)" vertex="1">
+          <mxGeometry height="80" width="300" x="770" y="388" as="geometry" />
+        </mxCell>
+        <mxCell id="p1e1" edge="1" parent="1" source="p1s" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p1land">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1e2" edge="1" parent="1" source="p1land" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p1want">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1e3" edge="1" parent="1" source="p1land" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#64748B;strokeWidth=1.2;" target="p1chat">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1e4" edge="1" parent="1" source="p1want" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p1apply" value="Apply">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1e5" edge="1" parent="1" source="p1apply" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p1submit">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1e6" edge="1" parent="1" source="p1submit" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#64748B;strokeWidth=1.2;" target="p1ses">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1e7" edge="1" parent="1" source="p1submit" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p1status">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1045.06" y="290.06" />
+              <mxPoint x="1510" y="290.06" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1e8" edge="1" parent="1" source="p1status" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p1rev">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1e9" edge="1" parent="1" source="p1rev" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;" target="p1ok" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1e10" edge="1" parent="1" source="p1rev" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#B91C1C;strokeWidth=1.4;" target="p1deny" value="No">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1e11" edge="1" parent="1" source="p1deny" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p1end1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1e12" edge="1" parent="1" source="p1want" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;curved=0;" target="p1login" value="Login">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="430" y="241" />
+              <mxPoint x="430" y="428" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1e13" edge="1" parent="1" source="p1login" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p1route">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1e14" edge="1" parent="1" source="p1want" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#C2410C;strokeWidth=1.4;" target="p1claim" value="Alumni claim">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p2un" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;arcSize=8;" value="&lt;b&gt;6. Unlock enrollment&lt;/b&gt;&lt;br&gt;/enrollment + approved&lt;br&gt;application number" vertex="1">
+          <mxGeometry height="70" width="210" x="70" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="p2bat" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;arcSize=8;" value="&lt;b&gt;7. Choose batch&lt;/b&gt;&lt;br&gt;Published training batch&lt;br&gt;linked program + trainer" vertex="1">
+          <mxGeometry height="70" width="200" x="310" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="p2pro" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;arcSize=8;" value="&lt;b&gt;8. TESDA profile&lt;/b&gt;&lt;br&gt;Name, birth, education,&lt;br&gt;guardian, employment" vertex="1">
+          <mxGeometry height="70" width="200" x="540" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="p2psgc" parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;" value="&lt;b&gt;PSGC API&lt;/b&gt;&lt;br&gt;Region to Province to&lt;br&gt;City/Municipality to Barangay" vertex="1">
+          <mxGeometry height="70" width="210" x="770" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="p2doc" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;arcSize=8;" value="&lt;b&gt;9. Upload required docs&lt;/b&gt;&lt;br&gt;Birth cert · Form 137/138/diploma&lt;br&gt;Good moral · ID photo · E-signature" vertex="1">
+          <mxGeometry height="70" width="250" x="1010" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="p2sub" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;arcSize=8;" value="&lt;b&gt;10. Submit enrollment&lt;/b&gt;&lt;br&gt;Role to applicant&lt;br&gt;Status: profile_submitted" vertex="1">
+          <mxGeometry height="70" width="220" x="1290" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="p2pay" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;arcSize=8;" value="&lt;b&gt;11. Redirect to payment&lt;/b&gt;&lt;br&gt;/payment&lt;br&gt;Applicant cannot enter /trainee yet" vertex="1">
+          <mxGeometry height="70" width="240" x="1540" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="p2note" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#64748B;fontColor=#334155;fontSize=11;align=left;spacingLeft=10;" value="Draft uploads can be previewed before submit. Address dropdowns use PSGC_API_URL. Admission Gmail is reused for the applicant account." vertex="1">
+          <mxGeometry height="40" width="1560" x="70" y="750" as="geometry" />
+        </mxCell>
+        <mxCell id="p2e2" edge="1" parent="1" source="p2un" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p2bat">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2e3" edge="1" parent="1" source="p2bat" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p2pro">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2e4" edge="1" parent="1" source="p2pro" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#64748B;strokeWidth=1.2;" target="p2psgc">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2e5" edge="1" parent="1" source="p2psgc" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p2doc">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2e6" edge="1" parent="1" source="p2doc" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p2sub">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2e7" edge="1" parent="1" source="p2sub" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p2pay">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p3how" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;fontStyle=1;" value="Payment&lt;br&gt;method?" vertex="1">
+          <mxGeometry height="90" width="160" x="90" y="930" as="geometry" />
+        </mxCell>
+        <mxCell id="p3on" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;arcSize=8;" value="&lt;b&gt;12a. PayMongo online&lt;/b&gt;&lt;br&gt;Checkout Session&lt;br&gt;GCash / card / QRPh" vertex="1">
+          <mxGeometry height="68" width="220" x="320" y="910" as="geometry" />
+        </mxCell>
+        <mxCell id="p3ret" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;arcSize=8;" value="&lt;b&gt;13a. Return to MCARE&lt;/b&gt;&lt;br&gt;/payment/return · complete&lt;br&gt;Retrieve checkout (no webhook)" vertex="1">
+          <mxGeometry height="68" width="240" x="570" y="910" as="geometry" />
+        </mxCell>
+        <mxCell id="p3os" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;arcSize=8;" value="&lt;b&gt;12b. Pay on site&lt;/b&gt;&lt;br&gt;Receipt / ticket issued&lt;br&gt;Pay at MCARE cashier" vertex="1">
+          <mxGeometry height="68" width="220" x="320" y="1000" as="geometry" />
+        </mxCell>
+        <mxCell id="p3ver" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;13b. Admin verifies&lt;/b&gt;&lt;br&gt;Payment Scheduling&lt;br&gt;Record / proof / transaction" vertex="1">
+          <mxGeometry height="68" width="240" x="570" y="1000" as="geometry" />
+        </mxCell>
+        <mxCell id="p3clr" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D1FAE5;strokeColor=#047857;fontColor=#065F46;fontSize=11;arcSize=8;" value="&lt;b&gt;14. Payment cleared&lt;/b&gt;&lt;br&gt;EnrollmentPaymentLifecycle&lt;br&gt;Status to pre_enlistment&lt;br&gt;review_released_at set" vertex="1">
+          <mxGeometry height="90" width="250" x="860" y="950" as="geometry" />
+        </mxCell>
+        <mxCell id="p3mail" parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;" value="&lt;b&gt;SES receipt&lt;/b&gt;&lt;br&gt;PaymentVerifiedNotification&lt;br&gt;Admins notified" vertex="1">
+          <mxGeometry height="70" width="210" x="1150" y="960" as="geometry" />
+        </mxCell>
+        <mxCell id="p3e1" edge="1" parent="1" source="p2pay" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p3how">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1660" y="810" />
+              <mxPoint x="170" y="810" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p3e2" edge="1" parent="1" source="p3how" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p3on" value="Online">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p3e3" edge="1" parent="1" source="p3on" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p3ret">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p3e4" edge="1" parent="1" source="p3how" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p3os" value="On-site">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p3e5" edge="1" parent="1" source="p3os" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p3ver">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p3e6" edge="1" parent="1" source="p3ret" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;" target="p3clr">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p3e7" edge="1" parent="1" source="p3ver" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;" target="p3clr">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p3e8" edge="1" parent="1" source="p3clr" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#64748B;strokeWidth=1.2;" target="p3mail">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p4rev" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;15. Enrollment review queue&lt;/b&gt;&lt;br&gt;/admin/enrollments&lt;br&gt;Only payment-cleared packets" vertex="1">
+          <mxGeometry height="70" width="240" x="70" y="1226" as="geometry" />
+        </mxCell>
+        <mxCell id="p4docs" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;16. Per-document review&lt;/b&gt;&lt;br&gt;Accept / Replace / Missing + notes&lt;br&gt;5 required files" vertex="1">
+          <mxGeometry height="70" width="240" x="340" y="1226" as="geometry" />
+        </mxCell>
+        <mxCell id="p4dec" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;fontStyle=1;" value="Approve&lt;br&gt;enrollment?" vertex="1">
+          <mxGeometry height="90" width="160" x="620" y="1216" as="geometry" />
+        </mxCell>
+        <mxCell id="p4no" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;Denied&lt;/b&gt;&lt;br&gt;Status email&lt;br&gt;Applicant may correct and resubmit" vertex="1">
+          <mxGeometry height="70" width="230" x="820" y="1216" as="geometry" />
+        </mxCell>
+        <mxCell id="p4end2" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#1E293B;fontColor=#FFFFFF;strokeColor=#0F172A;fontStyle=1;fontSize=12;" value="End / retry" vertex="1">
+          <mxGeometry height="36" width="130" x="870" y="1310" as="geometry" />
+        </mxCell>
+        <mxCell id="p4yes" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CCFBF1;strokeColor=#0F766E;fontColor=#134E4A;fontSize=11;arcSize=8;" value="&lt;b&gt;17. Approve to TRAINEE&lt;/b&gt;&lt;br&gt;Role trainee · learning_status active&lt;br&gt;Rolling modules assigned · notified" vertex="1">
+          <mxGeometry height="80" width="280" x="1090" y="1226" as="geometry" />
+        </mxCell>
+        <mxCell id="p4tesda" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;Optional admin extras&lt;/b&gt;&lt;br&gt;TESDA registration PDF&lt;br&gt;Create staff/trainee accounts&lt;br&gt;Programs / batches / schedules" vertex="1">
+          <mxGeometry height="80" width="250" x="1410" y="1226" as="geometry" />
+        </mxCell>
+        <mxCell id="p4docs2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#64748B;fontColor=#334155;fontSize=11;align=left;spacingLeft=10;" value="Required documents: Birth Certificate · Form 137/138 or Diploma · Good Moral · ID Photo (1x1/2x2) · E-signature" vertex="1">
+          <mxGeometry height="36" width="1630" x="70" y="1350" as="geometry" />
+        </mxCell>
+        <mxCell id="p4e1" edge="1" parent="1" source="p3clr" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p4rev">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="985" y="1100" />
+              <mxPoint x="190" y="1100" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p4e2" edge="1" parent="1" source="p4rev" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p4docs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p4e3" edge="1" parent="1" source="p4docs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p4dec">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p4e4" edge="1" parent="1" source="p4dec" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#B91C1C;strokeWidth=1.4;" target="p4no" value="No">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p4e5" edge="1" parent="1" source="p4no" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p4end2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p4e6" edge="1" parent="1" source="p4dec" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;" target="p4yes" value="Yes">
+          <mxGeometry relative="1" x="0.0053" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="700" y="1190" />
+              <mxPoint x="1230" y="1190" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p4e7" edge="1" parent="1" source="p4yes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#64748B;strokeWidth=1.2;" target="p4tesda">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p5tr" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E8FF;strokeColor=#7E22CE;fontColor=#581C87;fontSize=11;arcSize=8;" value="&lt;b&gt;18. Trainer delivers class&lt;/b&gt;&lt;br&gt;/trainer · password login&lt;br&gt;Publish modules and quizzes&lt;br&gt;Attendance by batch&lt;br&gt;Competency outcomes" vertex="1">
+          <mxGeometry height="120" width="250" x="70" y="1490" as="geometry" />
+        </mxCell>
+        <mxCell id="p5te" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CCFBF1;strokeColor=#0F766E;fontColor=#134E4A;fontSize=11;arcSize=8;" value="&lt;b&gt;19. Trainee studies&lt;/b&gt;&lt;br&gt;/trainee · Google or password&lt;br&gt;Stream · classwork · quizzes&lt;br&gt;Schedule · watermarked PDFs&lt;br&gt;Progress + classroom comments" vertex="1">
+          <mxGeometry height="120" width="250" x="360" y="1490" as="geometry" />
+        </mxCell>
+        <mxCell id="p5pay" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CCFBF1;strokeColor=#0F766E;fontColor=#134E4A;fontSize=11;arcSize=8;" value="&lt;b&gt;Trainee payments&lt;/b&gt;&lt;br&gt;View balance&lt;br&gt;Upload proof&lt;br&gt;Generate onsite ticket" vertex="1">
+          <mxGeometry height="90" width="190" x="700" y="1505" as="geometry" />
+        </mxCell>
+        <mxCell id="p5loop" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;fontStyle=1;" value="Still&lt;br&gt;training?" vertex="1">
+          <mxGeometry height="80" width="140" x="940" y="1510" as="geometry" />
+        </mxCell>
+        <mxCell id="p5elig" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;20. CompletionEligibilityService&lt;/b&gt;&lt;br&gt;Approved · payment paid · rolling started&lt;br&gt;All required CORE units competent&lt;br&gt;Required outcomes competent&lt;br&gt;Core modules trainer-validated&lt;br&gt;All published module quizzes passed" vertex="1">
+          <mxGeometry height="130" width="320" x="1220" y="1485" as="geometry" />
+        </mxCell>
+        <mxCell id="p5ann" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;arcSize=8;" value="&lt;b&gt;Shared LMS tools&lt;/b&gt;&lt;br&gt;Admin + trainer announcements&lt;br&gt;Notifications inbox&lt;br&gt;Search / reports / exports" vertex="1">
+          <mxGeometry height="100" width="240" x="1590" y="1495" as="geometry" />
+        </mxCell>
+        <mxCell id="p5e1" edge="1" parent="1" source="p4yes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p5tr">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1230" y="1400" />
+              <mxPoint x="110" y="1400" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p5e2" edge="1" parent="1" source="p4yes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="p5te">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1230" y="1190" />
+              <mxPoint x="1740" y="1190" />
+              <mxPoint x="1740" y="1450" />
+              <mxPoint x="485" y="1450" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p5e3" edge="1" parent="1" source="p5tr" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#64748B;strokeWidth=1.2;" target="p5te">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p5e4" edge="1" parent="1" source="p5te" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p5pay">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p5e5" edge="1" parent="1" source="p5te" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p5loop">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="485" y="1470" />
+              <mxPoint x="900" y="1470" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p5e6" edge="1" parent="1" source="p5loop" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#B91C1C;strokeWidth=1.4;" target="p5tr" value="Yes — continue">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="960" y="1640" />
+              <mxPoint x="195" y="1640" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p5e7" edge="1" parent="1" source="p5loop" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;" target="p5elig" value="Ready">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p5e8" edge="1" parent="1" source="p5tr" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#64748B;strokeWidth=1.2;" target="p5ann">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="195" y="1660" />
+              <mxPoint x="1710" y="1660" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p6grad" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;21. Admin graduates trainee&lt;/b&gt;&lt;br&gt;learning_status = graduated&lt;br&gt;AlumniProfile / graduate access" vertex="1">
+          <mxGeometry height="80" width="260" x="70" y="1790" as="geometry" />
+        </mxCell>
+        <mxCell id="p6doc" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D1FAE5;strokeColor=#047857;fontColor=#065F46;fontSize=11;arcSize=8;" value="&lt;b&gt;22. Official documents&lt;/b&gt;&lt;br&gt;Generate COTC and/or TOR&lt;br&gt;Browsershot + Chrome PDF&lt;br&gt;Release · preview · reissue · batch TOR" vertex="1">
+          <mxGeometry height="90" width="270" x="360" y="1790" as="geometry" />
+        </mxCell>
+        <mxCell id="p6hub" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D1FAE5;strokeColor=#047857;fontColor=#065F46;fontSize=11;arcSize=8;" value="&lt;b&gt;23. Career Hub&lt;/b&gt;&lt;br&gt;/trainee/career-hub&lt;br&gt;Set availability for duty&lt;br&gt;Browse published jobs" vertex="1">
+          <mxGeometry height="80" width="230" x="660" y="1790" as="geometry" />
+        </mxCell>
+        <mxCell id="p6inq" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D1FAE5;strokeColor=#047857;fontColor=#065F46;fontSize=11;arcSize=8;" value="&lt;b&gt;24. Graduate inquiry&lt;/b&gt;&lt;br&gt;Contact interest to admin&lt;br&gt;Admin updates status/notes" vertex="1">
+          <mxGeometry height="80" width="230" x="920" y="1790" as="geometry" />
+        </mxCell>
+        <mxCell id="p6sms" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;25. Optional job SMS&lt;/b&gt;&lt;br&gt;Semaphore: none / now / scheduled&lt;br&gt;career:send-scheduled-sms" vertex="1">
+          <mxGeometry height="80" width="250" x="1180" y="1790" as="geometry" />
+        </mxCell>
+        <mxCell id="p6end" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#0B6E4F;fontColor=#FFFFFF;strokeColor=#064E3B;fontStyle=1;fontSize=12;" value="End" vertex="1">
+          <mxGeometry height="44" width="130" x="1480" y="1808" as="geometry" />
+        </mxCell>
+        <mxCell id="p6alt" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF7ED;strokeColor=#C2410C;fontColor=#7C2D12;fontSize=11;arcSize=8;" value="&lt;b&gt;Historical alumni join here&lt;/b&gt;&lt;br&gt;Approved claim creates graduated enrollment then Career Hub (no LMS cycle)" vertex="1">
+          <mxGeometry height="50" width="560" x="70" y="1910" as="geometry" />
+        </mxCell>
+        <mxCell id="p6pause" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#64748B;fontColor=#334155;fontSize=11;align=left;spacingLeft=10;" value="Admin may also set trainee status to paused or withdrawn. Paused/withdrawn trainees lose active.training LMS access. Graduates keep documents, grades, and Career Hub." vertex="1">
+          <mxGeometry height="50" width="770" x="790" y="1920" as="geometry" />
+        </mxCell>
+        <mxCell id="p6e1" edge="1" parent="1" source="p5elig" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;" target="p6grad">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1240" y="1670" />
+              <mxPoint x="200" y="1670" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p6e2" edge="1" parent="1" source="p6grad" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p6doc">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p6e3" edge="1" parent="1" source="p6doc" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p6hub">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p6e4" edge="1" parent="1" source="p6hub" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p6inq">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p6e5" edge="1" parent="1" source="p6inq" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" target="p6sms">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p6e6" edge="1" parent="1" source="p6sms" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;" target="p6end">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p6e7" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#C2410C;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2140" y="420" />
+              <mxPoint x="2140" y="2010" />
+              <mxPoint x="630" y="2010" />
+            </Array>
+            <mxPoint x="1069.9999999999995" y="420" as="sourcePoint" />
+            <mxPoint x="630" y="1955" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p6e8" edge="1" parent="1" source="p6alt" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#C2410C;strokeWidth=1.4;" target="p6hub">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1foot" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#64748B;fontColor=#334155;fontSize=11;align=left;spacingLeft=10;" value="More detail: tab 2 = full decision tree · tab 3 = LMS swimlanes · tab 4 = admission/enrollment/payment statuses · tab 5 = eligibility + Career Hub · tab 6 = login, roles, and portals." vertex="1">
+          <mxGeometry height="36" width="2120" x="40" y="2068" as="geometry" />
+        </mxCell>
+        <mxCell id="0U-JINIBQVMnqHP7URXs-2" edge="1" parent="1" source="p1ok" style="endArrow=classic;html=1;rounded=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;curved=0;fillColor=#d5e8d4;strokeColor=#82b366;" target="p2un" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <Array as="points">
+              <mxPoint x="1995" y="540" />
+              <mxPoint x="175" y="540" />
+            </Array>
+            <mxPoint x="970" y="650" as="sourcePoint" />
+            <mxPoint x="1020" y="600" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="decision-tree" name="2. Decision Tree">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="2210" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="t" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#0B3D2E;fontColor=#FFFFFF;strokeColor=none;fontSize=20;fontStyle=1;align=center;" value="MCARE Hub — Decision Flow (every branch)">
+          <mxGeometry x="40" y="20" width="1520" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="ts" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#14532D;fontColor=#D1FAE5;strokeColor=none;fontSize=12;align=center;" value="Same pipeline as page 1, drawn as a single vertical decision tree with deny/retry/login side paths.">
+          <mxGeometry x="40" y="68" width="1520" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="d0" parent="1" vertex="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#0B6E4F;fontColor=#FFFFFF;strokeColor=#064E3B;fontStyle=1;fontSize=12;" value="Start">
+          <mxGeometry x="670" y="120" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="d1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F2FE;strokeColor=#0369A1;fontColor=#0C4A6E;fontSize=11;arcSize=8;" value="&lt;b&gt;Open /&lt;/b&gt;&lt;br&gt;Landing, programs, updates">
+          <mxGeometry x="610" y="190" width="260" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="de01" parent="1" edge="1" source="d0" target="d1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d2" parent="1" vertex="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;fontStyle=1;" value="Need?">
+          <mxGeometry x="650" y="280" width="180" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="de12" parent="1" edge="1" source="d1" target="d2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d2a" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;arcSize=8;" value="&lt;b&gt;Login&lt;/b&gt;&lt;br&gt;Staff password&lt;br&gt;Trainee Google/password&lt;br&gt;2FA config-driven (admin exempt)">
+          <mxGeometry x="80" y="270" width="250" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="d2c" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF7ED;strokeColor=#C2410C;fontColor=#7C2D12;fontSize=11;arcSize=8;" value="&lt;b&gt;Alumni claim&lt;/b&gt;&lt;br&gt;/alumni/claim&lt;br&gt;Evidence + email verify">
+          <mxGeometry x="1180" y="270" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="de2a" parent="1" edge="1" source="d2" target="d2a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" value="Login">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="de2c" parent="1" edge="1" source="d2" target="d2c" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#C2410C;strokeWidth=1.4;" value="Claim">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F2FE;strokeColor=#0369A1;fontColor=#0C4A6E;fontSize=11;arcSize=8;" value="&lt;b&gt;Admission /applications&lt;/b&gt;&lt;br&gt;Gmail unique for pending/approved&lt;br&gt;Throttle 3/min">
+          <mxGeometry x="590" y="410" width="300" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="de23" parent="1" edge="1" source="d2" target="d3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" value="Apply">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d4" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F2FE;strokeColor=#0369A1;fontColor=#0C4A6E;fontSize=11;arcSize=8;" value="&lt;b&gt;pending + application_number&lt;/b&gt;&lt;br&gt;SES to applicant and admins&lt;br&gt;Lookup at /applications/status">
+          <mxGeometry x="590" y="510" width="300" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="de34" parent="1" edge="1" source="d3" target="d4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d5" parent="1" vertex="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;fontStyle=1;" value="Admit?">
+          <mxGeometry x="650" y="620" width="180" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="de45" parent="1" edge="1" source="d4" target="d5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d5n" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;Denied&lt;/b&gt;&lt;br&gt;Notes + SES then End">
+          <mxGeometry x="80" y="620" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="d5e" parent="1" vertex="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#1E293B;fontColor=#FFFFFF;strokeColor=#0F172A;fontStyle=1;fontSize=12;" value="End">
+          <mxGeometry x="130" y="710" width="120" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="de5n" parent="1" edge="1" source="d5" target="d5n" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#B91C1C;strokeWidth=1.4;" value="No">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="de5e" parent="1" edge="1" source="d5n" target="d5e" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d6" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;arcSize=8;" value="&lt;b&gt;Unlock /enrollment&lt;/b&gt;&lt;br&gt;Approved application number">
+          <mxGeometry x="590" y="750" width="300" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="de56" parent="1" edge="1" source="d5" target="d6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d7" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;arcSize=8;" value="&lt;b&gt;TESDA packet&lt;/b&gt;&lt;br&gt;Batch · profile · PSGC address&lt;br&gt;5 documents · role becomes applicant">
+          <mxGeometry x="590" y="840" width="300" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="de67" parent="1" edge="1" source="d6" target="d7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d8" parent="1" vertex="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;fontStyle=1;" value="Pay how?">
+          <mxGeometry x="650" y="960" width="180" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="de78" parent="1" edge="1" source="d7" target="d8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d8a" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;arcSize=8;" value="&lt;b&gt;PayMongo&lt;/b&gt;&lt;br&gt;Checkout then pay then return&lt;br&gt;Retrieve status">
+          <mxGeometry x="80" y="950" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="d8b" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;arcSize=8;" value="&lt;b&gt;On-site&lt;/b&gt;&lt;br&gt;Ticket then cashier&lt;br&gt;Admin Payment Scheduling">
+          <mxGeometry x="1180" y="950" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="de8a" parent="1" edge="1" source="d8" target="d8a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" value="Online">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="de8b" parent="1" edge="1" source="d8" target="d8b" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" value="On-site">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d9" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D1FAE5;strokeColor=#047857;fontColor=#065F46;fontSize=11;arcSize=8;" value="&lt;b&gt;Cleared&lt;/b&gt;&lt;br&gt;pre_enlistment · review_released_at&lt;br&gt;Receipt email · admin notify">
+          <mxGeometry x="590" y="1100" width="300" height="74" as="geometry" />
+        </mxCell>
+        <mxCell id="de8a9" parent="1" edge="1" source="d8a" target="d9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="de8b9" parent="1" edge="1" source="d8b" target="d9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d10" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;Document review&lt;/b&gt;&lt;br&gt;Accept / Replace / Missing + notes&lt;br&gt;TESDA form export available">
+          <mxGeometry x="590" y="1210" width="300" height="74" as="geometry" />
+        </mxCell>
+        <mxCell id="de910" parent="1" edge="1" source="d9" target="d10" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d11" parent="1" vertex="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;fontStyle=1;" value="Enlist?">
+          <mxGeometry x="650" y="1330" width="180" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="de1011" parent="1" edge="1" source="d10" target="d11" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d11n" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;Denied&lt;/b&gt;&lt;br&gt;Correct and resubmit path">
+          <mxGeometry x="80" y="1330" width="230" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="d11e" parent="1" vertex="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#1E293B;fontColor=#FFFFFF;strokeColor=#0F172A;fontStyle=1;fontSize=12;" value="End / retry">
+          <mxGeometry x="115" y="1420" width="160" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="de11n" parent="1" edge="1" source="d11" target="d11n" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#B91C1C;strokeWidth=1.4;" value="No">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="de11e" parent="1" edge="1" source="d11n" target="d11e" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d12" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CCFBF1;strokeColor=#0F766E;fontColor=#134E4A;fontSize=11;arcSize=8;" value="&lt;b&gt;TRAINEE&lt;/b&gt;&lt;br&gt;active · rolling module release&lt;br&gt;Cannot enter LMS if paused/withdrawn">
+          <mxGeometry x="590" y="1460" width="300" height="74" as="geometry" />
+        </mxCell>
+        <mxCell id="de1112" parent="1" edge="1" source="d11" target="d12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d13" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E8FF;strokeColor=#7E22CE;fontColor=#581C87;fontSize=11;arcSize=8;" value="&lt;b&gt;LMS loop&lt;/b&gt;&lt;br&gt;Trainer publish/assess · Trainee study/quiz&lt;br&gt;Attendance · competency · comments">
+          <mxGeometry x="590" y="1570" width="300" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="de1213" parent="1" edge="1" source="d12" target="d13" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d14" parent="1" vertex="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;fontStyle=1;" value="Eligible to&lt;br&gt;graduate?">
+          <mxGeometry x="640" y="1690" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="de1314" parent="1" edge="1" source="d13" target="d14" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d14n" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E8FF;strokeColor=#7E22CE;fontColor=#581C87;fontSize=11;arcSize=8;" value="&lt;b&gt;Not yet&lt;/b&gt;&lt;br&gt;Missing units, outcomes,&lt;br&gt;validated modules, or quizzes">
+          <mxGeometry x="80" y="1690" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="de14n" parent="1" edge="1" source="d14" target="d14n" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#B91C1C;strokeWidth=1.4;" value="No">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="de14loop" parent="1" edge="1" source="d14n" target="d13" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#64748B;strokeWidth=1.2;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="205" y="1650" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d15" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;Graduated&lt;/b&gt;&lt;br&gt;AlumniProfile · grades · Career Hub">
+          <mxGeometry x="590" y="1830" width="300" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="de1415" parent="1" edge="1" source="d14" target="d15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d16" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D1FAE5;strokeColor=#047857;fontColor=#065F46;fontSize=11;arcSize=8;" value="&lt;b&gt;COTC / TOR&lt;/b&gt;&lt;br&gt;Generate · release · download · reissue">
+          <mxGeometry x="590" y="1930" width="300" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="de1516" parent="1" edge="1" source="d15" target="d16" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d17" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D1FAE5;strokeColor=#047857;fontColor=#065F46;fontSize=11;arcSize=8;" value="&lt;b&gt;Career Hub + SMS&lt;/b&gt;&lt;br&gt;Jobs · inquiries · Semaphore optional">
+          <mxGeometry x="590" y="2030" width="300" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="de1617" parent="1" edge="1" source="d16" target="d17" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d18" parent="1" vertex="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#0B6E4F;fontColor=#FFFFFF;strokeColor=#064E3B;fontStyle=1;fontSize=12;" value="End">
+          <mxGeometry x="670" y="2130" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="de1718" parent="1" edge="1" source="d17" target="d18" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d2c2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF7ED;strokeColor=#C2410C;fontColor=#7C2D12;fontSize=11;arcSize=8;" value="&lt;b&gt;Admin claim review&lt;/b&gt;&lt;br&gt;Approve then graduated trainee">
+          <mxGeometry x="1180" y="1910" width="250" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="de2c2" parent="1" edge="1" source="d2c" target="d2c2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#C2410C;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1480" y="230" />
+              <mxPoint x="1480" y="1942" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="de2c3" parent="1" edge="1" source="d2c2" target="d17" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#C2410C;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d2cn" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;Claim rejected&lt;/b&gt;&lt;br&gt;Portal stays locked then End">
+          <mxGeometry x="1180" y="280" width="250" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="de2cn" parent="1" edge="1" source="d2c" target="d2cn" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#B91C1C;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d2ar" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;arcSize=8;" value="&lt;b&gt;AccountPortal&lt;/b&gt;&lt;br&gt;admin / trainer / trainee / alumni dashboards&lt;br&gt;Applicant with app to payment.show">
+          <mxGeometry x="80" y="320" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="de2ar" parent="1" edge="1" source="d2a" target="d2ar" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="lms-cycle" name="3. LMS Teaching Cycle">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2000" pageHeight="980" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="tb" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#0B3D2E;fontColor=#FFFFFF;strokeColor=none;fontSize=20;fontStyle=1;align=center;" value="MCARE Hub — LMS Teaching and Assessment Cycle">
+          <mxGeometry x="40" y="16" width="1920" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="ts" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#14532D;fontColor=#D1FAE5;strokeColor=none;fontSize=12;align=center;" value="Active trainee /trainee · Trainer /trainer · Caregiving NC II catalog + optional custom modules (MCARE-CUSTOM-id, not on TOR by default)">
+          <mxGeometry x="40" y="64" width="1920" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="laneT" parent="1" vertex="1" style="swimlane;horizontal=0;whiteSpace=wrap;html=1;startSize=36;fontStyle=1;fontSize=13;fillColor=#FAF5FF;strokeColor=#7E22CE;fontColor=#581C87;" value="Trainer">
+          <mxGeometry x="40" y="110" width="1920" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="laneS" parent="1" vertex="1" style="swimlane;horizontal=0;whiteSpace=wrap;html=1;startSize=36;fontStyle=1;fontSize=13;fillColor=#F0FDFA;strokeColor=#0F766E;fontColor=#134E4A;" value="Trainee">
+          <mxGeometry x="40" y="380" width="1920" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="laneA" parent="1" vertex="1" style="swimlane;horizontal=0;whiteSpace=wrap;html=1;startSize=36;fontStyle=1;fontSize=13;fillColor=#FEF2F2;strokeColor=#B91C1C;fontColor=#7F1D1D;" value="Admin">
+          <mxGeometry x="40" y="650" width="1920" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="t1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E8FF;strokeColor=#7E22CE;fontColor=#581C87;fontSize=11;arcSize=8;" value="&lt;b&gt;1. Assigned batch&lt;/b&gt;&lt;br&gt;View class roster&lt;br&gt;Dashboard / search">
+          <mxGeometry x="100" y="170" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="t2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E8FF;strokeColor=#7E22CE;fontColor=#581C87;fontSize=11;arcSize=8;" value="&lt;b&gt;2. Publish module&lt;/b&gt;&lt;br&gt;Catalog preset or custom&lt;br&gt;Lesson + supplementary files">
+          <mxGeometry x="380" y="170" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="te1" parent="1" edge="1" source="t1" target="t2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="t3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E8FF;strokeColor=#7E22CE;fontColor=#581C87;fontSize=11;arcSize=8;" value="&lt;b&gt;3. Publish quiz&lt;/b&gt;&lt;br&gt;On module or standalone&lt;br&gt;Publication toggle">
+          <mxGeometry x="660" y="170" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="te2" parent="1" edge="1" source="t2" target="t3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="t4" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E8FF;strokeColor=#7E22CE;fontColor=#581C87;fontSize=11;arcSize=8;" value="&lt;b&gt;4. Attendance&lt;/b&gt;&lt;br&gt;Mark by batch/date&lt;br&gt;Export workbook">
+          <mxGeometry x="940" y="170" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="te3" parent="1" edge="1" source="t3" target="t4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="t5" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E8FF;strokeColor=#7E22CE;fontColor=#581C87;fontSize=11;arcSize=8;" value="&lt;b&gt;5. Evaluate&lt;/b&gt;&lt;br&gt;Quiz attempts + files&lt;br&gt;Module outcomes">
+          <mxGeometry x="1220" y="170" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="te4" parent="1" edge="1" source="t4" target="t5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="t6" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E8FF;strokeColor=#7E22CE;fontColor=#581C87;fontSize=11;arcSize=8;" value="&lt;b&gt;6. Competency&lt;/b&gt;&lt;br&gt;NC II units / outcomes&lt;br&gt;Charts + Excel export">
+          <mxGeometry x="1500" y="170" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="te5" parent="1" edge="1" source="t5" target="t6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CCFBF1;strokeColor=#0F766E;fontColor=#134E4A;fontSize=11;arcSize=8;" value="&lt;b&gt;1. Stream&lt;/b&gt;&lt;br&gt;Announcements&lt;br&gt;active.training required">
+          <mxGeometry x="100" y="440" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="s2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CCFBF1;strokeColor=#0F766E;fontColor=#134E4A;fontSize=11;arcSize=8;" value="&lt;b&gt;2. Classwork&lt;/b&gt;&lt;br&gt;Open released modules&lt;br&gt;Watermarked PDF viewer">
+          <mxGeometry x="380" y="440" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="se1" parent="1" edge="1" source="s1" target="s2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CCFBF1;strokeColor=#0F766E;fontColor=#134E4A;fontSize=11;arcSize=8;" value="&lt;b&gt;3. Progress&lt;/b&gt;&lt;br&gt;Module + submodule&lt;br&gt;progress.update">
+          <mxGeometry x="660" y="440" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="se2" parent="1" edge="1" source="s2" target="s3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s4" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CCFBF1;strokeColor=#0F766E;fontColor=#134E4A;fontSize=11;arcSize=8;" value="&lt;b&gt;4. Take quiz&lt;/b&gt;&lt;br&gt;Start attempt · submit&lt;br&gt;View pass/fail">
+          <mxGeometry x="940" y="440" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="se3" parent="1" edge="1" source="s3" target="s4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s5" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CCFBF1;strokeColor=#0F766E;fontColor=#134E4A;fontSize=11;arcSize=8;" value="&lt;b&gt;5. Comments&lt;/b&gt;&lt;br&gt;Module/quiz comments&lt;br&gt;with trainer/admin">
+          <mxGeometry x="1220" y="440" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="se4" parent="1" edge="1" source="s4" target="s5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s6" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CCFBF1;strokeColor=#0F766E;fontColor=#134E4A;fontSize=11;arcSize=8;" value="&lt;b&gt;6. Schedule / pay&lt;/b&gt;&lt;br&gt;Calendar · balance&lt;br&gt;Proof or onsite ticket">
+          <mxGeometry x="1500" y="440" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="se5" parent="1" edge="1" source="s5" target="s6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v12" parent="1" edge="1" source="t2" target="s2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#64748B;strokeWidth=1.2;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v13" parent="1" edge="1" source="t3" target="s4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#64748B;strokeWidth=1.2;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v54" parent="1" edge="1" source="s4" target="t5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#64748B;strokeWidth=1.2;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v65" parent="1" edge="1" source="s3" target="t5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#64748B;strokeWidth=1.2;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;Oversee LMS&lt;/b&gt;&lt;br&gt;Modules, presets, outcomes&lt;br&gt;Trainee roster + status&lt;br&gt;Attendance export">
+          <mxGeometry x="100" y="710" width="230" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;CompletionEligibilityService&lt;/b&gt;&lt;br&gt;1 Enrollment approved&lt;br&gt;2 Payment paid&lt;br&gt;3 Rolling training started&lt;br&gt;4 Core units competent&lt;br&gt;5 Required outcomes competent&lt;br&gt;6 Core modules validated&lt;br&gt;7 Published quizzes passed">
+          <mxGeometry x="400" y="690" width="280" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="a3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;Set learning status&lt;/b&gt;&lt;br&gt;active · paused&lt;br&gt;graduated · withdrawn">
+          <mxGeometry x="750" y="710" width="210" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="a4" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D1FAE5;strokeColor=#047857;fontColor=#065F46;fontSize=11;arcSize=8;" value="&lt;b&gt;Certificates&lt;/b&gt;&lt;br&gt;COTC / TOR generate&lt;br&gt;Release · reissue · batch TOR">
+          <mxGeometry x="1030" y="710" width="220" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="a5" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D1FAE5;strokeColor=#047857;fontColor=#065F46;fontSize=11;arcSize=8;" value="&lt;b&gt;Career Hub&lt;/b&gt;&lt;br&gt;Post jobs · inquiries&lt;br&gt;Semaphore SMS options">
+          <mxGeometry x="1320" y="710" width="220" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="ae1" parent="1" edge="1" source="a1" target="a2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ae2" parent="1" edge="1" source="a2" target="a3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ae3" parent="1" edge="1" source="a3" target="a4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ae4" parent="1" edge="1" source="a4" target="a5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="vt6a2" parent="1" edge="1" source="t6" target="a2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#64748B;strokeWidth=1.2;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="fn" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#64748B;fontColor=#334155;fontSize=11;align=left;spacingLeft=10;" value="Learning PDFs are stamped with the MCARE watermark. Printing/saving may be restricted in the viewer. Custom assessed modules may create optional unit MCARE-CUSTOM-id and are not included in TOR by default. Admin can manage catalog presets in LMS Modules.">
+          <mxGeometry x="40" y="900" width="1920" height="50" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="admit-pay" name="4. Admission · Enrollment · Payment">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1960" pageHeight="1070" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="b" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#0B3D2E;fontColor=#FFFFFF;strokeColor=none;fontSize=20;fontStyle=1;align=center;" value="MCARE Hub — Admission, Enrollment, and Payment Detail">
+          <mxGeometry x="40" y="16" width="1880" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="s" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#14532D;fontColor=#D1FAE5;strokeColor=none;fontSize=12;align=center;" value="Statuses, documents, and payment lifecycle used by the live routes and services.">
+          <mxGeometry x="40" y="64" width="1880" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="g1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 8;fillColor=#F8FAFC;strokeColor=#94A3B8;verticalAlign=top;align=left;fontStyle=1;fontSize=13;spacingLeft=12;spacingTop=6;fontColor=#334155;" value="A. AdmissionApplication">
+          <mxGeometry x="40" y="110" width="600" height="420" as="geometry" />
+        </mxCell>
+        <mxCell id="a1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F2FE;strokeColor=#0369A1;fontColor=#0C4A6E;fontSize=11;arcSize=8;" value="&lt;b&gt;Create /applications&lt;/b&gt;&lt;br&gt;Active TrainingProgram&lt;br&gt;Gmail required and unique&lt;br&gt;among pending/approved">
+          <mxGeometry x="60" y="160" width="260" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;Statuses&lt;/b&gt;&lt;br&gt;pending&lt;br&gt;approved&lt;br&gt;denied (notes required)">
+          <mxGeometry x="340" y="160" width="260" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="a3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F2FE;strokeColor=#0369A1;fontColor=#0C4A6E;fontSize=11;arcSize=8;" value="&lt;b&gt;Applicant tools&lt;/b&gt;&lt;br&gt;/applications/received&lt;br&gt;/applications/status lookup&lt;br&gt;Throttle: 3/min submit, search limiter">
+          <mxGeometry x="60" y="270" width="260" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="a4" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;Admin /admin/applications&lt;/b&gt;&lt;br&gt;Show · approve · deny · delete&lt;br&gt;SES review email on decision">
+          <mxGeometry x="340" y="270" width="260" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="a5" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;arcSize=8;" value="&lt;b&gt;Result of approve&lt;/b&gt;&lt;br&gt;Applicant unlocks /enrollment&lt;br&gt;with application_number">
+          <mxGeometry x="60" y="390" width="540" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="ae12" parent="1" edge="1" source="a1" target="a2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ae13" parent="1" edge="1" source="a1" target="a3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ae24" parent="1" edge="1" source="a2" target="a4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ae45" parent="1" edge="1" source="a4" target="a5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="g2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 8;fillColor=#F8FAFC;strokeColor=#94A3B8;verticalAlign=top;align=left;fontStyle=1;fontSize=13;spacingLeft=12;spacingTop=6;fontColor=#334155;" value="B. EnrollmentApplication packet">
+          <mxGeometry x="660" y="110" width="1260" height="420" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;arcSize=8;" value="&lt;b&gt;Unlock&lt;/b&gt;&lt;br&gt;POST /enrollment/unlock&lt;br&gt;Approved admission number">
+          <mxGeometry x="680" y="160" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;arcSize=8;" value="&lt;b&gt;Form fields&lt;/b&gt;&lt;br&gt;Batch + program&lt;br&gt;Personal / education / guardian&lt;br&gt;PSGC cascade address">
+          <mxGeometry x="930" y="160" width="240" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;arcSize=8;" value="&lt;b&gt;Required uploads&lt;/b&gt;&lt;br&gt;1 Birth certificate&lt;br&gt;2 Form 137/138 or diploma&lt;br&gt;3 Good moral&lt;br&gt;4 ID photo jpg/png&lt;br&gt;5 E-signature">
+          <mxGeometry x="1190" y="160" width="240" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;arcSize=8;" value="&lt;b&gt;On submit&lt;/b&gt;&lt;br&gt;Role = applicant&lt;br&gt;status = profile_submitted&lt;br&gt;Redirect /payment">
+          <mxGeometry x="1450" y="160" width="230" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#64748B;fontColor=#334155;fontSize=11;align=left;spacingLeft=10;" value="&lt;b&gt;Enrollment statuses&lt;/b&gt;&lt;br&gt;profile_submitted then (after pay) pre_enlistment then approved or denied&lt;br&gt;Learning: active · paused · graduated · withdrawn">
+          <mxGeometry x="680" y="320" width="500" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;Admin extras&lt;/b&gt;&lt;br&gt;TESDA registration PDF · document preview/content&lt;br&gt;Only review_released / payment-cleared rows enter the queue">
+          <mxGeometry x="1200" y="320" width="480" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ee12" parent="1" edge="1" source="e1" target="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ee23" parent="1" edge="1" source="e2" target="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ee34" parent="1" edge="1" source="e3" target="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="g3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 8;fillColor=#F8FAFC;strokeColor=#94A3B8;verticalAlign=top;align=left;fontStyle=1;fontSize=13;spacingLeft=12;spacingTop=6;fontColor=#334155;" value="C. Payment lifecycle">
+          <mxGeometry x="40" y="550" width="1880" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="c0" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;arcSize=8;" value="&lt;b&gt;Select method&lt;/b&gt;&lt;br&gt;/payment&lt;br&gt;enrollment.payment.access">
+          <mxGeometry x="60" y="600" width="210" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="c1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;arcSize=8;" value="&lt;b&gt;Online&lt;/b&gt;&lt;br&gt;PayMongoCheckoutService&lt;br&gt;GCash, card, QRPh&lt;br&gt;status online_pending">
+          <mxGeometry x="300" y="600" width="230" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="c2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;arcSize=8;" value="&lt;b&gt;Return routes&lt;/b&gt;&lt;br&gt;/payment/return&lt;br&gt;/payment/complete&lt;br&gt;/payment/cancel · /status">
+          <mxGeometry x="560" y="600" width="230" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="c3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;arcSize=8;" value="&lt;b&gt;On-site&lt;/b&gt;&lt;br&gt;Ticket / receipt&lt;br&gt;status onsite_pending&lt;br&gt;Cashier pay">
+          <mxGeometry x="300" y="720" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="c4" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;Admin verify&lt;/b&gt;&lt;br&gt;Store transaction&lt;br&gt;Verify + view proof&lt;br&gt;partially_paid or paid">
+          <mxGeometry x="560" y="720" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="c5" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D1FAE5;strokeColor=#047857;fontColor=#065F46;fontSize=11;arcSize=8;" value="&lt;b&gt;EnrollmentPaymentLifecycle&lt;/b&gt;&lt;br&gt;If clearance OK:&lt;br&gt;• notify once&lt;br&gt;• profile_submitted to pre_enlistment&lt;br&gt;• set review_released_at&lt;br&gt;• SES receipt + admin notify">
+          <mxGeometry x="820" y="630" width="300" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="c6" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CCFBF1;strokeColor=#0F766E;fontColor=#134E4A;fontSize=11;arcSize=8;" value="&lt;b&gt;Trainee later payments&lt;/b&gt;&lt;br&gt;/trainee/payments&lt;br&gt;Upload proof&lt;br&gt;Generate onsite ticket&lt;br&gt;Balance still visible after enlistment">
+          <mxGeometry x="1150" y="630" width="280" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="c7" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#64748B;fontColor=#334155;fontSize=11;align=left;spacingLeft=10;" value="&lt;b&gt;Keys / notes&lt;/b&gt;&lt;br&gt;PAYMONGO env · live vs test&lt;br&gt;No live webhook in current routes&lt;br&gt;Applicant must return to MCARE for retrieve&lt;br&gt;Fee defaults 22000 / DP 2000">
+          <mxGeometry x="1460" y="630" width="300" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="ce01" parent="1" edge="1" source="c0" target="c1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" value="Online">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ce12" parent="1" edge="1" source="c1" target="c2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ce03" parent="1" edge="1" source="c0" target="c3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" value="On-site">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ce34" parent="1" edge="1" source="c3" target="c4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ce25" parent="1" edge="1" source="c2" target="c5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ce45" parent="1" edge="1" source="c4" target="c5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="foot" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#64748B;fontColor=#334155;fontSize=11;align=left;spacingLeft=10;" value="Payment alone does not open /trainee. Admin must still accept documents and approve enrollment. Denied applicants are sent back to enrollment.create via AccountPortal.">
+          <mxGeometry x="40" y="1000" width="1880" height="44" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="grad-career" name="5. Graduation · Docs · Career Hub">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1960" pageHeight="860" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="b" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#0B3D2E;fontColor=#FFFFFF;strokeColor=none;fontSize=20;fontStyle=1;align=center;" value="MCARE Hub — Graduation, Documents, and Career Hub">
+          <mxGeometry x="40" y="16" width="1880" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="s" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#14532D;fontColor=#D1FAE5;strokeColor=none;fontSize=12;align=center;" value="How a trainee becomes a graduate and how jobs / SMS / official PDFs work.">
+          <mxGeometry x="40" y="64" width="1880" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="g1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 8;fillColor=#F8FAFC;strokeColor=#94A3B8;verticalAlign=top;align=left;fontStyle=1;fontSize=13;spacingLeft=12;spacingTop=6;fontColor=#334155;" value="A. Eligibility (all must pass)">
+          <mxGeometry x="40" y="110" width="620" height="420" as="geometry" />
+        </mxCell>
+        <mxCell id="el" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;CompletionEligibilityService&lt;/b&gt;&lt;br&gt;1. Enrollment status = approved&lt;br&gt;2. Payment status = paid&lt;br&gt;3. Rolling training started (learning_started_at)&lt;br&gt;4. All required CORE competency units = competent&lt;br&gt;5. All required outcomes = competent&lt;br&gt;6. Required core modules trainer-validated&lt;br&gt;7. Every published module quiz passed">
+          <mxGeometry x="60" y="160" width="580" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="el2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#64748B;fontColor=#334155;fontSize=11;align=left;spacingLeft=10;" value="Admin can still expedite administrative graduation when permitted. Statuses: active / paused / graduated / withdrawn.">
+          <mxGeometry x="60" y="420" width="580" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="g2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 8;fillColor=#F8FAFC;strokeColor=#94A3B8;verticalAlign=top;align=left;fontStyle=1;fontSize=13;spacingLeft=12;spacingTop=6;fontColor=#334155;" value="B. Official documents">
+          <mxGeometry x="680" y="110" width="620" height="420" as="geometry" />
+        </mxCell>
+        <mxCell id="od1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D1FAE5;strokeColor=#047857;fontColor=#065F46;fontSize=11;arcSize=8;" value="&lt;b&gt;Generate&lt;/b&gt;&lt;br&gt;COTC and/or TOR&lt;br&gt;OfficialDocumentManager&lt;br&gt;Browsershot + Chrome">
+          <mxGeometry x="700" y="160" width="270" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="od2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D1FAE5;strokeColor=#047857;fontColor=#065F46;fontSize=11;arcSize=8;" value="&lt;b&gt;Release&lt;/b&gt;&lt;br&gt;Trainee can view/download&lt;br&gt;only after release">
+          <mxGeometry x="990" y="160" width="270" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="od3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;Reissue / preview&lt;/b&gt;&lt;br&gt;Admin preview + download&lt;br&gt;Batch TOR export job">
+          <mxGeometry x="700" y="280" width="270" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="od4" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#64748B;fontColor=#334155;fontSize=11;align=left;spacingLeft=10;" value="&lt;b&gt;Hours / signatories&lt;/b&gt;&lt;br&gt;Default caregiving hours: 786&lt;br&gt;Trainer + registrar signatory env">
+          <mxGeometry x="990" y="280" width="270" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="ode12" parent="1" edge="1" source="od1" target="od2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ode13" parent="1" edge="1" source="od1" target="od3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#64748B;strokeWidth=1.2;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="g3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 8;fillColor=#F8FAFC;strokeColor=#94A3B8;verticalAlign=top;align=left;fontStyle=1;fontSize=13;spacingLeft=12;spacingTop=6;fontColor=#334155;" value="C. Career Hub">
+          <mxGeometry x="1320" y="110" width="600" height="420" as="geometry" />
+        </mxCell>
+        <mxCell id="ch1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;Admin posts job&lt;/b&gt;&lt;br&gt;/admin learning alumni-jobs&lt;br&gt;Publish caregiving opportunity">
+          <mxGeometry x="1340" y="160" width="270" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ch2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;arcSize=8;" value="&lt;b&gt;SMS mode&lt;/b&gt;&lt;br&gt;none · immediate queue&lt;br&gt;scheduled (every minute cron)">
+          <mxGeometry x="1630" y="160" width="260" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ch3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D1FAE5;strokeColor=#047857;fontColor=#065F46;fontSize=11;arcSize=8;" value="&lt;b&gt;Graduate&lt;/b&gt;&lt;br&gt;Set availability&lt;br&gt;Browse jobs&lt;br&gt;Send contact inquiry">
+          <mxGeometry x="1340" y="270" width="270" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="ch4" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;Admin inquiry desk&lt;/b&gt;&lt;br&gt;Update status / notes&lt;br&gt;Delete if needed">
+          <mxGeometry x="1630" y="270" width="260" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="che12" parent="1" edge="1" source="ch1" target="ch2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#64748B;strokeWidth=1.2;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="che13" parent="1" edge="1" source="ch1" target="ch3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="che34" parent="1" edge="1" source="ch3" target="ch4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="g4" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 8;fillColor=#F8FAFC;strokeColor=#94A3B8;verticalAlign=top;align=left;fontStyle=1;fontSize=13;spacingLeft=12;spacingTop=6;fontColor=#334155;" value="D. Historical alumni claim (joins as already-graduated)">
+          <mxGeometry x="40" y="550" width="1880" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="h1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF7ED;strokeColor=#C2410C;fontColor=#7C2D12;fontSize=11;arcSize=8;" value="&lt;b&gt;1. /alumni/claim&lt;/b&gt;&lt;br&gt;Identity, address,&lt;br&gt;training year, evidence">
+          <mxGeometry x="60" y="600" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="h2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF7ED;strokeColor=#C2410C;fontColor=#7C2D12;fontSize=11;arcSize=8;" value="&lt;b&gt;2. Verify email&lt;/b&gt;&lt;br&gt;Claim stays locked&lt;br&gt;until checks finish">
+          <mxGeometry x="340" y="600" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="h3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;3. Onsite / admin&lt;/b&gt;&lt;br&gt;Identity + archive evidence&lt;br&gt;/admin/historical-alumni">
+          <mxGeometry x="600" y="600" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="h4" parent="1" vertex="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;fontStyle=1;" value="Approve?">
+          <mxGeometry x="900" y="590" width="140" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="h5" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D1FAE5;strokeColor=#047857;fontColor=#065F46;fontSize=11;arcSize=8;" value="&lt;b&gt;Approved&lt;/b&gt;&lt;br&gt;Graduated enrollment created&lt;br&gt;Career Hub unlocks">
+          <mxGeometry x="1080" y="600" width="260" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="h6" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;Rejected&lt;/b&gt;&lt;br&gt;Notes recorded&lt;br&gt;Portal remains locked">
+          <mxGeometry x="1380" y="600" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="h7" parent="1" vertex="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#1E293B;fontColor=#FFFFFF;strokeColor=#0F172A;fontStyle=1;fontSize=12;" value="End">
+          <mxGeometry x="1680" y="618" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="he12" parent="1" edge="1" source="h1" target="h2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="he23" parent="1" edge="1" source="h2" target="h3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="he34" parent="1" edge="1" source="h3" target="h4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="he45" parent="1" edge="1" source="h4" target="h5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="he46" parent="1" edge="1" source="h4" target="h6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#B91C1C;strokeWidth=1.4;" value="No">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="he67" parent="1" edge="1" source="h6" target="h7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="hn" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#64748B;fontColor=#334155;fontSize=11;align=left;spacingLeft=10;" value="Approved historical alumni skip the LMS loop. They receive graduate access (documents, grades, Career Hub) on the same trainee layout. Legacy /alumni URLs still render Career Hub.">
+          <mxGeometry x="60" y="720" width="1570" height="60" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="auth-roles" name="6. Auth · Roles · Integrations">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1960" pageHeight="930" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="b" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#0B3D2E;fontColor=#FFFFFF;strokeColor=none;fontSize=20;fontStyle=1;align=center;" value="MCARE Hub — Authentication, Roles, Portals, and Integrations">
+          <mxGeometry x="40" y="16" width="1880" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="s" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#14532D;fontColor=#D1FAE5;strokeColor=none;fontSize=12;align=center;" value="Who can enter which portal, and which third-party service is called.">
+          <mxGeometry x="40" y="64" width="1880" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="g1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 8;fillColor=#F8FAFC;strokeColor=#94A3B8;verticalAlign=top;align=left;fontStyle=1;fontSize=13;spacingLeft=12;spacingTop=6;fontColor=#334155;" value="A. Login decision">
+          <mxGeometry x="40" y="110" width="920" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="l0" parent="1" vertex="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#0B6E4F;fontColor=#FFFFFF;strokeColor=#064E3B;fontStyle=1;fontSize=12;" value="Open /login">
+          <mxGeometry x="70" y="160" width="160" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="l1" parent="1" vertex="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;fontStyle=1;" value="Account type?">
+          <mxGeometry x="280" y="140" width="160" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="l2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;Admin / Trainer&lt;/b&gt;&lt;br&gt;Email + password only&lt;br&gt;Google is blocked">
+          <mxGeometry x="500" y="130" width="220" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="l3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CCFBF1;strokeColor=#0F766E;fontColor=#134E4A;fontSize=11;arcSize=8;" value="&lt;b&gt;Trainee / Applicant / Graduate&lt;/b&gt;&lt;br&gt;Password or Google OAuth&lt;br&gt;Links google_id · may verify email">
+          <mxGeometry x="500" y="230" width="280" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="l4" parent="1" vertex="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;fontStyle=1;" value="&lt;b&gt;Email verified?&lt;/b&gt;">
+          <mxGeometry x="800" y="140" width="130" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="l5" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;arcSize=8;" value="&lt;b&gt;Optional email 2FA&lt;/b&gt;&lt;br&gt;6-digit code · config roles&lt;br&gt;Current code exempts admin">
+          <mxGeometry x="70" y="330" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="l6" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;arcSize=8;" value="&lt;b&gt;AccountPortal&lt;/b&gt;&lt;br&gt;Send to role dashboard&lt;br&gt;Applicant with enrollment to payment&lt;br&gt;Denied applicant to enrollment form&lt;br&gt;Awaiting approval: blocked from LMS">
+          <mxGeometry x="360" y="330" width="320" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="le01" parent="1" edge="1" source="l0" target="l1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="le12" parent="1" edge="1" source="l1" target="l2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" value="Staff">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="le13" parent="1" edge="1" source="l1" target="l3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;" value="Learner">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="le24" parent="1" edge="1" source="l2" target="l4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="le34" parent="1" edge="1" source="l3" target="l4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="le45" parent="1" edge="1" source="l4" target="l5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;dashPattern=8 8;strokeColor=#64748B;strokeWidth=1.2;" value="If enabled">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="le46" parent="1" edge="1" source="l4" target="l6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#047857;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="le56" parent="1" edge="1" source="l5" target="l6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#334155;strokeWidth=1.4;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="g2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 8;fillColor=#F8FAFC;strokeColor=#94A3B8;verticalAlign=top;align=left;fontStyle=1;fontSize=13;spacingLeft=12;spacingTop=6;fontColor=#334155;" value="B. Role to portal to permissions">
+          <mxGeometry x="980" y="110" width="940" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="r1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#B91C1C;fontColor=#7F1D1D;fontSize=11;arcSize=8;" value="&lt;b&gt;admin to /admin&lt;/b&gt;&lt;br&gt;enrollments.review · payments.verify&lt;br&gt;schedules · trainees · modules&lt;br&gt;official-documents · accounts&lt;br&gt;logs · alumni.jobs.manage">
+          <mxGeometry x="1000" y="160" width="280" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="r2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E8FF;strokeColor=#7E22CE;fontColor=#581C87;fontSize=11;arcSize=8;" value="&lt;b&gt;trainer to /trainer&lt;/b&gt;&lt;br&gt;modules.publish · quizzes.manage&lt;br&gt;trainees.view/export&lt;br&gt;competencies.assess&lt;br&gt;announcements.manage">
+          <mxGeometry x="1300" y="160" width="280" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="r3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CCFBF1;strokeColor=#0F766E;fontColor=#134E4A;fontSize=11;arcSize=8;" value="&lt;b&gt;trainee to /trainee&lt;/b&gt;&lt;br&gt;modules.view · quizzes.take&lt;br&gt;progress.update · payments.view&lt;br&gt;documents / cotc.download&lt;br&gt;alumni.jobs.view after graduate">
+          <mxGeometry x="1000" y="310" width="280" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="r4" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#B45309;fontColor=#78350F;fontSize=11;arcSize=8;" value="&lt;b&gt;applicant&lt;/b&gt;&lt;br&gt;enrollment.submit · payments.view&lt;br&gt;No LMS until approved&lt;br&gt;&lt;b&gt;alumni (legacy)&lt;/b&gt; uses trainee layout">
+          <mxGeometry x="1300" y="310" width="280" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="g3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 8;fillColor=#F8FAFC;strokeColor=#94A3B8;verticalAlign=top;align=left;fontStyle=1;fontSize=13;spacingLeft=12;spacingTop=6;fontColor=#334155;" value="C. Third-party integrations">
+          <mxGeometry x="40" y="560" width="1880" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="i1" parent="1" vertex="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;" value="&lt;b&gt;PayMongo&lt;/b&gt;&lt;br&gt;Enrollment checkout&lt;br&gt;GCash / card / QRPh&lt;br&gt;Retrieve on return">
+          <mxGeometry x="60" y="620" width="270" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="i2" parent="1" vertex="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;" value="&lt;b&gt;Amazon SES&lt;/b&gt;&lt;br&gt;Admission, payment,&lt;br&gt;2FA, credentials,&lt;br&gt;LMS / Career mail">
+          <mxGeometry x="370" y="620" width="270" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="i3" parent="1" vertex="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;" value="&lt;b&gt;Google OAuth&lt;/b&gt;&lt;br&gt;Socialite for non-staff&lt;br&gt;/auth/google&lt;br&gt;Staff blocked">
+          <mxGeometry x="680" y="620" width="270" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="i4" parent="1" vertex="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;" value="&lt;b&gt;PSGC API&lt;/b&gt;&lt;br&gt;PH address cascade&lt;br&gt;enrollment forms">
+          <mxGeometry x="990" y="620" width="270" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="i5" parent="1" vertex="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;" value="&lt;b&gt;Semaphore SMS&lt;/b&gt;&lt;br&gt;Career job alerts&lt;br&gt;immediate or scheduled">
+          <mxGeometry x="1300" y="620" width="270" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="i6" parent="1" vertex="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#475569;fontColor=#334155;fontSize=11;" value="&lt;b&gt;Browsershot&lt;/b&gt;&lt;br&gt;COTC / TOR PDFs&lt;br&gt;Node + Chrome">
+          <mxGeometry x="1610" y="620" width="270" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="st" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#64748B;fontColor=#334155;fontSize=11;align=left;spacingLeft=10;" value="&lt;b&gt;Stack:&lt;/b&gt; Laravel 12 · Vite + Tailwind 4 · Spatie Permission · MySQL/SQLite · database queue · OpenSpout Excel · FPDF/FPDI watermark · timezone Asia/Manila">
+          <mxGeometry x="40" y="860" width="1880" height="44" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

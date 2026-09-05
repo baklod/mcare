@@ -22,6 +22,7 @@ class PublicUpdateTest extends TestCase
             ->assertOk()
             ->assertSee('Public Settings')
             ->assertSee('Social media links')
+            ->assertDontSee('TESDA form registrar')
             ->assertSee('Add Facebook update')
             ->assertSee('data-public-update-dialog', false);
 

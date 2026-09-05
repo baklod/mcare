@@ -10,17 +10,14 @@
     $resolvedUser = $user ?: $application?->user;
     $displayName = trim((string) ($name ?: $resolvedUser?->name ?: $resolvedUser?->email ?: 'MCARE User'));
     $initial = \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($displayName, 0, 1));
-    $candidateUrl = trim((string) ($src ?: $resolvedUser?->profilePhotoUrl() ?? ''));
-
-    if (
-        $candidateUrl === ''
-        && $useEnrollmentPhoto
+    $enrollmentPhotoUrl = (
+        $useEnrollmentPhoto
         && $resolvedUser
         && filled($application?->id_photo_path)
         && auth()->user()?->role === 'admin'
-    ) {
-        $candidateUrl = route('admin.accounts.photo', $resolvedUser, absolute: false);
-    }
+    ) ? route('admin.accounts.photo', $resolvedUser, absolute: false) : '';
+
+    $candidateUrl = trim((string) ($src ?: $enrollmentPhotoUrl ?: $resolvedUser?->profilePhotoUrl() ?? ''));
 
     $isSafeRelativeUrl = \Illuminate\Support\Str::startsWith($candidateUrl, '/')
         && ! \Illuminate\Support\Str::startsWith($candidateUrl, '//');

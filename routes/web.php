@@ -125,6 +125,11 @@ Route::middleware('throttle:global-web')->group(function () {
             Route::patch('/password', [AccountSettingsController::class, 'updatePassword'])
                 ->middleware('throttle:sensitive-mutation')
                 ->name('password.update');
+            Route::patch('/registrar', [AccountSettingsController::class, 'updateRegistrar'])
+                ->middleware('throttle:sensitive-mutation')
+                ->name('registrar.update');
+            Route::get('/registrar-signature', [AccountSettingsController::class, 'registrarSignature'])
+                ->name('registrar.signature');
             Route::post('/security-event', [AccountSettingsController::class, 'securityEvent'])
                 ->middleware('throttle:sensitive-mutation')
                 ->name('security-event');

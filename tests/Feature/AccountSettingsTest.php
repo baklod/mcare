@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
+use App\Models\PublicSiteSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -44,7 +45,7 @@ class AccountSettingsTest extends TestCase
                 'avatar_url' => $avatarUrl,
             ]);
 
-            $this->actingAs($user)
+            $settings = $this->actingAs($user)
                 ->get(route('account.settings'))
                 ->assertOk()
                 ->assertSee('Night mode')
@@ -54,6 +55,12 @@ class AccountSettingsTest extends TestCase
                 ->assertSee('data-dashboard-role="'.$role.'"', false)
                 ->assertDontSee('Back to dashboard')
                 ->assertSee($avatarUrl, false);
+
+            if ($role === 'admin') {
+                $settings->assertSee('TESDA form registrar');
+            } else {
+                $settings->assertDontSee('TESDA form registrar');
+            }
 
             $this->actingAs($user)
                 ->get(route('account.help'))
@@ -187,5 +194,93 @@ class AccountSettingsTest extends TestCase
             ->assertSee('Help')
             ->assertDontSee(route('account.settings').'#change-password', false)
             ->assertDontSee('data-dashboard-notifications', false);
+    }
+
+    public function test_admin_can_save_a_drawn_registrar_signature_for_the_tesda_form(): void
+    {
+        Storage::fake('local');
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->from(route('account.settings'))
+            ->patch(route('account.registrar.update'), [
+                'registrar_name' => 'Salvacion A. Collao',
+                'registrar_signature_type' => 'draw',
+                'registrar_signature_data' => $this->pngDataUrl(),
+            ])
+            ->assertRedirect(route('account.settings').'#tesda-registrar')
+            ->assertSessionHas('saved', 'TESDA form registrar name and signature saved.');
+
+        $settings = PublicSiteSetting::query()->firstOrFail();
+        $this->assertSame('Salvacion A. Collao', $settings->registrar_name);
+        $this->assertSame('draw', $settings->registrar_signature_type);
+        $this->assertTrue($settings->hasRegistrarSignature());
+
+        $this->actingAs($admin)
+            ->get(route('account.registrar.signature'))
+            ->assertOk()
+            ->assertHeader('content-type', 'image/png');
+    }
+
+    public function test_admin_can_save_an_uploaded_registrar_signature(): void
+    {
+        Storage::fake('local');
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->patch(route('account.registrar.update'), [
+                'registrar_name' => 'Maria Santos',
+                'registrar_signature_type' => 'upload',
+                'registrar_signature_upload' => UploadedFile::fake()->image('registrar.png', 240, 80),
+            ])
+            ->assertRedirect(route('account.settings').'#tesda-registrar')
+            ->assertSessionHas('saved');
+
+        $settings = PublicSiteSetting::query()->firstOrFail();
+        $this->assertSame('Maria Santos', $settings->registrar_name);
+        $this->assertSame('upload', $settings->registrar_signature_type);
+        $this->assertTrue($settings->hasRegistrarSignature());
+    }
+
+    public function test_non_admin_cannot_save_the_tesda_registrar_signature(): void
+    {
+        $trainer = User::factory()->create(['role' => 'trainer']);
+
+        $this->actingAs($trainer)
+            ->patch(route('account.registrar.update'), [
+                'registrar_name' => 'Salvacion A. Collao',
+                'registrar_signature_type' => 'draw',
+                'registrar_signature_data' => $this->pngDataUrl(),
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_admin_cannot_save_a_registrar_without_a_signature(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->from(route('account.settings'))
+            ->patch(route('account.registrar.update'), [
+                'registrar_name' => 'Salvacion A. Collao',
+                'registrar_signature_type' => 'draw',
+            ])
+            ->assertRedirect(route('account.settings'))
+            ->assertSessionHasErrorsIn('registrar', 'registrar_signature_data');
+
+        $this->assertDatabaseCount('public_site_settings', 0);
+    }
+
+    private function pngDataUrl(): string
+    {
+        $image = imagecreatetruecolor(120, 40);
+        imagefilledrectangle($image, 0, 0, 120, 40, imagecolorallocate($image, 255, 255, 255));
+        imageline($image, 8, 28, 110, 12, imagecolorallocate($image, 20, 20, 20));
+        ob_start();
+        imagepng($image);
+        $bytes = (string) ob_get_clean();
+        imagedestroy($image);
+
+        return 'data:image/png;base64,'.base64_encode($bytes);
     }
 }

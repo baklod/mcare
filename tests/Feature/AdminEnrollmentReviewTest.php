@@ -239,6 +239,64 @@ class AdminEnrollmentReviewTest extends TestCase
         $this->assertStringContainsString('attachment;', (string) $download->headers->get('Content-Disposition'));
     }
 
+    public function test_tesda_registration_form_embeds_the_id_photo_and_signature(): void
+    {
+        Storage::fake('local');
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->create(['role' => 'trainee']);
+        $applicant->forceFill([
+            'profile_photo_path' => 'avatars/'.$applicant->id.'/missing.png',
+        ])->save();
+        $photoPath = 'enrollment-documents/'.$applicant->id.'/id-photo.png';
+        $signaturePath = 'enrollment-documents/'.$applicant->id.'/signature.png';
+        $this->storeTesdaJpeg($photoPath, 320, 240);
+        $this->storeTesdaSignaturePng($signaturePath);
+
+        $application = EnrollmentApplication::create([
+            'user_id' => $applicant->id,
+            'email' => $applicant->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => 'John Lloyd',
+            'last_name' => 'Blanquera',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Male',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'street' => '123 Training Street',
+            'barangay' => 'Central',
+            'city' => 'Pili',
+            'province' => 'Camarines Sur',
+            'zip_code' => '4418',
+            'educational_attainment' => 'College Graduate',
+            'school_name' => 'MCARE College',
+            'year_graduated' => 2022,
+            'privacy_consent' => true,
+            'id_photo_path' => $photoPath,
+            'signature_path' => $signaturePath,
+            'signature_type' => 'draw',
+            'status' => EnrollmentApplication::STATUS_APPROVED,
+            'review_released_at' => now(),
+        ]);
+
+        $photoUrl = route('admin.accounts.photo', $applicant, absolute: false);
+
+        $this->actingAs($admin)
+            ->get(route('admin.enrollments.show', $application))
+            ->assertOk()
+            ->assertSee($photoUrl, false)
+            ->assertDontSee('/storage/'.$applicant->profile_photo_path, false);
+
+        $preview = $this->actingAs($admin)->get(route('admin.enrollments.tesda-form', [
+            $application,
+            'disposition' => 'inline',
+        ]));
+
+        $preview->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF-', $preview->getContent());
+        $this->assertStringContainsString('/DCTDecode', $preview->getContent());
+        $this->assertGreaterThanOrEqual(3, preg_match_all('/\/Subtype\s*\/Image/', $preview->getContent()));
+    }
+
     public function test_non_admin_cannot_generate_tesda_registration_form(): void
     {
         $applicant = User::factory()->create(['role' => 'applicant']);
@@ -702,5 +760,31 @@ class AdminEnrollmentReviewTest extends TestCase
             'payment_verified_at' => now(),
             'review_released_at' => now(),
         ]);
+    }
+
+    private function storeTesdaJpeg(string $path, int $width, int $height): void
+    {
+        $image = imagecreatetruecolor($width, $height);
+        imagefilledrectangle($image, 0, 0, $width, $height, imagecolorallocate($image, 30, 90, 180));
+        ob_start();
+        imagejpeg($image, null, 90);
+        Storage::disk('local')->put($path, (string) ob_get_clean());
+        imagedestroy($image);
+    }
+
+    private function storeTesdaSignaturePng(string $path): void
+    {
+        $image = imagecreatetruecolor(240, 80);
+        imagealphablending($image, false);
+        imagesavealpha($image, true);
+        imagefilledrectangle($image, 0, 0, 240, 80, imagecolorallocatealpha($image, 0, 0, 0, 127));
+        imagealphablending($image, true);
+        $ink = imagecolorallocate($image, 20, 20, 20);
+        imageline($image, 12, 60, 90, 18, $ink);
+        imageline($image, 90, 18, 228, 58, $ink);
+        ob_start();
+        imagepng($image);
+        Storage::disk('local')->put($path, (string) ob_get_clean());
+        imagedestroy($image);
     }
 }

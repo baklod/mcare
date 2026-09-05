@@ -192,7 +192,7 @@
             <section class="border border-slate-200 bg-white p-6">
                 <p class="text-xs font-bold uppercase tracking-wider text-purple-700">Official TESDA form</p>
                 <h2 class="mt-2 text-xl font-bold text-slate-950">Registration Form MIS 03-01</h2>
-                <p class="mt-3 text-sm leading-6 text-slate-600">Applicant answers, ID photo, and e-signature are placed on the original two-page TESDA form.</p>
+                <p class="mt-3 text-sm leading-6 text-slate-600">Applicant answers, ID photo, and e-signature are placed on the original two-page TESDA form. The registrar name and signature come from <a href="{{ route('account.settings') }}#tesda-registrar" class="font-semibold text-purple-700 hover:text-purple-800">Settings</a>.</p>
                 <div class="mt-5 grid grid-cols-1 gap-3">
                     <a href="{{ route('admin.enrollments.tesda-form', [$application, 'disposition' => 'inline']) }}" target="_blank" rel="noopener" class="primary-action w-full text-center">
                         Preview / Print form

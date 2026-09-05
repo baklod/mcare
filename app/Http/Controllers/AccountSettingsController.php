@@ -3,13 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Models\AdminActivityLog;
+use App\Models\PublicSiteSetting;
 use App\Services\ProfilePhotoStore;
 use App\Support\AccountPortal;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\HeaderUtils;
+use Symfony\Component\HttpFoundation\Response;
 
 class AccountSettingsController extends Controller
 {
@@ -88,6 +94,54 @@ class AccountSettingsController extends Controller
         return back()->with('saved', 'Your profile photo has been updated.');
     }
 
+    public function updateRegistrar(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin($request);
+
+        $validated = $this->validatedRegistrar($request, PublicSiteSetting::current());
+        $settings = PublicSiteSetting::instance();
+        $previousPath = $settings->registrar_signature_path;
+        $signaturePath = $this->storeRegistrarSignature($request, $settings);
+        $before = $settings->only(['registrar_name', 'registrar_signature_type']);
+
+        $settings->update([
+            'registrar_name' => $validated['registrar_name'],
+            'registrar_signature_type' => $validated['registrar_signature_type'],
+            'registrar_signature_path' => $signaturePath,
+        ]);
+
+        AdminActivityLog::record($request->user(), 'account.registrar.updated', $settings, [
+            'before' => $before,
+            'after' => $settings->fresh()->only(['registrar_name', 'registrar_signature_type']),
+            'signature_replaced' => $signaturePath !== $previousPath,
+        ]);
+
+        return redirect()
+            ->to(route('account.settings').'#tesda-registrar')
+            ->with('saved', 'TESDA form registrar name and signature saved.');
+    }
+
+    public function registrarSignature(Request $request): BinaryFileResponse
+    {
+        $this->ensureAdmin($request);
+
+        $settings = PublicSiteSetting::current();
+        abort_unless($settings->hasRegistrarSignature(), 404);
+
+        $path = (string) $settings->registrar_signature_path;
+        $filename = basename($path);
+        $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
+        $mime = Storage::disk('local')->mimeType($path) ?: 'application/octet-stream';
+        abort_unless(str_starts_with((string) $mime, 'image/'), 404);
+
+        return response()->file(Storage::disk('local')->path($path), [
+            'Content-Type' => $mime,
+            'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_INLINE, $filename, $fallbackFilename),
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
     /**
      * Record a small allow-listed set of client-visible abuse signals.
      *
@@ -122,6 +176,98 @@ class AccountSettingsController extends Controller
             'user' => $request->user(),
             'roleLabel' => AccountPortal::roleLabelFor($request->user()),
             'portalUrl' => $portalUrl,
+            'siteSettings' => $request->user()?->role === 'admin' ? PublicSiteSetting::current() : null,
         ];
+    }
+
+    private function ensureAdmin(Request $request): void
+    {
+        abort_unless($request->user()?->role === 'admin', 403);
+    }
+
+    /** @return array{registrar_name: string, registrar_signature_type: string} */
+    private function validatedRegistrar(Request $request, PublicSiteSetting $settings): array
+    {
+        $request->merge([
+            'registrar_name' => trim((string) $request->input('registrar_name')),
+        ]);
+
+        $hasSavedSignature = $settings->hasRegistrarSignature();
+
+        $validated = $request->validateWithBag('registrar', [
+            'registrar_name' => ['required', 'string', 'max:180', 'not_regex:/[<>"`;{}|\\\\]/u'],
+            'registrar_signature_type' => ['required', Rule::in(['draw', 'upload'])],
+            'registrar_signature_data' => [
+                'exclude_unless:registrar_signature_type,draw',
+                $hasSavedSignature ? 'nullable' : 'required',
+                'string',
+            ],
+            'registrar_signature_upload' => [
+                'exclude_unless:registrar_signature_type,upload',
+                $hasSavedSignature ? 'nullable' : 'required',
+                'file',
+                'mimes:jpg,jpeg,png',
+                'extensions:jpg,jpeg,png',
+                'max:5120',
+            ],
+        ], [
+            'not_regex' => 'This field contains characters that are not allowed for security reasons.',
+            'registrar_signature_data.required' => 'Draw the registrar signature before saving.',
+            'registrar_signature_upload.required' => 'Upload a registrar signature image before saving.',
+        ]);
+
+        return [
+            'registrar_name' => $validated['registrar_name'],
+            'registrar_signature_type' => $validated['registrar_signature_type'],
+        ];
+    }
+
+    private function storeRegistrarSignature(Request $request, PublicSiteSetting $settings): ?string
+    {
+        $existingPath = $settings->hasRegistrarSignature() ? $settings->registrar_signature_path : null;
+
+        if ($request->input('registrar_signature_type') === 'upload') {
+            if (! $request->hasFile('registrar_signature_upload')) {
+                return $existingPath;
+            }
+
+            $path = $request->file('registrar_signature_upload')->store('organization-assets', 'local');
+            $this->forgetRegistrarSignature($existingPath, $path);
+
+            return $path;
+        }
+
+        $signatureData = $request->input('registrar_signature_data');
+
+        if (! is_string($signatureData) || $signatureData === '') {
+            return $existingPath;
+        }
+
+        if (! str_starts_with($signatureData, 'data:image/png;base64,')) {
+            throw ValidationException::withMessages([
+                'registrar_signature_data' => 'Draw the registrar signature before saving.',
+            ])->errorBag('registrar');
+        }
+
+        $decodedSignature = base64_decode(substr($signatureData, strlen('data:image/png;base64,')), true);
+
+        if (! $decodedSignature || strlen($decodedSignature) > 5 * 1024 * 1024) {
+            throw ValidationException::withMessages([
+                'registrar_signature_data' => 'The drawn signature could not be saved. Please clear and draw it again.',
+            ])->errorBag('registrar');
+        }
+
+        $path = 'organization-assets/registrar-signature-'.now()->format('YmdHis').'.png';
+        Storage::disk('local')->put($path, $decodedSignature);
+        $this->forgetRegistrarSignature($existingPath, $path);
+
+        return $path;
+    }
+
+    private function forgetRegistrarSignature(?string $existingPath, string $newPath): void
+    {
+        if ($existingPath && $existingPath !== $newPath && Storage::disk('local')->exists($existingPath)) {
+            Storage::disk('local')->delete($existingPath);
+        }
     }
 }

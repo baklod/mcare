@@ -338,6 +338,7 @@ class EnrollmentReviewController extends Controller
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => $disposition.'; filename="'.$filename.'"',
             'Content-Length' => (string) strlen($pdf),
+            'Cache-Control' => 'private, no-store',
             'X-Content-Type-Options' => 'nosniff',
         ]);
     }
